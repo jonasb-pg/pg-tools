@@ -15,6 +15,7 @@ Analyse Tool von Pretty Good: geführte Prüfung von Retouren am Analyseplatz, m
 | `docs/secrets.md` | Wo Schlüssel liegen (nie Werte) |
 | `docs/matchmaker.md` | Matchmaker Sheet, Script, Integration |
 | `docs/betrieb.md` | Einspielen, Go-live, Kosten, Tests |
+| `docs/standardablauf.md` | Ablauf am Analyseplatz (gleich wie Projekt-Doc «analyse-tool-standardablauf») |
 | `docs/entscheide.md` | Entscheid-Log |
 | `data/` | Snapshot Einstellungen, extrahierte Code-Fakten |
 | `tools/` | `extract.js` + `gen.py`: erzeugte Doku neu bauen |
