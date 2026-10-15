@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-15.11` (Test, nicht live). Live: Bereitstellung Version 7.
+Stand: Version `2026-10-15.12` (Test, nicht live). Live: Bereitstellung Version 7.
 
 ## Komponenten
 
@@ -33,7 +33,7 @@ Analyseplatz: Scan --> starteAnalyse --> ueberblick_ (Recherche + Handbuch + Stu
              sonst Ricardo (Fotos per QR/Handy --> RICARDO FOTOS, ricardoText --> Claude) | Regal Analysiert
   abschliessen --> Analysen, Prüfschritte, Testmittel-Log, Ricardo, Produkte.Analyse-Status = Erledigt, Vermerk im Matchmaker Sheet
 Wiedereinstieg: Scan PG-ID mit Regal Matchmaker --> matchmakerZurueck --> Entscheid --> Analysen-Zeile nachführen
-Werkstatt (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSpeichern --> Testkonten, kontenAbgleich_ --> Testmittel «Testkonto Google/Apple-ID/Amazon» = Ja/Nein; mittelSpeichern --> Testmittel
+Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSpeichern --> Testkonten, kontenAbgleich_ --> Testmittel «Testkonto Google/Apple-ID/Amazon» = Ja/Nein; mittelSpeichern --> Testmittel
 ```
 
 ## Auslöser (Trigger)

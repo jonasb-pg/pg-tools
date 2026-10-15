@@ -8,7 +8,7 @@ Regel: Im Repo stehen nur **Name und Ort** eines Geheimnisses, nie der Wert.
 | `CLAUDE_API_KEY` | Matchmaker-Script: Script-Properties, gesetzt über Menü «Claude-Schlüssel setzen» | Jonas | `suche_` → `frageClaude_` |
 | Icecat-Benutzername | Sheet Einstellungen | Jonas | `icecatUrl_()`; heute offener Zugang `openIcecat-live`, vor Dauerbetrieb eigenes Konto |
 | Test-WLAN Passwort | Sheet Einstellungen | Team | Anzeige im Schritt Funktion |
-| Testkonten (Google, Apple-ID, Amazon, Hersteller-Apps) | Tab «Testkonten» im ANALYSE TOOL Sheet, gepflegt im Admin-Bereich «Werkstatt»; Logindaten inkl. Passwort für das Analyse-Team sichtbar (interne Regel von Pretty Good, Entscheid 15.10.2026). Werte nie im Repo | Analyse-Team | Hausregel «Funktionen mit App und Konto nur mit Testkonto» |
+| Testkonten (Google, Apple-ID, Amazon, Hersteller-Apps) | Tab «Testkonten» im ANALYSE TOOL Sheet, gepflegt im Bereich «Infrastruktur»; Logindaten inkl. Passwort für das Analyse-Team sichtbar (interne Regel von Pretty Good, Entscheid 15.10.2026). Werte nie im Repo | Analyse-Team | Hausregel «Funktionen mit App und Konto nur mit Testkonto» |
 | ASWO-Login | ASWO-App am Computer | Team | Ersatzteile (Rückfall-Shop) |
 
 ## Weitere Script-Properties (keine Geheimnisse)

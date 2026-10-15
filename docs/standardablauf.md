@@ -1,6 +1,6 @@
 # Analyse Tool: Standardablauf
 
-Stand 15.10.2026, Testversion 2026-10-15.11 (live ist noch Version 7). Entscheide von Jonas, umgesetzt im Analyse Tool (Web-App am Google Sheet «ANALYSE TOOL»).
+Stand 15.10.2026, Testversion 2026-10-15.12 (live ist noch Version 7). Entscheide von Jonas, umgesetzt im Analyse Tool (Web-App am Google Sheet «ANALYSE TOOL»).
 
 Technische Doku (Code, Datenmodell, Stati, Prompts, APIs, Entscheid-Log): GitHub-Repo `jonasb-pg/pg-analyse-tool` (privat). Dieses Dokument beschreibt nur den Ablauf.
 
@@ -50,7 +50,7 @@ Ein Schritt pro Bildschirm. Der Server legt pro Produkt fest, welche Schritte es
 - Garantie: 90 Tage im Analyse Tool, 30 Tage auf Ricardo.
 - Ricardo-Zustand: versiegelt = Neu und originalverpackt; A = Neu (gemäss Beschreibung); B, C = Gebraucht.
 
-## Werkstatt (für das ganze Team)
+## Infrastruktur (für das ganze Team)
 
 Testkonten mit Logindaten (für das Team sichtbar, interne Regel) und Testmittel pflegen. Aktive Testkonten setzen die Testmittel «Testkonto Google / Apple-ID / Amazon» automatisch.
 

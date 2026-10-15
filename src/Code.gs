@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.11';
+const VERSION = '2026-10-15.12';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -2104,10 +2104,10 @@ function teilShops_(e) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Werkstatt: Testkonten und Testmittel, für das ganze Analyse-Team     */
+/* Infrastruktur: Testkonten und Testmittel, für das ganze Analyse-Team */
 /* ------------------------------------------------------------------ */
 
-/** Alles für die Seite «Werkstatt». Passwörter gehen mit (interne Regel: für das Team sichtbar). */
+/** Alles für die Seite «Infrastruktur». Passwörter gehen mit (interne Regel: für das Team sichtbar). */
 function werkstatt() {
   const konten = lies_('Testkonten').z.map(function (r) {
     return { r: r._r, dienst: String(r['Dienst'] || ''), login: String(r['Login'] || ''), passwort: String(r['Passwort'] || ''), geraet: String(r['Gerät'] || ''), notiz: String(r['Notiz'] || ''),

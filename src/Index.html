@@ -456,7 +456,7 @@
 </div></div>
 <script>
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
-  var VERSION = '2026-10-15.11';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
+  var VERSION = '2026-10-15.12';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
   var LAUF = {};                                    // was zur laufenden Analyse nur im Moment gilt und nicht gespeichert wird: Wartezustände, das Urteil des Servers, offene Klappen
@@ -468,7 +468,7 @@
   var T = {
     'fb.knopf': ['Feedback', 'Feedback'], 'fb.titel': ['Was fehlt oder stört?', 'What is missing or bothering you?'], 'fb.platz': ['z.B. Handbuch fehlt, Schritt unklar, Idee …', 'e.g. manual missing, step unclear, idea …'],
     'fb.senden': ['Senden', 'Send'], 'fb.wo': ['Wird mit {0}, Schritt «{1}» gespeichert.', 'Saved with {0}, step “{1}”.'], 'fb.danke': ['Danke! Feedback ist gespeichert.', 'Thanks! Feedback saved.'], 'fb.leer': ['Bitte zuerst etwas hineinschreiben.', 'Please write something first.'],
-    'nav.sektion': ['Analyse', 'Analysis'], 'nav.scan': ['Analysieren', 'Analyse'], 'nav.liste': ['Warteschlange', 'Queue'], 'nav.teile': ['Ersatzteile', 'Spare parts'], 'nav.admin': ['Admin', 'Admin'], 'nav.werkstatt': ['Werkstatt', 'Workshop'],
+    'nav.sektion': ['Analyse', 'Analysis'], 'nav.scan': ['Analysieren', 'Analyse'], 'nav.liste': ['Warteschlange', 'Queue'], 'nav.teile': ['Ersatzteile', 'Spare parts'], 'nav.admin': ['Admin', 'Admin'], 'nav.werkstatt': ['Infrastruktur', 'Infrastructure'],
     'ws.konten': ['Testkonten', 'Test accounts'], 'ws.mittel': ['Testmittel', 'Test equipment'], 'ws.dienst': ['Dienst', 'Service'], 'ws.login': ['Login', 'Login'], 'ws.pw': ['Passwort', 'Password'],
     'ws.geraet': ['Gerät', 'Device'], 'ws.notiz': ['Notiz', 'Note'], 'ws.aktiv': ['Aktiv', 'Active'], 'ws.inaktiv': ['Inaktiv', 'Inactive'], 'ws.neu': ['Neues Testkonto', 'New test account'],
     'ws.bearb': ['Bearbeiten', 'Edit'], 'ws.speichern': ['Speichern', 'Save'], 'ws.abbr': ['Abbrechen', 'Cancel'], 'ws.leer': ['Noch keine Testkonten.', 'No test accounts yet.'],
@@ -1633,7 +1633,7 @@
     }).join('') : '<p class="still">' + tx('teil.leer') + '</p>';
   }
 
-  /* ---------- Werkstatt: Testkonten und Testmittel (für das ganze Team) ---------- */
+  /* ---------- Infrastruktur: Testkonten und Testmittel (für das ganze Team) ---------- */
   /* WS = Daten vom Server; WSK = offenes Formular (neu: r leer). Passwörter sind für das Team sichtbar (interne Regel). */
   var WS = null, WSK = null;
   function zeichneWerkstatt(r) { WS = r; WSK = null; wsZeichnen(); }

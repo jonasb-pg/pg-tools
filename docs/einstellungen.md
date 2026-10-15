@@ -1,6 +1,6 @@
 # Einstellungen (Tab «Einstellungen»)
 
-<!-- Automatisch erzeugt mit tools/gen.py aus data/einstellungen-snapshot.json (Version 2026-10-15.11). Nicht von Hand ändern. -->
+<!-- Automatisch erzeugt mit tools/gen.py aus data/einstellungen-snapshot.json (Version 2026-10-15.12). Nicht von Hand ändern. -->
 
 
 Sheet ANALYSE TOOL (1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM), Tab Einstellungen, Stand 15.10.2026 12:10. Werte, die Geheimnisse sind, stehen nicht hier (siehe docs/secrets.md).

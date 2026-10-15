@@ -42,3 +42,5 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 15.10.2026 | Doku | Repo bei jeder Änderung nachführen (Code, Doku, Entscheide); Matchmaker-Script liegt in `matchmaker-script/` | |
 | 15.10.2026 | Admin | Admin-Bereich vorerst nur Testkonten und Testmittel; Passwörter für das Analyse-Team sichtbar | |
 | 15.10.2026 | Repo | Ein Repo für alle Tools vorgeschlagen (Umbenennung in `pg-tools` offen, macht Jonas) | |
+| 15.10.2026 | Daten | Return Tool bleibt «nur lesen», kein Rückfluss im Moment; Matchmaker Sheet (erledigte Stücke im Abgleich) und Ricardo Tool später anschauen | |
+| 15.10.2026 | Oberfläche | Bereich für Testkonten und Testmittel heisst «Infrastruktur» | «Werkstatt» |
