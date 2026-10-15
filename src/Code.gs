@@ -2356,7 +2356,7 @@ function umbau_(ss) {
       'Analysen': ['Analysen', 'Eine abgeschlossene Analyse pro Zeile: Dauer, Ergebnis, Grade, Befund, Verkaufsinfo. Das ist das Prüfprotokoll pro Gerät.'],
       'Einstellungen': ['Einstellungen', 'Schalter, Grenzwerte, Hausregeln und die Anweisungen an die KI in normaler Sprache.'],
       'Listen': ['Listen', 'Auswahlwerte. Die linke Liste ist frei anpassbar, die rechte verwendet das Tool fest.'],
-      'Testmittel': ['Testmittel', 'Liste der Testmittel. «Vorhanden» pflegt ihr hier: Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. Neue Namen trägt das Tool nach.'] };
+      'Testmittel': ['Testmittel', 'Liste der Testmittel. «Vorhanden» pflegt das Team in der Oberfläche unter «Infrastruktur» (oder hier). Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».'] };
     ue.getDataRange().getValues().forEach(function (z, i) {
       const n = neu[String(z[0])];
       if (n && (String(z[0]) !== n[0] || String(z[1]) !== (n[1] || neu['Stufen'][1]))) ue.getRange(i + 1, 1, 1, 2).setValues([[n[0], n[1] || neu['Stufen'][1]]]);
