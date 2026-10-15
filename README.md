@@ -6,6 +6,7 @@ Analyse Tool von Pretty Good: geführte Prüfung von Retouren am Analyseplatz, m
 |---|---|
 | `src/Code.gs` | Server (Apps Script), Stand = Editor |
 | `src/Index.html` | Oberfläche (HTML, CSS, JS) |
+| `matchmaker-script/Code.gs` | Script im Matchmaker Sheet (Suche, Profile, Urteile), Stand = Editor |
 | `docs/architektur.md` | Komponenten, IDs, Datenflüsse, Trigger, Sperren |
 | `docs/datenmodell.md` | Tabs und Spalten (erzeugt) |
 | `docs/stati.md` | Stati, Übergänge, Regale, Gründe, Stufen, Grades |

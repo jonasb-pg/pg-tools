@@ -39,3 +39,6 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 15.10.2026 | Matchmaker | KI-Abgleich pro Produkt gegen alle offenen Aufträge nach der Identität; Treffer «passt» = Pflicht, keine Wahl; MM vor Ricardo; Wiedereinstieg per Scan durch MM-Person; Vermerk «Aus Analyse» im Matchmaker Sheet | |
 | 15.10.2026 | Admin | Admin-Bereich für Analyse-Team (Testkonten inkl. Logindaten nach internen Regeln, Testmittel, weitere Aktionen) | |
 | 15.10.2026 | Doku | Technische Doku in privatem GitHub-Repo unter Jonas' eigenem Konto | |
+| 15.10.2026 | Doku | Repo bei jeder Änderung nachführen (Code, Doku, Entscheide); Matchmaker-Script liegt in `matchmaker-script/` | |
+| 15.10.2026 | Admin | Admin-Bereich vorerst nur Testkonten und Testmittel; Passwörter für das Analyse-Team sichtbar | |
+| 15.10.2026 | Repo | Ein Repo für alle Tools vorgeschlagen (Umbenennung in `pg-tools` offen, macht Jonas) | |
