@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.13';
+const VERSION = '2026-10-15.14';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -176,7 +176,7 @@ const NEUE_EINSTELLUNGEN = [
   ['KI-Modell Ricardo', 'claude-haiku-5-5', 'Mit diesem Modell schreibt das Tool Titel und Artikelbeschrieb für Ricardo.'],
   ['Ricardo-Anweisung', RICARDO_ANWEISUNG, 'So schreibt die KI Titel und Artikelbeschrieb. Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter.'],
   ['Ricardo-Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Artikelbeschrieb.'],
-  ['Ricardo-Schlusssatz', 'Alle Produkte werden von Pretty Good sorgfältig geprüft und mit einer Garantie von 30 Tagen verkauft.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden.'],
+  ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Alle Artikel werden von Pretty Good sorgfältig geprüft, nicht geprüfte Funktionen werden im Beschrieb aufgelistet. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool.'],
   ['Handbuch-Suche', HANDBUCH_SUCHE, 'So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus.'],
   ['Matchmaker-Sheet ID', MM_SHEET, 'Aus diesem Sheet (Tab «Matchmaker») liest das Tool die offenen Suchaufträge. Beim Auftrag schreibt es in die Spalte «Aus Analyse», wenn ein Stück ins Regal «Matchmaker» kommt.'],
   ['KI-Modell Matchmaker', 'claude-sonnet-5-5', 'Mit diesem Modell prüft das Tool jedes Produkt gegen alle offenen Suchaufträge.'],

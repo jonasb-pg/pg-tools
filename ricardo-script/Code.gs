@@ -32,9 +32,11 @@ const RICARDO_FRIST_TAGE = 60;
 const POST_KOPF = ['Firmenname', 'Firmenzusatz', 'Anrede', 'Nachname', 'Vorname', 'Adresszusatz', 'Strasse ', 'Hausnummer ', 'PLZ', 'Ort',
   'Kunden-ID', 'E-Mail', 'Telefon', 'Mobil', 'Sendungsnotiz', 'Adresstyp', 'Persönliche Anschrift'];
 const OFFEN = ['In Arbeit', 'Bereit'];
-// Regal im Lager je Status des Listings bzw. des Verkaufs (wie im Analyse Tool: «Ricardo Offline» = analysiert, noch nicht gelistet)
-const REGAL = { 'In Arbeit': 'Ricardo Offline', 'Bereit': 'Ricardo Offline', 'Gelistet': 'Ricardo Online', 'Verkauft': 'Ricardo Unpaid',
-  'Zu packen': 'Ricardo Unpaid', 'Wartet auf Zahlung': 'Ricardo Unpaid' };
+// Regal im Lager je Status des Listings bzw. des Verkaufs. Die Namen stehen in den Einstellungen (im Admin-Teil umbenennbar)
+const REGAL_STATUS = { 'In Arbeit': 'Regal Offline', 'Bereit': 'Regal Offline', 'Gelistet': 'Regal Online', 'Verkauft': 'Regal Unpaid',
+  'Zu packen': 'Regal Unpaid', 'Wartet auf Zahlung': 'Regal Unpaid' };
+const REGAL_VORGABE = { 'Regal Offline': 'Ricardo Offline', 'Regal Online': 'Ricardo Online', 'Regal Unpaid': 'Ricardo Unpaid' };
+const SCHLUSSSATZ = 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Alle Artikel werden von Pretty Good sorgfältig geprüft, nicht geprüfte Funktionen werden im Beschrieb aufgelistet. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.';
 const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM', ANALYSE_TAB = 'Ricardo';
 // Status, in denen ein Stück wieder frei ist und neu gelistet werden kann
 const FREI = ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'];
@@ -55,12 +57,15 @@ const DEFAULTS = [
   ['Hinweis-Tabs', 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden', 'Wird nur durchsucht, wenn in den Such-Tabs nichts gefunden wird'],
   ['Laufzeit Tage', 6, 'Laufzeit der Auktion; danach gilt ein Angebot als abgelaufen'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
-  ['Schlusssatz', 'Geprüfte Retouren von Pretty Good: Von uns sorgfältig getestet mit 30 Tagen Garantie.', 'Steht am Ende jedes Beschriebs. Keine Domain verwenden'],
+  ['Schlusssatz', SCHLUSSSATZ, 'Steht am Ende jedes Beschriebs. Keine Domain verwenden. Gleicher Satz wie «Ricardo-Schlusssatz» im ANALYSE TOOL'],
   ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
   ['Warnschwelle aktive Angebote', 90, 'Ricardo-Limite ist standardmässig 100'],
   ['Admins', '', 'E-Mail-Adressen mit Zugriff auf den Admin-Teil, Komma-getrennt. Leer = alle'],
   ['Text-Anweisung', 'Schreibe zuerst zwei bis drei Sätze, die das Produkt und seinen Nutzen beschreiben. Danach bis zu 8 Stichpunkte. Ton: freundlich, sachlich, per Du.', 'So soll Claude Titel, Einleitung und Stichpunkte schreiben. In normalen Worten formulieren. Wirkt beim nächsten «Erstellen»'],
-  ['Claude-Modell', 'claude-haiku-4-5-20251001', 'Modell für Titel und Beschrieb']
+  ['Claude-Modell', 'claude-haiku-4-5-20251001', 'Modell für Titel und Beschrieb'],
+  ['Regal Offline', REGAL_VORGABE['Regal Offline'], 'Regal für Stücke, die auf Ricardo warten (In Arbeit, Bereit). Gleicher Name wie im Analyse Tool'],
+  ['Regal Online', REGAL_VORGABE['Regal Online'], 'Regal für gelistete Stücke'],
+  ['Regal Unpaid', REGAL_VORGABE['Regal Unpaid'], 'Regal für verkaufte Stücke, bis sie bezahlt und versendet sind']
 ];
 
 const VERSAND_DEFAULT = [
@@ -190,7 +195,7 @@ const DOKU = [
   ['GRUNDREGELN', [
     'Das Return Tool (Inventar) und das ANALYSE TOOL werden nur gelesen. Das Skript schreibt dort nie. Alles zu Ricardo, auch der Status, steht in diesem Sheet.',
     'Stücke aus der Analyse: Zustand und «geprüft» kommen aus der Analyse und sind gesperrt. Titel und Beschrieb dürfen geändert werden, die Spalte «Text geändert» hält fest, wer und wann. «Text aus der Analyse» stellt den Text der Analyse wieder her. Wird ein Bündel daraus, gilt der normale Ablauf (neuer Text, neue Prüfung).',
-    'Regale: In Arbeit und Bereit = «Ricardo Offline», Gelistet = «Ricardo Online», verkauft bis bezahlt = «Ricardo Unpaid».',
+    'Regale: In Arbeit und Bereit = «Ricardo Offline», Gelistet = «Ricardo Online», verkauft bis bezahlt = «Ricardo Unpaid». Die Namen stehen in den Einstellungen «Regal Offline/Online/Unpaid» und lassen sich im Admin-Teil umbenennen.',
     'Das Tool veröffentlicht nichts bei Ricardo und überweist kein Geld. Es führt nur Buch.',
     'Der Claude-Schlüssel steht nur in den Script-Eigenschaften, nie im Code, nie im Sheet, nie in einem Chat.',
     'Texte ohne Domains und Kontaktangaben. Garantie: 30 Tage. Versand nur per Post.',
@@ -300,7 +305,8 @@ function startDaten() {
     laufzeit: Number(cfg_('Laufzeit Tage')) || 6,
     retoureGruende: RETOURE_GRUENDE,
     kiAktiv: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY'),
-    aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90
+    aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90,
+    regale: { offline: regal_('Bereit'), online: regal_('Gelistet'), unpaid: regal_('Verkauft') }
   };
 }
 
@@ -453,6 +459,9 @@ function ausAnalyse_(rec, q) {
 }
 
 /** Text und Zustand kommen aus der Analyse, solange das Listing kein Bündel ist. */
+/** Name des Regals zu einem Status, aus den Einstellungen. */
+function regal_(status) { const k = REGAL_STATUS[status]; return k ? (cfg_(k) || REGAL_VORGABE[k]) : ''; }
+
 function istAnalyse_(rec) { return rec['Quelle Tab'] === 'Analyse' && !String(rec['Bündel-IDs'] || '').trim(); }
 
 /* ------------------------------------------------------------------ */
@@ -874,7 +883,7 @@ function uebersicht() {
       const g = rec['Gelistet am'];
       const tage = g instanceof Date ? Math.floor((jetzt - g.getTime()) / 86400000) : 0;
       out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],
-        zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''), regal: REGAL[rec['Status']] || '', quelle: String(rec['Quelle Tab'] || ''),
+        zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''), regal: regal_(rec['Status']), quelle: String(rec['Quelle Tab'] || ''),
         seit: datum_(rec['Gelistet am'] || rec['Angelegt am']),
         abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeit });
     });
@@ -932,7 +941,7 @@ function lade_(id) {
     masse: masse_(rec['Spezifikationen']),
     englisch: en.slice(1).join('\n'), englischAlt: en[0] !== pruefsumme_(rec['Titel'] + '\n' + rec['Beschrieb']),
     quelle: String(rec['Quelle Tab']), analyse: istAnalyse_(rec), analyseNr: String(rec['Analyse-Nr'] || ''), fotoOrdner: String(rec['Foto-Ordner'] || ''),
-    geaendert: String(rec['Text geändert'] || ''), regal: REGAL[rec['Status']] || ''
+    geaendert: String(rec['Text geändert'] || ''), regal: regal_(rec['Status'])
   };
 }
 
@@ -1169,7 +1178,7 @@ function vZeile_(v) {
   return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID']), titel: v['Titel'], am: datum_(v['Verkauft am']),
     total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
     name: [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer']), kaeufer: String(v['Käufer']),
-    ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'] || REGAL[v['Status']] || '', klasse: v['Versandklasse'] || v['Lieferart'] };
+    ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'] || regal_(v['Status']), klasse: v['Versandklasse'] || v['Lieferart'] };
 }
 
 /** aktion: 'gepackt' oder 'bezahlt'. */
@@ -1512,7 +1521,7 @@ function adminEinstellungen() {
 
 function adminSpeichereEinstellungen(werte) {
   pruefeAdmin_();
-  ['Return Tool ID', 'Such-Tabs'].forEach(function (n) {
+  ['Return Tool ID', 'Such-Tabs', 'Regal Offline', 'Regal Online', 'Regal Unpaid'].forEach(function (n) {
     if (werte[n] !== undefined && !String(werte[n]).trim()) throw new Error('Die Einstellung «' + n + '» darf nicht leer sein.');
   });
   const e = SpreadsheetApp.getActive().getSheetByName(TAB_E);

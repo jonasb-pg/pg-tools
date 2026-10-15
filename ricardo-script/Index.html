@@ -488,6 +488,8 @@
   function t(k) {
     var e = T[k], s = e ? e[L === 'en' ? 1 : 0] : k;
     for (var i = 1; i < arguments.length; i++) s = s.split('{' + (i - 1) + '}').join(arguments[i]);
+    /* Regalnamen kommen aus den Einstellungen (Admin) */
+    if (S && S.regale) s = s.split('«Ricardo Offline»').join('«' + S.regale.offline + '»').split('«Ricardo Online»').join('«' + S.regale.online + '»').split('«Ricardo Unpaid»').join('«' + S.regale.unpaid + '»');
     return s;
   }
   function st(s) { return L === 'en' && ST[s] ? ST[s] : s; }

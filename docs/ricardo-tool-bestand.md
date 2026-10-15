@@ -51,12 +51,12 @@ Hier, im selben Repo wie Analyse Tool und Matchmaker (Schnittstelle Tab «Ricard
 | Prio | Stand | Umsetzung |
 |---|---|---|
 | 1 | umgesetzt | Neue Quelle Tab «Ricardo» im ANALYSE TOOL (Einstellung «Analyse Tool ID», nur lesen). Startseite: Karte «Aus der Analyse, bereit zum Listen». Suche findet analysierte Stücke zuerst; dieselbe PG-ID aus dem Return Tool erscheint dann nicht doppelt. Return Tool bleibt zweite Quelle |
-| 2 | umgesetzt | `REGAL`: In Arbeit/Bereit = Ricardo Offline, Gelistet = Ricardo Online, Verkauft/Zu packen/Wartet auf Zahlung = Ricardo Unpaid. Anzeige auf der Karte, in «Laufende Angebote» und als Lagerort beim Verkauf (wenn kein Lagerort) |
+| 2 | umgesetzt | Regalnamen als Einstellungen «Regal Offline/Online/Unpaid» (Admin): In Arbeit/Bereit = Ricardo Offline, Gelistet = Ricardo Online, Verkauft/Zu packen/Wartet auf Zahlung = Ricardo Unpaid. Anzeige auf der Karte, in «Laufende Angebote» und als Lagerort beim Verkauf (wenn kein Lagerort) |
 | 3 | umgesetzt | Listing aus der Analyse übernimmt Titel, Beschrieb, Zustand, Startpreis, Neupreis, EAN, Versand (über Gewicht/Sperrgut auf den Tab «Versand» abgebildet), Analyse-Nr, Foto-Ordner; «geprüft» = ja. Ist danach direkt «Bereit». Fotos-Feld verlinkt den Drive-Ordner |
 | 4/5 | umgesetzt | Analyse-Modus (`istAnalyse_`: Quelle «Analyse» und kein Bündel): Zustand, «geprüft», Mängel gesperrt (Server ignoriert sie); Mängel-Regeln in `pruefe_` entfallen; Knopf «Text aus der Analyse wiederherstellen» statt KI |
 | 6 | umgesetzt | Bündel mischen Analyse, Return Tool und RC. Ein offenes RC-Listing geht im Bündel auf (Status Abgebrochen). Auflösen rechnet Preis/Neupreis des Hauptstücks zurück (`basis_`), bei Analyse-Hauptstück kommt der Analyse-Text zurück |
 | 7 | umgesetzt | RC bleibt; RC lässt sich nach Abbruch, «Unverkauft» oder aufgelöstem Bündel neu listen (`neuAusRc_`) |
-| 8 | offen | Versandklassen werden über das Gewicht abgebildet, Namen bleiben je Tool. Schlusssätze sind Einstellungen in beiden Sheets und unterscheiden sich: Entscheid Jonas, welcher gilt |
+| 8 | umgesetzt | Versandklassen werden über das Gewicht abgebildet, Namen bleiben je Tool. Schlusssatz in beiden Sheets gleich (Entscheid 15.10.2026) |
 | 9 | unverändert | CSV-Import, Post-Adressen, Zahlung, Retouren, Admin |
 | neu | umgesetzt | Vermerk «geändert»: Spalte «Text geändert» = «geändert von … am …», wenn Titel oder Beschrieb aus der Analyse von Hand geändert werden; wird beim Wiederherstellen geleert |
 
