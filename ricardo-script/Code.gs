@@ -1,10 +1,10 @@
 /**
  * Ricardo Tool – Pretty Good
- * Liest Produkte aus dem Return Tool (nur lesen) und führt alles zu Ricardo in diesem Sheet.
+ * Liest Produkte aus dem Tab «Ricardo» im ANALYSE TOOL und aus dem Return Tool (beides nur lesen) und führt alles zu Ricardo in diesem Sheet.
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-09.2';
+const VERSION = '2026-10-15.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku';
 const TZ = 'Europe/Zurich';
 
@@ -12,7 +12,8 @@ const L_COLS = ['PG-ID', 'Status', 'EAN', 'Bezeichnung', 'Kategorie', 'Neupreis 
   'Zustand', 'Mängel', 'Gewicht bis kg', 'Sperrgut', 'Versandklasse', 'Versandkosten CHF',
   'Titel', 'Beschrieb', 'Ricardo-Link', 'Bearbeitet von',
   'Angelegt am', 'Gelistet am', 'Verkauft am', 'Versendet am', 'Spezifikationen', 'Produktlink', 'Quelle Tab',
-  'Bündel-IDs', 'Bündel-Inhalt', 'Getestet', 'Erzielter Preis CHF', 'Verkauf-Nr', 'Mängel Text', 'Text Englisch'];
+  'Bündel-IDs', 'Bündel-Inhalt', 'Getestet', 'Erzielter Preis CHF', 'Verkauf-Nr', 'Mängel Text', 'Text Englisch',
+  'Analyse-Nr', 'Foto-Ordner', 'Text geändert'];
 
 const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW', 'Preis CHF', 'Versand CHF', 'Total CHF',
   'Provision CHF', 'Auszahlung CHF', 'Status', 'Käufer', 'Firma', 'Vorname', 'Nachname', 'Strasse', 'Hausnummer', 'Postfach',
@@ -31,10 +32,14 @@ const RICARDO_FRIST_TAGE = 60;
 const POST_KOPF = ['Firmenname', 'Firmenzusatz', 'Anrede', 'Nachname', 'Vorname', 'Adresszusatz', 'Strasse ', 'Hausnummer ', 'PLZ', 'Ort',
   'Kunden-ID', 'E-Mail', 'Telefon', 'Mobil', 'Sendungsnotiz', 'Adresstyp', 'Persönliche Anschrift'];
 const OFFEN = ['In Arbeit', 'Bereit'];
+// Regal im Lager je Status des Listings bzw. des Verkaufs (wie im Analyse Tool: «Ricardo Offline» = analysiert, noch nicht gelistet)
+const REGAL = { 'In Arbeit': 'Ricardo Offline', 'Bereit': 'Ricardo Offline', 'Gelistet': 'Ricardo Online', 'Verkauft': 'Ricardo Unpaid',
+  'Zu packen': 'Ricardo Unpaid', 'Wartet auf Zahlung': 'Ricardo Unpaid' };
+const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM', ANALYSE_TAB = 'Ricardo';
 // Status, in denen ein Stück wieder frei ist und neu gelistet werden kann
 const FREI = ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'];
 // Spalten aus früheren Versionen: «einrichten» entfernt sie, damit bestehende Zeilen zu den Spalten passen
-const ALT_L = ['Anzahl Fotos', 'Foto-Ordner', 'Lieferumfang'], ALT_V = ['Storno-Grund'], ALT_R = ['Zurück erhalten am', 'Entscheid Stück'], ALT_E = ['Mindest-Startpreis CHF'];
+const ALT_L = ['Anzahl Fotos', 'Lieferumfang'], ALT_V = ['Storno-Grund'], ALT_R = ['Zurück erhalten am', 'Entscheid Stück'], ALT_E = ['Mindest-Startpreis CHF'];
 const DOMAIN = /https?:\/\/|www\.|@[a-z0-9-]+\.|\b[a-z0-9-]+\.(ch|com|de|net|org|io|li|at|fr|it|shop|swiss)\b/i;
 const DOMAIN_G = /\b[a-z0-9-]+\.(ch|com|de|net|org|io|li|at|fr|it|shop|swiss)\b/gi;
 
@@ -45,6 +50,7 @@ const ZUSTAND_EN = { 'Neu und originalverpackt': 'New, original packaging', 'Neu
 
 const DEFAULTS = [
   ['Return Tool ID', '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E', 'Wird nur gelesen, nie beschrieben'],
+  ['Analyse Tool ID', ANALYSE_ID, 'ANALYSE TOOL: Tab «Ricardo» mit den analysierten Stücken (Titel, Beschrieb, Zustand, Preis, Versand, Fotos). Wird nur gelesen, nie beschrieben'],
   ['Such-Tabs', 'Online', 'Tabs im Return Tool, aus denen gelistet werden darf (Komma-getrennt)'],
   ['Hinweis-Tabs', 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden', 'Wird nur durchsucht, wenn in den Such-Tabs nichts gefunden wird'],
   ['Laufzeit Tage', 6, 'Laufzeit der Auktion; danach gilt ein Angebot als abgelaufen'],
@@ -83,7 +89,7 @@ function einrichten() {
   }
   ss.setSpreadsheetTimeZone(TZ);
   kopf_(sh, L_COLS, 2, ALT_L);
-  textSpalten_(sh, L_COLS, ['PG-ID', 'EAN', 'Verkauf-Nr', 'Bündel-IDs']);
+  textSpalten_(sh, L_COLS, ['PG-ID', 'EAN', 'Verkauf-Nr', 'Bündel-IDs', 'Analyse-Nr']);
 
   let e = ss.getSheetByName(TAB_E);
   if (!e) {
@@ -132,6 +138,7 @@ function einrichten() {
   wochen_();
   // Lesezugriff aufs Return Tool prüfen
   SpreadsheetApp.openById(cfg_('Return Tool ID')).getName();
+  SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getName();
   log_('Einrichten', '', 'Aufbau geprüft');
   try { SpreadsheetApp.getUi().alert('Ricardo Tool ist eingerichtet.'); } catch (err) { /* ohne UI aufgerufen */ }
 }
@@ -177,10 +184,13 @@ function textSpalten_(sh, cols, namen) {
 const DOKU = [
   ['ZWECK', [
     'Internes Tool, um Retouren und Reuse-Stücke über das normale Ricardo-Verkaufsformular zu verkaufen. Ricardo hat keine Schnittstelle: Das Tool bereitet alles vor, eine Person kopiert die Felder ins Ricardo-Formular.',
+    'Quellen: 1. ANALYSE TOOL, Tab «Ricardo»: analysierte Stücke mit fertigem Titel, Beschrieb, Zustand, Startpreis, Versand und Fotos (Liste «Aus der Analyse» auf der Startseite). 2. Return Tool: Stücke ohne Analyse, der Text kommt von Claude. 3. Ohne Inventar (RC-0001). Bündel dürfen die drei mischen.',
     'Ablauf: Produkt suchen (EAN oder Name) > Zustand, Versandklasse, Text > bei Ricardo einstellen > Link speichern > Verkaufsbericht einlesen > packen > Zahlung bestätigen und versenden > allenfalls Retoure.'
   ]],
   ['GRUNDREGELN', [
-    'Das Return Tool (Inventar) wird nur gelesen. Das Skript schreibt dort nie. Alles zu Ricardo steht in diesem Sheet.',
+    'Das Return Tool (Inventar) und das ANALYSE TOOL werden nur gelesen. Das Skript schreibt dort nie. Alles zu Ricardo, auch der Status, steht in diesem Sheet.',
+    'Stücke aus der Analyse: Zustand und «geprüft» kommen aus der Analyse und sind gesperrt. Titel und Beschrieb dürfen geändert werden, die Spalte «Text geändert» hält fest, wer und wann. «Text aus der Analyse» stellt den Text der Analyse wieder her. Wird ein Bündel daraus, gilt der normale Ablauf (neuer Text, neue Prüfung).',
+    'Regale: In Arbeit und Bereit = «Ricardo Offline», Gelistet = «Ricardo Online», verkauft bis bezahlt = «Ricardo Unpaid».',
     'Das Tool veröffentlicht nichts bei Ricardo und überweist kein Geld. Es führt nur Buch.',
     'Der Claude-Schlüssel steht nur in den Script-Eigenschaften, nie im Code, nie im Sheet, nie in einem Chat.',
     'Texte ohne Domains und Kontaktangaben. Garantie: 30 Tage. Versand nur per Post.',
@@ -217,7 +227,7 @@ const DOKU = [
     'In Arbeit > Bereit (alles vollständig) > Gelistet (Ricardo-Link gespeichert) > Verkauft (Verkaufsbericht) > Versendet (Zahlung bestätigt).',
     'Frei für ein neues Listing sind: Abgebrochen, Unverkauft, Storniert, Retour abgeschlossen. Dann legt das Tool eine neue Zeile an, die alte bleibt als Verlauf.',
     'Retourniert: Retoure läuft. Retour abgeschlossen: Geld zurück und bei Ricardo storniert.',
-    'Nummern: PG-… kommt aus dem Return Tool. RC-0001 vergibt das Tool für Stücke ohne Inventar. RT-0001 sind Retouren.'
+    'Nummern: PG-… kommt aus dem Return Tool bzw. der Analyse (Spalte «Analyse-Nr»). RC-0001 vergibt das Tool für Stücke ohne Inventar. RT-0001 sind Retouren.'
   ]],
   ['STATUS VERKAUF', [
     'Zu packen > Wartet auf Zahlung (gepackt) > Bezahlt und versendet. Dazu: Storniert (im Admin-Teil gelöscht), Retourniert.',
@@ -305,8 +315,15 @@ function suche(q) {
   const passt = matcher_(q);
   const listings = listingsIndex_();
   let treffer = [];
+  const ana = {};
+  leseAnalyse_().filter(passt).forEach(function (r) {
+    const l = listings[r.id];
+    r.status = l ? l.status : ''; r.teilVon = l && l.teilVon ? l.teilVon : '';
+    ana[r.id] = true; treffer.push(r);
+  });
   liste_(cfg_('Such-Tabs')).forEach(function (tab) {
     leseQuelle_(src, tab).filter(passt).forEach(function (r) {
+      if (ana[r.id]) return;                                   // dasselbe Stück ist analysiert: es zählt die Analyse
       const l = listings[r.id];
       r.status = l ? l.status : '';
       r.teilVon = l && l.teilVon ? l.teilVon : '';
@@ -378,6 +395,67 @@ function leseQuelle_(src, tab) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Quelle ANALYSE TOOL, Tab «Ricardo» (nur lesen)                      */
+/* ------------------------------------------------------------------ */
+
+/** Alle Stücke, die die Analyse für Ricardo vorbereitet hat. Pro PG-ID gilt die letzte Zeile. Fehlt der Tab (noch nie «Auf Ricardo»), ist die Liste leer. */
+function leseAnalyse_() {
+  const sh = SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getSheetByName(ANALYSE_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const vals = sh.getDataRange().getValues();
+  const kopf = vals[0].map(function (x) { return String(x).trim(); });
+  const c = function (name) { return kopf.indexOf(name); };
+  if (c('PG-ID') === -1 || c('Titel') === -1 || c('Artikelbeschrieb') === -1) throw new Error('Im ANALYSE TOOL hat der Tab «' + ANALYSE_TAB + '» nicht die erwarteten Spalten (PG-ID, Titel, Artikelbeschrieb).');
+  const g = function (row, n) { return c(n) === -1 ? '' : row[c(n)]; };
+  const je = {};
+  for (let i = 1; i < vals.length; i++) {
+    const row = vals[i], id = String(g(row, 'PG-ID')).trim();
+    if (!id) continue;
+    const ean = String(g(row, 'EAN')).replace(/^'/, '').trim(), dat = g(row, 'Analysiert am');
+    je[id] = {
+      id: id, nr: String(g(row, 'Analyse-Nr')).trim(), name: String(g(row, 'Bezeichnung')).trim(), ean: ean, eanNorm: normEan_(ean),
+      titel: String(g(row, 'Titel')).trim(), beschrieb: String(g(row, 'Artikelbeschrieb')).replace(/\r/g, '').trim(),
+      zustand: String(g(row, 'Ricardo-Zustand')).trim(), grade: String(g(row, 'Grade')).trim(),
+      vp: zahl_(g(row, 'Startpreis CHF')), ovp: zahl_(g(row, 'Neupreis CHF')), klasse: String(g(row, 'Versandklasse')).trim(),
+      ordner: String(g(row, 'Foto-Ordner')).trim(), fotos: zahl_(g(row, 'Fotos')), kuerzel: String(g(row, 'Kürzel')).trim(),
+      erfasst: dat instanceof Date ? datum_(dat) : String(dat).slice(0, 10), tab: 'Analyse', spez: '', kat: '', link: '', ort: ''
+    };
+  }
+  return Object.keys(je).map(function (k) { return je[k]; });
+}
+
+function findeAnalyse_(id) { return leseAnalyse_().filter(function (r) { return r.id === id; })[0] || null; }
+
+/** Versandklasse der Analyse («0-2kg / PostPac B-Post», «0-30 kg / Sperrgut B-Post») als Gewicht bis kg und Sperrgut. Den Preis nimmt das Tool aus dem Tab «Versand». */
+function analyseVersand_(klasse) {
+  const k = String(klasse || ''), m = /(\d+)\s*kg/i.exec(k.replace(/^.*?-\s*(?=\d+\s*kg)/, ''));
+  return { gewicht: m ? Number(m[1]) : 0, sperrgut: /sperrgut/i.test(k) };
+}
+
+/** Für die Startseite: analysierte Stücke, die noch in keinem Listing stecken. */
+function analyseListe() {
+  const idx = listingsIndex_();
+  return leseAnalyse_().filter(function (r) { return !idx[r.id]; })
+    .map(function (r) { return { id: r.id, name: r.name, titel: r.titel, zustand: r.zustand, preis: r.vp, fotos: r.fotos, ordner: r.ordner, kuerzel: r.kuerzel, erfasst: r.erfasst }; })
+    .sort(function (a, b) { return a.id.localeCompare(b.id); });
+}
+
+/** Setzt Titel, Beschrieb, Zustand, Preis und Versand wie in der Analyse. */
+function ausAnalyse_(rec, q) {
+  rec['EAN'] = q.ean; rec['Bezeichnung'] = q.name; rec['Neupreis CHF'] = q.ovp || ''; rec['Startpreis CHF'] = rappen_(q.vp);
+  rec['Zustand'] = ZUSTAENDE.indexOf(q.zustand) !== -1 ? q.zustand : ''; rec['Mängel'] = ''; rec['Mängel Text'] = ''; rec['Text Englisch'] = '';
+  rec['Getestet'] = 'ja'; rec['Titel'] = q.titel; rec['Beschrieb'] = q.beschrieb; rec['Text geändert'] = '';
+  rec['Analyse-Nr'] = q.nr; rec['Foto-Ordner'] = q.ordner; rec['Quelle Tab'] = 'Analyse';
+  const v = analyseVersand_(q.klasse), vk = versand_(v.gewicht, v.sperrgut);
+  rec['Gewicht bis kg'] = v.gewicht || ''; rec['Sperrgut'] = v.sperrgut ? 'ja' : 'nein';
+  rec['Versandklasse'] = vk ? vk.klasse : ''; rec['Versandkosten CHF'] = vk ? vk.preis : '';
+  return rec;
+}
+
+/** Text und Zustand kommen aus der Analyse, solange das Listing kein Bündel ist. */
+function istAnalyse_(rec) { return rec['Quelle Tab'] === 'Analyse' && !String(rec['Bündel-IDs'] || '').trim(); }
+
+/* ------------------------------------------------------------------ */
 /* Listing anlegen und bearbeiten                                      */
 /* ------------------------------------------------------------------ */
 
@@ -398,7 +476,20 @@ function starteListing(id, auchAndere) {
   try {
     const idx = listingsIndex_();
     if (idx[id] && idx[id].teilVon) throw new Error(id + ' ist bereits Teil des Bündels ' + idx[id].teilVon + '.');
-    if (!idx[id]) {
+    if (!idx[id] && /^RC-\d+$/.test(id)) neuAusRc_(id);
+    else if (!idx[id] && findeAnalyse_(id)) {
+      const q = findeAnalyse_(id);
+      if (!q.vp) throw new Error('Produkt ' + id + ' hat in der Analyse keinen Startpreis.');
+      const rec = {};
+      L_COLS.forEach(function (k) { rec[k] = ''; });
+      rec['PG-ID'] = q.id; rec['Status'] = 'In Arbeit'; rec['Lagerort'] = q.ort; rec['Bearbeitet von'] = nutzer_(); rec['Angelegt am'] = new Date();
+      ausAnalyse_(rec, q);
+      const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+      sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
+      schreibe_(sh, sh.getLastRow(), rec);                     // Status Bereit, wenn aus der Analyse schon alles da ist
+      log_('Listing aus Analyse', id, q.nr + ' ' + q.name);
+    }
+    else if (!idx[id]) {
       const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
       const q = findeQuelle_(id, auchAndere === true);
       if (!q) throw new Error('Produkt ' + id + ' wurde in den Such-Tabs des Return Tools nicht gefunden.');
@@ -414,6 +505,20 @@ function starteListing(id, auchAndere) {
     }
     return lade_(id);
   } finally { lock.releaseLock(); }
+}
+
+/** Ein Stück ohne Inventar (RC-…) wieder listen: neue Zeile mit den Angaben der letzten. */
+function neuAusRc_(id) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  const zeile = findeZeile_(sh, id);
+  if (!zeile) throw new Error('Stück ' + id + ' gibt es nicht.');
+  const alt = zeileZuRec_(sh, zeile), rec = {};
+  L_COLS.forEach(function (k) { rec[k] = ''; });
+  basis_(alt);                                                  // war es Hauptstück eines Bündels: nur seine eigenen Angaben
+  ['PG-ID', 'Bezeichnung', 'Neupreis CHF', 'Startpreis CHF', 'Lagerort', 'Spezifikationen', 'Quelle Tab'].forEach(function (k) { rec[k] = alt[k]; });
+  rec['Status'] = 'In Arbeit'; rec['Bearbeitet von'] = nutzer_(); rec['Angelegt am'] = new Date();
+  sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
+  log_('Listing neu', id, rec['Bezeichnung']);
 }
 
 /** Listing für ein Stück, das nicht im Return Tool steht (z.B. Reuse). Das Tool vergibt eine eigene Nummer RC-0001. */
@@ -443,9 +548,20 @@ function freiesListing(d) {
   } finally { lock.releaseLock(); }
 }
 
-/** Fügt ein weiteres Stück zum Listing hinzu (z.B. Filament-Multipack). */
+/** Angaben eines Stücks für ein Bündel: aus der Analyse, dem Return Tool oder (RC-…) aus der eigenen letzten Zeile. */
+function teil_(id) {
+  if (/^RC-\d+$/.test(id)) {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), z = findeZeile_(sh, id);
+    if (!z) return null;
+    const r = zeileZuRec_(sh, z);
+    return { id: id, name: String(r['Bezeichnung']), vp: zahl_(r['Startpreis CHF']), ovp: zahl_(r['Neupreis CHF']), spez: String(r['Spezifikationen'] || ''), zeile: z, status: r['Status'], rc: true };
+  }
+  return findeAnalyse_(id) || findeQuelle_(id);
+}
+
+/** Fügt ein weiteres Stück zum Listing hinzu (z.B. Filament-Multipack). Gemischt erlaubt: analysiert, Return Tool, ohne Inventar (RC). */
 function buendelHinzu(id, zusatzId) {
-  id = String(id).trim(); zusatzId = String(zusatzId).trim().toUpperCase().replace(/^PG-?/, 'PG-');
+  id = String(id).trim(); zusatzId = String(zusatzId).trim().toUpperCase().replace(/^PG-?(?=\d)/, 'PG-');
   if (id === zusatzId) throw new Error('Das ist das Hauptstück dieses Listings.');
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
@@ -454,25 +570,35 @@ function buendelHinzu(id, zusatzId) {
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
     if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ist bereits «' + rec['Status'] + '».');
-    if (rec['Quelle Tab'] === 'Frei') throw new Error('Bündel sind nur bei inventarisierten Stücken möglich.');
-    const idx = listingsIndex_();
-    if (idx[zusatzId]) throw new Error(zusatzId + ' ist bereits in einem Listing' + (idx[zusatzId].teilVon ? ' (Bündel ' + idx[zusatzId].teilVon + ')' : '') + '.');
-    const q = findeQuelle_(zusatzId);
-    if (!q) throw new Error('Produkt ' + zusatzId + ' wurde in den Such-Tabs des Return Tools nicht gefunden.');
+    const idx = listingsIndex_(), rc = /^RC-\d+$/.test(zusatzId);
+    const q = teil_(zusatzId);
+    if (!q) throw new Error('Stück ' + zusatzId + ' wurde weder in der Analyse noch in den Such-Tabs des Return Tools gefunden.');
+    if (idx[zusatzId] && (!rc || idx[zusatzId].teilVon || OFFEN.indexOf(idx[zusatzId].status) === -1 || liste_(zeileZuRec_(sh, q.zeile)['Bündel-IDs']).length)) {
+      throw new Error(zusatzId + ' ist bereits in einem Listing' + (idx[zusatzId].teilVon ? ' (Bündel ' + idx[zusatzId].teilVon + ')' : '') + '.');
+    }
+    if (!q.vp) throw new Error('Stück ' + zusatzId + ' hat keinen Startpreis.');
     const ids = liste_(rec['Bündel-IDs']); ids.push(q.id);
     const inhalt = String(rec['Bündel-Inhalt'] || rec['Bezeichnung']).split('\n').filter(String); inhalt.push(q.name);
     rec['Bündel-IDs'] = ids.join(', '); rec['Bündel-Inhalt'] = inhalt.join('\n');
     rec['Startpreis CHF'] = rappen_(Number(rec['Startpreis CHF']) + Number(q.vp || 0));
     rec['Neupreis CHF'] = (Number(rec['Neupreis CHF']) || 0) + Number(q.ovp || 0) || '';
     const spez = bereinigeSpez_(q.spez);
-    if (spez && String(rec['Spezifikationen']).indexOf(spez) === -1) rec['Spezifikationen'] = (rec['Spezifikationen'] + ' | ' + spez).slice(0, 4000);
-    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = '';
+    if (spez && String(rec['Spezifikationen']).indexOf(spez) === -1) rec['Spezifikationen'] = (rec['Spezifikationen'] ? rec['Spezifikationen'] + ' | ' : '') + spez;
+    rec['Spezifikationen'] = String(rec['Spezifikationen']).slice(0, 4000);
+    // Ein Bündel braucht einen neuen Text und eine neue Prüfung, auch wenn das Hauptstück analysiert ist
+    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = ''; rec['Text geändert'] = ''; rec['Text Englisch'] = '';
     schreibe_(sh, zeile, rec);
-    log_('Bündel ergänzt', id, zusatzId);
+    if (rc && idx[zusatzId]) {                                  // ein offenes RC-Listing geht im Bündel auf
+      const r2 = zeileZuRec_(sh, q.zeile);
+      r2['Status'] = 'Abgebrochen'; r2['Bearbeitet von'] = nutzer_();
+      schreibe_(sh, q.zeile, r2, true);
+    }
+    log_('Bündel ergänzt', id, zusatzId + (q.tab ? ' (' + q.tab + ')' : ''));
     return lade_(id);
   } finally { lock.releaseLock(); }
 }
 
+/** Löst das Bündel auf: Das Hauptstück bekommt wieder seine eigenen Angaben, die weiteren Stücke sind wieder frei. */
 function buendelLeeren(id) {
   id = String(id).trim();
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -482,15 +608,41 @@ function buendelLeeren(id) {
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
     if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ist bereits «' + rec['Status'] + '».');
-    const q = findeQuelle_(id);
-    if (!q) throw new Error('Produkt ' + id + ' wurde im Return Tool nicht mehr gefunden.');
+    basis_(rec);
     rec['Bündel-IDs'] = ''; rec['Bündel-Inhalt'] = '';
-    rec['Startpreis CHF'] = rappen_(q.vp); rec['Neupreis CHF'] = q.ovp || ''; rec['Spezifikationen'] = bereinigeSpez_(q.spez);
-    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = '';
+    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = ''; rec['Text geändert'] = ''; rec['Text Englisch'] = '';
+    if (rec['Quelle Tab'] === 'Analyse') {
+      const q = findeAnalyse_(id);
+      if (!q) throw new Error('Produkt ' + id + ' wurde in der Analyse nicht mehr gefunden.');
+      ausAnalyse_(rec, q);
+    }
     schreibe_(sh, zeile, rec);
     log_('Bündel geleert', id, '');
     return lade_(id);
   } finally { lock.releaseLock(); }
+}
+
+/** Preis, Neupreis und Stichworte des Hauptstücks ohne die weiteren Stücke eines Bündels. */
+function basis_(rec) {
+  const ids = liste_(rec['Bündel-IDs']);
+  if (!ids.length) return rec;
+  const id = String(rec['PG-ID']);
+  if (rec['Quelle Tab'] !== 'Frei' && rec['Quelle Tab'] !== 'Analyse') {
+    const q = findeQuelle_(id, true);
+    if (!q) throw new Error('Produkt ' + id + ' wurde im Return Tool nicht mehr gefunden.');
+    rec['Startpreis CHF'] = rappen_(q.vp); rec['Neupreis CHF'] = q.ovp || ''; rec['Spezifikationen'] = bereinigeSpez_(q.spez);
+    return rec;
+  }
+  let vp = Number(rec['Startpreis CHF']) || 0, ovp = Number(rec['Neupreis CHF']) || 0;
+  ids.forEach(function (b) {
+    const q = teil_(b);
+    if (!q) throw new Error('Stück ' + b + ' aus dem Bündel wurde nicht mehr gefunden. Bitte das Listing abbrechen und neu anlegen.');
+    vp -= Number(q.vp || 0); ovp -= Number(q.ovp || 0);
+  });
+  if (!(vp > 0)) throw new Error('Der Preis des Hauptstücks lässt sich nicht mehr bestimmen. Bitte das Listing abbrechen und neu anlegen.');
+  rec['Startpreis CHF'] = rappen_(vp); rec['Neupreis CHF'] = ovp > 0 ? runde_(ovp) : '';
+  rec['Spezifikationen'] = String(rec['Spezifikationen'] || '').split(' | ')[0];
+  return rec;
 }
 
 function lade(id) { return lade_(String(id).trim()); }
@@ -503,6 +655,8 @@ function speichereDetails(id, d) {
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
     if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist bereits «' + rec['Status'] + '» und kann nicht mehr geändert werden.');
+    if (istAnalyse_(rec)) { d = Object.assign({}, d); delete d.zustand; delete d.maengel; delete d.maengelText; delete d.getestet; }   // stammen aus der Analyse
+    const alt = { titel: String(rec['Titel']), beschrieb: String(rec['Beschrieb']) };
     if (d.zustand !== undefined) {
       if (d.zustand && ZUSTAENDE.indexOf(d.zustand) === -1) throw new Error('Unbekannter Zustand.');
       rec['Zustand'] = d.zustand;
@@ -524,6 +678,8 @@ function speichereDetails(id, d) {
     rec['Versandklasse'] = vk ? vk.klasse : ''; rec['Versandkosten CHF'] = vk ? vk.preis : '';
     if (d.titel !== undefined) rec['Titel'] = text_(d.titel, 200);
     if (d.beschrieb !== undefined) rec['Beschrieb'] = String(d.beschrieb).replace(/\r/g, '').trim().replace(/^[=+]+\s*/, '');
+    // Vermerk, wenn jemand den Text aus der Analyse von Hand ändert
+    if (istAnalyse_(rec) && (rec['Titel'] !== alt.titel || rec['Beschrieb'] !== alt.beschrieb)) rec['Text geändert'] = 'geändert von ' + nutzer_() + ' am ' + datum_(new Date());
     rec['Bearbeitet von'] = nutzer_();
     schreibe_(sh, zeile, rec);
     return lade_(id);
@@ -535,6 +691,7 @@ function erstelleText(id) {
   const zeile = findeZeile_(sh, id);
   if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
   const rec = zeileZuRec_(sh, zeile);
+  if (istAnalyse_(rec)) return textAusAnalyse_(id);
   if (!rec['Zustand']) throw new Error('Bitte zuerst den Zustand wählen und speichern.');
   if (MAENGEL_PFLICHT.indexOf(rec['Zustand']) !== -1 && !rec['Mängel']) throw new Error('Bitte zuerst die Mängel beschreiben.');
   let ki = null, quelle = 'Bausteine';
@@ -552,6 +709,22 @@ function erstelleText(id) {
   const r = speichereDetails(id, { titel: titel, beschrieb: beschrieb, maengelText: maengelText, englisch: en });
   r.textQuelle = quelle;
   return r;
+}
+
+/** Stellt Titel, Beschrieb, Zustand und Versand wieder her, wie sie die Analyse geschrieben hat. */
+function textAusAnalyse_(id) {
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id), rec = zeileZuRec_(sh, zeile);
+    if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist bereits «' + rec['Status'] + '» und kann nicht mehr geändert werden.');
+    const q = findeAnalyse_(id);
+    if (!q) throw new Error('Produkt ' + id + ' wurde in der Analyse nicht mehr gefunden.');
+    ausAnalyse_(rec, q); rec['Bearbeitet von'] = nutzer_();
+    schreibe_(sh, zeile, rec);
+    log_('Text aus Analyse', id, q.nr);
+    const r = lade_(id); r.textQuelle = 'Analyse';
+    return r;
+  } finally { lock.releaseLock(); }
 }
 
 /** Aufbau nach dem Ricardo-Guide: Produktname, Einleitung, Zustand und Highlights, Versand, Schlusssatz. */
@@ -701,7 +874,7 @@ function uebersicht() {
       const g = rec['Gelistet am'];
       const tage = g instanceof Date ? Math.floor((jetzt - g.getTime()) / 86400000) : 0;
       out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],
-        zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''),
+        zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''), regal: REGAL[rec['Status']] || '', quelle: String(rec['Quelle Tab'] || ''),
         seit: datum_(rec['Gelistet am'] || rec['Angelegt am']),
         abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeit });
     });
@@ -719,8 +892,9 @@ function uebersicht() {
 function pruefe_(rec) {
   const f = [];
   if (!rec['Startpreis CHF']) f.push('Startpreis fehlt');
-  if (!rec['Zustand']) f.push('Zustand wählen');
-  if (MAENGEL_PFLICHT.indexOf(rec['Zustand']) !== -1 && !rec['Mängel']) f.push('Mängel beschreiben');
+  const ana = istAnalyse_(rec);                                 // Zustand, Prüfung und Mängel stehen dann schon im Text der Analyse
+  if (!rec['Zustand']) f.push(ana ? 'Zustand fehlt in der Analyse' : 'Zustand wählen');
+  if (!ana && MAENGEL_PFLICHT.indexOf(rec['Zustand']) !== -1 && !rec['Mängel']) f.push('Mängel beschreiben');
   if (rec['Getestet'] !== 'ja') f.push('Produkt prüfen und «geprüft» bestätigen');
   if (!rec['Gewicht bis kg'] || !rec['Versandklasse']) f.push('Versandklasse wählen');
   const t = String(rec['Titel']);
@@ -731,9 +905,10 @@ function pruefe_(rec) {
     if (b.length > 5000) f.push('Beschrieb kürzen (max. 5000 Zeichen)');
     if (DOMAIN.test(b) || DOMAIN.test(t)) f.push('Titel oder Beschrieb enthält einen Link, eine Domain oder eine Kontaktangabe');
     if (rec['Zustand'] && b.indexOf(rec['Zustand']) === -1) f.push('Beschrieb nennt den gewählten Zustand nicht: neu erstellen');
-    if (rec['Mängel'] && !rec['Mängel Text']) f.push('Mängel geändert: Titel und Beschrieb neu erstellen');
+    if (ana) { /* keine Mängel-Regeln */ }
+    else if (rec['Mängel'] && !rec['Mängel Text']) f.push('Mängel geändert: Titel und Beschrieb neu erstellen');
     else if (rec['Mängel'] && !/(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt die Mängel nicht: neu erstellen');
-    if (!rec['Mängel'] && /(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt Mängel, erfasst sind keine: neu erstellen');
+    if (!ana && !rec['Mängel'] && /(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt Mängel, erfasst sind keine: neu erstellen');
   }
   return f;
 }
@@ -755,7 +930,9 @@ function lade_(id) {
     getestet: rec['Getestet'] === 'ja', buendelIds: liste_(rec['Bündel-IDs']),
     buendelInhalt: String(rec['Bündel-Inhalt'] || '').split('\n').filter(String),
     masse: masse_(rec['Spezifikationen']),
-    englisch: en.slice(1).join('\n'), englischAlt: en[0] !== pruefsumme_(rec['Titel'] + '\n' + rec['Beschrieb'])
+    englisch: en.slice(1).join('\n'), englischAlt: en[0] !== pruefsumme_(rec['Titel'] + '\n' + rec['Beschrieb']),
+    quelle: String(rec['Quelle Tab']), analyse: istAnalyse_(rec), analyseNr: String(rec['Analyse-Nr'] || ''), fotoOrdner: String(rec['Foto-Ordner'] || ''),
+    geaendert: String(rec['Text geändert'] || ''), regal: REGAL[rec['Status']] || ''
   };
 }
 
@@ -992,7 +1169,7 @@ function vZeile_(v) {
   return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID']), titel: v['Titel'], am: datum_(v['Verkauft am']),
     total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
     name: [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer']), kaeufer: String(v['Käufer']),
-    ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'], klasse: v['Versandklasse'] || v['Lieferart'] };
+    ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'] || REGAL[v['Status']] || '', klasse: v['Versandklasse'] || v['Lieferart'] };
 }
 
 /** aktion: 'gepackt' oder 'bezahlt'. */
@@ -1155,7 +1332,7 @@ let LANG = 'de';
 
 function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
-  const f = { startDaten: startDaten, suche: suche, starteListing: starteListing, lade: lade, speichereDetails: speichereDetails,
+  const f = { startDaten: startDaten, suche: suche, analyseListe: analyseListe, starteListing: starteListing, lade: lade, speichereDetails: speichereDetails,
     erstelleText: erstelleText, buendelHinzu: buendelHinzu, buendelLeeren: buendelLeeren, freiesListing: freiesListing,
     markiereGelistet: markiereGelistet, setzeStatus: setzeStatus,
     uebersicht: uebersicht, importVerkaeufe: importVerkaeufe, verkaeufe: verkaeufe,
@@ -1191,6 +1368,14 @@ const EN_REGELN = [
   [/^Listing (\S+) ist bereits «(.+)» und kann nicht mehr geändert werden\.$/, function (m, i, s) { return 'Listing ' + i + ' is already "' + st_(s) + '" and can no longer be changed.'; }],
   [/^(\S+) ist bereits in einem Listing(?: \(Bündel (\S+)\))?\.$/, function (m, a, b) { return a + ' is already in a listing' + (b ? ' (bundle ' + b + ')' : '') + '.'; }],
   [/^Unbekannter Zustand\.$/, 'Unknown condition.'],
+  [/^Produkt (\S+) hat in der Analyse keinen Startpreis\.$/, 'Product $1 has no starting price in the analysis.'],
+  [/^Produkt (\S+) wurde in der Analyse nicht mehr gefunden\.$/, 'Product $1 is no longer in the analysis.'],
+  [/^Stück (\S+) gibt es nicht\.$/, 'Item $1 does not exist.'],
+  [/^Stück (\S+) wurde weder in der Analyse noch in den Such-Tabs des Return Tools gefunden\.$/, 'Item $1 was found neither in the analysis nor in the search tabs of the Return Tool.'],
+  [/^Stück (\S+) hat keinen Startpreis\.$/, 'Item $1 has no starting price.'],
+  [/^Stück (\S+) aus dem Bündel wurde nicht mehr gefunden\..*$/, 'Item $1 of the bundle was not found any more. Please discard the listing and create it again.'],
+  [/^Der Preis des Hauptstücks lässt sich nicht mehr bestimmen\..*$/, 'The price of the main item cannot be determined any more. Please discard the listing and create it again.'],
+  [/^Zustand fehlt in der Analyse$/, 'Condition missing in the analysis'],
   [/^Bitte zuerst den Zustand wählen und speichern\.$/, 'Please choose the condition and save first.'],
   [/^Bitte zuerst die Mängel beschreiben\.$/, 'Please describe the defects first.'],
   [/^Das ist kein gültiger Ricardo-Angebotslink\..*$/, 'This is not a valid Ricardo listing link. Please paste the address of the published listing.'],

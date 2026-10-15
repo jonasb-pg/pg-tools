@@ -162,6 +162,11 @@
 
       <!-- ===================== LISTEN ===================== -->
       <section id="s-listen">
+        <div class="karte" id="ana-karte" hidden>
+          <div class="kopf"><h2 data-t="ana.titel"></h2><button onclick="ladeAnalyse()" data-t="aktualisieren"></button></div>
+          <p class="still" style="margin:6px 0 0" data-t="ana.hilfe"></p>
+          <div id="ana-liste"></div>
+        </div>
         <div class="karte">
           <input type="text" id="q" data-tp="such.platz" autocomplete="off" autofocus>
           <p class="still" style="margin:10px 0 0" data-t="such.hilfe"></p>
@@ -196,6 +201,7 @@
               <h3 data-t="s1.titel"></h3>
               <label><span data-t="s1.zustand"></span> <small data-t="s1.zustand.hilfe"></small></label>
               <div class="wahl" id="d-zustand"></div>
+              <p class="still" id="d-ana" style="margin:6px 0 0" hidden></p>
               <div id="d-maengel-block">
                 <label for="d-maengel"><span data-t="s1.maengel"></span> <small id="d-maengel-hinweis"></small></label>
                 <textarea id="d-maengel" rows="2" data-tp="s1.maengel.platz"></textarea>
@@ -224,7 +230,8 @@
             <div class="nr">2</div>
             <div class="inhalt">
               <h3 data-t="s2.titel"></h3>
-              <p><button class="haupt-knopf" onclick="textErstellen()" data-t="s2.erstellen"></button> <span class="still" id="t-quelle"></span></p>
+              <p><button class="haupt-knopf" id="t-knopf" onclick="textErstellen()"></button> <span class="still" id="t-quelle"></span></p>
+              <div id="t-geaendert" class="meldung warn" hidden></div>
               <label for="t-titel"><span data-t="s2.titelfeld"></span> <small id="t-zahl"></small></label>
               <input type="text" id="t-titel" maxlength="60">
               <label for="t-beschrieb"><span data-t="s2.beschrieb"></span> <small id="b-zahl"></small></label>
@@ -353,6 +360,16 @@
     'such.keine': ['<strong>Nicht im Return Tool gefunden.</strong> Retouren zuerst im Erfassungstool erfassen. Für Reuse-Stücke «Stück ohne Inventar listen» verwenden.', '<strong>Not found in the Return Tool.</strong> Record returns in the intake tool first. For Reuse items use «List an item without inventory».'],
     'such.anders': ['<strong>Nicht für Ricardo vorgesehen.</strong> Das Produkt liegt in einem anderen Kanal:', '<strong>Not meant for Ricardo.</strong> The product is in another channel:'],
     'such.trotzdem': ['Trotzdem listen', 'List anyway'], 'such.trotzdem.frage': ['{0} liegt im Kanal «{1}». Trotzdem auf Ricardo listen? Danach im Return Tool den Kanal auf «Online» umstellen.', '{0} is in the channel «{1}». List it on Ricardo anyway? Afterwards change the channel to «Online» in the Return Tool.'],
+    'ana.titel': ['Aus der Analyse, bereit zum Listen', 'From the analysis, ready to list'],
+    'ana.hilfe': ['Titel, Beschrieb, Zustand, Startpreis, Versand und Fotos hat die Analyse vorbereitet. Stück aus dem Regal «Ricardo Offline» nehmen.', 'Title, description, condition, starting price, shipping and photos were prepared in the analysis. Take the item from the shelf «Ricardo Offline».'],
+    'ana.leer': ['Keine analysierten Stücke offen.', 'No analysed items open.'], 'th.zustand': ['Zustand', 'Condition'], 'th.fotos': ['Fotos', 'Photos'], 'th.analysiert': ['Analysiert', 'Analysed'],
+    'ana.ordner': ['Ordner', 'Folder'], 'ana.quelle': ['aus der Analyse', 'from the analysis'],
+    'ana.gesperrt': ['Zustand und Prüfung stammen aus der Analyse {0} und lassen sich hier nicht ändern.', 'Condition and check come from analysis {0} and cannot be changed here.'],
+    's2.analyse': ['Text aus der Analyse wiederherstellen', 'Restore text from the analysis'], 's2.analyse.frage': ['Den Text der Analyse wiederherstellen? Deine Änderungen gehen verloren.', 'Restore the text from the analysis? Your changes will be lost.'],
+    's2.analyse.ok': ['Text aus der Analyse. Bitte gegenlesen.', 'Text from the analysis. Please proofread.'],
+    's2.geaendert': ['Text der Analyse wurde {0}.', 'The analysis text was changed ({0}).'],
+    'f.fotos.ana': ['Fotos aus dem Drive-Ordner der Analyse laden', 'Upload the photos from the Drive folder of the analysis'], 'f.fotos.link': ['Foto-Ordner öffnen', 'Open photo folder'],
+    'a.regal': [', Regal «{0}»', ', shelf «{0}»'], 'a.analyse': [', Analyse {0}', ', analysis {0}'],
     'frei.link': ['Stück ohne Inventar listen (z.B. Reuse)', 'List an item without inventory (e.g. Reuse)'],
     'frei.text': ['Für Stücke, die nicht im Return Tool stehen. Das Tool vergibt eine eigene Nummer (RC-0001), die als Referenz-Nr. zu Ricardo geht.', 'For items that are not in the Return Tool. The tool assigns its own number (RC-0001), which goes to Ricardo as reference no.'],
     'frei.name': ['Bezeichnung', 'Name'], 'frei.name.platz': ['Marke, Modell, Produkt', 'Brand, model, product'], 'frei.preis': ['Startpreis CHF', 'Starting price CHF'], 'frei.neu': ['Neupreis CHF', 'New price CHF'], 'frei.frei': ['freiwillig', 'optional'],
@@ -377,8 +394,8 @@
     's1.speichern': ['Angaben speichern', 'Save details'], 's1.versand': ['Versand: {0}, CHF {1}', 'Shipping: {0}, CHF {1}'],
     's1.zustand.fehlt': ['Bitte den Zustand wählen.', 'Please choose the condition.'], 's1.klasse.fehlt': ['Bitte die Versandklasse wählen.', 'Please choose the shipping class.'],
     'b.titel': ['Bündel bilden', 'Build a bundle'], 'b.hilfe': ['(freiwillig, z.B. mehrere Filamente als Set)', '(optional, e.g. several filaments as a set)'],
-    'b.platz': ['PG-ID des weiteren Stücks, z.B. PG-4571', 'PG-ID of the additional item, e.g. PG-4571'], 'b.plus': ['Hinzufügen', 'Add'], 'b.weg': ['Bündel auflösen', 'Dissolve bundle'],
-    'b.text': ['Die PG-ID steht in der Trefferliste der Suche. Startpreis und Neupreis werden zusammengezählt, Titel und Beschrieb müssen danach neu erstellt werden.', 'The PG-ID is shown in the search results. Starting price and new price are added up; title and description must be created again afterwards.'],
+    'b.platz': ['PG-ID oder RC-Nummer des weiteren Stücks, z.B. PG-4571', 'PG-ID or RC number of the additional item, e.g. PG-4571'], 'b.plus': ['Hinzufügen', 'Add'], 'b.weg': ['Bündel auflösen', 'Dissolve bundle'],
+    'b.text': ['Analysierte Stücke, Stücke aus dem Return Tool und Stücke ohne Inventar (RC-…) lassen sich mischen. Startpreis und Neupreis werden zusammengezählt, Titel und Beschrieb müssen danach neu erstellt und das Bündel geprüft werden.', 'Analysed items, items from the Return Tool and items without inventory (RC-…) can be mixed. Starting price and new price are added up; title and description must be created again and the bundle checked afterwards.'],
     'b.leer': ['Noch kein Bündel.', 'No bundle yet.'], 'b.frage': ['Bündel auflösen? Die weiteren Stücke werden wieder frei.', 'Dissolve the bundle? The additional items become available again.'],
     's2.titel': ['Titel und Beschrieb', 'Title and description'], 's2.erstellen': ['Titel und Beschrieb erstellen', 'Create title and description'], 's2.titelfeld': ['Titel', 'Title'], 's2.beschrieb': ['Beschrieb', 'Description'],
     's1.masse': ['Laut Return Tool (Produkt ohne Verpackung): {0}', 'According to the Return Tool (product without packaging): {0}'],
@@ -581,6 +598,21 @@
   }
   function start(id) { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); }
 
+  /* ---------- Aus der Analyse ---------- */
+  var ANA = [];
+  function ladeAnalyse() { still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); }); }
+  function zeichneAnalyse() {
+    $('ana-karte').hidden = false;
+    if (!ANA.length) { $('ana-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('ana.leer') + '</p>'; return; }
+    var z = '';
+    ANA.forEach(function (a) {
+      z += '<tr><td class="mono">' + esc(a.id) + '</td><td>' + esc(a.titel || a.name) + '</td><td>' + esc(zu(a.zustand)) + '</td><td>' + (a.preis ? 'CHF ' + Number(a.preis).toFixed(2) : '') + '</td>' +
+        '<td>' + esc(a.fotos || 0) + (/^https:\/\//.test(a.ordner) ? ' <a href="' + esc(a.ordner) + '">' + t('ana.ordner') + '</a>' : '') + '</td><td class="mono">' + esc(a.erfasst) + (a.kuerzel ? ' ' + esc(a.kuerzel) : '') + '</td>' +
+        '<td><button class="haupt-knopf" onclick="start(\'' + esc(a.id) + '\')">' + t('such.listen') + '</button></td></tr>';
+    });
+    $('ana-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.zustand', 'th.preis', 'th.fotos', 'th.analysiert', ''], z);
+  }
+
   /* ---------- Arbeitsbereich ---------- */
   function oeffne(r) {
     R = r; $('arbeit').hidden = false;
@@ -597,7 +629,14 @@
   function aktualisiere(r) {
     var wahl = R ? R.zustandWahl : ''; R = r; R.zustandWahl = wahl || r.zustand;
     $('a-titel').textContent = r.id + (r.buendelIds.length ? t('a.weitere', r.buendelIds.length) : '') + ': ' + r.bezeichnung;
-    $('a-meta').textContent = t('a.meta', r.lagerort || t('a.unbekannt'), r.ean || t('a.keine'), r.startpreis) + (r.neupreis ? t('a.neupreis', Number(r.neupreis).toFixed(2)) : '');
+    $('a-meta').textContent = t('a.meta', r.lagerort || t('a.unbekannt'), r.ean || t('a.keine'), r.startpreis) + (r.neupreis ? t('a.neupreis', Number(r.neupreis).toFixed(2)) : '') +
+      (r.analyseNr ? t('a.analyse', r.analyseNr) : '') + (r.regal ? t('a.regal', r.regal) : '');
+    /* Aus der Analyse: Zustand und Prüfung stehen fest, der Text lässt sich wiederherstellen */
+    $('d-ana').hidden = !r.analyse; $('d-ana').textContent = r.analyse ? t('ana.gesperrt', r.analyseNr) : '';
+    Array.prototype.forEach.call($('d-zustand').querySelectorAll('button'), function (b) { b.disabled = !!r.analyse; });
+    $('d-getestet').disabled = !!r.analyse;
+    $('t-knopf').textContent = t(r.analyse ? 's2.analyse' : 's2.erstellen');
+    $('t-geaendert').hidden = !(r.analyse && r.geaendert); $('t-geaendert').textContent = r.geaendert ? t('s2.geaendert', r.geaendert) : '';
     $('a-status').textContent = st(r.status); $('a-status').className = 'etikett' + (r.status === 'Bereit' ? ' hell' : '');
     $('d-versand').textContent = r.klasse ? t('s1.versand', r.klasse, r.versand) : '';
     $('t-en').hidden = L !== 'en' || !r.englisch; $('t-en-text').textContent = r.englisch || '';
@@ -605,7 +644,6 @@
     $('d-masse').hidden = !r.masse.length; $('d-masse').textContent = t('s1.masse', r.masse.join(' · '));
     maengelHinweis();
     $('b-inhalt').innerHTML = r.buendelInhalt.length > 1 ? '<ul>' + r.buendelInhalt.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<p class="still">' + t('b.leer') + '</p>';
-    $('buendel').hidden = !!r.frei;
     if (r.buendelIds.length) $('buendel').open = true;
     zaehle();
     if (r.fehlt.length) {
@@ -619,13 +657,13 @@
   /* Solange Eingaben nicht gespeichert sind, bleiben die Kopierfelder zu: Kopiert wird nur, was im Sheet steht */
   function offen() { if (R && !$('arbeit').hidden) { $('karte-zu').textContent = t('s3.offen'); $('karte-zu').hidden = false; $('karte-auf').hidden = true; } }
   function maengelHinweis() {
-    $('d-maengel-block').hidden = !R.zustandWahl || R.zustandWahl === 'Neu und originalverpackt';
+    $('d-maengel-block').hidden = !R.zustandWahl || R.zustandWahl === 'Neu und originalverpackt' || !!R.analyse;
     $('d-maengel-hinweis').textContent = t(S.maengelPflicht.indexOf(R.zustandWahl) !== -1 ? 's1.maengel.pflicht' : 's1.maengel.frei');
   }
   function zustandKnoepfe(aktiv) {
     R.zustandWahl = aktiv || '';
     $('d-zustand').innerHTML = S.zustaende.map(function (z, i) {
-      return '<button type="button" class="' + (z === R.zustandWahl ? 'an' : '') + '" onclick="zustandKnoepfe(S.zustaende[' + i + ']);maengelHinweis();offen()">' + esc(zu(z)) + '</button>';
+      return '<button type="button"' + (R.analyse ? ' disabled' : '') + ' class="' + (z === R.zustandWahl ? 'an' : '') + '" onclick="zustandKnoepfe(S.zustaende[' + i + ']);maengelHinweis();offen()">' + esc(zu(z)) + '</button>';
     }).join('');
   }
   var KLASSEN = ['2', '10', '30', 'S'], klasseWahl = '';
@@ -653,11 +691,13 @@
     var los = function () {
       ruf('erstelleText', [R.id], function (r) {
         $('t-titel').value = r.titel; $('t-beschrieb').value = r.beschrieb;
-        $('t-quelle').textContent = t(r.textQuelle === 'Claude' ? 's2.claude' : 's2.bausteine');
+        $('t-quelle').textContent = t(r.textQuelle === 'Analyse' ? 's2.analyse.ok' : r.textQuelle === 'Claude' ? 's2.claude' : 's2.bausteine');
+        if (r.textQuelle === 'Analyse') fuelle(r);
         aktualisiere(r);
       });
     };
-    if (R.titel) frage(t('s2.ersetzen'), los); else los();
+    if (R.analyse) { if (R.geaendert) frage(t('s2.analyse.frage'), los); else los(); }
+    else if (R.titel) frage(t('s2.ersetzen'), los); else los();
   }
   function textSpeichern() { ruf('speichereDetails', [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }], aktualisiere); }
   function zaehle() {
@@ -671,7 +711,7 @@
   /* ---------- Listing-Karte in der Reihenfolge des Ricardo-Formulars ---------- */
   function felder(r) {
     var f = [
-      [t('f.fotos'), t('f.fotos.w'), t('f.fotos.h'), null],
+      [t('f.fotos'), r.fotoOrdner ? t('f.fotos.ana') : t('f.fotos.w'), t('f.fotos.h'), null, r.fotoOrdner],
       [t('f.titel'), r.titel, '', r.titel],
       [t('f.typ'), t('f.typ.w'), t('f.typ.h'), null],
       [t('f.zustand'), zu(r.zustand), t('f.zustand.h'), null],
@@ -687,7 +727,7 @@
     ];
     $('felder').innerHTML = f.map(function (x, i) {
       var knopf = x[3] != null ? '<button onclick="kopiere(' + i + ', this)">' + t('kopieren') + '</button>' : '';
-      return '<div class="feld"><div class="name">' + esc(x[0]) + '</div><div class="wert">' + esc(x[1]) + (x[2] ? '<small>' + esc(x[2]) + '</small>' : '') + '</div><div>' + knopf + '</div></div>';
+      return '<div class="feld"><div class="name">' + esc(x[0]) + '</div><div class="wert">' + esc(x[1]) + (/^https:\/\//.test(x[4] || '') ? ' <a href="' + esc(x[4]) + '">' + t('f.fotos.link') + '</a>' : '') + (x[2] ? '<small>' + esc(x[2]) + '</small>' : '') + '</div><div>' + knopf + '</div></div>';
     }).join('');
     felder.daten = f;
   }
@@ -716,7 +756,7 @@
   function abbrechen() {
     frage(t('s4.abbr.frage', R.id), function () { ruf('setzeStatus', [R.id, 'Abgebrochen'], function () { schliesse(); }); });
   }
-  function schliesse() { R = null; $('arbeit').hidden = true; $('q').focus(); window.scrollTo(0, 0); }
+  function schliesse() { R = null; $('arbeit').hidden = true; $('q').focus(); window.scrollTo(0, 0); ladeAnalyse(); }
 
   /* ---------- Verkäufe ---------- */
   function importieren() {
@@ -874,7 +914,7 @@
       if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '" onclick="unverkauft(\'' + esc(x.id) + '\')">' + t('u.unverkauft') + '</button>';
       var m = x.abgelaufen ? '<span class="etikett hell">' + t('u.abgelaufen') + '</span>' : '<span class="etikett">' + esc(st(x.status)) + '</span>';
       z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (x.link ? '<span class="klein"><a href="' + esc(x.link) + '">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
-        '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + '</td><td>' + a + '</td></tr>';
+        '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + (x.regal ? '<span class="klein">' + esc(x.regal) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
     });
     $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
   }
@@ -890,6 +930,7 @@
   lade(true);
   google.script.run.withSuccessHandler(function (s) {
     lade(false); S = s; texte(); $('q').focus();
+    ladeAnalyse();
     still('verkaeufe', [], function (v) { marke($('z-verkauf'), v.offen.length); });
     still('retouren', [], function (r) { marke($('z-retour'), r.offen.length); });
   }).withFailureHandler(function (e) {
