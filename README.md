@@ -15,6 +15,8 @@ Analyse Tool von Pretty Good: geführte Prüfung von Retouren am Analyseplatz, m
 | `docs/secrets.md` | Wo Schlüssel liegen (nie Werte) |
 | `docs/matchmaker.md` | Matchmaker Sheet, Script, Integration |
 | `docs/betrieb.md` | Einspielen, Go-live, Kosten, Tests |
+| `docs/vorschlag-matchmaker.md` | Befund und Vorschlag Matchmaker vereinfachen |
+| `docs/ricardo-tool-bestand.md` | Ricardo Tool: Ist, Lücken, Anpassungen |
 | `docs/standardablauf.md` | Ablauf am Analyseplatz (gleich wie Projekt-Doc «analyse-tool-standardablauf») |
 | `docs/entscheide.md` | Entscheid-Log |
 | `data/` | Snapshot Einstellungen, extrahierte Code-Fakten |
