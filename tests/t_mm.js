@@ -1,6 +1,6 @@
 const vm=require('vm'),fs=require('fs');const P=new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?()=>'':P,apply:()=>P,construct:()=>P});
 const c={console,Session:P,PropertiesService:P,Utilities:P,SpreadsheetApp:P,DriveApp:P,ScriptApp:P,HtmlService:P,LockService:P,UrlFetchApp:P,CacheService:P,ContentService:P};
-vm.createContext(c);vm.runInContext(fs.readFileSync('../src/Code.gs','utf8'),c);
+vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/../src/Code.gs','utf8'),c);
 c.ANTWORT = '```json\n{"treffer":[{"nr":3,"urteil":"ähnlich","hinweis":"x"},{"nr":2,"urteil":"passt","hinweis":"Bosch Akkusauger"},{"nr":7,"urteil":"passt"}]}\n```';
 vm.runInContext(`
 einst_=function(){return {}}; produkt_=function(){return {'PG-ID':'PG-1',Bezeichnung:'Bosch Unlimited 7',Kategorie:'Haushalt',Link:''}}; log_=function(){};

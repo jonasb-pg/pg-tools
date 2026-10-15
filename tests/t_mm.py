@@ -1,6 +1,6 @@
 import json
 from playwright.sync_api import sync_playwright
-html=open('../src/Index.html',encoding='utf8').read()
+html=open('src/Index.html',encoding='utf8').read()
 stub="""<script>window.CALLS=[];window.ARGS={};window.google={script:{url:{getLocation:function(cb){}},run:(function(){var ok;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(){return o},api:function(l,n,a){CALLS.push(n);ARGS[n]=a;var f=ok;
 if(n==='startDaten')setTimeout(function(){f({version:'x',admin:false,zahlen:{offen:3},listen:{kategorie:[]},reparatur:[]})},5);
 if(n==='matchmaker')setTimeout(function(){f(window.MMR)},300);

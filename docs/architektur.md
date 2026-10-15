@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-15.12` (Test, nicht live). Live: Bereitstellung Version 7.
+Stand: Version `2026-10-15.13` (Test, nicht live). Live: Bereitstellung Version 7.
 
 ## Komponenten
 

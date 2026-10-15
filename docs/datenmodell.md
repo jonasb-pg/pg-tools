@@ -1,6 +1,6 @@
 # Datenmodell
 
-<!-- Automatisch erzeugt mit tools/gen.py aus src/Code.gs (Version 2026-10-15.12). Nicht von Hand ändern. -->
+<!-- Automatisch erzeugt mit tools/gen.py aus src/Code.gs (Version 2026-10-15.13). Nicht von Hand ändern. -->
 
 
 Sheet **ANALYSE TOOL** `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM`. Spaltennamen sind Schlüssel: Der Code liest und schreibt nach Name, nicht nach Position. `einrichten()` prüft, ob alle Spalten da sind.

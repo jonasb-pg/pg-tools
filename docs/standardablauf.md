@@ -1,6 +1,6 @@
 # Analyse Tool: Standardablauf
 
-Stand 15.10.2026, Testversion 2026-10-15.12 (live ist noch Version 7). Entscheide von Jonas, umgesetzt im Analyse Tool (Web-App am Google Sheet «ANALYSE TOOL»).
+Stand 15.10.2026, Testversion 2026-10-15.13 (live ist noch Version 7). Entscheide von Jonas, umgesetzt im Analyse Tool (Web-App am Google Sheet «ANALYSE TOOL»).
 
 Technische Doku (Code, Datenmodell, Stati, Prompts, APIs, Entscheid-Log): GitHub-Repo `jonasb-pg/pg-analyse-tool` (privat). Dieses Dokument beschreibt nur den Ablauf.
 

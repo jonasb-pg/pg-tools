@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.12';
+const VERSION = '2026-10-15.13';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -290,6 +290,9 @@ const EN_REGELN = [
   [/^Produkt (\S+) liegt nicht im Regal Matchmaker\.$/, 'Product $1 is not on the Matchmaker shelf.'],
   [/^Der Matchmaker-Abgleich hat nicht geklappt \((.*)\)\.$/, 'The Matchmaker check failed ($1).'],
   [/^Der Suchauftrag fehlt\.$/, 'The search request is missing.'],
+  [/^Der Suchauftrag ist im Matchmaker Sheet nicht mehr offen\.$/, 'The search request is no longer open in the Matchmaker sheet.'],
+  [/^Beim Wiedereinstieg lässt sich nur der Ausgang ändern, nicht die Analyse\.$/, 'On re-entry only the exit can change, not the analysis.'],
+  [/^Dieser Suchauftrag hat schon nicht geklappt\.$/, 'This search request already did not work out.'],
   [/^Der gespeicherte Stand der Analyse fehlt\.$/, 'The saved state of the analysis is missing.'],
   [/^Der Stand der Analyse ist zu gross zum Speichern\.$/, 'The state of the analysis is too large to save.'],
   [/^Produkt (\S+) wartet nicht auf eine Reparatur\.$/, 'Product $1 is not waiting for a repair.'],
@@ -403,6 +406,8 @@ function ich_() { try { return Session.getActiveUser().getEmail() || ''; } catch
 function key_() { return PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY') || ''; }
 /** Freitext darf im Sheet nie als Formel landen. */
 function txt_(s) { s = String(s == null ? '' : s).trim(); return /^[=+\-@]/.test(s) ? "'" + s : s; }
+/** Immer als Text speichern (Sheets macht sonst aus «0815» die Zahl 815 oder aus «1/2/3» ein Datum): für Passwort, Login, Teilenummer, EAN. trim = false lässt Leerzeichen stehen (Passwort). */
+function txtFest_(s, trim) { s = String(s == null ? '' : s); if (trim !== false) s = s.trim(); return s ? "'" + s : ''; }
 function zahl_(v) {
   if (typeof v === 'number') return v;
   const s = String(v == null ? '' : v).replace(/[^0-9,.\-]/g, '');
@@ -1586,11 +1591,12 @@ function reparaturPause(d) {
   if (p['Analyse-Status'] === 'Erledigt') throw new Error('Produkt ' + id + ' ist bereits analysiert.');
   if (!was) throw new Error('Bitte eingeben, was zu reparieren ist.');
   const stand = JSON.stringify({ was: was, teil: teil, kuerzel: kuerzel, zeit: zeit_(), stand: d.stand || null });
-  if (stand.length > 8500) throw new Error('Der Stand der Analyse ist zu gross zum Speichern.');
+  if (Utilities.newBlob(stand).getBytes().length > 8800) throw new Error('Der Stand der Analyse ist zu gross zum Speichern.');      // Script-Property: max. 9 KB pro Wert (Bytes, nicht Zeichen)
   blatt_('Bestellliste');                                                    // legt den Tab beim ersten Mal an, ausserhalb der Sperre
   gesperrt_(function () {
-    PropertiesService.getScriptProperties().setProperty(REP_STAND + id, stand);
-    if (teil) schreib_('Bestellliste', [{ 'Zeit': zeit_(), 'PG-ID': id, 'Produkt': txt_(p['Bezeichnung']), 'Was': txt_(was), 'Teil': txt_(teil), 'Teilenummer': txt_(String(t.nummer || '').slice(0, 80)),
+    try { PropertiesService.getScriptProperties().setProperty(REP_STAND + id, stand); }
+    catch (err) { log_('Reparatur-Fehler', id, err.message); throw new Error('Der Stand der Analyse ist zu gross zum Speichern.'); }
+    if (teil) schreib_('Bestellliste', [{ 'Zeit': zeit_(), 'PG-ID': id, 'Produkt': txt_(p['Bezeichnung']), 'Was': txt_(was), 'Teil': txt_(teil), 'Teilenummer': txtFest_(String(t.nummer || '').slice(0, 80)),
       'Shop': txt_(String(t.shop || '').slice(0, 80)), 'Preis CHF': zahl_(t.preis), 'Link': /^https?:\/\/\S+$/i.test(String(t.link || '').trim()) ? String(t.link).trim() : '', 'Kürzel': kuerzel, 'Status': 'Offen' }]);
     const st = {};
     lies_('Produkte').z.forEach(function (r) { if (String(r['PG-ID']) === id) st[r._r] = 'Reparatur'; });
@@ -1760,6 +1766,9 @@ function abschliessen(d) {
       const r = lies_('Analysen').z.filter(function (y) { return String(y['PG-ID']) === pg; }).pop();
       if (!r || r['Regal'] !== 'Matchmaker') throw new Error('Produkt ' + pg + ' liegt nicht im Regal Matchmaker.');
       try { alt = (JSON.parse(String(r['Stand'] || '') || 'null') || {}).mm || null; } catch (err) { alt = null; }
+      /* Beim Wiedereinstieg zählt nur der Ausgang: Die Analyse selbst (reusable, Grade) muss gleich bleiben, und der alte Auftrag zählt nicht mehr. */
+      if (String(r['Reusable']) !== (x.reusable ? 'Ja' : 'Nein') || String(r['Grade']) !== String(x.grade)) throw new Error('Beim Wiedereinstieg lässt sich nur der Ausgang ändern, nicht die Analyse.');
+      if (mm && alt && mm.schluessel === alt.schluessel) throw new Error('Dieser Suchauftrag hat schon nicht geklappt.');
       const z = {}, setze = function (feld, wert) { z[r._r] = wert; setz_('Analysen', feld, z); };
       setze('Regal', regal);
       setze('Matchmaker-Auftrag', txt_(String(r['Matchmaker-Auftrag'] || '') + ' → nicht geklappt ' + heute + (mm ? '; neu: ' + auftrag : '')));
@@ -1815,6 +1824,8 @@ function mmPruefen_(d) {
   const m = d.mm || {};
   if (!String(m.gesucht || '').trim() || !String(m.schluessel || '').trim()) throw new Error('Der Suchauftrag fehlt.');
   if (!d.stand || !d.stand.s) throw new Error('Der gespeicherte Stand der Analyse fehlt.');
+  /* Der Auftrag muss im Matchmaker Sheet noch offen sein (Schlüssel aus Gesucht + Mehr Infos). Läuft ausserhalb der Sperre. */
+  if (!mmAuftraege_(einst_()).liste.some(function (a) { return mmSchluessel_(a) === String(m.schluessel); })) throw new Error('Der Suchauftrag ist im Matchmaker Sheet nicht mehr offen.');
   return { gesucht: String(m.gesucht).trim().slice(0, 200), mehr: String(m.mehr || '').trim().slice(0, 300), limit: zahl_(m.limit), hinweis: String(m.hinweis || '').slice(0, 120), schluessel: String(m.schluessel).slice(0, 600) };
 }
 
@@ -1890,13 +1901,12 @@ function fotoHochladen(id, art, daten) {
   const bytes = Utilities.base64Decode(m[2]);
   if (bytes.length > FOTO_MAX_MB * 1048576) throw new Error('Das Foto ist zu gross.');
   const e = einst_(), p = produkt_(id), pg = String(p['PG-ID']);
-  gesperrt_(function () {
-    const f = fotoOrdner_(e, pg, true), alle = [], it = f.getFiles();
-    while (it.hasNext()) { const x = it.next(); if (x.getName().indexOf(FOTO_ARTEN[art]) === 0) alle.push(x); }
-    if (art === 'hauptbild') alle.forEach(function (x) { x.setTrashed(true); });
-    const nr = art === 'hauptbild' ? '' : ' ' + ('0' + (alle.length + 1)).slice(-2);
-    f.createFile(Utilities.newBlob(bytes, 'image/' + m[1], FOTO_ARTEN[art] + nr + ' ' + pg + (m[1] === 'png' ? '.png' : '.jpg')));
-  });
+  /* Nur das Anlegen des Ordners braucht die Sperre (sonst zwei Ordner gleichen Namens). Hochladen läuft ohne Sperre, damit andere Schreibvorgänge nicht warten. */
+  const f = gesperrt_(function () { return fotoOrdner_(e, pg, true); }), alle = [], it = f.getFiles();
+  while (it.hasNext()) { const x = it.next(); if (x.getName().indexOf(FOTO_ARTEN[art]) === 0 && !x.isTrashed()) alle.push(x); }
+  const nr = art === 'hauptbild' ? '' : ' ' + ('0' + (alle.length + 1)).slice(-2) + '-' + Utilities.formatDate(new Date(), TZ, 'HHmmss');
+  f.createFile(Utilities.newBlob(bytes, 'image/' + m[1], FOTO_ARTEN[art] + nr + ' ' + pg + (m[1] === 'png' ? '.png' : '.jpg')));
+  if (art === 'hauptbild') alle.forEach(function (x) { x.setTrashed(true); });                  // erst nach dem neuen Hauptbild das alte weg
   log_('Foto', pg, art);
   return fotoStand(pg);
 }
@@ -1978,7 +1988,7 @@ function ricardoPruefen_(d, u, x, e, p) {
   if (!(preis > 0)) throw new Error('Bitte den Startpreis eintragen.');
   const st = fotoStand(String(p['PG-ID'])), fehlt = fotoFehlt_(st, !!String(d.maengel || '').trim());
   if (fehlt.length) throw new Error('Es fehlen noch Fotos: ' + fehlt.join(', ') + '.');
-  return { 'PG-ID': String(p['PG-ID']), 'Bezeichnung': txt_(p['Bezeichnung']), 'EAN': ean_(p['Barcode']), 'Titel': txt_(titel), 'Artikelbeschrieb': txt_(beschrieb.slice(0, 5000)),
+  return { 'PG-ID': String(p['PG-ID']), 'Bezeichnung': txt_(p['Bezeichnung']), 'EAN': txtFest_(ean_(p['Barcode'])), 'Titel': txt_(titel), 'Artikelbeschrieb': txt_(beschrieb.slice(0, 5000)),
     'Ricardo-Zustand': ricardoZustand_(x), 'Grade': x.grade, 'Startpreis CHF': preis, 'Neupreis CHF': zahl_(p['Neupreis CHF']) || '', 'Versandklasse': v.name, 'Versand CHF': v.preis,
     'Foto-Ordner': st.ordner, 'Fotos': st.liste.length };
 }
@@ -2086,7 +2096,7 @@ function ersatzteilSuche(id, name, teil, kuerzel) {
     'Hinweis': txt_(String(d.hinweis || '').slice(0, 600)), 'Kürzel': String(kuerzel || '').trim().toUpperCase() };
   gesperrt_(function () {
     schreib_('Ersatzteile', (angebote.length ? angebote : [{}]).map(function (a) {           // ohne Treffer bleibt eine Zeile: So sieht man, was nicht zu finden war
-      const o = { 'Teil': txt_(a.teil), 'Teilenummer': txt_(a.teilenummer), 'Art': a.art === 'Nachbau' ? 'Nachbau' : (a.art === 'Original' ? 'Original' : ''),
+      const o = { 'Teil': txt_(a.teil), 'Teilenummer': txtFest_(a.teilenummer), 'Art': a.art === 'Nachbau' ? 'Nachbau' : (a.art === 'Original' ? 'Original' : ''),
         'Preis CHF': zahl_(a.preis), 'Shop': txt_(a.shop), 'Link': a.link ? String(a.link) : '', 'Lieferbar': a.lieferbar === 'Ja' || a.lieferbar === 'Nein' ? a.lieferbar : '' };
       Object.keys(fest).forEach(function (f) { o[f] = fest[f]; });
       return o;
@@ -2125,7 +2135,7 @@ function kontoSpeichern(k, kuerzel) {
   if (TESTKONTO_DIENSTE.indexOf(dienst) < 0 || !login) throw new Error('Bitte Dienst und Login eingeben.');
   blatt_('Testkonten');
   gesperrt_(function () {
-    const werte = { 'Dienst': dienst, 'Login': txt_(login), 'Passwort': txt_(String(k.passwort || '').slice(0, 200)), 'Gerät': txt_(String(k.geraet || '').slice(0, 120)),
+    const werte = { 'Dienst': dienst, 'Login': txtFest_(login), 'Passwort': txtFest_(String(k.passwort || '').slice(0, 200), false), 'Gerät': txt_(String(k.geraet || '').slice(0, 120)),
       'Notiz': txt_(String(k.notiz || '').slice(0, 500)), 'Aktiv': k.aktiv === false ? 'Nein' : 'Ja', 'Geändert von': wer, 'Geändert am': zeit_() };
     if (k.r) {
       const r = lies_('Testkonten').z.filter(function (x) { return x._r === Number(k.r); })[0];

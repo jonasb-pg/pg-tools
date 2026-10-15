@@ -5,10 +5,11 @@ vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/../src/Code.gs',
 vm.runInContext(`
 var DB={Testkonten:[], Testmittel:[{Testmittel:'Steckdose',Vorhanden:''},{Testmittel:'Testkonto Google',Vorhanden:'Nein'},{Testmittel:'Testkonto Apple-ID',Vorhanden:'Nein'}]};
 lies_=function(n){return {kopf:[],z:DB[n].map(function(r,i){return Object.assign({_r:i+2},r);})}};
-schreib_=function(n,o){o.forEach(function(x){DB[n].push(Object.assign({},x));});};
-setz_=function(n,f,w){Object.keys(w).forEach(function(r){DB[n][Number(r)-2][f]=w[r];});};
+var ROH=function(v){return typeof v==='string'&&v.charAt(0)==="'"?v.slice(1):v;};  /* wie Sheets: führendes ' heisst «Text», wird nicht gespeichert */
+schreib_=function(n,o){o.forEach(function(x){var y={};Object.keys(x).forEach(function(k){y[k]=ROH(x[k]);});DB[n].push(y);});};
+setz_=function(n,f,w){Object.keys(w).forEach(function(r){DB[n][Number(r)-2][f]=ROH(w[r]);});};
 gesperrt_=function(f){return f();}; blatt_=function(){}; log_=function(){}; zeit_=function(){return '15.10.2026 13:00:00'};
-var A=kontoSpeichern({dienst:'Google',login:'pg.test@gmail.com',passwort:'=geheim',geraet:'Foto-Handy',aktiv:true},'jb');
+var A=kontoSpeichern({dienst:'Google',login:'pg.test@gmail.com',passwort:' 0815 ',geraet:'Foto-Handy',aktiv:true},'jb');
 var M1=JSON.stringify(DB.Testmittel);
 var B=kontoSpeichern({r:2,login_alt:'pg.test@gmail.com',dienst:'Google',login:'pg.test@gmail.com',passwort:'neu',aktiv:false},'JB');
 var M2=JSON.stringify(DB.Testmittel);

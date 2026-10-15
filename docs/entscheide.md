@@ -44,3 +44,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 15.10.2026 | Repo | Ein Repo für alle Tools vorgeschlagen (Umbenennung in `pg-tools` offen, macht Jonas) | |
 | 15.10.2026 | Daten | Return Tool bleibt «nur lesen», kein Rückfluss im Moment; Matchmaker Sheet (erledigte Stücke im Abgleich) und Ricardo Tool später anschauen | |
 | 15.10.2026 | Oberfläche | Bereich für Testkonten und Testmittel heisst «Infrastruktur» | «Werkstatt» |
+| 15.10.2026 | Qualität | Unabhängige Code-Prüfung (9 Befunde, 0 hoch) behoben in .13: Wiedereinstieg Matchmaker sperrt Navigation + Server prüft Grade/Reusable und alten Auftrag; Passwort, Login, Teilenummer, EAN immer als Text; Foto-Upload ohne Script-Sperre; Matchmaker-Lauf-Token; Auftrag beim Abschluss gegen Matchmaker Sheet geprüft; Bild-Fehlertext; Reparatur-Stand in Bytes geprüft; «Später reparieren» übersteht Neuladen; Ricardo-Auto-Text überschreibt nichts | |

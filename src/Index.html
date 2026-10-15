@@ -456,7 +456,7 @@
 </div></div>
 <script>
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
-  var VERSION = '2026-10-15.12';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
+  var VERSION = '2026-10-15.13';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
   var LAUF = {};                                    // was zur laufenden Analyse nur im Moment gilt und nicht gespeichert wird: Wartezustände, das Urteil des Servers, offene Klappen
@@ -574,7 +574,7 @@
     'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Übernommen', '4 · Taken over'], 'ri.preis': ['Startpreis', 'Starting price'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
     'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
-    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
+    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
     'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
     'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
     'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
@@ -784,7 +784,7 @@
   }
   /* Neue Recherche während der Analyse: Der Ablauf beginnt von vorn, die Uhr läuft weiter. */
   function uebernimm(d) {
-    AN.d = d; AN.i = 0; AN.s = leer(d); AN.gate = null; AN.rm = {}; AN.mm = null;
+    AN.d = d; AN.i = 0; AN.s = leer(d); AN.gate = null; AN.rm = {}; AN.mm = null; AN.mmLauf = 0;
     LAUF = { infosAuf: LAUF.infosAuf };
     sichern(); zeichneAnalyse();
   }
@@ -1140,9 +1140,10 @@
   function mmStart() {
     if (!AN || (AN.mm && !AN.mm.fehler)) return;
     var id = AN.d.produkt.id, i = AN.d.ident || {}, neu = function () { return AN && AN.d.produkt.id === id && schritt() === 'entscheid'; };
-    AN.mm = { laeuft: true }; sichern();
-    google.script.run.withSuccessHandler(function (r) { if (!AN || AN.d.produkt.id !== id) return; AN.mm = r; sichern(); if (neu()) zeichneSchritt(); })
-      .withFailureHandler(function (e) { if (!AN || AN.d.produkt.id !== id) return; AN.mm = { fehler: String((e && e.message) || e).replace(/^Error:\s*/, '') }; sichern(); if (neu()) zeichneSchritt(); })
+    var lauf = Date.now(), meins = function () { return AN && AN.d.produkt.id === id && AN.mmLauf === lauf; };          // ein älterer Abgleich (z.B. vor «Modell neu») zählt nicht
+    AN.mm = { laeuft: true }; AN.mmLauf = lauf; sichern();
+    google.script.run.withSuccessHandler(function (r) { if (!meins()) return; AN.mm = r; sichern(); if (neu()) zeichneSchritt(); })
+      .withFailureHandler(function (e) { if (!meins()) return; AN.mm = { fehler: String((e && e.message) || e).replace(/^Error:\s*/, '') }; sichern(); if (neu()) zeichneSchritt(); })
       .api(L, 'matchmaker', [id, { marke: i.marke || '', modell: i.modell || '', nr: i.herstellernr || '' }, AN.mmAus || []]);
   }
   function mmNochmal() { AN.mm = null; mmStart(); zeichneSchritt(); }
@@ -1242,6 +1243,7 @@
   /* Schritt direkt wählen. Wer nach einem K.-o. einen früheren Schritt wählt, nimmt das K.-o. zurück wie mit «Zurück». Abschliessen geht erst, wenn der Server nichts Offenes mehr meldet. */
   function springe(v) {
     var s = AN.s, n = Number(v);
+    if (AN.nachMm) return;                                                       // Wiedereinstieg aus dem Matchmaker: nur der Ausgang ist neu
     if (isNaN(n) || n < 0 || n >= AN.d.ablauf.length) return;
     LAUF.raus = false; AN.gate = null;
     if ((s.ko || s.versiegelt) && n <= (s.ab || 0)) { s.ko = null; s.versiegelt = false; s.ab = null; }
@@ -1255,6 +1257,7 @@
     LAUF.raus = false;
     if (AN.gate && AN.gate.sp) { delete AN.gate.sp; delete AN.gate.spAng; }          // aus «Später reparieren» zurück zur Reparaturfrage
     else if (AN.gate) AN.gate = null;
+    else if (AN.nachMm) return;
     else if (s.ko || s.versiegelt) { AN.i = s.ab || 0; s.ko = null; s.versiegelt = false; s.ab = null; }
     else AN.i--;
     stand();
@@ -1365,7 +1368,7 @@
   function kanal(v) {
     if (v === 'regal' || v === 'matchmaker') { AN.s.kanal = v; sichern(); abschluss(); return; }
     AN.s.kanal = 'ricardo'; sichern(); zeichneSchritt();
-    fotoHolen(); if (!AN.s.ricTitel && !AN.s.ricBeschrieb) ricText();
+    fotoHolen(); if (!AN.s.ricTitel && !AN.s.ricBeschrieb) ricText(true);
   }
   function fwAbbruch(v, k, el) { AN.s.fwAbbruch = !!el.checked; sichern(); }
   function kanalZurueck() { AN.s.kanal = ''; sichern(); zeichneSchritt(); }
@@ -1456,13 +1459,16 @@
   }
   function ricVersand(i) { AN.s.ricVersand = AN.d.ricardo.versand[Number(i)].name; sichern(); zeichneSchritt(); }
   /* Entwurf der KI für Titel und Artikelbeschrieb. Was die Person schon geschrieben hat, wird ersetzt: darum nur auf Knopfdruck neu. */
-  function ricText() {
+  function ricText(auto) {
     var id = AN.d.produkt.id;
     if (LAUF.ricLaeuft) return;
     LAUF.ricLaeuft = true; zeichneSchritt();
     google.script.run.withSuccessHandler(function (x) {
       if (!AN || AN.d.produkt.id !== id) return;
-      LAUF.ricLaeuft = false; AN.s.ricTitel = x.titel || ''; AN.s.ricBeschrieb = x.beschrieb || ''; sichern(); zeichneSchritt();
+      LAUF.ricLaeuft = false;
+      if (auto !== true || !AN.s.ricTitel) AN.s.ricTitel = x.titel || '';                   // beim Auto-Start nur leere Felder füllen: Getipptes bleibt
+      if (auto !== true || !AN.s.ricBeschrieb) AN.s.ricBeschrieb = x.beschrieb || '';
+      sichern(); zeichneSchritt();
     }).withFailureHandler(function (e) { LAUF.ricLaeuft = false; if (AN && AN.d.produkt.id === id) zeichneSchritt(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'ricardoText', [daten()]);
   }
 
@@ -1511,7 +1517,7 @@
     if (!datei || !art) return;
     FS.laedt = art; fsZeichnen();
     verkleinern(datei, function (daten) {
-      if (!daten) { FS.laedt = ''; fsZeichnen(); melde(t('hb.keinpdf'), true); return; }
+      if (!daten) { FS.laedt = ''; fsZeichnen(); melde(t('fs.keinbild'), true); return; }
       google.script.run.withSuccessHandler(function (st) { FS.laedt = ''; FS.st = st; fsZeichnen(); })
         .withFailureHandler(function (e) { FS.laedt = ''; fsZeichnen(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'fotoHochladen', [FS.id, art, daten]);
     });
@@ -1748,6 +1754,7 @@
     document.addEventListener('input', function (ev) {
       if (ev.target.id === 'hv-suche') { clearTimeout(HV.suchZeit); HV.suchZeit = setTimeout(hvSuche, 250); return; }
       var e = ev.target.getAttribute('data-e'), v;
+      if (AN && AN.gate && AN.gate.sp && /^sp-/.test(ev.target.id)) { spLesen(); sichern(); return; }     // «Später reparieren»: Eingaben überstehen ein Neuladen
       if (!e || !AN) return;
       if (e === 'teil') { v = parseFloat(ev.target.value); AN.gate.teil = isFinite(v) && v > 0 ? v : 0; $('rep-urteil').innerHTML = gateUrteil(); }
       else AN.s[e] = ev.target.value;
