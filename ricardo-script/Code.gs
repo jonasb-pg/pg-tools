@@ -458,10 +458,10 @@ function ausAnalyse_(rec, q) {
   return rec;
 }
 
-/** Text und Zustand kommen aus der Analyse, solange das Listing kein Bündel ist. */
 /** Name des Regals zu einem Status, aus den Einstellungen. */
 function regal_(status) { const k = REGAL_STATUS[status]; return k ? (cfg_(k) || REGAL_VORGABE[k]) : ''; }
 
+/** Text und Zustand kommen aus der Analyse, solange das Listing kein Bündel ist. */
 function istAnalyse_(rec) { return rec['Quelle Tab'] === 'Analyse' && !String(rec['Bündel-IDs'] || '').trim(); }
 
 /* ------------------------------------------------------------------ */
