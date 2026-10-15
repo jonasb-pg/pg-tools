@@ -1,0 +1,1484 @@
+/**
+ * Ricardo Tool – Pretty Good
+ * Liest Produkte aus dem Return Tool (nur lesen) und führt alles zu Ricardo in diesem Sheet.
+ * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
+ */
+
+const VERSION = '2026-10-09.2';
+const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku';
+const TZ = 'Europe/Zurich';
+
+const L_COLS = ['PG-ID', 'Status', 'EAN', 'Bezeichnung', 'Kategorie', 'Neupreis CHF', 'Startpreis CHF', 'Lagerort',
+  'Zustand', 'Mängel', 'Gewicht bis kg', 'Sperrgut', 'Versandklasse', 'Versandkosten CHF',
+  'Titel', 'Beschrieb', 'Ricardo-Link', 'Bearbeitet von',
+  'Angelegt am', 'Gelistet am', 'Verkauft am', 'Versendet am', 'Spezifikationen', 'Produktlink', 'Quelle Tab',
+  'Bündel-IDs', 'Bündel-Inhalt', 'Getestet', 'Erzielter Preis CHF', 'Verkauf-Nr', 'Mängel Text', 'Text Englisch'];
+
+const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW', 'Preis CHF', 'Versand CHF', 'Total CHF',
+  'Provision CHF', 'Auszahlung CHF', 'Status', 'Käufer', 'Firma', 'Vorname', 'Nachname', 'Strasse', 'Hausnummer', 'Postfach',
+  'PLZ', 'Ort', 'Lieferart', 'Gepackt am', 'Bezahlt und versendet am', 'Storniert am', 'Lagerort', 'Versandklasse'];
+// Wird ADRESSE_TAGE nach dem Verkauf gelöscht. Der Name bleibt, damit Zahlung und Rückzahlung zugeordnet werden können
+const ADRESSE = ['Strasse', 'Hausnummer', 'Postfach'];
+const V_OFFEN = ['Zu packen', 'Wartet auf Zahlung'];
+const R_COLS = ['Retoure-Nr', 'Status', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Käufer', 'Name', 'Verkauft am', 'Eröffnet am', 'Grund', 'Notiz',
+  'Rückzahlung CHF', 'Rückzahlung am', 'Ricardo storniert am', 'Abgeschlossen am',
+  'Preis CHF', 'Versand CHF', 'Provision CHF', 'Eröffnet von', 'IBAN', 'Adresse', 'PLZ', 'Ort'];
+const ADRESSE_TAGE = 60; // so lange bleibt die Strasse nach dem Verkauf gespeichert (Garantie 30 Tage plus Reserve)
+const RETOURE_GRUENDE = ['Defekt', 'Transportschaden', 'Falscher Artikel'];
+// Ricardo nimmt den Antrag auf Rückerstattung der Provision bis 60 Tage nach Angebotsende an
+const RICARDO_FRIST_TAGE = 60;
+// Spalten exakt wie in der Post-Vorlage «Adressen hochladen» (inkl. Leerzeichen nach Strasse und Hausnummer)
+const POST_KOPF = ['Firmenname', 'Firmenzusatz', 'Anrede', 'Nachname', 'Vorname', 'Adresszusatz', 'Strasse ', 'Hausnummer ', 'PLZ', 'Ort',
+  'Kunden-ID', 'E-Mail', 'Telefon', 'Mobil', 'Sendungsnotiz', 'Adresstyp', 'Persönliche Anschrift'];
+const OFFEN = ['In Arbeit', 'Bereit'];
+// Status, in denen ein Stück wieder frei ist und neu gelistet werden kann
+const FREI = ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'];
+// Spalten aus früheren Versionen: «einrichten» entfernt sie, damit bestehende Zeilen zu den Spalten passen
+const ALT_L = ['Anzahl Fotos', 'Foto-Ordner', 'Lieferumfang'], ALT_V = ['Storno-Grund'], ALT_R = ['Zurück erhalten am', 'Entscheid Stück'], ALT_E = ['Mindest-Startpreis CHF'];
+const DOMAIN = /https?:\/\/|www\.|@[a-z0-9-]+\.|\b[a-z0-9-]+\.(ch|com|de|net|org|io|li|at|fr|it|shop|swiss)\b/i;
+const DOMAIN_G = /\b[a-z0-9-]+\.(ch|com|de|net|org|io|li|at|fr|it|shop|swiss)\b/gi;
+
+// Die vier Zustände, exakt wie im Ricardo-Formular
+const ZUSTAENDE = ['Neu und originalverpackt', 'Neu (gemäss Beschreibung)', 'Gebraucht', 'Defekt'];
+const MAENGEL_PFLICHT = ['Gebraucht', 'Defekt'];
+const ZUSTAND_EN = { 'Neu und originalverpackt': 'New, original packaging', 'Neu (gemäss Beschreibung)': 'New, as described', 'Gebraucht': 'Used', 'Defekt': 'Defective' };
+
+const DEFAULTS = [
+  ['Return Tool ID', '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E', 'Wird nur gelesen, nie beschrieben'],
+  ['Such-Tabs', 'Online', 'Tabs im Return Tool, aus denen gelistet werden darf (Komma-getrennt)'],
+  ['Hinweis-Tabs', 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden', 'Wird nur durchsucht, wenn in den Such-Tabs nichts gefunden wird'],
+  ['Laufzeit Tage', 6, 'Laufzeit der Auktion; danach gilt ein Angebot als abgelaufen'],
+  ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
+  ['Schlusssatz', 'Geprüfte Retouren von Pretty Good: Von uns sorgfältig getestet mit 30 Tagen Garantie.', 'Steht am Ende jedes Beschriebs. Keine Domain verwenden'],
+  ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
+  ['Warnschwelle aktive Angebote', 90, 'Ricardo-Limite ist standardmässig 100'],
+  ['Admins', '', 'E-Mail-Adressen mit Zugriff auf den Admin-Teil, Komma-getrennt. Leer = alle'],
+  ['Text-Anweisung', 'Schreibe zuerst zwei bis drei Sätze, die das Produkt und seinen Nutzen beschreiben. Danach bis zu 8 Stichpunkte. Ton: freundlich, sachlich, per Du.', 'So soll Claude Titel, Einleitung und Stichpunkte schreiben. In normalen Worten formulieren. Wirkt beim nächsten «Erstellen»'],
+  ['Claude-Modell', 'claude-haiku-4-5-20251001', 'Modell für Titel und Beschrieb']
+];
+
+const VERSAND_DEFAULT = [
+  ['PostPac B-Post bis 2 kg', 2, 9, 'nein'],
+  ['PostPac B-Post bis 10 kg', 10, 12, 'nein'],
+  ['PostPac B-Post bis 30 kg', 30, 21, 'nein'],
+  ['Sperrgut B-Post bis 30 kg', 30, 31, 'ja']
+];
+
+/* ------------------------------------------------------------------ */
+/* Einrichtung                                                         */
+/* ------------------------------------------------------------------ */
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('Ricardo Tool')
+    .addItem('Einrichten / Aufbau prüfen', 'einrichten')
+    .addToUi();
+}
+
+function einrichten() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(TAB_L);
+  if (!sh) {
+    const first = ss.getSheets()[0];
+    sh = (ss.getSheets().length === 1 && first.getLastRow() === 0) ? first.setName(TAB_L) : ss.insertSheet(TAB_L);
+  }
+  ss.setSpreadsheetTimeZone(TZ);
+  kopf_(sh, L_COLS, 2, ALT_L);
+  textSpalten_(sh, L_COLS, ['PG-ID', 'EAN', 'Verkauf-Nr', 'Bündel-IDs']);
+
+  let e = ss.getSheetByName(TAB_E);
+  if (!e) {
+    e = ss.insertSheet(TAB_E);
+    e.getRange(1, 1, 1, 3).setValues([['Einstellung', 'Wert', 'Erklärung']]).setFontWeight('bold').setBackground('#e6efe9');
+    e.setColumnWidth(1, 220); e.setColumnWidth(2, 380); e.setColumnWidth(3, 480); e.setFrozenRows(1);
+  }
+  // Einstellungen aus früheren Versionen entfernen
+  for (let i = e.getLastRow(); i > 1; i--) if (ALT_E.indexOf(String(e.getRange(i, 1).getValue()).trim()) !== -1) e.deleteRow(i);
+  const vorhanden = e.getLastRow() > 1 ? e.getRange(2, 1, e.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]).trim(); }) : [];
+  DEFAULTS.forEach(function (d) {
+    if (vorhanden.indexOf(d[0]) !== -1) return;
+    e.appendRow(d[0] === 'Admins' ? [d[0], Session.getEffectiveUser().getEmail(), d[2]] : d);
+    e.getRange(e.getLastRow(), 2).setNumberFormat('@').setFontColor('#0000FF');
+  });
+  CFG = null;
+
+  let v = ss.getSheetByName(TAB_V);
+  if (!v) {
+    v = ss.insertSheet(TAB_V);
+    v.getRange(1, 1, 1, 4).setValues([['Versandklasse (wie bei Ricardo)', 'bis kg', 'Preis CHF', 'Sperrgut']]).setFontWeight('bold').setBackground('#e6efe9');
+    v.getRange(2, 1, VERSAND_DEFAULT.length, 4).setValues(VERSAND_DEFAULT);
+    v.getRange(2, 2, VERSAND_DEFAULT.length, 2).setFontColor('#0000FF');
+    v.getRange(7, 1).setValue('Quelle: Ricardo-Hilfe «Postversand», Tarife ab 01.01.2026. Blaue Werte bei Tarifänderung anpassen.');
+    v.setColumnWidth(1, 280); v.setFrozenRows(1);
+  }
+  let s = ss.getSheetByName(TAB_S);
+  if (!s) s = ss.insertSheet(TAB_S);
+  kopf_(s, V_COLS, 0, ALT_V);
+  textSpalten_(s, V_COLS, ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Käufer', 'PLZ', 'Hausnummer', 'Postfach']);
+
+  let rt = ss.getSheetByName(TAB_R);
+  if (!rt) rt = ss.insertSheet(TAB_R);
+  kopf_(rt, R_COLS, 0, ALT_R);
+  textSpalten_(rt, R_COLS, ['Verkauf-Nr', 'PG-ID', 'Käufer', 'IBAN', 'PLZ']);
+
+  let lg = ss.getSheetByName(TAB_LOG);
+  if (!lg) {
+    lg = ss.insertSheet(TAB_LOG);
+    lg.getRange(1, 1, 1, 5).setValues([['Zeit', 'Person', 'Aktion', 'PG-ID', 'Detail']]).setFontWeight('bold').setBackground('#e6efe9');
+    lg.setFrozenRows(1);
+  }
+  // Warnung bei Handänderungen: Diese Tabs führt das Tool
+  [sh, s, rt, lg].forEach(function (t) { try { t.protect().setWarningOnly(true).setDescription('Wird vom Ricardo Tool geführt. Bitte nicht von Hand sortieren oder Spalten ändern.'); } catch (err) { /* nicht kritisch */ } });
+  doku_(ss);
+  wochen_();
+  // Lesezugriff aufs Return Tool prüfen
+  SpreadsheetApp.openById(cfg_('Return Tool ID')).getName();
+  log_('Einrichten', '', 'Aufbau geprüft');
+  try { SpreadsheetApp.getUi().alert('Ricardo Tool ist eingerichtet.'); } catch (err) { /* ohne UI aufgerufen */ }
+}
+
+/** Schreibt die Kopfzeile. Bestehende Spalten müssen passen: lieber eine klare Meldung als Daten in der falschen Spalte. */
+function kopf_(sh, cols, fixSpalten, alt) {
+  alt.forEach(function (n) {
+    if (!sh.getLastColumn()) return;
+    const k = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (x) { return String(x).trim(); });
+    if (k.indexOf(n) !== -1) sh.deleteColumn(k.indexOf(n) + 1);
+  });
+  if (sh.getLastColumn()) sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].forEach(function (x, i) {
+    x = String(x).trim();
+    if (x && x !== cols[i]) throw new Error('Tab «' + sh.getName() + '»: Spalte ' + (i + 1) + ' heisst «' + x + '», erwartet wird «' + (cols[i] || 'keine Spalte') + '». Die Kopfzeile wurde von Hand geändert, bitte zurückstellen.');
+  });
+  if (sh.getMaxColumns() < cols.length) sh.insertColumnsAfter(sh.getMaxColumns(), cols.length - sh.getMaxColumns());
+  sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#e6efe9');
+  sh.setFrozenRows(1);
+  if (fixSpalten) sh.setFrozenColumns(fixSpalten);
+}
+
+/** Prüft beim Start der Web-App, ob die Tabs zu dieser Version passen (z.B. nach einem Update ohne «einrichten»). */
+function aufbau_() {
+  const ss = SpreadsheetApp.getActive();
+  [[TAB_L, L_COLS], [TAB_S, V_COLS], [TAB_R, R_COLS], [TAB_E, ['Einstellung', 'Wert']], [TAB_V, []], [TAB_LOG, []]].forEach(function (p) {
+    const sh = ss.getSheetByName(p[0]);
+    const ok = sh && (!p[1].length || sh.getMaxColumns() >= p[1].length && sh.getRange(1, 1, 1, p[1].length).getValues()[0].every(function (x, i) { return String(x).trim() === p[1][i]; }));
+    if (!ok) throw new Error('Das Sheet passt nicht zu dieser Version (Tab «' + p[0] + '»). Bitte im Apps-Script-Editor die Funktion «einrichten» ausführen.');
+  });
+}
+
+function textSpalten_(sh, cols, namen) {
+  namen.forEach(function (n) {
+    const c = cols.indexOf(n) + 1;
+    if (c > 0 && sh.getMaxRows() > 1) sh.getRange(2, c, sh.getMaxRows() - 1, 1).setNumberFormat('@');
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Doku: steht als Tab im Sheet, damit das Tool ohne Chat gepflegt werden kann */
+/* ------------------------------------------------------------------ */
+
+const DOKU = [
+  ['ZWECK', [
+    'Internes Tool, um Retouren und Reuse-Stücke über das normale Ricardo-Verkaufsformular zu verkaufen. Ricardo hat keine Schnittstelle: Das Tool bereitet alles vor, eine Person kopiert die Felder ins Ricardo-Formular.',
+    'Ablauf: Produkt suchen (EAN oder Name) > Zustand, Versandklasse, Text > bei Ricardo einstellen > Link speichern > Verkaufsbericht einlesen > packen > Zahlung bestätigen und versenden > allenfalls Retoure.'
+  ]],
+  ['GRUNDREGELN', [
+    'Das Return Tool (Inventar) wird nur gelesen. Das Skript schreibt dort nie. Alles zu Ricardo steht in diesem Sheet.',
+    'Das Tool veröffentlicht nichts bei Ricardo und überweist kein Geld. Es führt nur Buch.',
+    'Der Claude-Schlüssel steht nur in den Script-Eigenschaften, nie im Code, nie im Sheet, nie in einem Chat.',
+    'Texte ohne Domains und Kontaktangaben. Garantie: 30 Tage. Versand nur per Post.',
+    'Storno = Eintrag im Admin-Teil löschen. Retoure = verkauftes Stück kommt auf Garantie zurück, Geld geht zurück.'
+  ]],
+  ['TECHNIK', [
+    'Google Apps Script, an dieses Sheet gebunden (Erweiterungen > Apps Script). Zwei Dateien: Code.gs (Server, beginnt mit /**) und Index.html (Oberfläche, beginnt mit <!DOCTYPE html>).',
+    'Bereitgestellt als Web-App: Ausführen als «Ich» (Besitzer), Zugriff «Jeder in Pretty Good». Alle Schreibvorgänge laufen also über das Konto des Besitzers. Dieses Konto braucht Lesezugriff aufs Return Tool.',
+    'Die Oberfläche ruft den Server nur über die Funktion api(sprache, name, argumente) auf. Die Liste der erlaubten Funktionen steht in api().',
+    'Meldungen entstehen auf Deutsch. Für die englische Oberfläche übersetzt die Tabelle EN_REGELN im Code. Neue Meldung = neue Zeile dort, sonst bleibt sie deutsch. Die Texte der Oberfläche stehen in Index.html im Objekt T als [Deutsch, Englisch].',
+    'Titel und Beschrieb schreibt Claude über die Anthropic-API (Funktion kiText_). Im selben Aufruf entsteht eine englische Lesehilfe (Spalte «Text Englisch»), die in der englischen Oberfläche angezeigt, aber nie kopiert wird. Den Stil steuert die Einstellung «Text-Anweisung», die Schutzregeln (nichts erfinden, keine Domains) stehen fest im Code. Zustand, Neupreis, Versandsatz und Schlusssatz setzt das Tool selbst ein (Funktion baueBeschrieb_). Ohne Schlüssel oder bei einem Fehler baut das Tool den Text aus Bausteinen. Fehler stehen im Tab «Log» als «KI-Fehler».',
+    'Spalten werden über ihre Position gelesen. Die Reihenfolge steht im Code in L_COLS (Listings), V_COLS (Verkäufe), R_COLS (Retouren). Kopfzeilen nie von Hand ändern, keine Spalten einfügen oder löschen. Zeilen sortieren schadet nicht, ist aber unnötig.',
+    'Alle Daten und Zeiten in Schweizer Zeit (Konstante TZ).'
+  ]],
+  ['NEUE VERSION EINSPIELEN', [
+    '1. Erweiterungen > Apps Script öffnen. Inhalt von Code.gs und Index.html komplett ersetzen und speichern.',
+    '2. Oben die Funktion «einrichten» wählen und ausführen. Sie ergänzt fehlende Tabs und Spalten, entfernt Spalten aus alten Versionen und schreibt diesen Tab neu. Sie löscht keine Daten.',
+    '3. Bereitstellen > Bereitstellungen verwalten > Stift > Version «Neue Version» > Bereitstellen. Die Adresse der Web-App bleibt gleich.',
+    '4. Web-App neu laden. Unten links muss die neue Versionsnummer stehen (Konstante VERSION in Code.gs).',
+    'Vor jeder Änderung am Code: Datei > Kopie erstellen (Sheet samt Skript), dann gibt es einen Stand zum Zurückgehen. Im Apps-Script-Editor lassen sich unter «Bereitstellungen verwalten» auch ältere Versionen wieder aktivieren.'
+  ]],
+  ['TABS', [
+    'Listings: ein Stück oder Bündel pro Zeile. Führt das Tool.',
+    'Verkäufe: ein Verkauf pro Zeile aus dem Ricardo-Verkaufsbericht. Führt das Tool.',
+    'Retouren: ein Garantiefall pro Zeile. Führt das Tool.',
+    'Wochenübersicht: Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.',
+    'Einstellungen: von Hand oder im Admin-Teil änderbar (blaue Werte).',
+    'Versand: Versandklassen und Preise. Von Hand änderbar (blaue Werte).',
+    'Post-Adressen und Auszahlungen: Zwischenablage für die Excel-Dateien, wird nach jedem Export geleert.',
+    'Log: jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.',
+    'Doku: dieser Tab. Wird bei jedem «einrichten» aus dem Code neu geschrieben, Änderungen hier gehen verloren.'
+  ]],
+  ['STATUS LISTING', [
+    'In Arbeit > Bereit (alles vollständig) > Gelistet (Ricardo-Link gespeichert) > Verkauft (Verkaufsbericht) > Versendet (Zahlung bestätigt).',
+    'Frei für ein neues Listing sind: Abgebrochen, Unverkauft, Storniert, Retour abgeschlossen. Dann legt das Tool eine neue Zeile an, die alte bleibt als Verlauf.',
+    'Retourniert: Retoure läuft. Retour abgeschlossen: Geld zurück und bei Ricardo storniert.',
+    'Nummern: PG-… kommt aus dem Return Tool. RC-0001 vergibt das Tool für Stücke ohne Inventar. RT-0001 sind Retouren.'
+  ]],
+  ['STATUS VERKAUF', [
+    'Zu packen > Wartet auf Zahlung (gepackt) > Bezahlt und versendet. Dazu: Storniert (im Admin-Teil gelöscht), Retourniert.',
+    'Zuordnung Verkauf zu Listing: zuerst über die Referenz-Nr. im Ricardo-Angebot (= PG-ID), sonst über die Artikelnummer im gespeicherten Ricardo-Link. Fehlt beides, steht der Verkauf als «nicht zugeordnet» in der Liste.',
+    'Ein Verkauf wird nur einmal eingelesen (Schlüssel: Order ID). Denselben Bericht mehrmals einlesen schadet nicht.'
+  ]],
+  ['RETOUREN', [
+    'Eröffnen: Verkauf suchen, Grund, IBAN (wird geprüft) und Adresse. Die Rückzahlung ist sofort fällig.',
+    'Zwei Schritte: «Rückzahlung gemacht» und «Bei Ricardo storniert» (Provision zurückfordern, Frist 60 Tage nach Verkauf). Danach ist die Retoure abgeschlossen und das Stück wieder frei.',
+    '«Offene Rückzahlungen als Excel» liefert Name, IBAN, Betrag, Adresse und Produkt aller noch nicht bezahlten Retouren. Zuerst exportieren und zahlen, dann «Rückzahlung gemacht» klicken.'
+  ]],
+  ['SCRIPT-EIGENSCHAFTEN', [
+    'Apps-Script-Editor > Zahnrad «Projekteinstellungen» > «Script-Eigenschaften».',
+    'ANTHROPIC_API_KEY: Schlüssel für Claude, erstellt auf console.anthropic.com unter «API Keys». Das Konto dort braucht Guthaben. Das Modell steht in der Einstellung «Claude-Modell».',
+    'LETZTER_IMPORT: setzt das Tool selbst. Zeitpunkt des letzten Verkaufsberichts, schützt davor, ein verkauftes Stück als unverkauft zu markieren.'
+  ]],
+  ['DATENSCHUTZ', [
+    'Strasse, Hausnummer und Postfach der Käufer werden ' + ADRESSE_TAGE + ' Tage nach dem Verkauf gelöscht, jeweils beim nächsten Import. Name, PLZ und Ort bleiben für Zahlungsabgleich und Auswertung.',
+    'IBAN und Adresse einer Retoure werden gelöscht, sobald die Rückzahlung bestätigt ist.',
+    'Wer Zugriff auf dieses Sheet hat, sieht diese Daten. Zugriff aufs Sheet deshalb klein halten. Für die Arbeit mit der Web-App braucht es keinen Zugriff aufs Sheet.'
+  ]],
+  ['WENN ETWAS NICHT GEHT', [
+    'Meldung «Das Sheet passt nicht zu dieser Version»: «einrichten» ausführen. Meldet «einrichten» eine falsche Spalte, wurde eine Kopfzeile von Hand geändert: zurückstellen und nochmals ausführen.',
+    'Web-App zeigt Code als Text: Code.gs und Index.html wurden vertauscht eingefügt.',
+    'Änderung ist nicht sichtbar: Es wurde keine neue Version bereitgestellt (Versionsnummer unten links prüfen).',
+    'Suche findet nichts: Einstellungen «Return Tool ID» und «Such-Tabs» prüfen. Im Return Tool muss die Kopfzeile die Spalten ID und Bezeichnung enthalten (weiter: Barcode, Link, Kategorie, OVP, VP, Lagerort, Spezifikationen, Erfasst). VP ist der Startpreis, OVP der Neupreis.',
+    'Texte kommen nur noch als Bausteine: Tab «Log» nach «KI-Fehler» durchsuchen. Meist ist das Guthaben leer, der Schlüssel ungültig oder das Modell in den Einstellungen nicht mehr verfügbar.',
+    'Verkaufsbericht wird abgelehnt: Ricardo hat das Format geändert. Erwartet wird CSV mit Semikolon und den Spalten Order ID, Article ID, ArticleTitle, ReferenceNumber, EndDate, Selling Price, ShippingCost, Buyer…, DeliveryDescription, ShippingStatus (Funktion importVerkaeufe).',
+    'Post lehnt die Adressdatei ab: Die Post hat ihre Vorlage geändert. Die Spalten stehen in POST_KOPF.',
+    'Admin-Reiter fehlt: Die eigene Adresse fehlt in der Einstellung «Admins» (direkt im Tab «Einstellungen» ergänzen). Leer heisst: alle sind Admin.',
+    'Falscher Status bei einem Eintrag: im Admin-Teil löschen und neu anlegen. Nur im Notfall direkt im Sheet korrigieren, und dann nur den Wert in der Spalte «Status».',
+    'Der Besitzer des Skripts verlässt die Firma: Das Sheet einem anderen Konto übertragen, dieses Konto stellt die Web-App neu bereit und braucht Lesezugriff aufs Return Tool. Die Adresse der Web-App ändert sich dann.'
+  ]],
+  ['WEITERENTWICKELN', [
+    'Alles Nötige steht in Code.gs, Index.html und diesem Tab. Für Änderungen einer Entwicklerin oder einer KI diese drei Dinge geben, dazu ein Beispiel des Ricardo-Verkaufsberichts.',
+    'Neue Spalte: immer am Ende von L_COLS, V_COLS oder R_COLS anhängen, nie dazwischen. Entfernte Spalte zusätzlich in ALT_L, ALT_V oder ALT_R eintragen, damit «einrichten» sie im Sheet löscht.',
+    'Neue Serverfunktion: in api() eintragen. Neue Fehlermeldung: in EN_REGELN übersetzen. Neuer Text der Oberfläche: in T mit beiden Sprachen.',
+    'Nach jeder Änderung VERSION erhöhen und den Ablauf einmal ganz durchspielen: Listing anlegen, listen, Bericht einlesen, packen, bezahlt, Retoure.',
+    'Ricardo-Vorgaben im Code: Titel höchstens 60 Zeichen, Beschrieb höchstens 5000, vier feste Zustände (ZUSTAENDE).'
+  ]]
+];
+
+function doku_(ss) {
+  const d = ss.getSheetByName(TAB_D) || ss.insertSheet(TAB_D);
+  const rows = [['Ricardo Tool', 'Version ' + VERSION + '. Dieser Tab wird bei jedem «einrichten» neu geschrieben.']];
+  DOKU.forEach(function (a) { rows.push(['', '']); a[1].forEach(function (z, i) { rows.push([i ? '' : a[0], z]); }); });
+  rows.push(['', ''], ['EINSTELLUNGEN', 'Bedeutung der Werte im Tab «Einstellungen»:']);
+  DEFAULTS.forEach(function (e) { rows.push(['', e[0] + ': ' + e[2] + '.']); });
+  d.clear();
+  d.getRange(1, 1, rows.length, 2).setValues(rows).setWrap(true).setVerticalAlignment('top');
+  d.getRange(1, 1, rows.length, 1).setFontWeight('bold');
+  d.setColumnWidth(1, 220); d.setColumnWidth(2, 900);
+}
+
+/* ------------------------------------------------------------------ */
+/* Web-App                                                             */
+/* ------------------------------------------------------------------ */
+
+function doGet(e) {
+  const t = HtmlService.createTemplateFromFile('Index');
+  t.lang = (e && e.parameter && e.parameter.lang) === 'en' ? 'en' : 'de';
+  return t.evaluate().setTitle('Ricardo Tool').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function startDaten() {
+  aufbau_();
+  return {
+    version: VERSION, admin: istAdmin_(),
+    zustaende: ZUSTAENDE, maengelPflicht: MAENGEL_PFLICHT,
+    laufzeit: Number(cfg_('Laufzeit Tage')) || 6,
+    retoureGruende: RETOURE_GRUENDE,
+    kiAktiv: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY'),
+    aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Suche im Return Tool (nur lesen)                                    */
+/* ------------------------------------------------------------------ */
+
+function suche(q) {
+  q = String(q || '').trim();
+  if (q.length < 3) return { treffer: [], andere: [], hinweis: 'Bitte mindestens 3 Zeichen eingeben oder eine EAN scannen.' };
+  const src = SpreadsheetApp.openById(cfg_('Return Tool ID'));
+  const passt = matcher_(q);
+  const listings = listingsIndex_();
+  let treffer = [];
+  liste_(cfg_('Such-Tabs')).forEach(function (tab) {
+    leseQuelle_(src, tab).filter(passt).forEach(function (r) {
+      const l = listings[r.id];
+      r.status = l ? l.status : '';
+      r.teilVon = l && l.teilVon ? l.teilVon : '';
+      treffer.push(r);
+    });
+  });
+  let andere = [];
+  if (!treffer.length) {
+    liste_(cfg_('Hinweis-Tabs')).forEach(function (tab) {
+      leseQuelle_(src, tab).filter(passt).forEach(function (r) {
+        const l = listings[r.id];
+        r.status = l ? l.status : ''; r.teilVon = l && l.teilVon ? l.teilVon : '';
+        andere.push(r);
+      });
+    });
+  }
+  return { treffer: treffer.slice(0, 40), andere: andere.slice(0, 20), mehr: treffer.length > 40 };
+}
+
+function matcher_(q) {
+  const ziffern = q.replace(/[\s-]/g, '');
+  if (/^\d{8,14}$/.test(ziffern)) {
+    const ean = normEan_(ziffern);
+    return function (r) { return r.eanNorm && r.eanNorm === ean; };
+  }
+  if (/^pg-?\d+$/i.test(q)) {
+    const id = q.toUpperCase().replace(/^PG-?/, 'PG-');
+    return function (r) { return r.id.toUpperCase() === id; };
+  }
+  const woerter = q.toLowerCase().split(/\s+/).filter(String);
+  return function (r) {
+    const n = r.name.toLowerCase();
+    return woerter.every(function (w) { return n.indexOf(w) !== -1; });
+  };
+}
+
+function leseQuelle_(src, tab) {
+  const sh = src.getSheetByName(tab);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const vals = sh.getDataRange().getValues();
+  let h = -1;
+  for (let i = 0; i < Math.min(12, vals.length); i++) {
+    const row = vals[i].map(function (x) { return String(x).trim(); });
+    if (row.indexOf('ID') !== -1 && row.indexOf('Bezeichnung') !== -1) { h = i; break; }
+  }
+  if (h === -1) return [];
+  const kopf = vals[h].map(function (x) { return String(x).trim(); });
+  const c = function (name) { return kopf.indexOf(name); };
+  const ci = { id: c('ID'), name: c('Bezeichnung'), ean: c('Barcode'), link: c('Link'), kat: c('Kategorie'),
+    ovp: c('OVP'), vp: c('VP'), ort: c('Lagerort'), spez: c('Spezifikationen'), erfasst: c('Erfasst') };
+  const g = function (row, i) { return i === -1 ? '' : row[i]; };
+  const out = [];
+  for (let i = h + 1; i < vals.length; i++) {
+    const row = vals[i];
+    const id = String(g(row, ci.id)).trim();
+    if (!id) continue;
+    const ean = String(g(row, ci.ean)).trim();
+    const erf = g(row, ci.erfasst);
+    out.push({
+      id: id, name: String(g(row, ci.name)).trim(), ean: ean, eanNorm: normEan_(ean),
+      link: String(g(row, ci.link)).trim(), kat: String(g(row, ci.kat)).trim(),
+      ovp: zahl_(g(row, ci.ovp)), vp: zahl_(g(row, ci.vp)), ort: String(g(row, ci.ort)).trim(),
+      spez: String(g(row, ci.spez)).trim(),
+      erfasst: erf instanceof Date ? datum_(erf) : String(erf).slice(0, 10),
+      tab: tab
+    });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Listing anlegen und bearbeiten                                      */
+/* ------------------------------------------------------------------ */
+
+function findeQuelle_(id, auchAndere) {
+  const src = SpreadsheetApp.openById(cfg_('Return Tool ID'));
+  let q = null;
+  liste_(cfg_('Such-Tabs')).concat(auchAndere ? liste_(cfg_('Hinweis-Tabs')) : []).forEach(function (tab) {
+    if (q) return;
+    const m = leseQuelle_(src, tab).filter(function (r) { return r.id === id; });
+    if (m.length) q = m[0];
+  });
+  return q;
+}
+
+function starteListing(id, auchAndere) {
+  id = String(id).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const idx = listingsIndex_();
+    if (idx[id] && idx[id].teilVon) throw new Error(id + ' ist bereits Teil des Bündels ' + idx[id].teilVon + '.');
+    if (!idx[id]) {
+      const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+      const q = findeQuelle_(id, auchAndere === true);
+      if (!q) throw new Error('Produkt ' + id + ' wurde in den Such-Tabs des Return Tools nicht gefunden.');
+      if (!q.vp) throw new Error('Produkt ' + id + ' hat im Return Tool keinen Preis (VP). Bitte dort ergänzen.');
+      const rec = {};
+      L_COLS.forEach(function (k) { rec[k] = ''; });
+      rec['PG-ID'] = q.id; rec['Status'] = 'In Arbeit'; rec['EAN'] = q.ean; rec['Bezeichnung'] = q.name;
+      rec['Kategorie'] = q.kat; rec['Neupreis CHF'] = q.ovp || ''; rec['Startpreis CHF'] = rappen_(q.vp);
+      rec['Lagerort'] = q.ort; rec['Bearbeitet von'] = nutzer_();
+      rec['Angelegt am'] = new Date(); rec['Spezifikationen'] = bereinigeSpez_(q.spez); rec['Produktlink'] = q.link; rec['Quelle Tab'] = q.tab;
+      sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
+      log_('Listing angelegt', id, q.name);
+    }
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+/** Listing für ein Stück, das nicht im Return Tool steht (z.B. Reuse). Das Tool vergibt eine eigene Nummer RC-0001. */
+function freiesListing(d) {
+  d = d || {};
+  const name = text_(d.name, 200);
+  const preis = rappen_(zahl_(d.preis));
+  if (name.length < 3) throw new Error('Bitte einen Namen mit mindestens 3 Zeichen eingeben.');
+  if (!preis) throw new Error('Bitte einen Startpreis eingeben.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    let max = 0;
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().forEach(function (r) {
+      const m = /^RC-(\d+)$/.exec(String(r[0]).trim()); if (m) max = Math.max(max, Number(m[1]));
+    });
+    const id = 'RC-' + ('000' + (max + 1)).slice(-4);
+    const rec = {};
+    L_COLS.forEach(function (k) { rec[k] = ''; });
+    rec['PG-ID'] = id; rec['Status'] = 'In Arbeit'; rec['Bezeichnung'] = name; rec['Startpreis CHF'] = preis;
+    rec['Neupreis CHF'] = zahl_(d.neupreis) || ''; rec['Lagerort'] = text_(d.lagerort, 100);
+    rec['Spezifikationen'] = text_(d.stichworte, 2000);
+    rec['Bearbeitet von'] = nutzer_(); rec['Angelegt am'] = new Date(); rec['Quelle Tab'] = 'Frei';
+    sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
+    log_('Freies Listing', id, name);
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+/** Fügt ein weiteres Stück zum Listing hinzu (z.B. Filament-Multipack). */
+function buendelHinzu(id, zusatzId) {
+  id = String(id).trim(); zusatzId = String(zusatzId).trim().toUpperCase().replace(/^PG-?/, 'PG-');
+  if (id === zusatzId) throw new Error('Das ist das Hauptstück dieses Listings.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    const zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ist bereits «' + rec['Status'] + '».');
+    if (rec['Quelle Tab'] === 'Frei') throw new Error('Bündel sind nur bei inventarisierten Stücken möglich.');
+    const idx = listingsIndex_();
+    if (idx[zusatzId]) throw new Error(zusatzId + ' ist bereits in einem Listing' + (idx[zusatzId].teilVon ? ' (Bündel ' + idx[zusatzId].teilVon + ')' : '') + '.');
+    const q = findeQuelle_(zusatzId);
+    if (!q) throw new Error('Produkt ' + zusatzId + ' wurde in den Such-Tabs des Return Tools nicht gefunden.');
+    const ids = liste_(rec['Bündel-IDs']); ids.push(q.id);
+    const inhalt = String(rec['Bündel-Inhalt'] || rec['Bezeichnung']).split('\n').filter(String); inhalt.push(q.name);
+    rec['Bündel-IDs'] = ids.join(', '); rec['Bündel-Inhalt'] = inhalt.join('\n');
+    rec['Startpreis CHF'] = rappen_(Number(rec['Startpreis CHF']) + Number(q.vp || 0));
+    rec['Neupreis CHF'] = (Number(rec['Neupreis CHF']) || 0) + Number(q.ovp || 0) || '';
+    const spez = bereinigeSpez_(q.spez);
+    if (spez && String(rec['Spezifikationen']).indexOf(spez) === -1) rec['Spezifikationen'] = (rec['Spezifikationen'] + ' | ' + spez).slice(0, 4000);
+    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = '';
+    schreibe_(sh, zeile, rec);
+    log_('Bündel ergänzt', id, zusatzId);
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+function buendelLeeren(id) {
+  id = String(id).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    const zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ist bereits «' + rec['Status'] + '».');
+    const q = findeQuelle_(id);
+    if (!q) throw new Error('Produkt ' + id + ' wurde im Return Tool nicht mehr gefunden.');
+    rec['Bündel-IDs'] = ''; rec['Bündel-Inhalt'] = '';
+    rec['Startpreis CHF'] = rappen_(q.vp); rec['Neupreis CHF'] = q.ovp || ''; rec['Spezifikationen'] = bereinigeSpez_(q.spez);
+    rec['Titel'] = ''; rec['Beschrieb'] = ''; rec['Getestet'] = '';
+    schreibe_(sh, zeile, rec);
+    log_('Bündel geleert', id, '');
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+function lade(id) { return lade_(String(id).trim()); }
+
+function speichereDetails(id, d) {
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    const zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist bereits «' + rec['Status'] + '» und kann nicht mehr geändert werden.');
+    if (d.zustand !== undefined) {
+      if (d.zustand && ZUSTAENDE.indexOf(d.zustand) === -1) throw new Error('Unbekannter Zustand.');
+      rec['Zustand'] = d.zustand;
+    }
+    const vorher = rec['Mängel'];
+    if (d.maengel !== undefined) rec['Mängel'] = text_(d.maengel, 1000);
+    if (rec['Zustand'] === 'Neu und originalverpackt') rec['Mängel'] = '';
+    // Geänderte Mängel-Notiz: der ausformulierte Satz gilt nicht mehr
+    if (rec['Mängel'] !== vorher) rec['Mängel Text'] = '';
+    if (d.maengelText !== undefined) rec['Mängel Text'] = d.maengelText;
+    if (d.englisch !== undefined) rec['Text Englisch'] = d.englisch;
+    if (d.sperrgut !== undefined) rec['Sperrgut'] = d.sperrgut ? 'ja' : 'nein';
+    if (d.getestet !== undefined) rec['Getestet'] = d.getestet ? 'ja' : '';
+    if (d.gewicht !== undefined) {
+      const g = zahl_(d.gewicht);
+      rec['Gewicht bis kg'] = g || '';
+    }
+    const vk = versand_(rec['Gewicht bis kg'], rec['Sperrgut'] === 'ja');
+    rec['Versandklasse'] = vk ? vk.klasse : ''; rec['Versandkosten CHF'] = vk ? vk.preis : '';
+    if (d.titel !== undefined) rec['Titel'] = text_(d.titel, 200);
+    if (d.beschrieb !== undefined) rec['Beschrieb'] = String(d.beschrieb).replace(/\r/g, '').trim().replace(/^[=+]+\s*/, '');
+    rec['Bearbeitet von'] = nutzer_();
+    schreibe_(sh, zeile, rec);
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+function erstelleText(id) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  const zeile = findeZeile_(sh, id);
+  if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+  const rec = zeileZuRec_(sh, zeile);
+  if (!rec['Zustand']) throw new Error('Bitte zuerst den Zustand wählen und speichern.');
+  if (MAENGEL_PFLICHT.indexOf(rec['Zustand']) !== -1 && !rec['Mängel']) throw new Error('Bitte zuerst die Mängel beschreiben.');
+  let ki = null, quelle = 'Bausteine';
+  try { ki = kiText_(rec); if (ki) quelle = 'Claude'; } catch (err) { log_('KI-Fehler', id, String(err).slice(0, 300)); }
+  if (!ki) ki = { titel: rec['Bezeichnung'], highlights: String(rec['Spezifikationen']).split(' | ').filter(String).slice(0, 5) };
+  // Mängel: von Claude ausformuliert (Stichworte, auch englisch), sonst die Notiz wörtlich
+  const maengelText = rec['Mängel'] ? (saeubere_(ki.maengel || '') || rec['Mängel']) : '';
+  const neu = String(rec['Zustand']).indexOf('Neu') === 0;
+  const basis = saeubere_(ki.titel || rec['Bezeichnung']).replace(/^neu\s*[:\-–]\s*/i, '');
+  const titel = neu ? 'Neu: ' + kuerze_(basis, 55) : kuerze_(basis, 60);
+  const beschrieb = baueBeschrieb_(rec, basis, saeubere_(ki.einleitung || ''), (ki.highlights || []).map(saeubere_).filter(String).slice(0, 8), maengelText);
+  log_('Text erstellt', id, quelle);
+  // Englische Lesehilfe: wird nie kopiert. Die erste Zeile merkt sich, zu welchem deutschen Text sie gehört
+  const en = ki.englisch ? pruefsumme_(titel + '\n' + beschrieb) + '\n' + baueEnglisch_(rec, ki.englisch, neu) : '';
+  const r = speichereDetails(id, { titel: titel, beschrieb: beschrieb, maengelText: maengelText, englisch: en });
+  r.textQuelle = quelle;
+  return r;
+}
+
+/** Aufbau nach dem Ricardo-Guide: Produktname, Einleitung, Zustand und Highlights, Versand, Schlusssatz. */
+function baueBeschrieb_(rec, name, einleitung, highlights, maengelText) {
+  const t = [name, ''];
+  if (einleitung) t.push(einleitung, '');
+  const inhalt = String(rec['Bündel-Inhalt'] || '').split('\n').filter(String);
+  if (inhalt.length > 1) { t.push('Inhalt des Sets:'); inhalt.forEach(function (x) { t.push('- ' + saeubere_(x)); }); t.push(''); }
+  t.push('Zustand: ' + rec['Zustand']);
+  if (maengelText) t.push('Mängel: ' + maengelText);
+  if (rec['Neupreis CHF']) t.push('Neupreis: CHF ' + Number(rec['Neupreis CHF']).toFixed(2));
+  t.push('');
+  if (highlights.length) { t.push('Highlights:'); highlights.forEach(function (e) { t.push('- ' + e); }); t.push(''); }
+  if (cfg_('Versandsatz')) t.push(cfg_('Versandsatz'), '');
+  if (cfg_('Schlusssatz')) t.push(cfg_('Schlusssatz'));
+  return t.join('\n').trim().slice(0, 5000);
+}
+
+/** Englische Fassung des Beschriebs im selben Aufbau, nur zum Lesen. */
+function baueEnglisch_(rec, e, neu) {
+  const s = function (x) { return saeubere_(x || ''); };
+  const t = [(neu ? 'New: ' : '') + s(e.titel), ''];
+  if (s(e.einleitung)) t.push(s(e.einleitung), '');
+  t.push('Condition: ' + (ZUSTAND_EN[rec['Zustand']] || rec['Zustand']));
+  if (rec['Mängel'] && s(e.maengel)) t.push('Defects: ' + s(e.maengel));
+  if (rec['Neupreis CHF']) t.push('New price: CHF ' + Number(rec['Neupreis CHF']).toFixed(2));
+  t.push('');
+  const h = (e.highlights || []).map(s).filter(String).slice(0, 8);
+  if (h.length) { t.push('Highlights:'); h.forEach(function (x) { t.push('- ' + x); }); t.push(''); }
+  if (s(e.versandsatz)) t.push(s(e.versandsatz), '');
+  if (s(e.schlusssatz)) t.push(s(e.schlusssatz));
+  return t.join('\n').trim().replace(/^[=+]+\s*/, '').slice(0, 6000);
+}
+
+/** Gewicht und Masse aus den Spezifikationen des Return Tools, nur als Hinweis für die Wahl der Versandklasse. */
+function masse_(spez) {
+  const out = [];
+  String(spez || '').split(' | ').forEach(function (x) {
+    x = x.trim();
+    if (/^(produkt|verpackungs|artikel|netto|brutto|gesamt)?-?\s*(gewicht|breite|höhe|länge|tiefe|durchmesser|abmessungen?|masse|dimensionen)\s*(\([^)]*\))?\s*:/i.test(x) && out.indexOf(x) === -1) out.push(x);
+  });
+  return out.slice(0, 12);
+}
+
+function pruefsumme_(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return String(h);
+}
+
+function kiText_(rec) {
+  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) return null;
+  // Feste Schutzregeln. Den Stil bestimmt die Einstellung «Text-Anweisung»
+  const system = 'Du schreibst Angebotstexte für den Schweizer Marktplatz Ricardo, auf Deutsch (Schweizer Rechtschreibung, kein ß). ' +
+    'Antworte nur mit JSON ohne Codeblock: {"titel": string, "einleitung": string, "highlights": [string], "maengel": string, ' +
+    '"englisch": {"titel": string, "einleitung": string, "highlights": [string], "maengel": string, "versandsatz": string, "schlusssatz": string}}. ' +
+    'REGELN, die immer gelten: ' +
+    'Technische Angaben, Masse, Zubehör, Lieferumfang und Eigenschaften nennst du nur, wenn sie in den gelieferten Fakten stehen. Erfinde nichts und schätze nichts. ' +
+    'Schreibe in titel, einleitung und highlights nichts über Zustand, Mängel, Preis, Garantie oder Versand: das wird separat ergänzt. ' +
+    'Keine URLs, keine Domains, keine Kontaktangaben, keine Emojis, keine Superlative und keine Versprechen. ' +
+    'titel: höchstens 55 Zeichen, sachlich, nur Marke, Modell und wichtigste Grösse oder Variante, beginnt mit Grossbuchstaben, ' +
+    'keine Codes, IDs, Preise und kein Wort «Neu». Bei einem Set mit mehreren Stücken beschreibt der Titel das Set (z.B. Anzahl und Art). ' +
+    'einleitung: ein Absatz Fliesstext ohne Zeilenumbruch, der sagt, was das Produkt ist und wofür man es braucht. Allgemein Bekanntes zur Produktart ist erlaubt, konkrete Angaben nur aus den Fakten. Leerer String, wenn die Stil-Anweisung keine Einleitung verlangt. ' +
+    'highlights: höchstens 8 kurze Stichpunkte mit den wichtigsten Funktionen oder Eckdaten, aus den Spezifikationen übernommen und sprachlich bereinigt. ' +
+    'Wenn keine Spezifikationen vorliegen, gib eine leere Liste zurück. ' +
+    'maengel: Wenn maengel_notiz vorhanden ist, formuliere sie als einen bis zwei sachliche deutsche Sätze. Die Notiz kann aus Stichworten bestehen oder englisch sein. ' +
+    'Gib jeden genannten Mangel vollständig wieder, beschönige nichts, lasse nichts weg und füge nichts hinzu. Ohne maengel_notiz ein leerer String. ' +
+    'englisch: getreue englische Übersetzung deiner Felder titel, einleitung, highlights und maengel sowie der beiden Sätze aus feste_saetze. Sie ist nur eine Lesehilfe fürs Team: nichts hinzufügen, nichts weglassen. Die feste_saetze verwendest du sonst nirgends. ' +
+    'STIL-ANWEISUNG des Teams für titel, einleitung und highlights (gilt, soweit sie den Regeln oben nicht widerspricht): ' + (cfg_('Text-Anweisung') || 'Sachlich und knapp, ohne Einleitung.');
+  const fakten = { bezeichnung: rec['Bezeichnung'], kategorie: rec['Kategorie'], spezifikationen: rec['Spezifikationen'] };
+  const inhalt = String(rec['Bündel-Inhalt'] || '').split('\n').filter(String);
+  if (inhalt.length > 1) fakten.set_inhalt = inhalt;
+  if (rec['Mängel']) fakten.maengel_notiz = rec['Mängel'];
+  fakten.feste_saetze = { versandsatz: cfg_('Versandsatz'), schlusssatz: cfg_('Schlusssatz') };
+  const resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    payload: JSON.stringify({ model: cfg_('Claude-Modell'), max_tokens: 2500, system: system,
+      messages: [{ role: 'user', content: JSON.stringify(fakten) }] })
+  });
+  if (resp.getResponseCode() !== 200) throw new Error('Claude ' + resp.getResponseCode() + ': ' + resp.getContentText().slice(0, 200));
+  const data = JSON.parse(resp.getContentText());
+  const text = (data.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+  const obj = JSON.parse(text.replace(/```json|```/g, '').trim());
+  if (!obj.titel) throw new Error('Claude-Antwort unvollständig');
+  return obj;
+}
+
+/* ------------------------------------------------------------------ */
+/* Statuswechsel                                                       */
+/* ------------------------------------------------------------------ */
+
+function markiereGelistet(id, link) {
+  link = String(link || '').trim();
+  if (!/^https:\/\/(www\.)?ricardo\.ch\/\S*\d{6,}\S*$/.test(link)) throw new Error('Das ist kein gültiger Ricardo-Angebotslink. Bitte die Adresse des veröffentlichten Angebots einfügen.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    const zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (pruefe_(rec).length) throw new Error('Listing ist noch nicht vollständig: ' + pruefe_(rec).join('; '));
+    const alle = listingsIndex_();
+    for (const k in alle) if (k !== id && alle[k].link === link) throw new Error('Dieser Ricardo-Link ist bereits bei ' + k + ' hinterlegt.');
+    rec['Status'] = 'Gelistet'; rec['Ricardo-Link'] = link; rec['Gelistet am'] = new Date(); rec['Bearbeitet von'] = nutzer_();
+    schreibe_(sh, zeile, rec, true);
+    log_('Gelistet', id, link);
+    return lade_(id);
+  } finally { lock.releaseLock(); }
+}
+
+function setzeStatus(id, neu) {
+  const erlaubt = { 'Abgebrochen': ['In Arbeit', 'Bereit'], 'Unverkauft': ['Gelistet'] };
+  if (!erlaubt[neu]) throw new Error('Unbekannter Status.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    const zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (erlaubt[neu].indexOf(rec['Status']) === -1) throw new Error('Wechsel von «' + rec['Status'] + '» zu «' + neu + '» ist nicht möglich.');
+    if (neu === 'Unverkauft') {
+      const g = rec['Gelistet am'];
+      const ende = g instanceof Date ? new Date(g.getTime() + (Number(cfg_('Laufzeit Tage')) || 6) * 86400000) : null;
+      const imp = Number(PropertiesService.getScriptProperties().getProperty('LETZTER_IMPORT')) || 0;
+      if (ende && ende.getTime() > new Date().getTime()) throw new Error('Das Angebot läuft noch bis ' + datum_(ende) + '.');
+      if (ende && imp < ende.getTime()) throw new Error('Bitte zuerst den aktuellen Verkaufsbericht einlesen. Das Angebot endete am ' + datum_(ende) + ', der letzte Import war ' + (imp ? 'am ' + datum_(new Date(imp)) : 'noch nie') + '. Sonst wird ein verkauftes Stück als unverkauft markiert.');
+    }
+    rec['Status'] = neu; rec['Bearbeitet von'] = nutzer_();
+    schreibe_(sh, zeile, rec, true);
+    log_('Status ' + neu, id, '');
+    return uebersicht();
+  } finally { lock.releaseLock(); }
+}
+
+function uebersicht() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  const out = [];
+  const laufzeit = Number(cfg_('Laufzeit Tage')) || 6;
+  const jetzt = new Date().getTime();
+  if (sh.getLastRow() > 1) {
+    const vals = sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues();
+    vals.forEach(function (row) {
+      const rec = {}; L_COLS.forEach(function (k, i) { rec[k] = row[i]; });
+      if (!rec['PG-ID'] || ['In Arbeit', 'Bereit', 'Gelistet'].indexOf(rec['Status']) === -1) return;
+      const g = rec['Gelistet am'];
+      const tage = g instanceof Date ? Math.floor((jetzt - g.getTime()) / 86400000) : 0;
+      out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],
+        zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''),
+        seit: datum_(rec['Gelistet am'] || rec['Angelegt am']),
+        abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeit });
+    });
+  }
+  const rang = { 'In Arbeit': 1, 'Bereit': 2, 'Gelistet': 3 };
+  out.sort(function (a, b) { return (Number(b.abgelaufen) - Number(a.abgelaufen)) || (rang[a.status] - rang[b.status]) || a.id.localeCompare(b.id); });
+  const imp = Number(PropertiesService.getScriptProperties().getProperty('LETZTER_IMPORT')) || 0;
+  return { letzterImport: imp ? datum_(new Date(imp)) : '', liste: out, aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90, laufzeit: laufzeit };
+}
+
+/* ------------------------------------------------------------------ */
+/* Hilfsfunktionen                                                     */
+/* ------------------------------------------------------------------ */
+
+function pruefe_(rec) {
+  const f = [];
+  if (!rec['Startpreis CHF']) f.push('Startpreis fehlt');
+  if (!rec['Zustand']) f.push('Zustand wählen');
+  if (MAENGEL_PFLICHT.indexOf(rec['Zustand']) !== -1 && !rec['Mängel']) f.push('Mängel beschreiben');
+  if (rec['Getestet'] !== 'ja') f.push('Produkt prüfen und «geprüft» bestätigen');
+  if (!rec['Gewicht bis kg'] || !rec['Versandklasse']) f.push('Versandklasse wählen');
+  const t = String(rec['Titel']);
+  if (!t) f.push('Titel erstellen'); else if (t.length > 60) f.push('Titel kürzen (' + t.length + ' von 60 Zeichen)');
+  const b = String(rec['Beschrieb']);
+  if (!b) f.push('Beschrieb erstellen');
+  else {
+    if (b.length > 5000) f.push('Beschrieb kürzen (max. 5000 Zeichen)');
+    if (DOMAIN.test(b) || DOMAIN.test(t)) f.push('Titel oder Beschrieb enthält einen Link, eine Domain oder eine Kontaktangabe');
+    if (rec['Zustand'] && b.indexOf(rec['Zustand']) === -1) f.push('Beschrieb nennt den gewählten Zustand nicht: neu erstellen');
+    if (rec['Mängel'] && !rec['Mängel Text']) f.push('Mängel geändert: Titel und Beschrieb neu erstellen');
+    else if (rec['Mängel'] && !/(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt die Mängel nicht: neu erstellen');
+    if (!rec['Mängel'] && /(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt Mängel, erfasst sind keine: neu erstellen');
+  }
+  return f;
+}
+
+function lade_(id) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  const zeile = findeZeile_(sh, id);
+  if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+  const rec = zeileZuRec_(sh, zeile);
+  const en = rec['Titel'] && rec['Text Englisch'] ? String(rec['Text Englisch']).split('\n') : [''];
+  return {
+    id: String(rec['PG-ID']), status: rec['Status'], ean: String(rec['EAN']), bezeichnung: rec['Bezeichnung'], kategorie: rec['Kategorie'],
+    neupreis: rec['Neupreis CHF'], startpreis: rec['Startpreis CHF'] === '' ? '' : Number(rec['Startpreis CHF']).toFixed(2),
+    lagerort: rec['Lagerort'], zustand: rec['Zustand'], maengel: rec['Mängel'], frei: rec['Quelle Tab'] === 'Frei',
+    gewicht: rec['Gewicht bis kg'], sperrgut: rec['Sperrgut'] === 'ja', klasse: rec['Versandklasse'],
+    versand: rec['Versandkosten CHF'] === '' ? '' : Number(rec['Versandkosten CHF']).toFixed(2),
+    titel: rec['Titel'], beschrieb: rec['Beschrieb'],
+    link: rec['Ricardo-Link'], produktlink: rec['Produktlink'], fehlt: pruefe_(rec), versandForm: versandForm_(rec),
+    getestet: rec['Getestet'] === 'ja', buendelIds: liste_(rec['Bündel-IDs']),
+    buendelInhalt: String(rec['Bündel-Inhalt'] || '').split('\n').filter(String),
+    masse: masse_(rec['Spezifikationen']),
+    englisch: en.slice(1).join('\n'), englischAlt: en[0] !== pruefsumme_(rec['Titel'] + '\n' + rec['Beschrieb'])
+  };
+}
+
+function schreibe_(sh, zeile, rec, statusFix) {
+  if (!statusFix && ['In Arbeit', 'Bereit'].indexOf(rec['Status']) !== -1) rec['Status'] = pruefe_(rec).length ? 'In Arbeit' : 'Bereit';
+  sh.getRange(zeile, 1, 1, L_COLS.length).setValues([L_COLS.map(function (k) { return rec[k]; })]);
+}
+
+function zeileZuRec_(sh, zeile) {
+  const row = sh.getRange(zeile, 1, 1, L_COLS.length).getValues()[0];
+  const rec = {}; L_COLS.forEach(function (k, i) { rec[k] = row[i]; });
+  return rec;
+}
+
+/** Zeile des Listings mit dieser PG-ID. Nach einem erneuten Listen gibt es mehrere: Es zählt die, die nicht frei ist, sonst die letzte. Unabhängig von der Sortierung im Sheet. */
+function findeZeile_(sh, id) {
+  if (sh.getLastRow() < 2) return 0;
+  const v = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  let letzte = 0;
+  for (let i = 0; i < v.length; i++) {
+    if (String(v[i][0]).trim() !== id) continue;
+    if (FREI.indexOf(v[i][1]) === -1) return i + 2;
+    letzte = i + 2;
+  }
+  return letzte;
+}
+
+/** Alle Stücke, die gerade in einem Listing gebunden sind (auch als Teil eines Bündels). */
+function listingsIndex_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  const idx = {};
+  if (sh.getLastRow() < 2) return idx;
+  sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues().forEach(function (row) {
+    const id = String(row[0]).trim();
+    const status = row[col_('Status') - 1];
+    if (!id) return;
+    if (FREI.indexOf(status) !== -1) return;
+    idx[id] = { status: status, link: String(row[col_('Ricardo-Link') - 1]) };
+    liste_(row[col_('Bündel-IDs') - 1]).forEach(function (b) { idx[b] = { status: status, link: '', teilVon: id }; });
+  });
+  return idx;
+}
+
+function zaehleAktive_() {
+  const idx = listingsIndex_(); let n = 0;
+  for (const k in idx) if (idx[k].status === 'Gelistet') n++;
+  return n;
+}
+
+function versand_(gewicht, sperrgut) {
+  const g = Number(gewicht);
+  if (!g || g <= 0) return null;
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_V);
+  const rows = sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 1), 4).getValues()
+    .filter(function (r) { return r[0] && Number(r[1]) > 0 && String(r[0]).indexOf('Quelle') !== 0; })
+    .filter(function (r) { return (String(r[3]).toLowerCase() === 'ja') === !!sperrgut; })
+    .sort(function (a, b) { return Number(a[1]) - Number(b[1]); });
+  for (let i = 0; i < rows.length; i++) if (g <= Number(rows[i][1])) return { klasse: rows[i][0], preis: Number(rows[i][2]) };
+  return null;
+}
+
+/** Versandangabe in den Begriffen des Ricardo-Formulars. */
+function versandForm_(rec) {
+  const g = Number(rec['Gewicht bis kg']);
+  if (!g || g > 30) return '';
+  if (rec['Sperrgut'] === 'ja') return 'Sperrgut, Economy';
+  return 'Paket, ' + (g <= 2 ? 'bis 2kg' : g <= 10 ? 'bis 10kg' : 'bis 30kg') + ', Economy';
+}
+
+let CFG = null;
+function cfg_(name) {
+  if (!CFG) {
+    CFG = {};
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_E);
+    sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 1), 2).getValues().forEach(function (r) { CFG[String(r[0]).trim()] = String(r[1]).trim(); });
+  }
+  return CFG[name] || '';
+}
+
+function log_(aktion, id, detail) {
+  try { SpreadsheetApp.getActive().getSheetByName(TAB_LOG).appendRow([new Date(), nutzer_(), aktion, id, detail]); } catch (err) { /* Log darf nie blockieren */ }
+}
+
+function nutzer_() { return Session.getActiveUser().getEmail() || 'unbekannt'; }
+function col_(name) { return L_COLS.indexOf(name) + 1; }
+function liste_(s) { return String(s).split(',').map(function (x) { return x.trim(); }).filter(String); }
+function normEan_(s) { return String(s).replace(/\D/g, '').replace(/^0+/, ''); }
+function rappen_(v) { return Math.round(Number(v) * 20) / 20; }
+function datum_(d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'dd.MM.yyyy') : ''; }
+function zahl_(v) {
+  if (typeof v === 'number') return v;
+  const n = parseFloat(String(v).replace(/['’\s]/g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+/** Freitext aus der Oberfläche: eine Zeile, begrenzt, und nie als Formel lesbar. */
+function text_(s, max) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().replace(/^[=+]+\s*/, '').slice(0, max); }
+function saeubere_(s) { return String(s).replace(/https?:\/\/\S+|www\.\S+/gi, '').replace(DOMAIN_G, '').replace(/\s+/g, ' ').trim(); }
+
+function kuerze_(s, n) {
+  if (s.length <= n) return s;
+  const k = s.slice(0, n + 1); const i = k.lastIndexOf(' ');
+  return (i > 20 ? k.slice(0, i) : s.slice(0, n)).replace(/[\s,;:-]+$/, '');
+}
+function bereinigeSpez_(s) {
+  return String(s).split(' | ').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x && x.indexOf(':') !== -1; }).join(' | ');
+}
+
+/* ------------------------------------------------------------------ */
+/* Verkäufe: Import des Ricardo-Verkaufsberichts, Zahlung, Versand      */
+/* ------------------------------------------------------------------ */
+
+/** Liest den Ricardo-Verkaufsbericht (CSV, Semikolon) ein. Bekannte Verkäufe werden übersprungen. */
+function importVerkaeufe(text) {
+  const zeilen = csv_(String(text || ''));
+  if (zeilen.length < 1 || zeilen[0].indexOf('Order ID') === -1 || zeilen[0].indexOf('Selling Price') === -1) {
+    throw new Error('Das ist kein Ricardo-Verkaufsbericht. Bitte die CSV-Datei aus «Mein Verkaufen > Verkauft > Verkaufsbericht erhalten» wählen.');
+  }
+  const kopf = zeilen[0];
+  const daten = zeilen.slice(1).filter(function (z) { return z.length > 1; }).map(function (z) {
+    const o = {}; kopf.forEach(function (k, i) { o[k] = String(z[i] == null ? '' : z[i]).trim(); }); return o;
+  });
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.getActive();
+    const sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
+    const bekannt = {};
+    if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues().forEach(function (r) { bekannt[String(r[0]).trim()] = true; });
+
+    // Listings nach PG-ID und nach Ricardo-Artikelnummer (aus dem gespeicherten Link)
+    const nachId = {}, nachArtikel = {};
+    const lv = sl.getLastRow() > 1 ? sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues() : [];
+    lv.forEach(function (row, i) {
+      const id = String(row[0]).trim(); if (!id) return;
+      // Bei mehreren Zeilen pro Stück zählt die, die nicht frei ist
+      const setze = function (map, k) { if (map[k] === undefined || FREI.indexOf(lv[map[k]][1]) !== -1) map[k] = i; };
+      setze(nachId, id.toUpperCase());
+      const m = String(row[col_('Ricardo-Link') - 1]).match(/(\d{6,})(?!.*\d{6,})/);
+      if (m) setze(nachArtikel, m[1]);
+    });
+    const geaendert = {};
+    const provision = (Number(cfg_('Provision %')) || 0) / 100;
+    const neu = []; let schonDa = 0, zugeordnet = 0;
+
+    daten.sort(function (a, b) { return datumZeit_(a['EndDate']) - datumZeit_(b['EndDate']); });
+    daten.forEach(function (d) {
+      const nr = d['Order ID']; if (!nr) return;
+      if (bekannt[nr]) { schonDa++; return; }
+      bekannt[nr] = true;
+      let li = nachId[String(d['ReferenceNumber']).toUpperCase()];
+      if (li === undefined) li = nachArtikel[d['Article ID']];
+      const L = li === undefined ? null : lv[li];
+      const wann = datumZeit_(d['EndDate']);
+      const preis = zahl_(d['Selling Price']), versand = zahl_(d['ShippingCost']);
+      const versandt = d['ShippingStatus'] === 'Versandt';
+      const adr = strasse_(d['BuyerAddress']);
+      const v = {};
+      V_COLS.forEach(function (k) { v[k] = ''; });
+      v['Verkauf-Nr'] = nr; v['Artikel-Nr'] = d['Article ID']; v['PG-ID'] = L ? String(L[0]) : '';
+      v['Titel'] = d['ArticleTitle']; v['Verkauft am'] = wann; v['KW'] = wann ? jahrKw_(wann)[1] : '';
+      v['Preis CHF'] = preis; v['Versand CHF'] = versand; v['Total CHF'] = runde_(preis + versand);
+      v['Provision CHF'] = runde_(preis * provision); v['Auszahlung CHF'] = runde_(preis - preis * provision);
+      v['Status'] = versandt ? 'Bezahlt und versendet' : 'Zu packen';
+      v['Käufer'] = d['BuyerNick']; v['PLZ'] = d['BuyerZipCode']; v['Ort'] = d['BuyerCity']; v['Lieferart'] = d['DeliveryDescription'];
+      v['Firma'] = d['BuyerCompanyName']; v['Vorname'] = d['BuyerFirstName']; v['Nachname'] = d['BuyerLastName'];
+      v['Strasse'] = adr[0]; v['Hausnummer'] = adr[1]; v['Postfach'] = d['BuyerPostalBox'];
+      if (L) {
+        zugeordnet++;
+        v['Lagerort'] = L[col_('Lagerort') - 1]; v['Versandklasse'] = L[col_('Versandklasse') - 1];
+        // Auch wenn «Gelistet» vergessen ging oder das Stück schon als unverkauft markiert war: verkauft ist verkauft
+        if (['In Arbeit', 'Bereit', 'Gelistet', 'Unverkauft'].indexOf(L[col_('Status') - 1]) !== -1) {
+          L[col_('Status') - 1] = versandt ? 'Versendet' : 'Verkauft';
+          L[col_('Erzielter Preis CHF') - 1] = preis; L[col_('Verkauf-Nr') - 1] = nr;
+          L[col_('Verkauft am') - 1] = wann; if (versandt) L[col_('Versendet am') - 1] = wann;
+          geaendert[li] = true;
+        }
+      }
+      neu.push(V_COLS.map(function (k) { return v[k]; }));
+    });
+    if (neu.length) sv.getRange(sv.getLastRow() + 1, 1, neu.length, V_COLS.length).setValues(neu);
+    adressenAufraeumen_(sv);
+    Object.keys(geaendert).forEach(function (i) { sl.getRange(Number(i) + 2, 1, 1, L_COLS.length).setValues([lv[i]]); });
+    PropertiesService.getScriptProperties().setProperty('LETZTER_IMPORT', String(new Date().getTime()));
+    wochen_();
+    log_('Verkaufsbericht', '', neu.length + ' neu, ' + schonDa + ' bekannt, ' + zugeordnet + ' zugeordnet');
+    const r = verkaeufe();
+    r.import = { neu: neu.length, bekannt: schonDa, zugeordnet: zugeordnet, ohne: neu.length - zugeordnet };
+    return r;
+  } finally { lock.releaseLock(); }
+}
+
+/** Offene Verkäufe für die Pack- und Zahlungsliste. */
+function verkaeufe() {
+  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+  const offen = [];
+  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (V_OFFEN.indexOf(v['Status']) === -1) return;
+    offen.push(vZeile_(v));
+  });
+  const rang = { 'Zu packen': 0, 'Wartet auf Zahlung': 1 };
+  // Holliste: zuerst nach Status, dann nach Lagerort
+  offen.sort(function (a, b) { return (rang[a.status] - rang[b.status]) || String(a.lagerort).localeCompare(String(b.lagerort)) || a.nr.localeCompare(b.nr); });
+  return { offen: offen, zuPacken: offen.filter(function (o) { return o.status === 'Zu packen'; }).length };
+}
+
+/** Löscht Strasse, Hausnummer und Postfach bei erledigten Verkäufen, die älter als ADRESSE_TAGE sind. */
+function adressenAufraeumen_(sv) {
+  if (sv.getLastRow() < 2) return;
+  const n = sv.getLastRow() - 1, grenze = new Date().getTime() - ADRESSE_TAGE * 86400000;
+  const st = sv.getRange(2, V_COLS.indexOf('Status') + 1, n, 1).getValues(), am = sv.getRange(2, V_COLS.indexOf('Verkauft am') + 1, n, 1).getValues();
+  const c0 = V_COLS.indexOf('Strasse') + 1, adr = sv.getRange(2, c0, n, 3).getValues();
+  let geaendert = false;
+  for (let i = 0; i < n; i++) {
+    if (V_OFFEN.indexOf(st[i][0]) !== -1 || !(am[i][0] instanceof Date) || am[i][0].getTime() > grenze) continue;
+    if (adr[i][0] || adr[i][1] || adr[i][2]) { adr[i] = ['', '', '']; geaendert = true; }
+  }
+  if (geaendert) sv.getRange(2, c0, n, 3).setValues(adr);
+}
+
+/** Prüft eine IBAN (Länge und Prüfziffer) und gibt sie in Vierergruppen zurück. */
+function iban_(s) {
+  const x = String(s || '').replace(/\s+/g, '').toUpperCase();
+  if (!x) throw new Error('Bitte die IBAN des Käufers eingeben.');
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(x) || ((x.slice(0, 2) === 'CH' || x.slice(0, 2) === 'LI') && x.length !== 21)) throw new Error('Die IBAN stimmt nicht. Bitte prüfen.');
+  const z = (x.slice(4) + x.slice(0, 4)).replace(/[A-Z]/g, function (b) { return String(b.charCodeAt(0) - 55); });
+  let rest = 0;
+  for (let i = 0; i < z.length; i++) rest = (rest * 10 + Number(z[i])) % 97;
+  if (rest !== 1) throw new Error('Die IBAN stimmt nicht. Bitte prüfen.');
+  return x.replace(/(.{4})/g, '$1 ').trim();
+}
+
+function vZeile_(v) {
+  return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID']), titel: v['Titel'], am: datum_(v['Verkauft am']),
+    total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
+    name: [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer']), kaeufer: String(v['Käufer']),
+    ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'], klasse: v['Versandklasse'] || v['Lieferart'] };
+}
+
+/** aktion: 'gepackt' oder 'bezahlt'. */
+function setzeVerkauf(nr, aktion) {
+  nr = String(nr).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActive();
+    const sv = ss.getSheetByName(TAB_S);
+    const nrn = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues() : [];
+    let zeile = 0;
+    for (let i = 0; i < nrn.length; i++) if (String(nrn[i][0]).trim() === nr) { zeile = i + 2; break; }
+    if (!zeile) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    let listingStatus = '';
+    if (aktion === 'gepackt') {
+      if (v['Status'] !== 'Zu packen') throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
+      v['Status'] = 'Wartet auf Zahlung'; v['Gepackt am'] = new Date();
+    } else if (aktion === 'bezahlt') {
+      if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
+      v['Status'] = 'Bezahlt und versendet'; v['Bezahlt und versendet am'] = new Date(); listingStatus = 'Versendet';
+    } else throw new Error('Unbekannte Aktion.');
+    sv.getRange(zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
+    if (listingStatus && v['PG-ID']) {
+      const sl = ss.getSheetByName(TAB_L);
+      const lz = findeZeile_(sl, String(v['PG-ID']));
+      if (lz) {
+        const rec = zeileZuRec_(sl, lz);
+        if (String(rec['Verkauf-Nr']) === nr) {
+          rec['Status'] = listingStatus; if (listingStatus === 'Versendet') rec['Versendet am'] = new Date();
+          schreibe_(sl, lz, rec, true);
+        }
+      }
+    }
+    wochen_();
+    log_('Verkauf ' + aktion, String(v['PG-ID']), nr);
+    return verkaeufe();
+  } finally { lock.releaseLock(); }
+}
+
+/** Schreibt die Adressen aller Verkäufe «Zu packen» im Format der Post-Vorlage «Adressen hochladen». */
+function postAdressen() {
+  const ss = SpreadsheetApp.getActive();
+  const sv = ss.getSheetByName(TAB_S);
+  let p = ss.getSheetByName(TAB_P) || ss.insertSheet(TAB_P);
+  p.clear();
+  if (p.getMaxColumns() < POST_KOPF.length) p.insertColumnsAfter(p.getMaxColumns(), POST_KOPF.length - p.getMaxColumns());
+  const rows = [];
+  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (v['Status'] !== 'Zu packen') return;
+    rows.push([v['Firma'], '', '', v['Nachname'], v['Vorname'], v['Postfach'] ? 'Postfach ' + v['Postfach'] : '', v['Strasse'], v['Hausnummer'],
+      v['PLZ'], v['Ort'], v['PG-ID'], '', '', '', 'Ricardo ' + v['Verkauf-Nr'], 1, 0]);
+  });
+  p.getRange(1, 1, Math.max(p.getMaxRows(), 1), POST_KOPF.length).setNumberFormat('@');
+  p.getRange(1, 1, 1, POST_KOPF.length).setValues([POST_KOPF]);
+  if (rows.length) p.getRange(2, 1, rows.length, POST_KOPF.length).setValues(rows);
+  SpreadsheetApp.flush();
+  log_('Post-Adressen', '', rows.length + ' Adressen');
+  if (!rows.length) return { anzahl: 0 };
+  const datei = alsExcel_(ss, p, TAB_P);
+  // Die Adressen werden nur für die Datei gebraucht und bleiben nicht im Sheet stehen
+  p.getRange(2, 1, rows.length, POST_KOPF.length).clearContent();
+  return { anzahl: rows.length, name: 'Post-Adressen-' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') + '.xlsx', datei: datei };
+}
+
+/** Gibt einen Tab als Excel-Datei (Base64) zurück, damit er auch ohne eigenen Zugriff aufs Sheet heruntergeladen werden kann. */
+function alsExcel_(ss, tab, name) {
+  // Der Export braucht die Drive-Berechtigung. Diese Zeile sorgt dafür, dass Google sie anfragt: DriveApp.getFiles()
+  const resp = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?format=xlsx&gid=' + tab.getSheetId(),
+    { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) throw new Error('Die Datei konnte nicht erzeugt werden (Fehler ' + resp.getResponseCode() + '). Die Daten stehen im Tab «' + name + '».');
+  return Utilities.base64Encode(resp.getBlob().getBytes());
+}
+
+function csv_(text) {
+  text = text.replace(/^﻿/, '');
+  const out = []; let zeile = [], feld = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { feld += '"'; i++; } else inQ = false; }
+      else feld += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ';') { zeile.push(feld); feld = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      zeile.push(feld); feld = ''; out.push(zeile); zeile = [];
+    } else feld += c;
+  }
+  if (feld !== '' || zeile.length) { zeile.push(feld); out.push(zeile); }
+  return out;
+}
+
+/** «30.08.2026 11:32» zu Datum, immer in Schweizer Zeit. */
+function datumZeit_(s) {
+  const m = String(s).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  return m ? Utilities.parseDate([m[1], m[2], m[3], m[4] || 0, m[5] || 0].join(' '), TZ, 'd M yyyy H m') : '';
+}
+
+/** Ricardo liefert Strasse und Hausnummer in einem Feld, meist mit zwei Leerzeichen getrennt. */
+function strasse_(s) {
+  s = String(s).trim();
+  let m = s.match(/^(.*?\S)\s{2,}(\S.*)$/);
+  if (m) return [m[1], m[2].replace(/\s+/g, ' ')];
+  m = s.match(/^(.*\D)\s+(\d+\s?[a-zA-Z]?)$/);
+  if (m) return [m[1].trim(), m[2]];
+  return [s, ''];
+}
+
+/** Schreibt den Tab «Wochenübersicht» neu: eine Zeile pro Kalenderwoche, berechnet aus dem Tab «Verkäufe». Stornierte und Retournierte zählen nicht zum Umsatz. */
+function wochen_() {
+  try {
+    const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S);
+    const w = ss.getSheetByName(TAB_W) || ss.insertSheet(TAB_W);
+    const kopf = ['Jahr', 'KW', 'Verkäufe', 'Umsatz CHF', 'Versand CHF', 'Provision CHF', 'Auszahlung CHF', 'Storniert', 'Offen (nicht versendet)', 'Retouren'];
+    const wochen = {};
+    const total = [0, 0, 0, 0, 0, 0, 0, 0];
+    if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+      const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+      const d = v['Verkauft am'];
+      if (!v['Verkauf-Nr'] || !(d instanceof Date)) return;
+      const jw = jahrKw_(d), key = jw[0] * 100 + jw[1];
+      const z = wochen[key] || (wochen[key] = [jw[0], jw[1], 0, 0, 0, 0, 0, 0, 0, 0]);
+      if (v['Status'] === 'Storniert') { z[7]++; total[5]++; return; }
+      if (v['Status'] === 'Retourniert') { z[9]++; total[7]++; return; }
+      const werte = [1, Number(v['Preis CHF']) || 0, Number(v['Versand CHF']) || 0, Number(v['Provision CHF']) || 0, Number(v['Auszahlung CHF']) || 0];
+      werte.forEach(function (x, i) { z[2 + i] += x; total[i] += x; });
+      if (V_OFFEN.indexOf(v['Status']) !== -1) { z[8]++; total[6]++; }
+    });
+    const zeilen = Object.keys(wochen).map(Number).sort(function (a, b) { return b - a; }).map(function (k) {
+      return wochen[k].map(function (x, i) { return i >= 3 && i <= 6 ? runde_(x) : x; });
+    });
+    w.clear();
+    w.getRange(1, 1, 1, kopf.length).setValues([kopf]).setFontWeight('bold').setBackground('#e6efe9');
+    w.getRange(2, 1, 1, kopf.length).setValues([['Total', '', total[0], runde_(total[1]), runde_(total[2]), runde_(total[3]), runde_(total[4]), total[5], total[6], total[7]]]).setFontWeight('bold');
+    if (zeilen.length) w.getRange(3, 1, zeilen.length, kopf.length).setValues(zeilen);
+    w.setFrozenRows(2);
+  } catch (err) { log_('Wochenübersicht-Fehler', '', String(err).slice(0, 200)); }
+}
+
+/** Jahr und Kalenderwoche nach ISO 8601. */
+function jahrKw_(d) {
+  const p = Utilities.formatDate(d, TZ, 'yyyy M d').split(' ').map(Number);
+  const t = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  const tag = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - tag);
+  const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return [t.getUTCFullYear(), Math.ceil(((t - start) / 86400000 + 1) / 7)];
+}
+
+function runde_(x) { return Math.round(Number(x) * 100) / 100; }
+
+/* ------------------------------------------------------------------ */
+/* Sprache: Die Web-App ruft alles über api() auf und gibt die Sprache mit */
+/* ------------------------------------------------------------------ */
+
+let LANG = 'de';
+
+function api(lang, name, args) {
+  LANG = lang === 'en' ? 'en' : 'de';
+  const f = { startDaten: startDaten, suche: suche, starteListing: starteListing, lade: lade, speichereDetails: speichereDetails,
+    erstelleText: erstelleText, buendelHinzu: buendelHinzu, buendelLeeren: buendelLeeren, freiesListing: freiesListing,
+    markiereGelistet: markiereGelistet, setzeStatus: setzeStatus,
+    uebersicht: uebersicht, importVerkaeufe: importVerkaeufe, verkaeufe: verkaeufe,
+    setzeVerkauf: setzeVerkauf, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
+    adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
+    retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt, retourenExport: retourenExport }[name];
+  if (!f) throw new Error('Unbekannte Funktion.');
+  let r;
+  try { r = f.apply(null, args || []); }
+  catch (e) { throw new Error(LANG === 'en' ? en_(String(e.message || e)) : String(e.message || e)); }
+  if (LANG === 'en' && r && typeof r === 'object') {
+    if (r.fehlt) r.fehlt = r.fehlt.map(en_);
+    if (r.hinweis) r.hinweis = en_(r.hinweis);
+  }
+  return r;
+}
+
+const EN_STATUS = { 'In Arbeit': 'In progress', 'Bereit': 'Ready', 'Gelistet': 'Listed', 'Verkauft': 'Sold', 'Versendet': 'Shipped',
+  'Storniert': 'Cancelled', 'Unverkauft': 'Unsold', 'Abgebrochen': 'Discarded', 'Zu packen': 'To pack',
+  'Wartet auf Zahlung': 'Awaiting payment', 'Bezahlt und versendet': 'Paid and shipped', 'Retourniert': 'Returned', 'Retour abgeschlossen': 'Return closed' };
+function st_(s) { return EN_STATUS[s] || s; }
+
+/** Meldungen entstehen auf Deutsch und werden hier für die englische Oberfläche übersetzt. Unbekannte Meldungen bleiben deutsch. */
+const EN_REGELN = [
+  [/^Bitte mindestens 3 Zeichen eingeben oder eine EAN scannen\.$/, 'Please enter at least 3 characters or scan an EAN.'],
+  [/^(\S+) ist bereits Teil des Bündels (\S+)\.$/, '$1 is already part of bundle $2.'],
+  [/^Produkt (\S+) wurde in den Such-Tabs des Return Tools nicht gefunden\.$/, 'Product $1 was not found in the search tabs of the Return Tool.'],
+  [/^Produkt (\S+) hat im Return Tool keinen Preis \(VP\)\. Bitte dort ergänzen\.$/, 'Product $1 has no price (VP) in the Return Tool. Please add it there.'],
+  [/^Produkt (\S+) wurde im Return Tool nicht mehr gefunden\.$/, 'Product $1 is no longer in the Return Tool.'],
+  [/^Das ist das Hauptstück dieses Listings\.$/, 'This is the main item of this listing.'],
+  [/^Listing (\S+) nicht gefunden\.$/, 'Listing $1 not found.'],
+  [/^Listing ist bereits «(.+)»\.$/, function (m, s) { return 'Listing is already "' + st_(s) + '".'; }],
+  [/^Listing (\S+) ist bereits «(.+)» und kann nicht mehr geändert werden\.$/, function (m, i, s) { return 'Listing ' + i + ' is already "' + st_(s) + '" and can no longer be changed.'; }],
+  [/^(\S+) ist bereits in einem Listing(?: \(Bündel (\S+)\))?\.$/, function (m, a, b) { return a + ' is already in a listing' + (b ? ' (bundle ' + b + ')' : '') + '.'; }],
+  [/^Unbekannter Zustand\.$/, 'Unknown condition.'],
+  [/^Bitte zuerst den Zustand wählen und speichern\.$/, 'Please choose the condition and save first.'],
+  [/^Bitte zuerst die Mängel beschreiben\.$/, 'Please describe the defects first.'],
+  [/^Das ist kein gültiger Ricardo-Angebotslink\..*$/, 'This is not a valid Ricardo listing link. Please paste the address of the published listing.'],
+  [/^Listing ist noch nicht vollständig: (.*)$/, function (m, l) { return 'Listing is not complete yet: ' + l.split('; ').map(en_).join('; '); }],
+  [/^Dieser Ricardo-Link ist bereits bei (\S+) hinterlegt\.$/, 'This Ricardo link is already stored for $1.'],
+  [/^Unbekannter Status\.$/, 'Unknown status.'],
+  [/^Unbekannte Funktion\.$/, 'Unknown function.'],
+  [/^Wechsel von «(.+)» zu «(.+)» ist nicht möglich\.$/, function (m, a, b) { return 'Changing from "' + st_(a) + '" to "' + st_(b) + '" is not possible.'; }],
+  [/^Das Angebot läuft noch bis (\S+)\.$/, 'The listing is still running until $1.'],
+  [/^Bitte zuerst den aktuellen Verkaufsbericht einlesen\. Das Angebot endete am (\S+), der letzte Import war (?:am (\S+)|noch nie)\..*$/,
+    function (m, a, b) { return 'Please import the current sales report first. The listing ended on ' + a + ', the last import was ' + (b ? 'on ' + b : 'never') + '. Otherwise a sold item would be marked as unsold.'; }],
+  [/^Startpreis fehlt$/, 'Starting price missing'],
+  [/^Zustand wählen$/, 'Choose the condition'],
+  [/^Mängel beschreiben$/, 'Describe the defects'],
+  [/^Produkt prüfen und «geprüft» bestätigen$/, 'Check the product and tick "checked"'],
+  [/^Versandklasse wählen$/, 'Choose the shipping class'],
+  [/^Titel erstellen$/, 'Create the title'],
+  [/^Titel kürzen \((\d+) von 60 Zeichen\)$/, 'Shorten the title ($1 of 60 characters)'],
+  [/^Beschrieb erstellen$/, 'Create the description'],
+  [/^Beschrieb kürzen \(max\. 5000 Zeichen\)$/, 'Shorten the description (max. 5000 characters)'],
+  [/^Titel oder Beschrieb enthält einen Link, eine Domain oder eine Kontaktangabe$/, 'Title or description contains a link, a domain or contact details'],
+  [/^Beschrieb nennt den gewählten Zustand nicht: neu erstellen$/, 'Description does not state the chosen condition: create it again'],
+  [/^Das ist kein Ricardo-Verkaufsbericht\..*$/, 'This is not a Ricardo sales report. Please choose the CSV file from "Mein Verkaufen > Verkauft > Verkaufsbericht erhalten".'],
+  [/^Verkauf (\S+) nicht gefunden\.$/, 'Sale $1 not found.'],
+  [/^Verkauf ist bereits «(.+)»\.$/, function (m, s) { return 'Sale is already "' + st_(s) + '".'; }],
+  [/^Bitte einen Grund wählen\.$/, 'Please choose a reason.'],
+  [/^Bitte die IBAN des Käufers eingeben\.$/, 'Please enter the buyer\'s IBAN.'],
+  [/^Die IBAN stimmt nicht\. Bitte prüfen\.$/, 'The IBAN is not valid. Please check it.'],
+  [/^Bitte Strasse und Hausnummer des Käufers eingeben\.$/, 'Please enter the buyer\'s street and house number.'],
+  [/^Unbekannte Aktion\.$/, 'Unknown action.'],
+  [/^Zu diesem Verkauf läuft eine Retoure\. Bitte im Reiter «Retouren» abschliessen\.$/, 'A return is open for this sale. Please finish it in the tab "Returns".'],
+  [/^Eine Retoure ist nur bei einem bezahlten und versendeten Verkauf möglich \(Status: «(.+)»\)\.$/, function (m, s) { return 'A return is only possible for a paid and shipped sale (status: "' + st_(s) + '").'; }],
+  [/^Retoure (\S+) nicht gefunden\.$/, 'Return $1 not found.'],
+  [/^Retoure (\S+) ist bereits abgeschlossen\.$/, 'Return $1 is already closed.'],
+  [/^Dieser Schritt ist bereits erledigt\.$/, 'This step is already done.'],
+  [/^Bitte einen Rückzahlungsbetrag eingeben\.$/, 'Please enter a refund amount.'],
+  [/^Die Datei konnte nicht erzeugt werden \(Fehler (\d+)\)\. Die Daten stehen im Tab «(.+)»\.$/, 'The file could not be created (error $1). The data is in the tab "$2".'],
+  [/^Nur für Admins\. Deine Adresse \((.*)\) steht nicht in der Einstellung «Admins»\.$/, 'Admins only. Your address ($1) is not listed in the setting "Admins".'],
+  [/^Das Sheet passt nicht zu dieser Version \(Tab «(.+)»\)\..*$/, 'The sheet does not match this version (tab "$1"). Please run the function "einrichten" in the Apps Script editor.'],
+  [/^Bitte einen Namen mit mindestens 3 Zeichen eingeben\.$/, 'Please enter a name with at least 3 characters.'],
+  [/^Bitte einen Startpreis eingeben\.$/, 'Please enter a starting price.'],
+  [/^Bündel sind nur bei inventarisierten Stücken möglich\.$/, 'Bundles are only possible for inventoried items.'],
+  [/^Mängel geändert: Titel und Beschrieb neu erstellen$/, 'Defects changed: create title and description again'],
+  [/^Beschrieb nennt die Mängel nicht: neu erstellen$/, 'Description does not state the defects: create it again'],
+  [/^Beschrieb nennt Mängel, erfasst sind keine: neu erstellen$/, 'Description states defects but none are recorded: create it again'],
+  [/^Eintrag nicht gefunden\. Bitte neu suchen\.$/, 'Entry not found. Please search again.'],
+  [/^Die Einstellung «(.+)» darf nicht leer sein\.$/, 'The setting "$1" must not be empty.']
+];
+function en_(s) {
+  for (let i = 0; i < EN_REGELN.length; i++) if (EN_REGELN[i][0].test(s)) return s.replace(EN_REGELN[i][0], EN_REGELN[i][1]);
+  return s;
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin: suchen, löschen (Storno), Einstellungen                       */
+/* ------------------------------------------------------------------ */
+
+function istAdmin_() {
+  const l = liste_(cfg_('Admins')).map(function (x) { return x.toLowerCase(); });
+  return !l.length || l.indexOf(nutzer_().toLowerCase()) !== -1;
+}
+function pruefeAdmin_() {
+  if (!istAdmin_()) throw new Error('Nur für Admins. Deine Adresse (' + nutzer_() + ') steht nicht in der Einstellung «Admins».');
+}
+
+/** Sucht in allen Listings und Verkäufen, egal in welchem Status. Ohne Suchbegriff: die neusten Einträge. */
+function adminSuche(q) {
+  pruefeAdmin_();
+  const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
+  const passt = function (text) { text = text.toLowerCase(); return woerter.every(function (w) { return text.indexOf(w) !== -1; }); };
+  const ss = SpreadsheetApp.getActive(), sl = ss.getSheetByName(TAB_L), sv = ss.getSheetByName(TAB_S);
+  const listings = [], verk = [];
+  if (sl.getLastRow() > 1) sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues().forEach(function (row, i) {
+    const r = {}; L_COLS.forEach(function (k, j) { r[k] = row[j]; });
+    if (!r['PG-ID'] || !passt([r['PG-ID'], r['Bezeichnung'], r['Titel'], r['Bündel-IDs'], r['EAN']].join(' '))) return;
+    listings.push({ zeile: i + 2, id: String(r['PG-ID']), name: r['Bezeichnung'], status: r['Status'], am: datum_(r['Angelegt am']), buendel: String(r['Bündel-IDs'] || '') });
+  });
+  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row, i) {
+    const v = {}; V_COLS.forEach(function (k, j) { v[k] = row[j]; });
+    if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Nachname']].join(' '))) return;
+    const z = vZeile_(v); z.zeile = i + 2;
+    verk.push(z);
+  });
+  return { listings: listings.reverse().slice(0, 30), verkaeufe: verk.reverse().slice(0, 30) };
+}
+
+/** Löscht die Zeile eines Listings. Das Stück ist danach wieder frei. */
+function adminLoescheListing(zeile, id) {
+  pruefeAdmin_();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+    zeile = Number(zeile);
+    if (!(zeile >= 2) || zeile > sl.getLastRow() || String(sl.getRange(zeile, 1).getValue()).trim() !== String(id)) throw new Error('Eintrag nicht gefunden. Bitte neu suchen.');
+    sl.deleteRow(zeile);
+    log_('Admin: Listing gelöscht', String(id), '');
+    return true;
+  } finally { lock.releaseLock(); }
+}
+
+/** Storniert einen Verkauf. Die Zeile bleibt als «Storniert» stehen, damit der Verkauf beim nächsten Import nicht wieder erscheint. Das Stück wird frei. */
+function adminLoescheVerkauf(zeile, nr) {
+  pruefeAdmin_();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
+    zeile = Number(zeile);
+    if (!(zeile >= 2) || zeile > sv.getLastRow() || String(sv.getRange(zeile, 1).getValue()).trim() !== String(nr)) throw new Error('Eintrag nicht gefunden. Bitte neu suchen.');
+    const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (v['Status'] === 'Retourniert') throw new Error('Zu diesem Verkauf läuft eine Retoure. Bitte im Reiter «Retouren» abschliessen.');
+    v['Status'] = 'Storniert'; v['Storniert am'] = new Date();
+    ADRESSE.forEach(function (k) { v[k] = ''; });
+    sv.getRange(zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
+    const pg = String(v['PG-ID']).trim();
+    const lz = pg ? findeZeile_(sl, pg) : 0;
+    if (lz) {
+      const rec = zeileZuRec_(sl, lz);
+      if (String(rec['Verkauf-Nr']) === String(nr)) { rec['Status'] = 'Storniert'; schreibe_(sl, lz, rec, true); }
+    }
+    wochen_();
+    log_('Admin: Verkauf storniert', pg, String(nr));
+    return true;
+  } finally { lock.releaseLock(); }
+}
+
+function adminEinstellungen() {
+  pruefeAdmin_();
+  const e = SpreadsheetApp.getActive().getSheetByName(TAB_E);
+  return e.getRange(2, 1, Math.max(e.getLastRow() - 1, 1), 3).getValues()
+    .filter(function (r) { return String(r[0]).trim(); })
+    .map(function (r) { return { name: String(r[0]).trim(), wert: String(r[1]), hilfe: String(r[2]) }; });
+}
+
+function adminSpeichereEinstellungen(werte) {
+  pruefeAdmin_();
+  ['Return Tool ID', 'Such-Tabs'].forEach(function (n) {
+    if (werte[n] !== undefined && !String(werte[n]).trim()) throw new Error('Die Einstellung «' + n + '» darf nicht leer sein.');
+  });
+  const e = SpreadsheetApp.getActive().getSheetByName(TAB_E);
+  const namen = e.getRange(2, 1, Math.max(e.getLastRow() - 1, 1), 1).getValues();
+  namen.forEach(function (r, i) {
+    const n = String(r[0]).trim();
+    if (n && werte[n] !== undefined) e.getRange(i + 2, 2).setValue(String(werte[n]).trim());
+  });
+  CFG = null;
+  log_('Admin: Einstellungen', '', Object.keys(werte).join(', '));
+  return adminEinstellungen();
+}
+
+/* ------------------------------------------------------------------ */
+/* Retouren: verkauftes Stück kommt zurück (Garantie), Geld geht zurück  */
+/* ------------------------------------------------------------------ */
+
+function rZeilen_() {
+  const rt = SpreadsheetApp.getActive().getSheetByName(TAB_R);
+  const out = [];
+  if (rt.getLastRow() > 1) rt.getRange(2, 1, rt.getLastRow() - 1, R_COLS.length).getValues().forEach(function (row, i) {
+    const r = {}; R_COLS.forEach(function (k, j) { r[k] = row[j]; });
+    if (r['Retoure-Nr']) { r._zeile = i + 2; out.push(r); }
+  });
+  return out;
+}
+
+/** Offene Retouren mit dem Stand der beiden Schritte Rückzahlung und Ricardo-Storno. */
+function retouren() {
+  const jetzt = new Date().getTime();
+  const alle = rZeilen_();
+  const offen = alle.filter(function (r) { return r['Status'] !== 'Abgeschlossen'; }).map(function (r) {
+    const vk = r['Verkauft am'];
+    const frist = vk instanceof Date ? new Date(vk.getTime() + RICARDO_FRIST_TAGE * 86400000) : null;
+    return { nr: String(r['Retoure-Nr']), verkauf: String(r['Verkauf-Nr']), pgId: String(r['PG-ID']), titel: r['Titel'], kaeufer: String(r['Käufer']), name: String(r['Name']),
+      eroeffnet: datum_(r['Eröffnet am']), grund: r['Grund'], notiz: r['Notiz'], iban: String(r['IBAN']),
+      betrag: runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)).toFixed(2),
+      rueckzahlung: r['Rückzahlung am'] ? Number(r['Rückzahlung CHF']).toFixed(2) : '', rueckzahlungAm: datum_(r['Rückzahlung am']),
+      ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null };
+  });
+  return { offen: offen, abgeschlossen: alle.length - offen.length,
+    auszahlungen: offen.filter(function (o) { return !o.rueckzahlungAm; }).length };
+}
+
+/** Bezahlte und versendete Verkäufe, für die eine Retoure eröffnet werden kann. */
+function retoureSuche(q) {
+  const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
+  if (!woerter.length) return [];
+  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+  const out = [];
+  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (v['Status'] !== 'Bezahlt und versendet') return;
+    const text = [v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Vorname'], v['Nachname']].join(' ').toLowerCase();
+    if (!woerter.every(function (w) { return text.indexOf(w) !== -1; })) return;
+    const o = vZeile_(v);
+    o.adresse = [[v['Strasse'], v['Hausnummer']].join(' ').trim(), v['Postfach']].filter(String).join(', ');
+    out.push(o);
+  });
+  return out.reverse().slice(0, 20);
+}
+
+function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
+  nr = String(nr).trim();
+  if (RETOURE_GRUENDE.indexOf(grund) === -1) throw new Error('Bitte einen Grund wählen.');
+  iban = iban_(iban);
+  adresse = text_(adresse, 200);
+  if (!adresse) throw new Error('Bitte Strasse und Hausnummer des Käufers eingeben.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L), rt = ss.getSheetByName(TAB_R);
+    const nrn = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues() : [];
+    let zeile = 0;
+    for (let i = 0; i < nrn.length; i++) if (String(nrn[i][0]).trim() === nr) { zeile = i + 2; break; }
+    if (!zeile) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (v['Status'] !== 'Bezahlt und versendet') throw new Error('Eine Retoure ist nur bei einem bezahlten und versendeten Verkauf möglich (Status: «' + v['Status'] + '»).');
+    let max = 0;
+    rZeilen_().forEach(function (r) { const m = /^RT-(\d+)$/.exec(String(r['Retoure-Nr'])); if (m) max = Math.max(max, Number(m[1])); });
+    const r = {}; R_COLS.forEach(function (k) { r[k] = ''; });
+    r['Retoure-Nr'] = 'RT-' + ('000' + (max + 1)).slice(-4); r['Status'] = 'Offen'; r['Verkauf-Nr'] = nr; r['PG-ID'] = v['PG-ID']; r['Titel'] = v['Titel'];
+    r['Käufer'] = v['Käufer']; r['Name'] = [v['Vorname'], v['Nachname']].join(' ').trim(); r['Verkauft am'] = v['Verkauft am']; r['Eröffnet am'] = new Date();
+    r['Grund'] = grund; r['Notiz'] = text_(notiz, 500);
+    r['Preis CHF'] = v['Preis CHF']; r['Versand CHF'] = v['Versand CHF']; r['Provision CHF'] = v['Provision CHF']; r['Eröffnet von'] = nutzer_();
+    r['IBAN'] = iban; r['Adresse'] = adresse; r['PLZ'] = v['PLZ']; r['Ort'] = v['Ort'];
+    rt.appendRow(R_COLS.map(function (k) { return r[k]; }));
+    sv.getRange(zeile, V_COLS.indexOf('Status') + 1).setValue('Retourniert');
+    const pg = String(v['PG-ID']).trim();
+    const lz = pg ? findeZeile_(sl, pg) : 0;
+    if (lz) {
+      const rec = zeileZuRec_(sl, lz);
+      if (String(rec['Verkauf-Nr']) === nr) { rec['Status'] = 'Retourniert'; schreibe_(sl, lz, rec, true); }
+    }
+    wochen_();
+    log_('Retoure eröffnet', pg, r['Retoure-Nr'] + ' ' + grund);
+    return retouren();
+  } finally { lock.releaseLock(); }
+}
+
+/** schritt: 'rueckzahlung' (wert = Betrag) oder 'ricardo'. Sind beide erledigt, ist die Retoure abgeschlossen und das Stück wieder frei. */
+function retoureSchritt(rtNr, schritt, wert) {
+  rtNr = String(rtNr).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActive(), rt = ss.getSheetByName(TAB_R), sl = ss.getSheetByName(TAB_L);
+    const r = rZeilen_().filter(function (x) { return String(x['Retoure-Nr']) === rtNr; })[0];
+    if (!r) throw new Error('Retoure ' + rtNr + ' nicht gefunden.');
+    if (r['Status'] === 'Abgeschlossen') throw new Error('Retoure ' + rtNr + ' ist bereits abgeschlossen.');
+    const feld = { rueckzahlung: 'Rückzahlung am', ricardo: 'Ricardo storniert am' }[schritt];
+    if (!feld) throw new Error('Unbekannte Aktion.');
+    if (r[feld]) throw new Error('Dieser Schritt ist bereits erledigt.');
+    if (schritt === 'rueckzahlung') {
+      const betrag = runde_(zahl_(wert));
+      if (!(betrag > 0)) throw new Error('Bitte einen Rückzahlungsbetrag eingeben.');
+      r['Rückzahlung CHF'] = betrag; r[feld] = new Date();
+      r['IBAN'] = ''; r['Adresse'] = ''; // nach der Zahlung nicht mehr nötig
+    } else r[feld] = new Date();
+    const fertig = r['Rückzahlung am'] && r['Ricardo storniert am'];
+    if (fertig) { r['Status'] = 'Abgeschlossen'; r['Abgeschlossen am'] = new Date(); }
+    rt.getRange(r._zeile, 1, 1, R_COLS.length).setValues([R_COLS.map(function (k) { return r[k]; })]);
+    if (fertig && r['PG-ID']) {
+      const lz = findeZeile_(sl, String(r['PG-ID']));
+      if (lz) {
+        const rec = zeileZuRec_(sl, lz);
+        if (rec['Status'] === 'Retourniert') { rec['Status'] = 'Retour abgeschlossen'; schreibe_(sl, lz, rec, true); }
+      }
+    }
+    log_('Retoure ' + schritt, String(r['PG-ID']), rtNr + (wert ? ' ' + wert : ''));
+    return retouren();
+  } finally { lock.releaseLock(); }
+}
+
+/** Excel-Liste aller offenen Rückzahlungen. Fällig ist eine Rückzahlung, sobald die Retoure eröffnet ist. */
+function retourenExport() {
+  const ss = SpreadsheetApp.getActive();
+  const a = ss.getSheetByName(TAB_A) || ss.insertSheet(TAB_A);
+  const kopf = ['Retoure-Nr', 'Name', 'IBAN', 'Betrag CHF', 'Adresse', 'PLZ', 'Ort', 'Produkt', 'PG-ID', 'Verkauf-Nr', 'Ricardo-Benutzername', 'Verkauft am', 'Eröffnet am', 'Grund'];
+  const rows = rZeilen_().filter(function (r) { return r['Status'] !== 'Abgeschlossen' && !r['Rückzahlung am']; }).map(function (r) {
+    return [r['Retoure-Nr'], r['Name'], r['IBAN'], runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)), r['Adresse'], String(r['PLZ']), r['Ort'], r['Titel'], r['PG-ID'], String(r['Verkauf-Nr']), r['Käufer'],
+      datum_(r['Verkauft am']), datum_(r['Eröffnet am']), r['Grund']];
+  });
+  a.clear();
+  a.getRange(1, 1, 1, kopf.length).setValues([kopf]).setFontWeight('bold');
+  if (!rows.length) return { anzahl: 0 };
+  a.getRange(2, 1, rows.length, kopf.length).setValues(rows);
+  a.getRange(rows.length + 2, 3, 1, 2).setValues([['Total', runde_(rows.reduce(function (s, r) { return s + r[3]; }, 0))]]).setFontWeight('bold');
+  SpreadsheetApp.flush();
+  log_('Auszahlungsliste', '', rows.length + ' Rückzahlungen');
+  const datei = alsExcel_(ss, a, TAB_A);
+  // IBAN und Adressen werden nur für die Datei gebraucht und bleiben nicht in diesem Tab stehen
+  a.getRange(2, 1, rows.length + 1, kopf.length).clearContent();
+  return { anzahl: rows.length, name: 'Rueckzahlungen-' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') + '.xlsx', datei: datei };
+}

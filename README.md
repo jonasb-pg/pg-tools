@@ -6,6 +6,7 @@ Analyse Tool von Pretty Good: geführte Prüfung von Retouren am Analyseplatz, m
 |---|---|
 | `src/Code.gs` | Server (Apps Script), Stand = Editor |
 | `src/Index.html` | Oberfläche (HTML, CSS, JS) |
+| `ricardo-script/Code.gs`, `Index.html` | Ricardo Tool (Sheet RICARDO TOOL), Stand 2026-10-09.2 = Editor 15.10. |
 | `matchmaker-script/Code.gs` | Script im Matchmaker Sheet (Suche, Profile, Urteile), Stand = Editor |
 | `docs/architektur.md` | Komponenten, IDs, Datenflüsse, Trigger, Sperren |
 | `docs/datenmodell.md` | Tabs und Spalten (erzeugt) |

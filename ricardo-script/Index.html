@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<base target="_blank">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;900&family=DM+Mono&display=swap" rel="stylesheet">
+<style>
+  /* Gestaltung nach dem Pretty Good Cockpit (Matchmaker): schwarze 2px-Linien, graue Fläche, Pink als Akzent */
+  :root { --ink:#0a0a0a; --muted:#696967; --grau:#d2d2ce; --weiss:#ffffff; --pink:#ffbaf5; --pink-hell:#fff5ff; --linie:rgba(10,10,10,.15);
+    --sans:sofiaPro, "Sofia Pro", Outfit, ui-sans-serif, system-ui, sans-serif; --mono:defaultSansMono, "DM Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:400 16px/1.5 var(--sans); color:var(--ink); background:var(--weiss); }
+  .app { display:flex; min-height:100%; }
+
+  /* Seitenleiste */
+  aside { flex:none; width:292px; background:var(--weiss); border-right:2px solid var(--ink); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; }
+  .marke-kopf { padding:16px; border-bottom:2px solid var(--ink); }
+  .marke-kopf img { display:block; height:32px; }
+  .marke-kopf .wort { font-weight:900; font-size:13px; line-height:1; letter-spacing:.3px; }
+  .gross { text-transform:uppercase; font-weight:600; letter-spacing:.8px; }
+  .marke-kopf .gross { color:var(--muted); margin-top:6px; display:block; }
+  .nav { padding:12px; flex:1; overflow:auto; }
+  .nav .sektion { color:var(--muted); font-size:14px; letter-spacing:.7px; padding:8px 12px; }
+  .nav button { display:flex; align-items:center; gap:12px; width:100%; height:44px; margin-bottom:6px; padding:10px 12px; text-align:left;
+    background:transparent; border:2px solid transparent; border-radius:4px; font:600 16px/1 var(--sans); letter-spacing:.8px; text-transform:uppercase; color:var(--ink); cursor:pointer; }
+  .nav button:hover { border-color:var(--ink); background:transparent; }
+  .nav button.an { background:var(--pink); border-color:var(--ink); border-left-width:6px; }
+  .nav button .zahl { margin-left:auto; }
+  .zahl { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 5px; border:2px solid var(--ink); border-radius:999px; background:var(--pink); font:600 13px/1 var(--sans); }
+  .nav button.an .zahl { background:var(--weiss); }
+  .fuss { padding:12px; border-top:2px solid var(--ink); }
+  .fuss .info { font-size:14px; color:var(--muted); margin:0 0 10px; }
+  .sprache { display:flex; border:2px solid var(--ink); border-radius:24px; overflow:hidden; }
+  .sprache button { flex:1; height:36px; border:0; border-radius:0; background:var(--weiss); font:600 14px/1 var(--sans); letter-spacing:.7px; cursor:pointer; color:var(--ink); }
+  .sprache button.an { background:var(--ink); color:var(--weiss); }
+
+  /* Hauptbereich */
+  .haupt { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--grau); }
+  .top { background:var(--weiss); border-bottom:2px solid var(--ink); min-height:56px; padding:16px 32px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .top h1 { margin:0; font:900 20px/1 var(--sans); text-transform:uppercase; }
+  .top span { color:var(--muted); }
+  main { padding:24px 32px 48px; max-width:1180px; width:100%; }
+  h2 { margin:0 0 12px; font:900 18px/1.2 var(--sans); text-transform:uppercase; }
+  h3 { margin:0 0 12px; font:900 16px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.3px; }
+  .karte { background:var(--weiss); border:2px solid var(--ink); border-radius:4px; padding:20px; margin-bottom:16px; }
+  .schritt { display:flex; gap:16px; }
+  .schritt > .nr { flex:none; width:34px; height:34px; border-radius:50%; background:var(--pink); border:2px solid var(--ink); display:flex; align-items:center; justify-content:center; font-weight:900; font-size:15px; }
+  .schritt > .inhalt { flex:1; min-width:0; }
+  p { margin:0 0 12px; }
+  a { color:var(--ink); font-weight:600; text-underline-offset:3px; }
+
+  input[type=text], textarea, select { width:100%; font:600 17px/1.4 var(--sans); padding:10px 14px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); color:var(--ink); }
+  input[type=text] { height:48px; }
+  select { width:auto; height:40px; padding:4px 10px; font-size:15px; }
+  textarea { resize:vertical; font-weight:400; }
+  ::placeholder { color:#a3a3a0; font-weight:600; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible, select:focus-visible, a:focus-visible { outline:3px solid var(--pink); outline-offset:2px; }
+  #q { height:56px; font-size:20px; }
+  input[type=checkbox] { width:22px; height:22px; accent-color:var(--ink); flex:none; margin:1px 0 0; }
+  input[type=file] { font:600 15px var(--sans); }
+  label { display:block; font-weight:600; margin:16px 0 6px; }
+  label small, .klein { font-weight:400; font-size:14px; color:var(--muted); }
+  label.haken { display:flex; gap:10px; align-items:flex-start; font-weight:600; }
+
+  button { font:600 14px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; cursor:pointer; height:40px; padding:0 18px; border:2px solid var(--ink); border-radius:24px; background:var(--weiss); color:var(--ink); }
+  button:hover { background:var(--grau); }
+  button.haupt-knopf { background:var(--pink); }
+  button.haupt-knopf:hover { background:#f0a3e5; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .wahl { display:flex; flex-wrap:wrap; gap:8px; }
+  .wahl button { border-radius:4px; }
+  .wahl button.an { background:var(--ink); color:var(--weiss); }
+
+  .tabelle { border:2px solid var(--ink); border-radius:4px; overflow:auto; background:var(--weiss); margin-top:12px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:var(--grau); color:var(--muted); font:600 14px/1.2 var(--sans); letter-spacing:.7px; text-transform:uppercase; text-align:left; padding:12px 16px; border-bottom:2px solid var(--ink); white-space:nowrap; }
+  td { padding:12px 16px; border-bottom:1px solid var(--linie); vertical-align:top; font-weight:600; }
+  tr:last-child td { border-bottom:0; }
+  td .klein { display:block; }
+  .mono { font:400 14px/1.4 var(--mono); color:var(--muted); }
+  .zeile-neu td { background:var(--pink-hell); }
+  .betrag { white-space:nowrap; font-size:18px; }
+
+  .meldung { padding:12px 16px; border:2px solid var(--ink); border-radius:4px; margin:12px 0; background:var(--weiss); }
+  .meldung.warn { background:var(--pink-hell); }
+  .meldung.ok { background:var(--pink); }
+  .meldung.stop { background:var(--ink); color:var(--weiss); }
+  .meldung ul { margin:6px 0 0; padding-left:20px; }
+  .etikett { display:inline-block; padding:6px 8px; border-radius:4px; background:var(--grau); font:600 13px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; white-space:nowrap; }
+  .etikett.hell { background:var(--pink); }
+
+  .feld { display:grid; grid-template-columns:190px 1fr auto; gap:14px; align-items:start; padding:12px 0; border-bottom:1px solid var(--linie); }
+  .feld:last-child { border-bottom:0; }
+  .feld .name { color:var(--muted); font-size:14px; letter-spacing:.7px; text-transform:uppercase; font-weight:600; padding-top:2px; }
+  .feld .wert { white-space:pre-wrap; word-break:break-word; font-weight:600; }
+  .feld .wert small { display:block; white-space:normal; font-weight:400; font-size:14px; color:var(--muted); }
+  .reihe { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .reihe > .breit { flex:1; min-width:220px; }
+  .kopf { display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .kopf h2 { margin:0; }
+  .still { color:var(--muted); font-size:14px; }
+  ol.ablauf { margin:0 0 14px; padding-left:20px; color:var(--muted); font-size:14px; }
+  details { margin-top:16px; border-top:1px solid var(--linie); padding-top:12px; }
+  summary { cursor:pointer; font-weight:600; }
+  #hinweis { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:30; max-width:min(680px, calc(100% - 32px)); padding:12px 44px 12px 16px;
+    border:2px solid var(--ink); border-radius:4px; background:var(--weiss); font-weight:600; cursor:pointer; }
+  #hinweis.ok { background:var(--pink); }
+  #hinweis.stop { background:var(--ink); color:var(--weiss); }
+  #hinweis::after { content:"×"; position:absolute; right:14px; top:8px; font-size:20px; }
+  #dialog { position:fixed; inset:0; z-index:40; background:rgba(10,10,10,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+  #dialog .box { background:var(--weiss); border:2px solid var(--ink); border-radius:4px; padding:24px; max-width:520px; width:100%; }
+  #dialog p { font-weight:600; font-size:18px; margin:0 0 20px; }
+  #dialog .reihe { justify-content:flex-end; }
+  [hidden] { display:none !important; }
+  #sperre { position:fixed; inset:0; z-index:50; cursor:progress; }
+  #lade { z-index:51; position:fixed; right:20px; bottom:20px; background:var(--ink); color:var(--weiss); padding:10px 16px; border-radius:24px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; font-size:13px; }
+
+  @media (max-width: 860px) {
+    .app { display:block; }
+    aside { width:auto; height:auto; position:static; border-right:0; border-bottom:2px solid var(--ink); }
+    .nav { display:flex; flex-wrap:wrap; gap:6px; }
+    .nav .sektion { display:none; }
+    .nav button { width:auto; margin:0; }
+    .fuss { display:flex; gap:12px; align-items:center; }
+    .fuss .info { margin:0; flex:1; }
+    main, .top { padding-left:16px; padding-right:16px; }
+    .feld { grid-template-columns:1fr; gap:4px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="marke-kopf">
+      <img src="https://app.pretty-good.ch/logo/logo-pretty-good.svg" alt="Pretty Good" onerror="this.hidden=true;document.getElementById('wort').hidden=false">
+      <div class="wort" id="wort" hidden>PRETTY<br>GOOD</div>
+      <span class="gross">Ricardo</span>
+    </div>
+    <div class="nav">
+      <div class="sektion gross" data-t="nav.sektion"></div>
+      <button id="nav-listen" class="an" onclick="zeige('listen')"><span data-t="nav.listen"></span></button>
+      <button id="nav-verkauf" onclick="zeige('verkauf')"><span data-t="nav.verkauf"></span><span class="zahl" id="z-verkauf" hidden></span></button>
+      <button id="nav-ueber" onclick="zeige('ueber')"><span data-t="nav.ueber"></span><span class="zahl" id="z-ueber" hidden></span></button>
+      <button id="nav-retour" onclick="zeige('retour')"><span data-t="nav.retour"></span><span class="zahl" id="z-retour" hidden></span></button>
+      <div class="sektion gross" id="nav-admin-sektion" data-t="nav.sektion2" hidden></div>
+      <button id="nav-admin" onclick="zeige('admin')" hidden><span data-t="nav.admin"></span></button>
+    </div>
+    <div class="fuss">
+      <p class="info" id="zaehler"></p>
+      <div class="sprache" role="group" aria-label="Sprache / Language">
+        <button id="l-de" onclick="sprache('de')">DE</button>
+        <button id="l-en" onclick="sprache('en')">EN</button>
+      </div>
+      <p class="info" id="version" style="margin:10px 0 0"></p>
+    </div>
+  </aside>
+
+  <div class="haupt">
+    <header class="top"><h1>Ricardo</h1><span class="gross" id="top-sub"></span></header>
+    <main>
+
+      <!-- ===================== LISTEN ===================== -->
+      <section id="s-listen">
+        <div class="karte">
+          <input type="text" id="q" data-tp="such.platz" autocomplete="off" autofocus>
+          <p class="still" style="margin:10px 0 0" data-t="such.hilfe"></p>
+          <div id="such-meldung"></div>
+          <div id="treffer"></div>
+          <p style="margin:12px 0 0"><a href="#" target="_self" onclick="freiZeigen();return false" data-t="frei.link"></a></p>
+          <div id="frei" hidden>
+            <p class="still" style="margin-top:10px" data-t="frei.text"></p>
+            <label for="fr-name" data-t="frei.name"></label>
+            <input type="text" id="fr-name" data-tp="frei.name.platz">
+            <div class="reihe" style="align-items:flex-end">
+              <div class="breit"><label for="fr-preis" data-t="frei.preis"></label><input type="text" id="fr-preis" inputmode="decimal"></div>
+              <div class="breit"><label for="fr-neu"><span data-t="frei.neu"></span> <small data-t="frei.frei"></small></label><input type="text" id="fr-neu" inputmode="decimal"></div>
+              <div class="breit"><label for="fr-ort"><span data-t="frei.ort"></span> <small data-t="frei.frei"></small></label><input type="text" id="fr-ort"></div>
+            </div>
+            <label for="fr-stich"><span data-t="frei.stich"></span> <small data-t="frei.frei"></small></label>
+            <input type="text" id="fr-stich" data-tp="frei.stich.platz">
+            <p style="margin:16px 0 0"><button class="haupt-knopf" onclick="freiAnlegen()" data-t="frei.anlegen"></button></p>
+          </div>
+        </div>
+
+        <div id="arbeit" hidden>
+          <div class="karte">
+            <div class="kopf"><h2 id="a-titel"></h2><span class="etikett" id="a-status"></span></div>
+            <p class="still" id="a-meta"></p>
+            <div id="a-fehlt"></div>
+          </div>
+
+          <div class="karte schritt">
+            <div class="nr">1</div>
+            <div class="inhalt">
+              <h3 data-t="s1.titel"></h3>
+              <label><span data-t="s1.zustand"></span> <small data-t="s1.zustand.hilfe"></small></label>
+              <div class="wahl" id="d-zustand"></div>
+              <div id="d-maengel-block">
+                <label for="d-maengel"><span data-t="s1.maengel"></span> <small id="d-maengel-hinweis"></small></label>
+                <textarea id="d-maengel" rows="2" data-tp="s1.maengel.platz"></textarea>
+                <p class="still" style="margin:6px 0 0" data-t="s1.maengel.ki"></p>
+              </div>
+              <label><span data-t="s1.klasse"></span> <small data-t="s1.klasse.hilfe"></small></label>
+              <p class="still" id="d-masse" style="margin:0 0 8px" hidden></p>
+              <div class="wahl" id="d-klasse"></div>
+              <label class="haken"><input type="checkbox" id="d-getestet"> <span data-t="s1.geprueft"></span></label>
+              <p style="margin-top:16px"><button class="haupt-knopf" onclick="speichern()" data-t="s1.speichern"></button> <span class="still" id="d-versand"></span></p>
+
+              <details id="buendel">
+                <summary><span data-t="b.titel"></span> <span class="klein" data-t="b.hilfe"></span></summary>
+                <div id="b-inhalt" style="margin-top:10px"></div>
+                <div class="reihe">
+                  <div class="breit"><input type="text" id="b-id" data-tp="b.platz"></div>
+                  <button onclick="buendelPlus()" data-t="b.plus"></button>
+                  <button onclick="buendelWeg()" data-t="b.weg"></button>
+                </div>
+                <p class="still" style="margin-top:10px" data-t="b.text"></p>
+              </details>
+            </div>
+          </div>
+
+          <div class="karte schritt">
+            <div class="nr">2</div>
+            <div class="inhalt">
+              <h3 data-t="s2.titel"></h3>
+              <p><button class="haupt-knopf" onclick="textErstellen()" data-t="s2.erstellen"></button> <span class="still" id="t-quelle"></span></p>
+              <label for="t-titel"><span data-t="s2.titelfeld"></span> <small id="t-zahl"></small></label>
+              <input type="text" id="t-titel" maxlength="60">
+              <label for="t-beschrieb"><span data-t="s2.beschrieb"></span> <small id="b-zahl"></small></label>
+              <textarea id="t-beschrieb" rows="14"></textarea>
+              <div id="t-en" class="meldung" hidden><strong data-t="s2.en"></strong><p class="still" id="t-en-hinweis" style="margin:4px 0 10px"></p><div id="t-en-text" style="white-space:pre-wrap"></div></div>
+              <p class="still" style="margin-top:8px" data-t="s2.hilfe"></p>
+              <p><button onclick="textSpeichern()" data-t="s2.speichern"></button></p>
+            </div>
+          </div>
+
+          <div class="karte schritt">
+            <div class="nr">3</div>
+            <div class="inhalt">
+              <h3 data-t="s3.titel"></h3>
+              <div id="karte-zu" class="meldung warn" data-t="s3.zu"></div>
+              <div id="karte-auf" hidden>
+                <p><a href="https://www.ricardo.ch/de/list/" data-t="s3.link"></a></p>
+                <div id="felder"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="karte schritt">
+            <div class="nr">4</div>
+            <div class="inhalt">
+              <h3 data-t="s4.titel"></h3>
+              <p><strong data-t="s4.pruefen"></strong></p>
+              <div id="kontrolle"></div>
+              <label for="r-link" data-t="s4.link"></label>
+              <div class="reihe">
+                <div class="breit"><input type="text" id="r-link" placeholder="https://www.ricardo.ch/de/a/..."></div>
+                <button class="haupt-knopf" onclick="gelistet()" data-t="s4.speichern"></button>
+              </div>
+              <p class="still" style="margin-top:10px" data-t="s4.regal"></p>
+              <p style="margin:18px 0 0"><button onclick="abbrechen()" data-t="s4.abbrechen"></button></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== VERKÄUFE ===================== -->
+      <section id="s-verkauf" hidden>
+        <div class="karte">
+          <h2 data-t="v.import"></h2>
+          <p data-t="v.import.text"></p>
+          <p><a href="https://www.ricardo.ch/de/my-ricardo/selling/orders" data-t="v.import.link"></a></p>
+          <div class="reihe"><input type="file" id="v-datei" accept=".csv,text/csv"> <button class="haupt-knopf" onclick="importieren()" data-t="v.einlesen"></button></div>
+          <div id="v-meldung"></div>
+        </div>
+        <div class="karte">
+          <div class="kopf"><h2 data-t="v.packen"></h2><button onclick="ladeVerkaeufe()" data-t="aktualisieren"></button></div>
+          <ol class="ablauf">
+            <li data-t="v.a1"></li><li data-t="v.a2"></li><li data-t="v.a3"></li><li data-t="v.a4"></li>
+          </ol>
+          <div class="reihe"><button onclick="post()" data-t="v.post"></button> <span id="v-post"></span></div>
+          <div id="v-liste"></div>
+        </div>
+      </section>
+
+      <!-- ===================== ÜBERSICHT ===================== -->
+      <section id="s-ueber" hidden>
+        <div class="karte">
+          <div class="kopf"><h2 data-t="u.titel"></h2><button onclick="ladeUebersicht()" data-t="aktualisieren"></button></div>
+          <p class="still" id="u-hinweis"></p>
+          <input type="text" id="u-filter" data-tp="u.filter" oninput="zeichneUebersicht()">
+          <div id="u-liste"></div>
+        </div>
+      </section>
+
+      <!-- ===================== RETOUREN ===================== -->
+      <section id="s-retour" hidden>
+        <div class="karte">
+          <h2 data-t="rt.neu"></h2>
+          <p class="still" data-t="rt.neu.text"></p>
+          <div class="reihe">
+            <div class="breit"><input type="text" id="rt-q" data-tp="rt.platz"></div>
+            <button class="haupt-knopf" onclick="retoureSuchen()" data-t="suchen"></button>
+          </div>
+          <div id="rt-treffer"></div>
+        </div>
+        <div class="karte">
+          <div class="kopf"><h2 data-t="rt.offen"></h2><div class="reihe"><button onclick="retourenExport()" data-t="rt.export"></button><button onclick="ladeRetouren()" data-t="aktualisieren"></button></div></div>
+          <p class="still" id="rt-info"></p>
+          <div id="rt-liste"></div>
+        </div>
+      </section>
+
+      <!-- ===================== ADMIN ===================== -->
+      <section id="s-admin" hidden>
+        <div class="karte">
+          <h2 data-t="ad.titel"></h2>
+          <p class="still" data-t="ad.text"></p>
+          <div class="reihe">
+            <div class="breit"><input type="text" id="ad-q" data-tp="ad.platz"></div>
+            <button class="haupt-knopf" onclick="adminSuchen()" data-t="suchen"></button>
+          </div>
+          <div id="ad-liste"></div>
+        </div>
+        <div class="karte">
+          <div class="kopf"><h2 data-t="ad.einst"></h2><button class="haupt-knopf" onclick="einstSpeichern()" data-t="ad.einst.speichern"></button></div>
+          <p class="still" data-t="ad.einst.text"></p>
+          <div class="meldung" id="ad-ki"></div>
+          <div id="ad-einst"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="hinweis" role="status" aria-live="polite" hidden onclick="this.hidden=true"></div>
+<div id="dialog" role="dialog" aria-modal="true" hidden><div class="box"><p id="dialog-text"></p><div class="reihe"><button id="dialog-nein" data-t="nein"></button><button id="dialog-ja" class="haupt-knopf" data-t="ja"></button></div></div></div>
+<div id="sperre" hidden></div>
+<div id="lade" hidden></div>
+
+<script>
+  var L = <?!= JSON.stringify(lang) ?>;
+  var S = null, R = null, UE = null, VK = null, ANDERE = [], RT = null, RTS = [], ANSICHT = 'listen';
+
+  /* ---------- Texte: [Deutsch, English] ---------- */
+  var T = {
+    'nav.sektion': ['Verkauf', 'Selling'], 'nav.listen': ['Listen', 'List'], 'nav.verkauf': ['Verkäufe & Versand', 'Sales & shipping'], 'nav.ueber': ['Laufende Angebote', 'Running listings'], 'nav.retour': ['Retouren', 'Returns'], 'nav.sektion2': ['Verwaltung', 'Management'], 'nav.admin': ['Admin', 'Admin'],
+    'aktiv': ['{0} Angebote aktiv', '{0} listings active'], 'aktiv.voll': ['{0} Angebote aktiv, Limite fast erreicht', '{0} listings active, limit almost reached'],
+    'lade': ['Einen Moment', 'One moment'], 'ja': ['Ja', 'Yes'], 'nein': ['Abbrechen', 'Cancel'], 'aktualisieren': ['Aktualisieren', 'Refresh'], 'suchen': ['Suchen', 'Search'], 'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'],
+    'such.platz': ['EAN scannen oder Produktname eingeben', 'Scan EAN or type product name'],
+    'such.hilfe': ['Stück aus dem Regal «Ricardo Offline» nehmen.', 'Take the item from the shelf «Ricardo Offline».'],
+    'such.keine': ['<strong>Nicht im Return Tool gefunden.</strong> Retouren zuerst im Erfassungstool erfassen. Für Reuse-Stücke «Stück ohne Inventar listen» verwenden.', '<strong>Not found in the Return Tool.</strong> Record returns in the intake tool first. For Reuse items use «List an item without inventory».'],
+    'such.anders': ['<strong>Nicht für Ricardo vorgesehen.</strong> Das Produkt liegt in einem anderen Kanal:', '<strong>Not meant for Ricardo.</strong> The product is in another channel:'],
+    'such.trotzdem': ['Trotzdem listen', 'List anyway'], 'such.trotzdem.frage': ['{0} liegt im Kanal «{1}». Trotzdem auf Ricardo listen? Danach im Return Tool den Kanal auf «Online» umstellen.', '{0} is in the channel «{1}». List it on Ricardo anyway? Afterwards change the channel to «Online» in the Return Tool.'],
+    'frei.link': ['Stück ohne Inventar listen (z.B. Reuse)', 'List an item without inventory (e.g. Reuse)'],
+    'frei.text': ['Für Stücke, die nicht im Return Tool stehen. Das Tool vergibt eine eigene Nummer (RC-0001), die als Referenz-Nr. zu Ricardo geht.', 'For items that are not in the Return Tool. The tool assigns its own number (RC-0001), which goes to Ricardo as reference no.'],
+    'frei.name': ['Bezeichnung', 'Name'], 'frei.name.platz': ['Marke, Modell, Produkt', 'Brand, model, product'], 'frei.preis': ['Startpreis CHF', 'Starting price CHF'], 'frei.neu': ['Neupreis CHF', 'New price CHF'], 'frei.frei': ['freiwillig', 'optional'],
+    'frei.stich': ['Stichworte für den Text', 'Keywords for the text'], 'frei.stich.platz': ['z.B. Farbe, Masse, Material, Besonderheiten', 'e.g. colour, size, material, special features'], 'frei.ort': ['Lagerort', 'Location'], 'frei.anlegen': ['Listing anlegen', 'Create listing'],
+    'such.mehrere': ['<strong>{0} Stücke gefunden.</strong> Das richtige Stück anhand von Lagerort und Erfassungsdatum wählen.', '<strong>{0} items found.</strong> Pick the right one by storage location and intake date.'],
+    'such.mehr': ['Mehr als 40 Treffer. Bitte genauer suchen.', 'More than 40 results. Please narrow the search.'],
+    'th.id': ['ID', 'ID'], 'th.produkt': ['Produkt', 'Product'], 'th.kanal': ['Kanal', 'Channel'], 'th.ort': ['Lagerort', 'Location'], 'th.erfasst': ['Erfasst', 'Recorded'], 'th.preis': ['Preis', 'Price'],
+    'th.status': ['Status', 'Status'], 'th.verkauf': ['Verkauf', 'Sale'], 'th.stueck': ['Stück', 'Item'], 'th.kaeufer': ['Käufer', 'Buyer'], 'th.zahlbetrag': ['Zahlbetrag', 'Amount due'], 'th.betrag': ['Betrag', 'Amount'],
+    'such.listen': ['Listen', 'List'], 'such.weiter': ['Weiter bearbeiten', 'Continue'], 'such.keinpreis': ['kein Preis im Return Tool', 'no price in Return Tool'],
+    'such.imbuendel': ['im Bündel {0}', 'in bundle {0}'],
+    'a.weitere': [' + {0} weitere', ' + {0} more'],
+    'a.meta': ['Lagerort {0}, EAN {1}, Startpreis CHF {2}', 'Location {0}, EAN {1}, starting price CHF {2}'], 'a.neupreis': [', Neupreis CHF {0}', ', new price CHF {0}'],
+    'a.unbekannt': ['unbekannt', 'unknown'], 'a.keine': ['keine', 'none'],
+    'a.offen': ['Noch offen:', 'Still open:'], 'a.fertig': ['<strong>Vollständig.</strong> Bereit zum Einstellen bei Ricardo.', '<strong>Complete.</strong> Ready to list on Ricardo.'],
+    's1.titel': ['Prüfen und erfassen', 'Check and record'], 's1.zustand': ['Zustand', 'Condition'], 's1.zustand.hilfe': ['wie bei Ricardo', 'as on Ricardo'],
+    's1.maengel': ['Mängel', 'Defects'], 's1.maengel.pflicht': ['Pflicht bei diesem Zustand', 'required for this condition'], 's1.maengel.frei': ['falls vorhanden', 'if any'],
+    's1.maengel.platz': ['Stichworte genügen, z.B. Kratzer hinten, OVP eingerissen', 'Keywords are enough, also in English, e.g. scratch on back, box torn'],
+    's1.maengel.ki': ['Stichworte genügen, auch auf Englisch. Beim Erstellen des Texts wird daraus ein deutscher Satz.', 'Keywords are enough, also in English. When the text is created they become a German sentence.'],
+    's1.klasse': ['Versandklasse', 'Shipping class'], 's1.klasse.hilfe': ['geschätzt, verpackt. Sperrgut ab 100 × 60 × 60 cm', 'estimated, packed. Bulky from 100 × 60 × 60 cm'],
+    'k.2': ['bis 2 kg', 'up to 2 kg'], 'k.10': ['bis 10 kg', 'up to 10 kg'], 'k.30': ['bis 30 kg', 'up to 30 kg'], 'k.S': ['Sperrgut', 'Bulky'],
+    's1.geprueft': ['Geprüft: Das Produkt funktioniert und die Angaben stimmen mit dem Stück überein', 'Checked: the product works and the details match the item'],
+    's1.speichern': ['Angaben speichern', 'Save details'], 's1.versand': ['Versand: {0}, CHF {1}', 'Shipping: {0}, CHF {1}'],
+    's1.zustand.fehlt': ['Bitte den Zustand wählen.', 'Please choose the condition.'], 's1.klasse.fehlt': ['Bitte die Versandklasse wählen.', 'Please choose the shipping class.'],
+    'b.titel': ['Bündel bilden', 'Build a bundle'], 'b.hilfe': ['(freiwillig, z.B. mehrere Filamente als Set)', '(optional, e.g. several filaments as a set)'],
+    'b.platz': ['PG-ID des weiteren Stücks, z.B. PG-4571', 'PG-ID of the additional item, e.g. PG-4571'], 'b.plus': ['Hinzufügen', 'Add'], 'b.weg': ['Bündel auflösen', 'Dissolve bundle'],
+    'b.text': ['Die PG-ID steht in der Trefferliste der Suche. Startpreis und Neupreis werden zusammengezählt, Titel und Beschrieb müssen danach neu erstellt werden.', 'The PG-ID is shown in the search results. Starting price and new price are added up; title and description must be created again afterwards.'],
+    'b.leer': ['Noch kein Bündel.', 'No bundle yet.'], 'b.frage': ['Bündel auflösen? Die weiteren Stücke werden wieder frei.', 'Dissolve the bundle? The additional items become available again.'],
+    's2.titel': ['Titel und Beschrieb', 'Title and description'], 's2.erstellen': ['Titel und Beschrieb erstellen', 'Create title and description'], 's2.titelfeld': ['Titel', 'Title'], 's2.beschrieb': ['Beschrieb', 'Description'],
+    's1.masse': ['Laut Return Tool (Produkt ohne Verpackung): {0}', 'According to the Return Tool (product without packaging): {0}'],
+    's2.en': ['Englische Lesehilfe', 'English reading aid'], 's2.en.ok': ['Nur zum Lesen. Kopiert wird der deutsche Text.', 'For reading only. The German text is what gets copied to Ricardo.'],
+    's2.en.alt': ['Der deutsche Text wurde seither geändert. Diese Fassung ist nicht mehr aktuell, bis der Text neu erstellt wird.', 'The German text has been changed since. This version is out of date until the text is created again.'],
+    's2.hilfe': ['Jedes Detail mit dem Stück vergleichen, besonders die Mängel.', 'Compare every detail with the item, especially the defects. The listing text stays in German.'],
+    's2.speichern': ['Änderungen am Text speichern', 'Save text changes'], 's2.zeichen': ['{0} von {1} Zeichen', '{0} of {1} characters'],
+    's2.ersetzen': ['Bestehenden Titel und Beschrieb ersetzen?', 'Replace the existing title and description?'],
+    's2.claude': ['Erstellt mit Claude. Bitte gegenlesen.', 'Created with Claude. Please proofread.'], 's2.bausteine': ['Aus Bausteinen erstellt (Claude nicht erreichbar oder kein Schlüssel).', 'Built from fixed blocks (Claude not reachable or no key).'],
+    's2.keinki': ['Kein API-Schlüssel hinterlegt: Text entsteht aus Bausteinen.', 'No API key stored: the text is built from fixed blocks.'],
+    's3.titel': ['Bei Ricardo einstellen', 'List on Ricardo'], 's3.offen': ['Es gibt ungespeicherte Änderungen. Bitte zuerst speichern, dann erscheinen die Felder zum Kopieren wieder.', 'There are unsaved changes. Please save first, then the fields to copy reappear.'], 's3.zu': ['Die Felder zum Kopieren erscheinen, sobald alles vollständig ist.', 'The fields to copy appear once everything is complete.'],
+    's3.link': ['Ricardo-Verkaufsformular öffnen', 'Open the Ricardo listing form'],
+    'f.fotos': ['Fotos', 'Photos (Fotos)'], 'f.fotos.w': ['Über den QR-Code im Ricardo-Formular laden', 'Upload via the QR code in the Ricardo form'],
+    'f.fotos.h': ['Neutraler Hintergrund. Verpackung, Angaben auf der Verpackung, das Produkt selbst und alles Zubehör. Nur Fotos von diesem Stück wählen.', 'Neutral background. Packaging, details on the packaging, the product itself and all accessories. Only pick photos of this item.'],
+    'f.titel': ['Titel', 'Title (Titel)'],
+    'f.typ': ['Produkttyp', 'Product type (Produkttyp)'], 'f.typ.w': ['Aus den Vorschlägen von Ricardo wählen', 'Choose from the suggestions Ricardo shows'], 'f.typ.h': ['Erscheint nach dem Titel. Passt keiner, «Wähle einen anderen Produkttyp».', 'Appears after the title. If none fits, «Wähle einen anderen Produkttyp».'],
+    'f.zustand': ['Zustand', 'Condition (Zustand)'], 'f.zustand.h': ['Den gleichnamigen Knopf wählen.', 'Click the button with this name.'],
+    'f.beschrieb': ['Beschreibung', 'Description (Beschreibung)'],
+    'f.ref': ['Referenz-Nr.', 'Reference no. (Referenz-Nr.)'], 'f.ref.h': ['Damit wird der Verkauf später automatisch diesem Stück zugeordnet.', 'This links the sale to this item automatically later.'],
+    'f.art': ['Angebotsart', 'Listing type (Angebotsart)'], 'f.art.w': ['Auktion', 'Auktion (auction)'],
+    'f.preis': ['Startpreis', 'Starting price (Startpreis)'], 'f.preis.h': ['Kein Sofort-Kaufpreis.', 'No buy-now price.'],
+    'f.laufzeit': ['Laufzeit', 'Duration (Laufzeit)'], 'f.laufzeit.w': ['{0} Tage', '{0} days'], 'f.laufzeit.h': ['Das Enddatum entsprechend setzen.', 'Set the end date accordingly.'],
+    'f.reakt': ['Reaktivierung', 'Reactivation (Reaktivierung)'], 'f.aus': ['Ausschalten', 'Switch off'], 'f.reakt.h': ['Der Schalter «Automatische Reaktivierung» ist bei Ricardo standardmässig eingeschaltet.', 'The switch «Automatische Reaktivierung» is on by default on Ricardo.'],
+    'f.versand': ['Versand', 'Shipping (Versand)'], 'f.versand.w': ['Einschalten: {0}', 'Switch on: {0}'], 'f.versand.h': ['Versandkosten für den Käufer: CHF {0}. Zeigt Ricardo einen anderen Betrag, mit diesem überschreiben.', 'Shipping cost for the buyer: CHF {0}. If Ricardo shows another amount, overwrite it with this one.'],
+    'f.abholung': ['Abholung', 'Pick-up (Abholung)'], 'f.abholung.h': ['Ist bei Ricardo standardmässig eingeschaltet.', 'Is on by default on Ricardo.'],
+    'f.boost': ['Boost', 'Boost'], 'f.boost.w': ['Keinen wählen', 'Choose none'],
+    's4.titel': ['Abschliessen', 'Finish'], 's4.pruefen': ['Vor dem Veröffentlichen bei Ricardo prüfen und abhaken:', 'Check and tick before publishing on Ricardo:'],
+    'p.4': ['Abholung ist ausgeschaltet', 'Pick-up is off'], 'p.5': ['Automatische Reaktivierung ist ausgeschaltet', 'Automatic reactivation is off'], 'p.6': ['Kein Boost gewählt', 'No boost chosen'],
+    's4.link': ['Link des veröffentlichten Angebots', 'Link of the published listing'], 's4.speichern': ['Als gelistet speichern', 'Save as listed'],
+    's4.regal': ['Danach das Stück ins Regal «Ricardo Online» stellen.', 'Then put the item on the shelf «Ricardo Online».'], 's4.abbrechen': ['Dieses Listing abbrechen', 'Discard this listing'],
+    's4.haken': ['Bitte zuerst alle Punkte der Kontrollliste abhaken.', 'Please tick all points of the checklist first.'],
+    's4.fertig': ['{0} ist als gelistet gespeichert. Stück ins Regal «Ricardo Online» stellen.', '{0} is saved as listed. Put the item on the shelf «Ricardo Online».'],
+    's4.abbr.frage': ['Listing {0} wirklich abbrechen?', 'Really discard listing {0}?'], 'kopie.fehler': ['Kopieren nicht möglich. Bitte von Hand markieren.', 'Copying is not possible. Please select by hand.'],
+    'v.import': ['Verkaufsbericht importieren', 'Import sales report'],
+    'v.import.text': ['Bei Ricardo unter «Mein Verkaufen, Verkauft» auf «Verkaufsbericht erhalten» klicken, als Zeitraum die letzten 7 Tage wählen und die Datei hier einlesen. Bereits bekannte Verkäufe werden übersprungen.', 'On Ricardo under «Mein Verkaufen, Verkauft» click «Verkaufsbericht erhalten», choose the last 7 days and load the file here. Sales that are already known are skipped.'],
+    'v.import.link': ['Ricardo «Verkauft» öffnen', 'Open Ricardo «Verkauft»'], 'v.einlesen': ['Einlesen', 'Import'],
+    'v.datei.fehlt': ['Bitte zuerst die Datei des Verkaufsberichts wählen.', 'Please choose the sales report file first.'], 'v.datei.fehler': ['Die Datei konnte nicht gelesen werden.', 'The file could not be read.'],
+    'v.neu': ['<strong>{0} neue Verkäufe eingelesen</strong>, {1} waren schon bekannt.', '<strong>{0} new sales imported</strong>, {1} were already known.'],
+    'v.ohne': [' {0} davon ohne Zuordnung zu einem Stück (Angebot ohne Referenz-Nr. erstellt).', ' {0} of them could not be linked to an item (listing created without reference no.).'],
+    'v.packen': ['Packen, Zahlung, Versand', 'Packing, payment, shipping'],
+    'v.a1': ['Adressliste bei der Post hochladen, Etiketten drucken', 'Upload the address list at Swiss Post, print the labels'],
+    'v.a2': ['Packen: gebrauchter Karton, Pretty-Good-Klebeband, Matchmaker-Karte und Care-Flyer', 'Pack: used box, Pretty Good tape, matchmaker card and care flyer'],
+    'v.a3': ['Paket in den Rollcontainer «Ricardo Unpaid»', 'Parcel into the roll container «Ricardo Unpaid»'], 'v.a4': ['Zahlung auf dem Konto prüfen, dann Postwagen', 'Check the payment on the bank account, then postal cart'],
+    'v.post': ['Adressliste für die Post erstellen', 'Create address list for Swiss Post'], 'v.post.leer': ['Keine Verkäufe mit Status «Zu packen».', 'No sales with status «To pack».'], 'v.post.dann': [' ({0} Adressen), dann im Postlogin unter «Paketetiketten Inland» hochladen.', ' ({0} addresses), then upload in the Post login under «Paketetiketten Inland».'],
+    'v.leer': ['Keine offenen Verkäufe. Alles gepackt, bezahlt und versendet.', 'No open sales. Everything is packed, paid and shipped.'],
+    'v.gepackt': ['Gepackt', 'Packed'], 'v.bezahlt': ['Bezahlt und versendet', 'Paid and shipped'],
+    'v.nichtzu': ['nicht zugeordnet', 'not linked'], 'v.ort': ['Lagerort {0}, ', 'Location {0}, '], 'v.nr': ['Nr. {0}', 'No. {0}'],
+    'v.f.bezahlt': ['{0} ist bezahlt (CHF {1} auf dem Konto) und geht in den Postwagen?', '{0} is paid (CHF {1} on the account) and goes into the postal cart?'],
+    'rt.neu': ['Retoure eröffnen', 'Open a return'],
+    'rt.neu.text': ['Für verkaufte Stücke, die auf Garantie zurückkommen. Den bezahlten und versendeten Verkauf suchen, Grund wählen, IBAN des Käufers eintragen, eröffnen.', 'For sold items that come back under guarantee. Find the paid and shipped sale, choose the reason, enter the buyer\'s IBAN, open the return.'],
+    'rt.platz': ['PG-ID, Titel, Käufername oder Verkaufsnummer', 'PG-ID, title, buyer name or sale number'], 'rt.keine': ['Kein bezahlter und versendeter Verkauf gefunden.', 'No paid and shipped sale found.'],
+    'rt.notiz': ['Notiz, freiwillig', 'Note, optional'], 'rt.iban': ['IBAN des Käufers', 'Buyer\'s IBAN'], 'rt.adresse': ['Strasse und Hausnummer', 'Street and house number'],
+    'rt.iban.fehlt': ['Bitte die IBAN des Käufers eingeben.', 'Please enter the buyer\'s IBAN.'], 'rt.adresse.fehlt': ['Bitte Strasse und Hausnummer des Käufers eingeben.', 'Please enter the buyer\'s street and house number.'], 'rt.eroeffnen': ['Retoure eröffnen', 'Open return'],
+    'rt.offen': ['Offene Retouren', 'Open returns'], 'rt.export': ['Offene Rückzahlungen als Excel', 'Refunds due as Excel'],
+    'rt.info': ['{0} offen, {1} abgeschlossen. Offene Rückzahlungen: {2}.', '{0} open, {1} closed. Refunds due: {2}.'], 'rt.leer': ['Keine offenen Retouren.', 'No open returns.'],
+    'th.retoure': ['Retoure', 'Return'], 'th.schritte': ['Schritte', 'Steps'],
+    'rt.seit': ['eröffnet {0}', 'opened {0}'], 'rt.verkauf': ['Verkauf {0}', 'Sale {0}'],
+   
+    'rt.s2': ['Rückzahlung gemacht', 'Refund made'], 'rt.s2.ok': ['CHF {0} zurückgezahlt am {1}', 'CHF {0} refunded on {1}'],
+    'rt.s3': ['Bei Ricardo storniert', 'Cancelled on Ricardo'], 'rt.s3.ok': ['Bei Ricardo storniert am {0}', 'Cancelled on Ricardo on {0}'],
+    'rt.s3.frist': ['Provision zurückfordern bis {0} (noch {1} Tage)', 'Reclaim the commission by {0} ({1} days left)'], 'rt.s3.vorbei': ['Frist für die Provision war am {0}', 'The deadline for the commission was {0}'],
+   
+    'rt.f.eroeffnen': ['Retoure für {0} eröffnen (Grund: {1})? Der Verkauf zählt danach nicht mehr zum Umsatz.', 'Open a return for {0} (reason: {1})? The sale no longer counts towards revenue afterwards.'],
+    'rt.f.zahlung': ['CHF {0} an {1} zurückgezahlt?', 'CHF {0} refunded to {1}?'],
+    'rt.export.leer': ['Keine offenen Rückzahlungen.', 'No refunds due.'],
+    'rt.export.fertig': [' ({0} Rückzahlungen)', ' ({0} refunds)'], 'rt.speichern': ['{0} speichern', 'Save {0}'],
+    'ad.titel': ['Storno: Einträge löschen', 'Cancel: delete entries'],
+    'ad.text': ['Sucht in allen Listings und Verkäufen, egal in welchem Status. Ohne Suchbegriff erscheinen die neusten Einträge.', 'Searches all listings and sales in any status. Without a search term the latest entries are shown.'],
+    'ad.platz': ['PG-ID, Titel, Käufer oder Verkaufsnummer', 'PG-ID, title, buyer or sale number'],
+    'ad.listings': ['Listings', 'Listings'], 'ad.verkaeufe': ['Verkäufe', 'Sales'], 'ad.leer': ['Nichts gefunden.', 'Nothing found.'], 'th.angelegt': ['Angelegt', 'Created'],
+    'ad.loeschen': ['Löschen', 'Delete'],
+    'ad.f.listing': ['Listing {0} endgültig löschen? Das Stück ist danach wieder frei. Ein Angebot auf Ricardo musst du dort selbst beenden.', 'Delete listing {0} for good? The item becomes available again. A listing on Ricardo must be ended there by you.'],
+    'ad.f.verkauf': ['Verkauf {0} löschen? Er verschwindet aus den offenen Paketen und zählt nicht mehr zum Umsatz, das Stück wird wieder frei. Der Verkauf bleibt als «Storniert» vermerkt, damit er beim nächsten Import nicht wieder erscheint.', 'Delete sale {0}? It disappears from the open parcels and no longer counts towards revenue; the item becomes available again. The sale stays recorded as «Cancelled» so that it does not reappear with the next import.'],
+    'ad.erledigt': ['Erledigt.', 'Done.'],
+    'ad.ki.an': ['Claude ist verbunden: Titel und Beschrieb werden formuliert.', 'Claude is connected: title and description are written by it.'],
+    'ad.ki.aus': ['Claude ist nicht verbunden. Der API-Schlüssel wird im Apps-Script-Editor eingetragen: Zahnrad «Projekteinstellungen», «Script-Eigenschaften», Name ANTHROPIC_API_KEY.', 'Claude is not connected. The API key is entered in the Apps Script editor: gear icon «Project settings», «Script properties», name ANTHROPIC_API_KEY.'],
+    'ad.einst': ['Einstellungen', 'Settings'], 'ad.einst.speichern': ['Einstellungen speichern', 'Save settings'], 'ad.einst.gespeichert': ['Einstellungen gespeichert.', 'Settings saved.'],
+    'ad.einst.text': ['Die Versandtarife stehen im Sheet im Tab «Versand».', 'The shipping rates are in the sheet in the tab «Versand».'],
+    'u.titel': ['Laufende Angebote', 'Running listings'], 'u.filter': ['Nach PG-ID oder Name filtern', 'Filter by PG-ID or name'],
+    'u.hinweis': ['Angebote, die länger als {0} Tage online sind, gelten als abgelaufen. Letzter Verkaufsbericht: {1}. «Unverkauft» geht erst, wenn nach dem Ende des Angebots ein Bericht eingelesen wurde.', 'Listings online for more than {0} days count as expired. Last sales report: {1}. «Unsold» only works once a report was imported after the listing ended.'],
+    'u.keiner': ['noch keiner', 'none yet'], 'u.leer': ['Keine laufenden Angebote.', 'No running listings.'], 'u.bearbeiten': ['Bearbeiten', 'Edit'], 'u.unverkauft': ['Unverkauft', 'Unsold'],
+    'u.abgelaufen': ['Abgelaufen', 'Expired'], 'u.seit': ['seit {0}', 'since {0}'], 'u.angebot': ['Angebot', 'Listing'],
+    'u.frage': ['{0} als unverkauft markieren? Das Stück neu triagieren (Caritas, Heilsarmee oder Lagerverkauf) und im Return Tool den neuen Kanal eintragen.', 'Mark {0} as unsold? Re-triage the item (Caritas, Heilsarmee or warehouse sale) and enter the new channel in the Return Tool.']
+  };
+  var ST = { 'In Arbeit': 'In progress', 'Bereit': 'Ready', 'Gelistet': 'Listed', 'Verkauft': 'Sold', 'Versendet': 'Shipped', 'Storniert': 'Cancelled', 'Unverkauft': 'Unsold', 'Abgebrochen': 'Discarded',
+    'Zu packen': 'To pack', 'Wartet auf Zahlung': 'Awaiting payment', 'Bezahlt und versendet': 'Paid and shipped', 'Retourniert': 'Returned', 'Retour abgeschlossen': 'Return closed' };
+  var ZU = { 'Gebraucht': 'Used', 'Neu und originalverpackt': 'New, original packaging', 'Neu (gemäss Beschreibung)': 'New, as described', 'Defekt': 'Defective' };
+  var GR = { 'Defekt': 'Defective', 'Transportschaden': 'Transport damage', 'Falscher Artikel': 'Wrong item' };
+
+  function t(k) {
+    var e = T[k], s = e ? e[L === 'en' ? 1 : 0] : k;
+    for (var i = 1; i < arguments.length; i++) s = s.split('{' + (i - 1) + '}').join(arguments[i]);
+    return s;
+  }
+  function st(s) { return L === 'en' && ST[s] ? ST[s] : s; }
+  /* Ricardo-Begriffe bleiben deutsch, auf Englisch mit Übersetzung in Klammern */
+  function zu(s) { return L === 'en' && ZU[s] ? s + ' (' + ZU[s] + ')' : s; }
+  function gr(s) { return L === 'en' && GR[s] ? GR[s] : s; }
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  /* Solange der Server arbeitet, ist die Oberfläche gesperrt: kein Doppelklick, keine zweite Aktion dazwischen */
+  var laeuft = 0;
+  function lade(an) { laeuft = Math.max(0, laeuft + (an ? 1 : -1)); $('lade').hidden = !laeuft; $('sperre').hidden = !laeuft; }
+  /* Meldungen und Rückfragen erscheinen im Tool statt als Browser-Fenster */
+  var hinweisZeit = null;
+  function melde(text, art) {
+    var e = $('hinweis'); e.textContent = text; e.className = art || ''; e.hidden = false;
+    clearTimeout(hinweisZeit); if (art !== 'stop') hinweisZeit = setTimeout(function () { e.hidden = true; }, 6000);
+  }
+  function frage(text, ja) {
+    $('dialog-text').textContent = text; $('dialog').hidden = false; $('dialog-ja').focus();
+    $('dialog-ja').onclick = function () { $('dialog').hidden = true; ja(); };
+    $('dialog-nein').onclick = function () { $('dialog').hidden = true; };
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('dialog').hidden = true; });
+  function ruf(name, args, ok) {
+    lade(true);
+    google.script.run.withSuccessHandler(function (x) { lade(false); ok(x); })
+      .withFailureHandler(function (e) { lade(false); melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); })
+      .api(L, name, args);
+  }
+  function still(name, args, ok) {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(function () {}).api(L, name, args);
+  }
+
+  /* ---------- Sprache ---------- */
+  function texte() {
+    document.documentElement.lang = L;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (e) { e.textContent = t(e.getAttribute('data-t')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tp]'), function (e) { e.placeholder = t(e.getAttribute('data-tp')); });
+    $('l-de').className = L === 'de' ? 'an' : ''; $('l-en').className = L === 'en' ? 'an' : '';
+    $('lade').textContent = t('lade');
+    $('top-sub').textContent = t('nav.' + ANSICHT);
+    if (S) { zaehler(S.aktiv, S.schwelle); $('version').textContent = 'Version ' + S.version; $('nav-admin').hidden = !S.admin; $('nav-admin-sektion').hidden = !S.admin; }
+  }
+  function sprache(neu) {
+    if (neu === L) return;
+    L = neu;
+    try { localStorage.setItem('rt-lang', L); } catch (e) { /* ohne Speicher gilt die Wahl bis zum Schliessen */ }
+    texte();
+    $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; $('v-meldung').innerHTML = ''; $('ad-liste').innerHTML = ''; $('v-post').innerHTML = '';
+    if (R) { var id = R.id; ruf('lade', [id], function (r) { kontrolle(); zustandKnoepfe(R.zustandWahl); klasseKnoepfe(klasseWahl); aktualisiere(r); }); }
+    if (VK) zeichneVerkaeufe();
+    if (UE) zeichneUebersicht();
+    if (ANSICHT === 'admin') ladeAdmin();
+    $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();
+  }
+
+  function zeige(was) {
+    ANSICHT = was;
+    ['listen', 'verkauf', 'ueber', 'retour', 'admin'].forEach(function (x) { $('s-' + x).hidden = was !== x; $('nav-' + x).className = was === x ? 'an' : ''; });
+    $('top-sub').textContent = t('nav.' + was);
+    if (was === 'ueber') ladeUebersicht(); else if (was === 'verkauf') ladeVerkaeufe(); else if (was === 'retour') ladeRetouren(); else if (was === 'admin') ladeAdmin(); else $('q').focus();
+  }
+  function zaehler(aktiv, schwelle) { S.aktiv = aktiv; S.schwelle = schwelle; $('zaehler').textContent = t(aktiv >= schwelle ? 'aktiv.voll' : 'aktiv', aktiv); }
+  function marke(el, n) { el.textContent = n; el.hidden = !n; }
+  function tab(kopf, zeilen) { return '<div class="tabelle"><table><tr>' + kopf.map(function (k) { return '<th>' + (k ? t(k) : '') + '</th>'; }).join('') + '</tr>' + zeilen + '</table></div>'; }
+
+  /* ---------- Suche ---------- */
+  $('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); suchen(); } });
+
+  function suchen() {
+    var q = $('q').value.trim();
+    $('treffer').innerHTML = ''; $('such-meldung').innerHTML = '';
+    ruf('suche', [q], function (x) {
+      if (x.hinweis) { $('such-meldung').innerHTML = '<div class="meldung warn">' + esc(x.hinweis) + '</div>'; return; }
+      if (!x.treffer.length && !x.andere.length) { $('such-meldung').innerHTML = '<div class="meldung stop">' + t('such.keine') + '</div>'; return; }
+      if (!x.treffer.length) {
+        var z = '';
+        ANDERE = x.andere;
+        x.andere.forEach(function (r, i) {
+          var k = r.status ? '<span class="etikett">' + esc(st(r.status)) + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          z += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td>' + (r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '') + '</td><td>' + k + '</td></tr>';
+        });
+        $('treffer').innerHTML = '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z); return;
+      }
+      var h = x.treffer.length > 1 ? '<div class="meldung warn">' + t('such.mehrere', x.treffer.length) + '</div>' : '', zl = '';
+      x.treffer.forEach(function (r) {
+        var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
+        if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
+        else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="start(\'' + esc(r.id) + '\')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+        else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
+        else knopf = '<span class="etikett">' + esc(st(r.status)) + '</span>';
+        zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
+      });
+      $('treffer').innerHTML = h + tab(['th.id', 'th.produkt', 'th.ort', 'th.erfasst', 'th.preis', ''], zl) + (x.mehr ? '<p class="still">' + t('such.mehr') + '</p>' : '');
+    });
+  }
+  function trotzdem(i) {
+    var r = ANDERE[i];
+    frage(t('such.trotzdem.frage', r.id, r.tab), function () { ruf('starteListing', [r.id, true], function (x) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(x); }); });
+  }
+  function freiZeigen() { $('frei').hidden = !$('frei').hidden; if (!$('frei').hidden) $('fr-name').focus(); }
+  function freiAnlegen() {
+    ruf('freiesListing', [{ name: $('fr-name').value, preis: $('fr-preis').value, neupreis: $('fr-neu').value, stichworte: $('fr-stich').value, lagerort: $('fr-ort').value }], function (r) {
+      ['fr-name', 'fr-preis', 'fr-neu', 'fr-stich', 'fr-ort'].forEach(function (i) { $(i).value = ''; });
+      $('frei').hidden = true; $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; oeffne(r);
+    });
+  }
+  function start(id) { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); }
+
+  /* ---------- Arbeitsbereich ---------- */
+  function oeffne(r) {
+    R = r; $('arbeit').hidden = false;
+    $('r-link').value = ''; $('b-id').value = ''; $('t-quelle').textContent = S.kiAktiv ? '' : t('s2.keinki');
+    kontrolle();
+    fuelle(r); aktualisiere(r);
+    window.scrollTo(0, $('arbeit').offsetTop - 10);
+  }
+  function fuelle(r) {
+    $('d-maengel').value = r.maengel || ''; $('d-getestet').checked = !!r.getestet;
+    $('t-titel').value = r.titel || ''; $('t-beschrieb').value = r.beschrieb || '';
+    zustandKnoepfe(r.zustand); klasseKnoepfe(r.sperrgut ? 'S' : (r.gewicht ? String(r.gewicht) : ''));
+  }
+  function aktualisiere(r) {
+    var wahl = R ? R.zustandWahl : ''; R = r; R.zustandWahl = wahl || r.zustand;
+    $('a-titel').textContent = r.id + (r.buendelIds.length ? t('a.weitere', r.buendelIds.length) : '') + ': ' + r.bezeichnung;
+    $('a-meta').textContent = t('a.meta', r.lagerort || t('a.unbekannt'), r.ean || t('a.keine'), r.startpreis) + (r.neupreis ? t('a.neupreis', Number(r.neupreis).toFixed(2)) : '');
+    $('a-status').textContent = st(r.status); $('a-status').className = 'etikett' + (r.status === 'Bereit' ? ' hell' : '');
+    $('d-versand').textContent = r.klasse ? t('s1.versand', r.klasse, r.versand) : '';
+    $('t-en').hidden = L !== 'en' || !r.englisch; $('t-en-text').textContent = r.englisch || '';
+    $('t-en-hinweis').textContent = t(r.englischAlt ? 's2.en.alt' : 's2.en.ok'); $('t-en').className = 'meldung' + (r.englischAlt ? ' warn' : '');
+    $('d-masse').hidden = !r.masse.length; $('d-masse').textContent = t('s1.masse', r.masse.join(' · '));
+    maengelHinweis();
+    $('b-inhalt').innerHTML = r.buendelInhalt.length > 1 ? '<ul>' + r.buendelInhalt.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<p class="still">' + t('b.leer') + '</p>';
+    $('buendel').hidden = !!r.frei;
+    if (r.buendelIds.length) $('buendel').open = true;
+    zaehle();
+    if (r.fehlt.length) {
+      $('a-fehlt').innerHTML = '<div class="meldung warn"><strong>' + t('a.offen') + '</strong><ul>' + r.fehlt.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul></div>';
+      $('karte-zu').textContent = t('s3.zu'); $('karte-zu').hidden = false; $('karte-auf').hidden = true;
+    } else {
+      $('a-fehlt').innerHTML = '<div class="meldung ok">' + t('a.fertig') + '</div>';
+      $('karte-zu').hidden = true; $('karte-auf').hidden = false; felder(r);
+    }
+  }
+  /* Solange Eingaben nicht gespeichert sind, bleiben die Kopierfelder zu: Kopiert wird nur, was im Sheet steht */
+  function offen() { if (R && !$('arbeit').hidden) { $('karte-zu').textContent = t('s3.offen'); $('karte-zu').hidden = false; $('karte-auf').hidden = true; } }
+  function maengelHinweis() {
+    $('d-maengel-block').hidden = !R.zustandWahl || R.zustandWahl === 'Neu und originalverpackt';
+    $('d-maengel-hinweis').textContent = t(S.maengelPflicht.indexOf(R.zustandWahl) !== -1 ? 's1.maengel.pflicht' : 's1.maengel.frei');
+  }
+  function zustandKnoepfe(aktiv) {
+    R.zustandWahl = aktiv || '';
+    $('d-zustand').innerHTML = S.zustaende.map(function (z, i) {
+      return '<button type="button" class="' + (z === R.zustandWahl ? 'an' : '') + '" onclick="zustandKnoepfe(S.zustaende[' + i + ']);maengelHinweis();offen()">' + esc(zu(z)) + '</button>';
+    }).join('');
+  }
+  var KLASSEN = ['2', '10', '30', 'S'], klasseWahl = '';
+  function klasseKnoepfe(aktiv) {
+    klasseWahl = aktiv || '';
+    $('d-klasse').innerHTML = KLASSEN.map(function (k) {
+      return '<button type="button" class="' + (k === klasseWahl ? 'an' : '') + '" onclick="klasseKnoepfe(\'' + k + '\');offen()">' + t('k.' + k) + '</button>';
+    }).join('');
+  }
+  function speichern() {
+    if (!R.zustandWahl) { melde(t('s1.zustand.fehlt'), 'stop'); return; }
+    if (!klasseWahl) { melde(t('s1.klasse.fehlt'), 'stop'); return; }
+    ruf('speichereDetails', [R.id, { zustand: R.zustandWahl, maengel: $('d-maengel-block').hidden ? '' : $('d-maengel').value,
+      gewicht: klasseWahl === 'S' ? '30' : klasseWahl, sperrgut: klasseWahl === 'S', getestet: $('d-getestet').checked }], aktualisiere);
+  }
+  function buendelPlus() {
+    var z = $('b-id').value.trim(); if (!z) return;
+    ruf('buendelHinzu', [R.id, z], function (r) { $('b-id').value = ''; fuelle(r); aktualisiere(r); });
+  }
+  function buendelWeg() {
+    if (!R.buendelIds.length) return;
+    frage(t('b.frage'), function () { ruf('buendelLeeren', [R.id], function (r) { fuelle(r); aktualisiere(r); }); });
+  }
+  function textErstellen() {
+    var los = function () {
+      ruf('erstelleText', [R.id], function (r) {
+        $('t-titel').value = r.titel; $('t-beschrieb').value = r.beschrieb;
+        $('t-quelle').textContent = t(r.textQuelle === 'Claude' ? 's2.claude' : 's2.bausteine');
+        aktualisiere(r);
+      });
+    };
+    if (R.titel) frage(t('s2.ersetzen'), los); else los();
+  }
+  function textSpeichern() { ruf('speichereDetails', [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }], aktualisiere); }
+  function zaehle() {
+    $('t-zahl').textContent = t('s2.zeichen', $('t-titel').value.length, 60);
+    $('b-zahl').textContent = t('s2.zeichen', $('t-beschrieb').value.length, 5000);
+  }
+  ['t-titel', 't-beschrieb'].forEach(function (i) { $(i).addEventListener('input', function () { zaehle(); offen(); }); });
+  $('d-maengel').addEventListener('input', offen); $('d-getestet').addEventListener('change', offen);
+  [['rt-q', retoureSuchen], ['ad-q', adminSuchen], ['b-id', buendelPlus]].forEach(function (p) { $(p[0]).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); p[1](); } }); });
+
+  /* ---------- Listing-Karte in der Reihenfolge des Ricardo-Formulars ---------- */
+  function felder(r) {
+    var f = [
+      [t('f.fotos'), t('f.fotos.w'), t('f.fotos.h'), null],
+      [t('f.titel'), r.titel, '', r.titel],
+      [t('f.typ'), t('f.typ.w'), t('f.typ.h'), null],
+      [t('f.zustand'), zu(r.zustand), t('f.zustand.h'), null],
+      [t('f.beschrieb'), r.beschrieb, '', r.beschrieb],
+      [t('f.ref'), r.id, t('f.ref.h'), r.id],
+      [t('f.art'), t('f.art.w'), '', null],
+      [t('f.preis'), 'CHF ' + r.startpreis, t('f.preis.h'), r.startpreis],
+      [t('f.laufzeit'), t('f.laufzeit.w', S.laufzeit), t('f.laufzeit.h'), null],
+      [t('f.reakt'), t('f.aus'), t('f.reakt.h'), null],
+      [t('f.versand'), t('f.versand.w', r.versandForm), t('f.versand.h', r.versand), null],
+      [t('f.abholung'), t('f.aus'), t('f.abholung.h'), null],
+      [t('f.boost'), t('f.boost.w'), '', null]
+    ];
+    $('felder').innerHTML = f.map(function (x, i) {
+      var knopf = x[3] != null ? '<button onclick="kopiere(' + i + ', this)">' + t('kopieren') + '</button>' : '';
+      return '<div class="feld"><div class="name">' + esc(x[0]) + '</div><div class="wert">' + esc(x[1]) + (x[2] ? '<small>' + esc(x[2]) + '</small>' : '') + '</div><div>' + knopf + '</div></div>';
+    }).join('');
+    felder.daten = f;
+  }
+  function kontrolle() {
+    $('kontrolle').innerHTML = [4, 5, 6].map(function (i) { return '<label class="haken"><input type="checkbox"> <span>' + t('p.' + i) + '</span></label>'; }).join('');
+  }
+  function kontrolleOk() { return Array.prototype.every.call($('kontrolle').querySelectorAll('input'), function (x) { return x.checked; }); }
+  function kopiere(i, knopf) {
+    var text = String(felder.daten[i][3]);
+    var fertig = function () { knopf.textContent = t('kopiert'); setTimeout(function () { knopf.textContent = t('kopieren'); }, 1500); };
+    var ersatz = function () {
+      var a = document.createElement('textarea'); a.value = text; a.style.position = 'fixed'; a.style.opacity = '0';
+      document.body.appendChild(a); a.select();
+      try { document.execCommand('copy'); fertig(); } catch (e) { melde(t('kopie.fehler'), 'stop'); }
+      document.body.removeChild(a);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, ersatz); else ersatz();
+  }
+  function gelistet() {
+    if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
+    ruf('markiereGelistet', [R.id, $('r-link').value], function (r) {
+      melde(t('s4.fertig', r.id), 'ok');
+      schliesse(); still('startDaten', [], function (s) { S = s; texte(); });
+    });
+  }
+  function abbrechen() {
+    frage(t('s4.abbr.frage', R.id), function () { ruf('setzeStatus', [R.id, 'Abgebrochen'], function () { schliesse(); }); });
+  }
+  function schliesse() { R = null; $('arbeit').hidden = true; $('q').focus(); window.scrollTo(0, 0); }
+
+  /* ---------- Verkäufe ---------- */
+  function importieren() {
+    var d = $('v-datei').files[0];
+    if (!d) { melde(t('v.datei.fehlt'), 'stop'); return; }
+    var leser = new FileReader();
+    leser.onload = function () {
+      ruf('importVerkaeufe', [String(leser.result)], function (v) {
+        var i = v.import;
+        $('v-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + '</div>';
+        $('v-datei').value = ''; VK = v; zeichneVerkaeufe();
+      });
+    };
+    leser.onerror = function () { melde(t('v.datei.fehler'), 'stop'); };
+    leser.readAsText(d, 'UTF-8');
+  }
+  function ladeVerkaeufe() { ruf('verkaeufe', [], function (v) { VK = v; zeichneVerkaeufe(); }); }
+  function gruende(id) { return '<select id="' + id + '">' + S.retoureGruende.map(function (g) { return '<option value="' + esc(g) + '">' + esc(gr(g)) + '</option>'; }).join('') + '</select>'; }
+  function zeichneVerkaeufe() {
+    marke($('z-verkauf'), VK.offen.length);
+    if (!VK.offen.length) { $('v-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('v.leer') + '</p>'; return; }
+    var z = '';
+    VK.offen.forEach(function (o, i) {
+      var a = o.status === 'Zu packen'
+        ? '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'gepackt\')">' + t('v.gepackt') + '</button>'
+        : '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'bezahlt\')">' + t('v.bezahlt') + '</button>';
+      z += '<tr class="' + (o.status === 'Zu packen' ? 'zeile-neu' : '') + '"><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td>' +
+        '<td>' + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span></td>' +
+        '<td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + (o.kaeufer && o.kaeufer !== o.name ? ', ' + esc(o.kaeufer) : '') + '</span></td>' +
+        '<td class="betrag">CHF ' + esc(o.total) + '</td><td><span class="etikett">' + esc(st(o.status)) + '</span></td><td>' + a + '</td></tr>';
+    });
+    $('v-liste').innerHTML = tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.zahlbetrag', 'th.status', ''], z);
+  }
+  function verkauf(i, aktion) {
+    var o = VK.offen[i];
+    var los = function () { ruf('setzeVerkauf', [o.nr, aktion], function (v) { VK = v; zeichneVerkaeufe(); }); };
+    if (aktion === 'gepackt') los(); else frage(t('v.f.bezahlt', o.pgId || o.titel, o.total), los);
+  }
+  function post() {
+    ruf('postAdressen', [], function (p) {
+      if (!p.anzahl) { $('v-post').textContent = t('v.post.leer'); return; }
+      ladeDatei(p, $('v-post'), t('v.post.dann', p.anzahl));
+    });
+  }
+  /* ---------- Retouren ---------- */
+  function ladeRetouren() { ruf('retouren', [], function (r) { RT = r; zeichneRetouren(); }); }
+  function retoureSuchen() {
+    ruf('retoureSuche', [$('rt-q').value], function (l) {
+      RTS = l;
+      if (!l.length) { $('rt-treffer').innerHTML = '<p class="still" style="margin-top:12px">' + t('rt.keine') + '</p>'; return; }
+      var z = '';
+      l.forEach(function (o, i) {
+        z += '<tr><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td><td>' + (o.pgId ? esc(o.pgId) + ' ' : '') + esc(o.titel) + '</td><td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + '</span></td><td class="betrag">CHF ' + esc(o.total) + '</td>' +
+          '<td>' + gruende('rg-' + i) + ' <input type="text" id="ri-' + i + '" placeholder="' + esc(t('rt.iban')) + '" autocomplete="off" style="height:40px;font-size:15px;margin:6px 0 0"><input type="text" id="ra-' + i + '" value="' + esc(o.adresse) + '" placeholder="' + esc(t('rt.adresse')) + '" style="height:40px;font-size:15px;margin:6px 0 0"><input type="text" id="rn-' + i + '" placeholder="' + esc(t('rt.notiz')) + '" style="height:40px;font-size:15px;margin:6px 0"> <button class="haupt-knopf" onclick="retoureNeu(' + i + ')">' + t('rt.eroeffnen') + '</button></td></tr>';
+      });
+      $('rt-treffer').innerHTML = tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.betrag', ''], z);
+    });
+  }
+  function retoureNeu(i) {
+    var o = RTS[i], grund = $('rg-' + i).value, notiz = $('rn-' + i).value;
+    if (!$('ri-' + i).value.trim()) { melde(t('rt.iban.fehlt'), 'stop'); $('ri-' + i).focus(); return; }
+    if (!$('ra-' + i).value.trim()) { melde(t('rt.adresse.fehlt'), 'stop'); $('ra-' + i).focus(); return; }
+    frage(t('rt.f.eroeffnen', o.pgId || o.titel, gr(grund)), function () {
+      ruf('retoureEroeffnen', [o.nr, grund, notiz, $('ri-' + i).value, $('ra-' + i).value], function (r) { RT = r; $('rt-treffer').innerHTML = ''; $('rt-q').value = ''; zeichneRetouren(); });
+    });
+  }
+  function zeichneRetouren() {
+    marke($('z-retour'), RT.offen.length);
+    $('rt-info').textContent = t('rt.info', RT.offen.length, RT.abgeschlossen, RT.auszahlungen);
+    if (!RT.offen.length) { $('rt-liste').innerHTML = '<p class="still">' + t('rt.leer') + '</p>'; return; }
+    var z = '';
+    RT.offen.forEach(function (o, i) {
+      var ok = function (text) { return '<div style="margin-bottom:8px">✓ ' + text + '</div>'; };
+      var s = o.rueckzahlungAm ? ok(t('rt.s2.ok', esc(o.rueckzahlung), esc(o.rueckzahlungAm)))
+        : '<div class="reihe" style="margin-bottom:8px">CHF <input type="text" id="rb-' + i + '" value="' + esc(o.betrag) + '" inputmode="decimal" style="width:110px;height:40px;font-size:15px"> <button class="haupt-knopf" onclick="retoureSchritt(' + i + ',\'rueckzahlung\')">' + t('rt.s2') + '</button></div>';
+      if (o.ricardo) s += ok(t('rt.s3.ok', esc(o.ricardo)));
+      else s += '<div><button onclick="retoureSchritt(' + i + ',\'ricardo\')">' + t('rt.s3') + '</button><span class="klein">' + (o.ricardoTage == null ? '' : o.ricardoTage >= 0 ? t('rt.s3.frist', esc(o.ricardoFrist), o.ricardoTage) : t('rt.s3.vorbei', esc(o.ricardoFrist))) + '</span></div>';
+      z += '<tr><td class="mono">' + esc(o.nr) + '<br>' + t('rt.seit', esc(o.eroeffnet)) + '</td>' +
+        '<td>' + (o.pgId ? esc(o.pgId) + ' ' : '') + esc(o.titel) + '<span class="klein">' + esc(gr(o.grund)) + (o.notiz ? ': ' + esc(o.notiz) : '') + '</span><span class="klein">' + t('rt.verkauf', esc(o.verkauf)) + '</span></td>' +
+        '<td>' + esc(o.name || o.kaeufer) + (o.name ? '<span class="klein">' + esc(o.kaeufer) + '</span>' : '') + (o.iban ? '<span class="klein mono">' + esc(o.iban) + '</span>' : '') + '</td><td class="betrag">CHF ' + esc(o.betrag) + '</td><td>' + s + '</td></tr>';
+    });
+    $('rt-liste').innerHTML = tab(['th.retoure', 'th.stueck', 'th.kaeufer', 'th.betrag', 'th.schritte'], z);
+  }
+  function retoureSchritt(i, schritt) {
+    var o = RT.offen[i];
+    var wert = schritt === 'rueckzahlung' ? $('rb-' + i).value : '';
+    var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], function (r) { RT = r; zeichneRetouren(); }); };
+    if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
+  }
+  function retourenExport() {
+    ruf('retourenExport', [], function (p) {
+      if (!p.anzahl) { melde(t('rt.export.leer'), ''); return; }
+      ladeDatei(p, $('rt-info'), t('rt.export.fertig', p.anzahl));
+    });
+  }
+  function ladeDatei(p, ziel, danach) {
+    var bin = atob(p.datei), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var u = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    ziel.innerHTML = '<a id="v-dl" href="' + u + '" download="' + esc(p.name) + '" target="_self">' + t('rt.speichern', esc(p.name)) + '</a>' + danach;
+    $('v-dl').click();
+  }
+
+  /* ---------- Admin ---------- */
+  var AD = null, EINST = [];
+  function ladeAdmin() { adminSuchen(); ruf('adminEinstellungen', [], zeichneEinst); }
+  function adminSuchen() { ruf('adminSuche', [$('ad-q').value], function (a) { AD = a; zeichneAdmin(); }); }
+  function zeichneAdmin() {
+    var h = '', z = '';
+    AD.listings.forEach(function (l, i) {
+      z += '<tr><td class="mono">' + esc(l.id) + (l.buendel ? '<br>+ ' + esc(l.buendel) : '') + '</td><td>' + esc(l.name) + '</td><td><span class="etikett">' + esc(st(l.status)) + '</span></td><td class="mono">' + esc(l.am) + '</td>' +
+        '<td><button onclick="adminLoesche(\'l\',' + i + ')">' + t('ad.loeschen') + '</button></td></tr>';
+    });
+    if (z) h += '<h3 style="margin:20px 0 0">' + t('ad.listings') + '</h3>' + tab(['th.id', 'th.produkt', 'th.status', 'th.angelegt', ''], z);
+    z = '';
+    AD.verkaeufe.forEach(function (o, i) {
+      z += '<tr><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td><td>' + (o.pgId ? esc(o.pgId) + ' ' : '') + esc(o.titel) + '</td><td>' + esc(o.kaeufer) + '<span class="klein">CHF ' + esc(o.total) + '</span></td>' +
+        '<td><span class="etikett">' + esc(st(o.status)) + '</span></td>' +
+        '<td>' + (o.status === 'Storniert' || o.status === 'Retourniert' ? '' : '<button onclick="adminLoesche(\'v\',' + i + ')">' + t('ad.loeschen') + '</button>') + '</td></tr>';
+    });
+    if (z) h += '<h3 style="margin:20px 0 0">' + t('ad.verkaeufe') + '</h3>' + tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.status', ''], z);
+    $('ad-liste').innerHTML = h || '<p class="still" style="margin-top:12px">' + t('ad.leer') + '</p>';
+  }
+  function adminFertig() { melde(t('ad.erledigt'), 'ok'); adminSuchen(); still('startDaten', [], function (s) { S = s; texte(); }); still('verkaeufe', [], function (v) { marke($('z-verkauf'), v.offen.length); }); }
+  function adminLoesche(art, i) {
+    if (art === 'l') { var l = AD.listings[i]; frage(t('ad.f.listing', l.id), function () { ruf('adminLoescheListing', [l.zeile, l.id], adminFertig); }); }
+    else { var o = AD.verkaeufe[i]; frage(t('ad.f.verkauf', o.nr), function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr], adminFertig); }); }
+  }
+  function zeichneEinst(l) {
+    EINST = l;
+    $('ad-ki').textContent = t(S.kiAktiv ? 'ad.ki.an' : 'ad.ki.aus'); $('ad-ki').className = 'meldung' + (S.kiAktiv ? '' : ' warn');
+    $('ad-einst').innerHTML = l.map(function (e, i) {
+      return '<div class="feld" style="grid-template-columns:230px 1fr"><div class="name">' + esc(e.name) + '</div><div>' + (e.name === 'Text-Anweisung' ? '<textarea id="es-' + i + '" rows="4">' + esc(e.wert) + '</textarea>' : '<input type="text" id="es-' + i + '" value="' + esc(e.wert) + '">') + '<small class="klein">' + esc(e.hilfe) + '</small></div></div>';
+    }).join('');
+  }
+  function einstSpeichern() {
+    var w = {};
+    EINST.forEach(function (e, i) { var v = $('es-' + i).value; if (v !== e.wert) w[e.name] = v; });
+    ruf('adminSpeichereEinstellungen', [w], function (l) { zeichneEinst(l); melde(t('ad.einst.gespeichert'), 'ok'); still('startDaten', [], function (s) { S = s; texte(); }); });
+  }
+
+  /* ---------- Laufende Angebote ---------- */
+  function ladeUebersicht() { ruf('uebersicht', [], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); }
+  function zeichneUebersicht() {
+    if (!UE) return;
+    marke($('z-ueber'), UE.liste.filter(function (x) { return x.abgelaufen; }).length);
+    $('u-hinweis').textContent = t('u.hinweis', UE.laufzeit, UE.letzterImport || t('u.keiner'));
+    var f = $('u-filter').value.trim().toLowerCase();
+    var l = UE.liste.filter(function (x) { return !f || (x.id + ' ' + x.name).toLowerCase().indexOf(f) !== -1; });
+    if (!l.length) { $('u-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('u.leer') + '</p>'; return; }
+    var z = '';
+    l.forEach(function (x) {
+      var a = '';
+      if (x.status === 'In Arbeit' || x.status === 'Bereit') a = '<button onclick="weiter(\'' + esc(x.id) + '\')">' + t('u.bearbeiten') + '</button>';
+      if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '" onclick="unverkauft(\'' + esc(x.id) + '\')">' + t('u.unverkauft') + '</button>';
+      var m = x.abgelaufen ? '<span class="etikett hell">' + t('u.abgelaufen') + '</span>' : '<span class="etikett">' + esc(st(x.status)) + '</span>';
+      z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (x.link ? '<span class="klein"><a href="' + esc(x.link) + '">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
+        '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + '</td><td>' + a + '</td></tr>';
+    });
+    $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
+  }
+  function unverkauft(id) {
+    frage(t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft'], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); });
+  }
+  function weiter(id) { ruf('lade', [id], function (r) { zeige('listen'); oeffne(r); }); }
+
+  /* ---------- Start ---------- */
+  try { var gemerkt = localStorage.getItem('rt-lang'); if (gemerkt === 'en' || gemerkt === 'de') L = gemerkt; } catch (e) { /* Vorgabe aus der Adresse gilt */ }
+  texte();
+  /* Ohne Startdaten bleibt das Tool gesperrt und zeigt den Grund */
+  lade(true);
+  google.script.run.withSuccessHandler(function (s) {
+    lade(false); S = s; texte(); $('q').focus();
+    still('verkaeufe', [], function (v) { marke($('z-verkauf'), v.offen.length); });
+    still('retouren', [], function (r) { marke($('z-retour'), r.offen.length); });
+  }).withFailureHandler(function (e) {
+    $('lade').hidden = true; melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); $('hinweis').onclick = null;
+  }).api(L, 'startDaten', []);
+</script>
+</body>
+</html>
