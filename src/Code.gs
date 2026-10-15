@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.10';
+const VERSION = '2026-10-15.11';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -200,6 +200,10 @@ const FEEDBACK_KOPF = ['Zeit', 'Kürzel', 'PG-ID', 'Schritt', 'Feedback', 'Statu
 /* Tab «Bestellliste»: Teile für Reparaturen, die warten (Regal «Reparatur»). Eine Person bestellt gebündelt und setzt «Status» von Hand. */
 const BESTELL_KOPF = ['Zeit', 'PG-ID', 'Produkt', 'Was', 'Teil', 'Teilenummer', 'Shop', 'Preis CHF', 'Link', 'Kürzel', 'Status'];
 const BESTELL_STATUS = ['Offen', 'Bestellt', 'Da'];
+/* Tab «Testkonten»: Konten, die das Analyse-Team für Geräte mit App und Konto eingerichtet hat. Logindaten inkl. Passwort sind für das Team sichtbar (interne Regel, Entscheid 15.10.2026). */
+const TESTKONTEN_KOPF = ['Dienst', 'Login', 'Passwort', 'Gerät', 'Notiz', 'Aktiv', 'Erfasst von', 'Erfasst am', 'Geändert von', 'Geändert am'];
+const TESTKONTO_DIENSTE = ['Google', 'Apple-ID', 'Amazon', 'Hersteller-App', 'Anderes'];
+const TESTKONTO_MITTEL = { 'Google': 'Testkonto Google', 'Apple-ID': 'Testkonto Apple-ID', 'Amazon': 'Testkonto Amazon' };   // aktives Konto = Testmittel «Ja»
 const REP_STAND = 'REPARATUR_';                                     // Script-Property pro Stück im Regal «Reparatur»: der Stand der Analyse
 /* Spalten, die der Code braucht. einrichten() prüft, ob das Sheet dazu passt. */
 const SPALTEN = {
@@ -214,6 +218,7 @@ const SPALTEN = {
   'Testmittel-Log': ['Zeit', 'PG-ID', 'Testmittel', 'Art', 'Kürzel'],
   'Feedback': FEEDBACK_KOPF,
   'Bestellliste': BESTELL_KOPF,
+  'Testkonten': TESTKONTEN_KOPF,
   'Ricardo': RICARDO_KOPF,
   'Ersatzteile': ['Zeit', 'PG-ID', 'Produkt', 'Gesucht', 'Teil', 'Teilenummer', 'Art', 'Preis CHF', 'Shop', 'Link', 'Lieferbar', 'VP CHF', 'Hinweis', 'Kürzel'],
   'Quellen-Log': ['Zeit', 'Schlüssel', 'Bezeichnung', 'Quelle', 'Gefunden', 'Gelieferte Felder', 'Meldung'],
@@ -244,7 +249,7 @@ function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
   const f = { startDaten: startDaten, suche: suche, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, adminDaten: adminDaten, verbindungTest: verbindungTest }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   try { return f.apply(null, args || []); }
   catch (e) { throw new Error(en_(String(e.message || e))); }
@@ -279,6 +284,9 @@ const EN_REGELN = [
   [/^Das ist kein PDF\.$/, 'This is not a PDF.'],
   [/^Das PDF ist grösser als (\d+) MB\.$/, 'The PDF is larger than $1 MB.'],
   [/^Bitte eingeben, was zu reparieren ist\.$/, 'Please enter what needs to be repaired.'],
+  [/^Bitte Dienst und Login eingeben\.$/, 'Please enter service and login.'],
+  [/^Bitte einen Namen für das Testmittel eingeben\.$/, 'Please enter a name for the test equipment.'],
+  [/^Diese Zeile hat sich inzwischen geändert\. Bitte neu laden\.$/, 'This row has changed in the meantime. Please reload.'],
   [/^Produkt (\S+) liegt nicht im Regal Matchmaker\.$/, 'Product $1 is not on the Matchmaker shelf.'],
   [/^Der Matchmaker-Abgleich hat nicht geklappt \((.*)\)\.$/, 'The Matchmaker check failed ($1).'],
   [/^Der Suchauftrag fehlt\.$/, 'The search request is missing.'],
@@ -299,7 +307,7 @@ function en_(s) {
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function blatt_(n) {
   let s = ss_().getSheetByName(n);
-  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Feedback': FEEDBACK_KOPF, 'Ricardo': RICARDO_KOPF, 'Bestellliste': BESTELL_KOPF }[n];
+  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Feedback': FEEDBACK_KOPF, 'Ricardo': RICARDO_KOPF, 'Bestellliste': BESTELL_KOPF, 'Testkonten': TESTKONTEN_KOPF }[n];
   if (!s && kopfNeu) {                                               // kamen nach der ersten Einrichtung dazu: werden beim ersten Gebrauch angelegt
     s = gesperrt_(function () {
       const neu = ss_().getSheetByName(n) || ss_().insertSheet(n);
@@ -2093,6 +2101,73 @@ function teilShops_(e) {
     const t = z.split('|').map(function (x) { return x.trim(); });
     return { name: t[0] || '', domain: (t[1] || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''), link: /^https:\/\//.test(t[2] || '') ? t[2] : '', info: t.slice(3).join(' | ') };
   }).filter(function (s) { return s.name && (s.domain || s.link); });
+}
+
+/* ------------------------------------------------------------------ */
+/* Werkstatt: Testkonten und Testmittel, für das ganze Analyse-Team     */
+/* ------------------------------------------------------------------ */
+
+/** Alles für die Seite «Werkstatt». Passwörter gehen mit (interne Regel: für das Team sichtbar). */
+function werkstatt() {
+  const konten = lies_('Testkonten').z.map(function (r) {
+    return { r: r._r, dienst: String(r['Dienst'] || ''), login: String(r['Login'] || ''), passwort: String(r['Passwort'] || ''), geraet: String(r['Gerät'] || ''), notiz: String(r['Notiz'] || ''),
+      aktiv: String(r['Aktiv']) !== 'Nein', von: String(r['Geändert von'] || r['Erfasst von'] || ''), am: r['Geändert am'] instanceof Date ? zeit_(r['Geändert am']) : String(r['Geändert am'] || r['Erfasst am'] || '') };
+  });
+  const mittel = lies_('Testmittel').z.map(function (r) { return { name: String(r['Testmittel'] || ''), vorhanden: String(r['Vorhanden'] || '') }; }).filter(function (m) { return m.name; });
+  return { konten: konten, mittel: mittel, dienste: TESTKONTO_DIENSTE };
+}
+
+/** Testkonto neu (k.r leer) oder ändern (k.r = Zeile, k.login_alt = Login beim Laden, als Schutz gegen verschobene Zeilen). Danach stimmen die Testmittel «Testkonto …» mit den aktiven Konten überein. */
+function kontoSpeichern(k, kuerzel) {
+  k = k || {};
+  const wer = String(kuerzel || '').trim().toUpperCase().slice(0, 4), dienst = String(k.dienst || '').trim(), login = String(k.login || '').trim().slice(0, 200);
+  if (!wer) throw new Error('Bitte zuerst ein Kürzel eingeben.');
+  if (TESTKONTO_DIENSTE.indexOf(dienst) < 0 || !login) throw new Error('Bitte Dienst und Login eingeben.');
+  blatt_('Testkonten');
+  gesperrt_(function () {
+    const werte = { 'Dienst': dienst, 'Login': txt_(login), 'Passwort': txt_(String(k.passwort || '').slice(0, 200)), 'Gerät': txt_(String(k.geraet || '').slice(0, 120)),
+      'Notiz': txt_(String(k.notiz || '').slice(0, 500)), 'Aktiv': k.aktiv === false ? 'Nein' : 'Ja', 'Geändert von': wer, 'Geändert am': zeit_() };
+    if (k.r) {
+      const r = lies_('Testkonten').z.filter(function (x) { return x._r === Number(k.r); })[0];
+      if (!r || String(r['Login']) !== String(k.login_alt || '')) throw new Error('Diese Zeile hat sich inzwischen geändert. Bitte neu laden.');
+      Object.keys(werte).forEach(function (f) { const z = {}; z[r._r] = werte[f]; setz_('Testkonten', f, z); });
+    } else schreib_('Testkonten', [Object.assign(werte, { 'Erfasst von': wer, 'Erfasst am': zeit_() })]);
+    kontenAbgleich_();
+  });
+  log_('Testkonto', '', dienst + ' · ' + login + (k.r ? ' geändert' : ' neu') + ' · ' + wer);              // ohne Passwort
+  return werkstatt();
+}
+
+/** Testmittel «Testkonto Google/Apple-ID/Amazon»: «Ja», sobald es ein aktives Konto dieses Dienstes gibt, sonst «Nein». Nur innerhalb von gesperrt_ aufrufen. */
+function kontenAbgleich_() {
+  const aktiv = {};
+  lies_('Testkonten').z.forEach(function (r) { if (String(r['Aktiv']) !== 'Nein') aktiv[String(r['Dienst'])] = true; });
+  const da = {}, setzen = {};
+  lies_('Testmittel').z.forEach(function (r) {
+    Object.keys(TESTKONTO_MITTEL).forEach(function (d) {
+      if (String(r['Testmittel']) !== TESTKONTO_MITTEL[d]) return;
+      da[d] = true;
+      const soll = aktiv[d] ? 'Ja' : 'Nein';
+      if (String(r['Vorhanden']) !== soll) setzen[r._r] = soll;
+    });
+  });
+  setz_('Testmittel', 'Vorhanden', setzen);
+  schreib_('Testmittel', Object.keys(TESTKONTO_MITTEL).filter(function (d) { return !da[d]; }).map(function (d) { return { 'Testmittel': TESTKONTO_MITTEL[d], 'Vorhanden': aktiv[d] ? 'Ja' : 'Nein' }; }));
+}
+
+/** Testmittel neu oder «Vorhanden» ändern. Gleicher Name (ohne Gross/Klein, Sonderzeichen) = dasselbe Testmittel. */
+function mittelSpeichern(m, kuerzel) {
+  m = m || {};
+  const wer = String(kuerzel || '').trim().toUpperCase().slice(0, 4), name = String(m.name || '').replace(/\s+/g, ' ').trim().slice(0, 120), vorhanden = m.vorhanden === 'Nein' ? 'Nein' : 'Ja';
+  if (!wer) throw new Error('Bitte zuerst ein Kürzel eingeben.');
+  if (!name) throw new Error('Bitte einen Namen für das Testmittel eingeben.');
+  gesperrt_(function () {
+    const r = lies_('Testmittel').z.filter(function (x) { return norm_(x['Testmittel']) === norm_(name); })[0];
+    if (r) { const z = {}; z[r._r] = vorhanden; setz_('Testmittel', 'Vorhanden', z); }
+    else schreib_('Testmittel', [{ 'Testmittel': txt_(name), 'Vorhanden': vorhanden }]);
+  });
+  log_('Testmittel', '', name + ' = ' + vorhanden + ' · ' + wer);
+  return werkstatt();
 }
 
 /* ------------------------------------------------------------------ */

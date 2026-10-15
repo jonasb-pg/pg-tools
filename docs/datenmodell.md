@@ -1,6 +1,6 @@
 # Datenmodell
 
-<!-- Automatisch erzeugt mit tools/gen.py aus src/Code.gs (Version 2026-10-15.10). Nicht von Hand ändern. -->
+<!-- Automatisch erzeugt mit tools/gen.py aus src/Code.gs (Version 2026-10-15.11). Nicht von Hand ändern. -->
 
 
 Sheet **ANALYSE TOOL** `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM`. Spaltennamen sind Schlüssel: Der Code liest und schreibt nach Name, nicht nach Position. `einrichten()` prüft, ob alle Spalten da sind.
@@ -15,6 +15,7 @@ Sheet **ANALYSE TOOL** `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM`. Spaltenna
 | Testmittel-Log | abschliessen | Auswertung | 1 Zeile pro Nennung |
 | Feedback | feedback | Jonas | 1 Zeile pro Eintrag; Status von Hand |
 | Bestellliste | reparaturPause | Startseite (Teil-Status), Besteller:in | 1 Zeile pro Teil; Status von Hand |
+| Testkonten |  |  |  |
 | Ricardo | abschliessen (kanal ricardo) | Ricardo Tool (geplant: Maske) | 1 Zeile pro Inserat |
 | Ersatzteile | ersatzteilSuche | ersatzteile, «Später reparieren» | 1 Zeile pro Angebot |
 | Quellen-Log | Recherche | Analyse der Quellen | 1 Zeile pro Quelle und Recherche |
@@ -169,6 +170,21 @@ Zusätzlich angelegt bei Bedarf: «Kosten» (jeder KI-Aufruf), «Bestellliste»,
 | 9 | Link |
 | 10 | Kürzel |
 | 11 | Status |
+
+## Testkonten
+
+| # | Spalte |
+|---|---|
+| 1 | Dienst |
+| 2 | Login |
+| 3 | Passwort |
+| 4 | Gerät |
+| 5 | Notiz |
+| 6 | Aktiv |
+| 7 | Erfasst von |
+| 8 | Erfasst am |
+| 9 | Geändert von |
+| 10 | Geändert am |
 
 ## Ricardo
 

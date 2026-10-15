@@ -109,3 +109,19 @@ Funktionsarten: `Kern`, `Beworben`, `Weitere`. Stufe wird automatisch nach VP ge
 ## Matchmaker-Urteil
 
 `passt` (Pflicht → Regal Matchmaker) | `ähnlich` (Hinweis, kein Muss) | kein Treffer.
+
+## Testkonten (Tab «Testkonten», ab Version .11)
+
+| Feld | Werte | Wirkung |
+|---|---|---|
+| Dienst | Google, Apple-ID, Amazon, Hersteller-App, Anderes | Google/Apple-ID/Amazon steuern das gleichnamige Testmittel |
+| Aktiv | Ja / Nein | mind. 1 aktives Konto eines Dienstes → Testmittel «Testkonto <Dienst>» = Ja, sonst Nein (`kontenAbgleich_`) |
+| Passwort | Klartext | für das Analyse-Team sichtbar (interne Regel); nie im Log, nie im Repo |
+
+## Testmittel «Vorhanden»
+
+| Wert | Wirkung im Schritt «Funktion» |
+|---|---|
+| Ja | gilt als vorhanden |
+| Nein | von Anfang an als fehlend markiert |
+| leer | unbekannt, Person entscheidet |

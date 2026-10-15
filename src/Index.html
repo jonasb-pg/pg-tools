@@ -310,6 +310,7 @@
       <button id="nav-scan" class="an" data-a="zeige" data-v="scan"><span data-t="nav.scan"></span></button>
       <button id="nav-liste" data-a="zeige" data-v="liste"><span data-t="nav.liste"></span><span class="zahl" id="z-liste" hidden></span></button>
       <button id="nav-teile" data-a="zeige" data-v="teile"><span data-t="nav.teile"></span></button>
+      <button id="nav-werkstatt" data-a="zeige" data-v="werkstatt"><span data-t="nav.werkstatt"></span></button>
       <button id="nav-admin" data-a="zeige" data-v="admin" hidden><span data-t="nav.admin"></span></button>
     </div>
     <div class="fuss">
@@ -409,6 +410,12 @@
         </div>
       </section>
 
+      <!-- ===================== WERKSTATT (Testkonten, Testmittel) ===================== -->
+      <section id="s-werkstatt" hidden>
+        <div class="karte"><h2 data-t="ws.konten"></h2><div id="ws-konten"></div></div>
+        <div class="karte"><h2 data-t="ws.mittel"></h2><div id="ws-mittel"></div></div>
+      </section>
+
       <!-- ===================== ADMIN ===================== -->
       <section id="s-admin" hidden>
         <div class="karte">
@@ -449,7 +456,7 @@
 </div></div>
 <script>
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
-  var VERSION = '2026-10-15.10';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
+  var VERSION = '2026-10-15.11';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
   var LAUF = {};                                    // was zur laufenden Analyse nur im Moment gilt und nicht gespeichert wird: Wartezustände, das Urteil des Servers, offene Klappen
@@ -461,7 +468,13 @@
   var T = {
     'fb.knopf': ['Feedback', 'Feedback'], 'fb.titel': ['Was fehlt oder stört?', 'What is missing or bothering you?'], 'fb.platz': ['z.B. Handbuch fehlt, Schritt unklar, Idee …', 'e.g. manual missing, step unclear, idea …'],
     'fb.senden': ['Senden', 'Send'], 'fb.wo': ['Wird mit {0}, Schritt «{1}» gespeichert.', 'Saved with {0}, step “{1}”.'], 'fb.danke': ['Danke! Feedback ist gespeichert.', 'Thanks! Feedback saved.'], 'fb.leer': ['Bitte zuerst etwas hineinschreiben.', 'Please write something first.'],
-    'nav.sektion': ['Analyse', 'Analysis'], 'nav.scan': ['Analysieren', 'Analyse'], 'nav.liste': ['Warteschlange', 'Queue'], 'nav.teile': ['Ersatzteile', 'Spare parts'], 'nav.admin': ['Admin', 'Admin'],
+    'nav.sektion': ['Analyse', 'Analysis'], 'nav.scan': ['Analysieren', 'Analyse'], 'nav.liste': ['Warteschlange', 'Queue'], 'nav.teile': ['Ersatzteile', 'Spare parts'], 'nav.admin': ['Admin', 'Admin'], 'nav.werkstatt': ['Werkstatt', 'Workshop'],
+    'ws.konten': ['Testkonten', 'Test accounts'], 'ws.mittel': ['Testmittel', 'Test equipment'], 'ws.dienst': ['Dienst', 'Service'], 'ws.login': ['Login', 'Login'], 'ws.pw': ['Passwort', 'Password'],
+    'ws.geraet': ['Gerät', 'Device'], 'ws.notiz': ['Notiz', 'Note'], 'ws.aktiv': ['Aktiv', 'Active'], 'ws.inaktiv': ['Inaktiv', 'Inactive'], 'ws.neu': ['Neues Testkonto', 'New test account'],
+    'ws.bearb': ['Bearbeiten', 'Edit'], 'ws.speichern': ['Speichern', 'Save'], 'ws.abbr': ['Abbrechen', 'Cancel'], 'ws.leer': ['Noch keine Testkonten.', 'No test accounts yet.'],
+    'ws.aktivfrage': ['Konto ist aktiv und nutzbar', 'Account is active and usable'], 'ws.geraetplatz': ['z.B. Foto-Handy', 'e.g. photo phone'], 'ws.mneu': ['Neues Testmittel', 'New test equipment'],
+    'ws.hinzu': ['Hinzufügen', 'Add'], 'ws.da': ['Vorhanden', 'Available'], 'ws.nichtda': ['Fehlt', 'Missing'], 'ws.gespeichert': ['Gespeichert.', 'Saved.'],
+    'ws.auto': ['wird über die Testkonten gesetzt', 'set by the test accounts'],
     'fuss.kuerzel': ['Kürzel', 'Initials'], 'fuss.ende': ['Beenden', 'End'], 'fuss.laeuft': ['Zuerst die laufende Analyse abschliessen oder abbrechen.', 'Finish or cancel the running analysis first.'],
     'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'],
     'start.titel': ['Session starten', 'Start session'],
@@ -1620,6 +1633,49 @@
     }).join('') : '<p class="still">' + tx('teil.leer') + '</p>';
   }
 
+  /* ---------- Werkstatt: Testkonten und Testmittel (für das ganze Team) ---------- */
+  /* WS = Daten vom Server; WSK = offenes Formular (neu: r leer). Passwörter sind für das Team sichtbar (interne Regel). */
+  var WS = null, WSK = null;
+  function zeichneWerkstatt(r) { WS = r; WSK = null; wsZeichnen(); }
+  function wsZeichnen() {
+    var k = WS.konten, auto = {}, f;
+    ['Testkonto Google', 'Testkonto Apple-ID', 'Testkonto Amazon'].forEach(function (n) { auto[n] = true; });
+    var zeile = function (x, i) {
+      return '<tr><td><strong>' + esc(x.dienst) + '</strong>' + (x.geraet ? '<br><small class="still">' + esc(x.geraet) + '</small>' : '') + '</td><td class="mono">' + esc(x.login) + '</td><td class="mono">' + esc(x.passwort)
+        + (x.passwort ? ' <button class="mini" data-a="wsKopier" data-v="' + i + '">' + tx('kopieren') + '</button>' : '') + '</td><td>' + esc(x.notiz) + '</td><td><span class="etikett' + (x.aktiv ? ' gruen' : '') + '">' + tx(x.aktiv ? 'ws.aktiv' : 'ws.inaktiv') + '</span></td>'
+        + '<td><button class="mini" data-a="wsEdit" data-v="' + i + '">' + tx('ws.bearb') + '</button></td></tr>';
+    };
+    f = WSK ? '<div class="ric-box" style="margin-top:14px"><div class="n">' + tx(WSK.r ? 'ws.bearb' : 'ws.neu') + '</div><label>' + tx('ws.dienst') + '</label><div class="wahl">' + knoepfe(WS.dienste, WSK.dienst, 'wsDienst') + '</div>'
+      + '<div class="reihe"><div class="breit"><label for="ws-login">' + tx('ws.login') + '</label><input type="text" id="ws-login" value="' + esc(WSK.login) + '" autocomplete="off"></div>'
+      + '<div class="breit"><label for="ws-pw">' + tx('ws.pw') + '</label><input type="text" id="ws-pw" value="' + esc(WSK.passwort) + '" autocomplete="off" spellcheck="false"></div></div>'
+      + '<div class="reihe"><div class="breit"><label for="ws-geraet">' + tx('ws.geraet') + '</label><input type="text" id="ws-geraet" value="' + esc(WSK.geraet) + '" placeholder="' + tx('ws.geraetplatz') + '" autocomplete="off"></div>'
+      + '<div class="breit"><label for="ws-notiz">' + tx('ws.notiz') + '</label><input type="text" id="ws-notiz" value="' + esc(WSK.notiz) + '" autocomplete="off"></div></div>'
+      + '<label class="ric-check" style="margin-top:10px"><input type="checkbox" id="ws-aktiv"' + (WSK.aktiv ? ' checked' : '') + '>' + tx('ws.aktivfrage') + '</label>'
+      + '<div class="knoepfe">' + taste('wsSpeichern', 'ws.speichern', 'pink') + taste('wsAbbr', 'ws.abbr') + '</div></div>'
+      : '<div class="knoepfe">' + taste('wsNeu', 'ws.neu', 'pink') + '</div>';
+    $('ws-konten').innerHTML = (k.length ? '<div class="tabelle"><table><thead><tr><th>' + tx('ws.dienst') + '</th><th>' + tx('ws.login') + '</th><th>' + tx('ws.pw') + '</th><th>' + tx('ws.notiz') + '</th><th></th><th></th></tr></thead><tbody>'
+      + k.map(zeile).join('') + '</tbody></table></div>' : '<p class="still">' + tx('ws.leer') + '</p>') + f;
+    $('ws-mittel').innerHTML = '<ul class="liste">' + WS.mittel.map(function (m, i) {
+      return '<li class="fn"><span class="txt">' + esc(m.name) + (auto[m.name] ? '<span class="zeilen-hinweis">' + tx('ws.auto') + '</span>' : '') + '</span><span class="jn">'
+        + (auto[m.name] ? '<span class="etikett' + (m.vorhanden === 'Ja' ? ' gruen' : '') + '">' + tx(m.vorhanden === 'Ja' ? 'ws.da' : 'ws.nichtda') + '</span>'
+          : [['Ja', 'ws.da', 'ok'], ['Nein', 'ws.nichtda', 'nok']].map(function (o) { return '<button class="' + o[2] + (m.vorhanden === o[0] ? ' an' : '') + '" data-a="mtSetz" data-k="' + i + '" data-v="' + o[0] + '" aria-pressed="' + (m.vorhanden === o[0]) + '">' + tx(o[1]) + '</button>'; }).join(''))
+        + '</span></li>'; }).join('') + '</ul>'
+      + '<label for="mt-neu">' + tx('ws.mneu') + '</label><div class="reihe"><div class="breit"><input type="text" id="mt-neu" data-enter="mtNeu" autocomplete="off"></div>' + taste('mtNeu', 'ws.hinzu', '', ' style="flex:none;width:auto"') + '</div>';
+  }
+  function wsLesen() { if (!WSK) return; WSK.login = $('ws-login').value.trim(); WSK.passwort = $('ws-pw').value; WSK.geraet = $('ws-geraet').value.trim(); WSK.notiz = $('ws-notiz').value.trim(); WSK.aktiv = $('ws-aktiv').checked; }
+  function wsNeu() { WSK = { r: '', login_alt: '', dienst: '', login: '', passwort: '', geraet: '', notiz: '', aktiv: true }; wsZeichnen(); }
+  function wsEdit(i) { var x = WS.konten[Number(i)]; WSK = { r: x.r, login_alt: x.login, dienst: x.dienst, login: x.login, passwort: x.passwort, geraet: x.geraet, notiz: x.notiz, aktiv: x.aktiv }; wsZeichnen(); $('ws-login').focus(); }
+  function wsDienst(v) { wsLesen(); WSK.dienst = v; wsZeichnen(); }
+  function wsAbbr() { WSK = null; wsZeichnen(); }
+  function wsSpeichern() {
+    wsLesen();
+    if (!WSK.dienst || !WSK.login) { melde(t('ws.login') + ' / ' + t('ws.dienst'), true); return; }
+    ruf('kontoSpeichern', [WSK, K], function (r) { zeichneWerkstatt(r); melde(t('ws.gespeichert')); });
+  }
+  function wsKopier(i, k, el) { kopiereText(WS.konten[Number(i)].passwort, el); }
+  function mtSetz(v, i) { ruf('mittelSpeichern', [{ name: WS.mittel[Number(i)].name, vorhanden: v }, K], function (r) { WS = r; wsZeichnen(); }); }
+  function mtNeu() { var n = $('mt-neu').value.trim(); if (!n) { $('mt-neu').focus(); return; } ruf('mittelSpeichern', [{ name: n, vorhanden: 'Ja' }, K], function (r) { WS = r; wsZeichnen(); melde(t('ws.gespeichert')); }); }
+
   /* ---------- Admin ---------- */
   function zeichneAdmin(r) {
     var bloecke = [], akt = null;
@@ -1647,12 +1703,12 @@
 
   /* ---------- Seiten und Aktionen ---------- */
   /* Seite: [Aufruf beim Öffnen, Funktion für die Antwort]. */
-  var SEITEN = { scan: null, liste: ['warteschlange', zeichneListe], teile: ['ersatzteile', zeichneTeile], admin: ['adminDaten', zeichneAdmin] };
+  var SEITEN = { scan: null, liste: ['warteschlange', zeichneListe], teile: ['ersatzteile', zeichneTeile], werkstatt: ['werkstatt', zeichneWerkstatt], admin: ['adminDaten', zeichneAdmin] };
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, fn: fn, fnWeiter: fnWeiter,
-    repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
+    repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
     kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test };
 
   /* ---------- Start ---------- */
