@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.14';
+const VERSION = '2026-10-15.15';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -2231,6 +2231,7 @@ function verbindungTest() {
 function einrichten() {
   const ss = ss_(), fehler = [];
   gesperrt_(function () { umbau_(ss); });
+  ['Kosten', 'Feedback', 'Ricardo', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
   Object.keys(SPALTEN).forEach(function (n) {
     const s = ss.getSheetByName(n);
     if (!s) { fehler.push('Tab «' + n + '» fehlt'); return; }
