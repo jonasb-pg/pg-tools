@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<base target="_blank">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;900&family=DM+Mono&display=swap" rel="stylesheet">
+<style>
+  /* Schrift des Cockpits (app.pretty-good.ch, CORS offen, geprüft am 14.10.2026). Fällt sie weg, greifen Outfit und DM Mono. */
+  @font-face { font-family:sofiaPro; src:url(https://app.pretty-good.ch/_next/static/immutable/media/SofiaPro_SemiBold-s.p.33k5evrv8kzp6.woff2) format("woff2"); font-weight:400 600; font-display:swap; }
+  @font-face { font-family:sofiaPro; src:url(https://app.pretty-good.ch/_next/static/immutable/media/SofiaPro_Black-s.p.05h8x691qwne-.woff2) format("woff2"); font-weight:700 900; font-display:swap; }
+  @font-face { font-family:defaultSansMono; src:url(https://app.pretty-good.ch/_next/static/immutable/media/default_sans_book_mono_WEB-s.p.3obwk9h866pc7.woff2) format("woff2"); font-weight:400; font-display:swap; }
+  /* Gestaltung nach dem Pretty Good Cockpit (Matchmaker), gleich wie im Ricardo Tool: schwarze 2px-Linien, graue Fläche, Pink als Akzent */
+  :root { --ink:#0a0a0a; --muted:#696967; --grau:#d2d2ce; --weiss:#ffffff; --pink:#ffbaf5; --pink-hell:#fff5ff; --linie:rgba(10,10,10,.15);
+    --gruen:#c9f2cf; --gelb:#fff1a8; --rot:#ffc9c4;
+    --sans:sofiaPro, "Sofia Pro", Outfit, ui-sans-serif, system-ui, sans-serif; --mono:defaultSansMono, "DM Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:400 16px/1.5 var(--sans); color:var(--ink); background:var(--weiss); }
+  .app { display:flex; min-height:100%; }
+
+  /* Seitenleiste */
+  aside { flex:none; width:268px; background:var(--weiss); border-right:2px solid var(--ink); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; }
+  .marke-kopf { padding:16px; border-bottom:2px solid var(--ink); }
+  .marke-kopf img { display:block; height:32px; }
+  .marke-kopf .wort { font-weight:900; font-size:13px; line-height:1; letter-spacing:.3px; }
+  .gross { text-transform:uppercase; font-weight:600; letter-spacing:.8px; }
+  .marke-kopf .gross { color:var(--muted); margin-top:6px; display:block; }
+  .nav { padding:12px; flex:1; overflow:auto; }
+  .nav .sektion { color:var(--muted); font-size:14px; letter-spacing:.7px; padding:8px 12px; }
+  .nav button { display:flex; align-items:center; gap:12px; width:100%; height:44px; margin-bottom:6px; padding:10px 12px; text-align:left;
+    background:transparent; border:2px solid transparent; border-radius:4px; font:600 16px/1 var(--sans); letter-spacing:.8px; text-transform:uppercase; color:var(--ink); cursor:pointer; }
+  .nav button:hover { border-color:var(--ink); background:transparent; }
+  .nav button.an { background:var(--pink); border-color:var(--ink); border-left-width:6px; }
+  .nav button .zahl { margin-left:auto; }
+  .zahl { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 5px; border:2px solid var(--ink); border-radius:999px; background:var(--pink); font:600 13px/1 var(--sans); }
+  .fuss { padding:12px; border-top:2px solid var(--ink); }
+  .fuss .info { font-size:14px; color:var(--muted); margin:0 0 10px; }
+  .fuss .wer { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .fuss .wer b { font:900 18px/1 var(--sans); }
+  .fuss .wer button { margin-left:auto; height:32px; padding:0 12px; font-size:12px; }
+  .sprache { display:flex; border:2px solid var(--ink); border-radius:24px; overflow:hidden; }
+  .sprache button { flex:1; height:36px; border:0; border-radius:0; background:var(--weiss); font:600 14px/1 var(--sans); letter-spacing:.7px; cursor:pointer; color:var(--ink); }
+  .sprache button.an { background:var(--ink); color:var(--weiss); }
+
+  /* Hauptbereich */
+  .haupt { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--grau); }
+  .top { background:var(--weiss); border-bottom:2px solid var(--ink); min-height:64px; padding:12px 32px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  .top h1 { margin:0; font:900 20px/1 var(--sans); text-transform:uppercase; }
+  .top .sub { color:var(--muted); }
+  /* PG-ID: die zentrale ID. Mono wie die Daten im Cockpit, umrandet, aber nie lauter als der Schritt, um den es gerade geht. */
+  .pgid { display:inline-block; font:400 17px/1 var(--mono); padding:6px 8px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); color:var(--ink); white-space:nowrap; }
+  .pgid.klein { font-size:15px; padding:0; border:0; }
+  .uhr { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .uhr .zeit { font:400 22px/1 var(--mono); padding:8px 12px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); min-width:150px; text-align:center; }
+  .uhr .zeit.ueber { background:var(--pink); }
+  .uhr .zeit.pause { color:var(--muted); border-style:dashed; }
+  main { padding:24px 32px 64px; max-width:1500px; width:100%; }
+  h2 { margin:0 0 12px; font:900 18px/1.2 var(--sans); text-transform:uppercase; }
+  h3 { margin:18px 0 8px; font:900 15px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.3px; }
+  h3:first-child { margin-top:0; }
+  .karte { background:var(--weiss); border:2px solid var(--ink); border-radius:4px; padding:20px; margin-bottom:16px; }
+  .karte.stop { border-width:4px; }
+  p { margin:0 0 12px; }
+  a { color:var(--ink); font-weight:600; text-underline-offset:3px; overflow-wrap:anywhere; }
+
+  input[type=text], input[type=number], textarea, select { width:100%; font:600 16px/1.4 var(--sans); padding:8px 12px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); color:var(--ink); }
+  input[type=text], input[type=number] { height:44px; }
+  textarea { resize:vertical; font-weight:400; min-height:70px; }
+  ::placeholder { color:#a3a3a0; font-weight:600; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible, select:focus-visible, a:focus-visible { outline:3px solid var(--pink); outline-offset:2px; }
+  #q { height:56px; font-size:20px; }
+  label { display:block; font-weight:600; margin:14px 0 6px; }
+  label small { font-weight:400; font-size:14px; color:var(--muted); }
+
+  button { font:600 14px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; cursor:pointer; height:40px; padding:0 18px; border:2px solid var(--ink); border-radius:24px; background:var(--weiss); color:var(--ink); }
+  button:hover { background:var(--grau); }
+  button.haupt-knopf { background:var(--pink); }
+  button.haupt-knopf:hover { background:#f0a3e5; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.mini { height:30px; padding:0 10px; font-size:12px; border-radius:4px; }
+  .wahl { display:flex; flex-wrap:wrap; gap:6px; }
+  .wahl button { border-radius:4px; }
+  .wahl button.an { background:var(--ink); color:var(--weiss); }
+
+  .tabelle { border:2px solid var(--ink); border-radius:4px; overflow:auto; background:var(--weiss); margin-top:12px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:var(--grau); color:var(--muted); font:600 14px/1.2 var(--sans); letter-spacing:.7px; text-transform:uppercase; text-align:left; padding:10px 14px; border-bottom:2px solid var(--ink); white-space:nowrap; }
+  td { padding:10px 14px; border-bottom:1px solid var(--linie); vertical-align:middle; font-weight:600; }
+  tr:last-child td { border-bottom:0; }
+  .mono { font:400 14px/1.4 var(--mono); color:var(--muted); }
+
+  .meldung { padding:12px 16px; border:2px solid var(--ink); border-radius:4px; margin:12px 0; background:var(--weiss); }
+  .meldung.warn { background:var(--pink-hell); }
+  .meldung.ok { background:var(--pink); }
+  .meldung.stop { background:var(--ink); color:var(--weiss); }
+  .meldung ul { margin:6px 0 0; padding-left:20px; }
+  .etikett { display:inline-block; padding:6px 8px; border-radius:4px; background:var(--grau); font:600 13px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; white-space:nowrap; }
+  .etikett.hell { background:var(--pink); }
+  .score { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border:2px solid var(--ink); border-radius:4px; font:600 13px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; white-space:nowrap; }
+  .score b { font:400 14px/1 var(--mono); }
+  .score.Gruen { background:var(--gruen); } .score.Gelb { background:var(--gelb); } .score.Rot { background:var(--rot); }
+
+  .feld { display:grid; grid-template-columns:170px 1fr auto; gap:14px; align-items:start; padding:12px 0; border-bottom:1px solid var(--linie); }
+  .feld:last-child { border-bottom:0; }
+  .feld .name { color:var(--muted); font-size:14px; letter-spacing:.7px; text-transform:uppercase; font-weight:600; padding-top:2px; }
+  .feld .wert { white-space:pre-wrap; word-break:break-word; font-weight:600; }
+  .feld .wert small { display:block; white-space:normal; font-weight:400; font-size:14px; color:var(--muted); margin-top:4px; }
+  .feld .seite { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  .reihe { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .reihe > .breit { flex:1; min-width:200px; }
+  .raster { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 20px; }
+  .still { color:var(--muted); font-size:14px; }
+  [hidden] { display:none !important; }
+
+  /* Analyse: ein Schritt pro Bildschirm */
+  #arbeit { max-width:900px; }
+  .schiene { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 16px; padding:0; list-style:none; }
+  .schiene li { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 6px; border:2px solid var(--ink); border-radius:999px; background:var(--weiss); font:600 13px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; }
+  .schiene .nr { width:22px; height:22px; border-radius:50%; background:var(--grau); display:flex; align-items:center; justify-content:center; font:600 12px/1 var(--sans); }
+  .schiene li[data-a] { cursor:pointer; }
+  .schiene li[data-a]:hover { background:var(--pink-hell); color:var(--ink); }
+  .schiene li.fertig { background:var(--grau); color:var(--muted); }
+  .schiene li.fertig .nr, .schiene li.aktiv .nr { background:var(--ink); color:var(--weiss); }
+  .schiene li.aktiv { background:var(--pink); }
+  .schiene li.aus { border-style:dashed; color:var(--muted); background:transparent; text-decoration:line-through; }
+  .kopf { display:flex; gap:12px; align-items:center; margin-bottom:6px; }
+  .kopf .nr { flex:none; width:38px; height:38px; border-radius:50%; background:var(--pink); border:2px solid var(--ink); display:flex; align-items:center; justify-content:center; font-weight:900; }
+  .kopf h2 { margin:0; font-size:24px; }
+  .frage { font:600 20px/1.3 var(--sans); margin:14px 0 16px; }
+  .abstand { margin:10px 0 0; }
+  .knoepfe { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+  .knopf { min-height:56px; height:auto; padding:0 24px; border-radius:28px; font-size:16px; flex:1 1 220px; }
+  .knopf.pink { background:var(--pink); }
+  .knopf.pink:hover { background:#f0a3e5; }
+  .knopf.schwarz { background:var(--ink); color:var(--weiss); }
+  .knopf.schwarz:hover { background:#333; }
+  .leiste { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-top:22px; padding-top:14px; border-top:1px solid var(--linie); }
+  /* Handbuch: Chip neben der Uhr, Schritt «Handbuch», Auszug in den Schritten */
+  .hb-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:2px solid var(--ink); border-radius:999px; background:var(--weiss); font:600 13px/1 var(--sans); letter-spacing:.6px; text-transform:uppercase; white-space:nowrap; }
+  .hb-chip.ok { background:var(--pink); }
+  .hb-chip.rot { background:var(--ink); color:var(--weiss); cursor:pointer; }
+  .dreh { width:12px; height:12px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:dreh 1s linear infinite; flex:none; }
+  @keyframes dreh { to { transform:rotate(360deg); } }
+  .hb-wege { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:760px) { .hb-wege { grid-template-columns:1fr; } }
+  .hb-box { border:2px solid var(--ink); border-radius:4px; padding:16px; }
+  .hb-box .n { font:900 13px/1 var(--sans); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+  .hb-box .still { margin:10px 0 0; }
+  a.knopf { display:flex; align-items:center; justify-content:center; border:2px solid var(--ink); background:var(--weiss); text-decoration:none; font-weight:600; letter-spacing:.7px; text-transform:uppercase; }
+  a.knopf:hover { background:var(--grau); }
+  .ablage { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:96px; border:2px dashed var(--ink); border-radius:4px; padding:8px; text-align:center; font:600 15px/1.4 var(--sans); color:var(--muted); cursor:pointer; }
+  .ablage:hover, .ablage.drueber { background:var(--pink-hell); color:var(--ink); }
+  .hb-warte { display:flex; align-items:center; gap:10px; margin:6px 0 0; }
+  .hb-chip.ok { cursor:pointer; }
+  .teil-q { margin:12px 0 8px; }
+  .ric { border-top:2px solid var(--ink); margin-top:18px; padding-top:6px; }
+  .ric-box { border:2px solid var(--ink); border-radius:4px; padding:16px; margin:12px 0; }
+  .ric-box > .n { font:900 13px/1 var(--sans); letter-spacing:.8px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+  .ric-fotos { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+  .ric-qr { width:150px; flex:none; display:flex; flex-direction:column; gap:6px; font-size:13px; }
+  .ric-qr svg, .ric-qr img { width:150px; height:150px; border:2px solid var(--ink); border-radius:4px; }
+  .ric-slots { flex:1 1 420px; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; min-width:0; }
+  @media (max-width:760px) { .ric-slots { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  .ric-slot { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .ric-slot strong { font-size:14px; }
+  .ric-bilder { display:flex; flex-wrap:wrap; gap:4px; min-height:64px; }
+  .ric-bild { position:relative; width:64px; height:64px; border:2px solid var(--ink); border-radius:4px; overflow:hidden; background:var(--grau); }
+  .ric-bild img { width:100%; height:100%; object-fit:cover; display:block; }
+  .ric-bild button { position:absolute; top:2px; right:2px; height:22px; width:22px; padding:0; border-radius:50%; font-size:12px; line-height:1; }
+  .ric-leer { width:64px; height:64px; border:2px dashed var(--muted); border-radius:4px; }
+  .ric-check { display:flex; gap:8px; align-items:center; font-size:14px; }
+  .ric-versand { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  .ric-versand button { height:auto; min-height:48px; text-transform:none; letter-spacing:0; }
+  .ric-versand button.an { background:var(--pink); }
+  .ric-zahl { color:var(--muted); font-weight:400; }
+  #r-beschrieb { min-height:260px; }
+  .vorschlag { display:inline-block; align-self:center; padding:4px 8px; border-radius:4px; background:var(--ink); color:var(--weiss); font:600 12px/1 var(--sans); letter-spacing:.6px; text-transform:uppercase; }
+  .kanal { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; margin-top:16px; }
+  .kanal > div { display:flex; flex-direction:column; gap:6px; }
+  .kanal .knopf, .fs-zeile .knopf { width:100%; flex:none; }
+  #foto-seite { max-width:520px; margin:0 auto; padding:20px 16px 40px; display:flex; flex-direction:column; gap:14px; }
+  #foto-seite[hidden] { display:none; }
+  .app[hidden] { display:none; }
+  .fs-kopf { display:flex; flex-direction:column; gap:4px; border-bottom:2px solid var(--ink); padding-bottom:12px; }
+  .fs-zeile { display:flex; flex-direction:column; gap:10px; border:2px solid var(--ink); border-radius:4px; padding:12px; }
+  .fs-zeile.offen { background:var(--pink-hell); }
+  .fs-titel { display:flex; align-items:center; gap:10px; }
+  .fs-titel div { flex:1; display:flex; flex-direction:column; }
+  .fs-titel span.still { font-size:14px; }
+  .fb-auf { width:100%; margin-bottom:12px; background:var(--pink); }
+  #fb { position:fixed; inset:0; z-index:45; background:rgba(10,10,10,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+  #fb[hidden] { display:none; }
+  .fb-karte { width:min(520px, 100%); margin:0; }
+  .fb-karte h2 { margin:0 0 12px; }
+  .fb-karte textarea { resize:vertical; }
+  .fb-karte #fb-wo { margin:8px 0 0; }
+  .shops { display:flex; flex-wrap:wrap; gap:10px; }
+  .shop { display:inline-flex; align-items:center; gap:8px; }
+  .shop .knopf { flex:none; min-height:44px; }
+  .infoknopf { position:relative; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:2px solid var(--ink); border-radius:50%; font:900 13px/1 var(--sans); cursor:help; background:var(--weiss); }
+  .infoknopf .tipp { display:none; position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:max-content; max-width:260px; padding:8px 10px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); font:400 13px/1.4 var(--sans); z-index:30; text-align:left; }
+  .infoknopf:hover .tipp, .infoknopf:focus .tipp { display:block; }
+  button.seite-link { border:0; border-radius:0; background:none; padding:0; height:auto; font:inherit; letter-spacing:0; text-transform:none; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; color:var(--ink); }
+  .sicher-eigen { display:inline-block; margin-left:8px; padding:3px 6px; border-radius:4px; background:var(--pink); font:600 11px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; vertical-align:middle; }
+  #hb-ansicht { position:fixed; inset:0; z-index:50; background:rgba(10,10,10,.55); display:flex; padding:16px; }
+  #hb-ansicht[hidden] { display:none; }
+  .hv { flex:1; display:flex; flex-direction:column; background:var(--weiss); border:2px solid var(--ink); border-radius:4px; min-width:0; }
+  .hv-kopf { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 16px; border-bottom:2px solid var(--ink); }
+  .hv-kopf h2 { margin:0; font:900 16px/1.2 var(--sans); text-transform:uppercase; flex:1 1 200px; overflow-wrap:anywhere; }
+  .hv-kopf input { flex:1 1 220px; width:auto; margin:0; }
+  .hv-kopf .knopf { flex:none; min-height:44px; }
+  .hv-fuss .knopf { flex:none; min-width:72px; min-height:44px; }
+  .hv-rumpf { flex:1; display:flex; min-height:0; }
+  .hv-treffer { width:300px; flex:none; overflow:auto; border-right:2px solid var(--ink); padding:8px; }
+  .hv-treffer button { display:block; width:100%; height:auto; border-radius:0; text-align:left; text-transform:none; letter-spacing:0; min-height:0; border:0; border-bottom:1px solid var(--linie); background:none; padding:8px; font:400 14px/1.4 var(--sans); cursor:pointer; }
+  .hv-treffer button:hover, .hv-treffer button.an { background:var(--pink-hell); }
+  .hv-treffer mark { background:var(--pink); }
+  .hv-seite { flex:1; overflow:auto; padding:12px; background:var(--grau); text-align:center; }
+  .hv-seite canvas { background:#fff; box-shadow:0 0 0 2px var(--ink); max-width:100%; }
+  .hv-fuss { display:flex; gap:10px; align-items:center; justify-content:center; padding:10px; border-top:2px solid var(--ink); }
+  @media (max-width:760px) { .hv-rumpf { flex-direction:column; } .hv-treffer { width:auto; max-height:30vh; border-right:0; border-bottom:2px solid var(--ink); } #hb-ansicht { padding:0; } }
+  .link { height:auto; background:none; border:0; border-radius:0; padding:6px 0; text-decoration:underline; text-underline-offset:3px; }
+  .link:hover { background:none; }
+  .link.rechts { margin-left:auto; color:var(--muted); }
+  .liste { margin:0; padding:0; list-style:none; border:2px solid var(--ink); border-radius:4px; overflow:hidden; }
+  .liste li { display:flex; gap:12px; align-items:center; padding:12px 14px; border-bottom:1px solid var(--linie); font-weight:600; min-width:0; }
+  .liste li:last-child { border-bottom:0; }
+  .liste .txt { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .liste .punkt { flex:none; width:10px; height:10px; border-radius:50%; background:var(--ink); }
+  .liste li.wahlzeile { padding:0; }
+  .liste button.zeile { display:flex; gap:12px; align-items:center; width:100%; height:auto; min-height:52px; padding:10px 14px; border:0; border-radius:0; background:none; text-align:left; text-transform:none; letter-spacing:0; font:600 16px/1.4 var(--sans); }
+  .liste button.zeile:hover { background:var(--pink-hell); }
+  .liste li.rot { background:var(--rot); }
+  .liste li.gesperrt { opacity:.45; }
+  .zeilen-hinweis { display:block; font-weight:400; font-size:14px; color:var(--muted); margin-top:2px; white-space:pre-wrap; }
+  .jn { display:flex; gap:6px; flex:none; }
+  .jn button { border-radius:4px; padding:0 14px; font-size:13px; }
+  .jn button.ok.an { background:var(--gruen); } .jn button.nok.an { background:var(--rot); } .jn button.np.an { background:var(--gelb); }
+  .chip { height:32px; padding:0 10px; border:2px solid var(--ink); border-radius:4px; background:var(--grau); font-size:13px; }
+  .chip.rot { background:var(--rot); }
+  .gruppe { margin:18px 0 8px; }
+  .wlan { display:inline-block; margin:0 0 12px; padding:6px 10px; border-radius:4px; background:var(--grau); font:400 15px/1.3 var(--mono); overflow-wrap:anywhere; }   /* ohne Grossschreibung: das Passwort steht da, wie es ist */
+  .etikett.gruen { background:var(--gruen); } .etikett.gelb { background:var(--gelb); }
+  .meldung h3 { margin:0 0 6px; font-size:14px; }
+  .meldung.gelb { background:var(--gelb); }
+  #a-unter { gap:8px 10px; }
+  #maengel { min-height:110px; font-weight:600; }
+  .grade { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+  .grade button { height:auto; text-align:left; padding:14px; border-radius:4px; text-transform:none; letter-spacing:0; min-width:0; }
+  .grade button b { display:block; font:900 34px/1 var(--sans); margin-bottom:8px; }
+  .grade button strong { display:block; font:600 15px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .grade button span { font:400 14px/1.4 var(--sans); color:var(--muted); }
+  .grade button.an { background:var(--pink); }
+  .urteil { font:900 30px/1.05 var(--sans); text-transform:uppercase; padding:18px; border:2px solid var(--ink); border-radius:4px; margin:14px 0; }
+  .urteil.ja { background:var(--gruen); } .urteil.nein { background:var(--ink); color:var(--weiss); }
+  .urteil small { display:block; font:600 15px/1.3 var(--sans); text-transform:none; margin-top:8px; }
+  .werte { display:grid; grid-template-columns:140px minmax(0, 1fr); gap:6px 14px; margin:14px 0; }
+  .werte dt { color:var(--muted); font:600 13px/1.6 var(--sans); letter-spacing:.7px; text-transform:uppercase; }
+  .werte dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
+  #start { position:fixed; inset:0; background:var(--grau); z-index:20; display:flex; align-items:center; justify-content:center; padding:20px; }
+  #start .karte { width:100%; max-width:440px; margin:0; }
+  #start input { height:64px; font:900 32px/1 var(--sans); text-align:center; text-transform:uppercase; letter-spacing:4px; }
+  #lade { position:fixed; right:20px; bottom:20px; background:var(--ink); color:var(--weiss); padding:10px 16px; border-radius:24px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; font-size:13px; z-index:30; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(640px, 90vw); padding:12px 18px; border:2px solid var(--ink); border-radius:4px; background:var(--pink); font-weight:600; z-index:40; }
+  #toast.stop { background:var(--ink); color:var(--weiss); }
+
+  @media (max-width: 860px) {
+    .app { display:block; }
+    aside { width:auto; height:auto; position:static; border-right:0; border-bottom:2px solid var(--ink); }
+    .nav { display:flex; flex-wrap:wrap; gap:6px; }
+    .nav .sektion { display:none; }
+    .nav button { width:auto; margin:0; }
+    main, .top { padding-left:16px; padding-right:16px; }
+    .feld { grid-template-columns:1fr; gap:4px; }
+    .feld .seite { flex-direction:row; flex-wrap:wrap; align-items:center; }
+    .raster { grid-template-columns:1fr; }
+    .schiene li:not(.aktiv) .name { display:none; }
+    .schiene li:not(.aktiv) { padding:6px; }
+    .grade { grid-template-columns:1fr; }
+    .liste li.fn { flex-wrap:wrap; }
+    .liste li.fn .txt { flex:1 1 100%; }
+    .liste li.fn .jn { width:100%; }
+    .liste li.fn .jn button { flex:1; }
+    .werte { grid-template-columns:1fr; gap:0; }
+    .werte dd { margin-bottom:8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== SESSION ===================== -->
+<div id="start" hidden>
+  <div class="karte">
+    <h2 data-t="start.titel"></h2>
+    <input type="text" id="kuerzel" maxlength="4" autocomplete="off" data-tp="start.platz" data-enter="sessionStart">
+    <div id="start-meldung"></div>
+    <p style="margin:16px 0 0"><button class="haupt-knopf" data-a="sessionStart" data-t="start.knopf"></button></p>
+  </div>
+</div>
+
+<div class="app">
+  <aside>
+    <div class="marke-kopf">
+      <img id="logo" src="https://app.pretty-good.ch/logo/logo-pretty-good.svg" alt="Pretty Good">
+      <div class="wort" id="wort" hidden>PRETTY<br>GOOD</div>
+      <span class="gross">Analyse</span>
+    </div>
+    <div class="nav">
+      <div class="sektion gross" data-t="nav.sektion"></div>
+      <button id="nav-scan" class="an" data-a="zeige" data-v="scan"><span data-t="nav.scan"></span></button>
+      <button id="nav-liste" data-a="zeige" data-v="liste"><span data-t="nav.liste"></span><span class="zahl" id="z-liste" hidden></span></button>
+      <button id="nav-teile" data-a="zeige" data-v="teile"><span data-t="nav.teile"></span></button>
+      <button id="nav-admin" data-a="zeige" data-v="admin" hidden><span data-t="nav.admin"></span></button>
+    </div>
+    <div class="fuss">
+      <button class="fb-auf" data-a="fbAuf" data-t="fb.knopf"></button>
+      <div class="wer"><span class="still" data-t="fuss.kuerzel"></span> <b id="wer"></b><button data-a="sessionEnde" data-t="fuss.ende"></button></div>
+      <div class="sprache" role="group" aria-label="Sprache / Language">
+        <button id="l-de" data-a="sprache" data-v="de">DE</button>
+        <button id="l-en" data-a="sprache" data-v="en">EN</button>
+      </div>
+      <p class="info" id="version" style="margin:10px 0 0"></p>
+    </div>
+  </aside>
+
+  <div class="haupt">
+    <header class="top">
+      <h1>Analyse</h1><span class="gross sub" id="top-sub"></span>
+      <div class="uhr" id="uhr" hidden>
+        <span class="hb-chip" id="hb-chip" hidden></span>
+        <span class="zeit" id="uhr-zeit">00:00</span>
+        <button data-a="pause" id="uhr-knopf"></button>
+        <button data-a="abbruch" id="a-abbruch"></button>
+      </div>
+    </header>
+    <main>
+
+      <!-- ===================== SCAN ===================== -->
+      <section id="s-scan">
+        <div id="scan-suche">
+          <div class="karte">
+            <input type="text" id="q" data-tp="such.platz" data-enter="suchen" autocomplete="off">
+            <div id="such-meldung"></div>
+            <div id="treffer"></div>
+            <p style="margin:14px 0 0"><a href="#" target="_self" data-a="ohneZeigen" data-t="ohne.link"></a></p>
+          </div>
+          <div class="karte" id="ohne" hidden>
+            <h2 data-t="ohne.titel"></h2>
+            <label for="o-name" data-t="ohne.name"></label><input type="text" id="o-name" data-tp="ohne.name.platz" autocomplete="off">
+            <label for="o-link" data-t="ohne.link2"></label><input type="text" id="o-link" placeholder="https://www.galaxus.ch/..." autocomplete="off">
+            <div class="reihe">
+              <div class="breit"><label for="o-vp" data-t="ohne.vp"></label><input type="number" id="o-vp" min="0" step="1"></div>
+              <div class="breit"><label data-t="ohne.kat"></label><div class="wahl" id="o-kat"></div></div>
+            </div>
+            <div id="ohne-meldung"></div>
+            <p style="margin:16px 0 0"><button class="haupt-knopf" id="o-knopf" data-a="ohneAnlegen" data-t="ohne.knopf"></button></p>
+          </div>
+          <div id="fertig"></div>
+          <div id="rep-liste"></div>
+        </div>
+
+        <div id="arbeit" hidden>
+          <div class="karte">
+            <div class="reihe" style="align-items:flex-start">
+              <div class="breit">
+                <h2 id="a-titel" style="margin-bottom:6px"></h2>
+                <div class="reihe" id="a-unter"></div>
+              </div>
+              <button class="mini" data-a="zeige" data-v="teile" data-t="a.teil"></button>
+            </div>
+          </div>
+          <ol class="schiene" id="schiene"></ol>
+          <div id="schritt"></div>
+
+          <div class="karte" id="infos" hidden>
+            <h2 data-t="ub.titel"></h2>
+            <div id="ub-infos"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== WARTESCHLANGE ===================== -->
+      <section id="s-liste" hidden>
+        <div class="karte">
+          <div class="reihe">
+            <div class="breit"><h2 style="margin:0" data-t="liste.titel"></h2><span class="still" id="liste-zahlen"></span></div>
+            <button data-a="aktualisieren" data-t="liste.neu"></button>
+            <button data-a="aktualisieren" data-v="1" id="liste-fehler" hidden data-t="liste.fehler"></button>
+          </div>
+          <div id="liste-meldung"></div>
+          <div id="liste"></div>
+        </div>
+      </section>
+
+      <!-- ===================== ERSATZTEILE ===================== -->
+      <section id="s-teile" hidden>
+        <div class="karte">
+          <h2 data-t="teil.titel"></h2>
+          <div class="raster">
+            <div><label for="t-name" data-t="teil.produkt"></label><input type="text" id="t-name" data-tp="ohne.name.platz" data-enter="teilSuchen" autocomplete="off"></div>
+            <div><label for="t-teil" data-t="teil.welches"></label><input type="text" id="t-teil" data-tp="teil.platz" data-enter="teilSuchen" autocomplete="off"></div>
+          </div>
+          <div id="t-meldung"></div>
+          <p style="margin:16px 0 0"><button class="haupt-knopf" id="t-knopf" data-a="teilSuchen" data-t="teil.knopf"></button></p>
+        </div>
+        <div class="karte">
+          <h2 data-t="teil.liste"></h2>
+          <div id="teile"></div>
+        </div>
+      </section>
+
+      <!-- ===================== ADMIN ===================== -->
+      <section id="s-admin" hidden>
+        <div class="karte">
+          <div class="reihe">
+            <div class="breit"><h2 style="margin:0" data-t="adm.titel"></h2><span class="still" id="adm-status"></span></div>
+            <button id="adm-knopf" data-a="test" data-t="adm.test"></button>
+            <a id="adm-sheet" href="#" data-t="adm.sheet"></a>
+          </div>
+          <div id="adm-test"></div>
+        </div>
+        <div id="adm-aus"></div>
+        <div class="karte"><h2 data-t="adm.batches"></h2><div id="adm-batches"></div></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div id="foto-seite" hidden>
+  <div class="fs-kopf"><span class="gross" data-t="fs.titel"></span><span class="mono" id="fs-id" style="font-size:22px"></span><strong id="fs-name"></strong></div>
+  <div id="fs-liste"></div>
+  <input type="file" id="fs-datei" accept="image/*" capture="environment" hidden>
+  <p class="still" data-t="fs.hinweis"></p>
+</div>
+<div id="lade" hidden></div>
+<div id="toast" hidden></div>
+
+<div id="fb" hidden><div class="fb-karte karte" role="dialog" aria-modal="true" aria-labelledby="fb-titel">
+  <h2 id="fb-titel" data-t="fb.titel"></h2>
+  <textarea id="fb-text" rows="5" maxlength="2000" data-tp="fb.platz"></textarea>
+  <p class="still" id="fb-wo"></p>
+  <div class="knoepfe"><button class="knopf pink" data-a="fbSenden" data-t="fb.senden"></button><button class="knopf" data-a="fbZu" data-t="hv.zu"></button></div>
+</div></div>
+<div id="hb-ansicht" hidden><div class="hv" role="dialog" aria-modal="true" aria-labelledby="hv-titel">
+  <div class="hv-kopf"><h2 id="hv-titel"></h2><input type="text" id="hv-suche" inputmode="search" autocomplete="off"><a class="link" id="hv-drive" target="_blank" rel="noopener noreferrer"></a><button class="knopf" data-a="hbZu" id="hv-zu"></button></div>
+  <div class="hv-rumpf"><div class="hv-treffer" id="hv-treffer"></div><div class="hv-seite" id="hv-seite"></div></div>
+  <div class="hv-fuss"><button class="knopf" data-a="hbBlatt" data-v="-1">‹</button><span id="hv-nr" class="mono"></span><button class="knopf" data-a="hbBlatt" data-v="1">›</button></div>
+</div></div>
+<script>
+  /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
+  var VERSION = '2026-10-15.10';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
+  var L = 'de', S = null, K = '', ANSICHT = 'scan';
+  var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
+  var LAUF = {};                                    // was zur laufenden Analyse nur im Moment gilt und nicht gespeichert wird: Wartezustände, das Urteil des Servers, offene Klappen
+  var REP = [];                                    // Stücke im Regal «Reparatur» (Startseite)
+  var FERTIG = null;                                // Protokoll der zuletzt abgeschlossenen Analyse
+  var OFFEN = {}, OKAT = '', toastZeit = null;      // laufende Aufrufe, gewählte Kategorie für ein Stück ohne Inventar
+
+  /* ---------- Texte: [Deutsch, English] ---------- */
+  var T = {
+    'fb.knopf': ['Feedback', 'Feedback'], 'fb.titel': ['Was fehlt oder stört?', 'What is missing or bothering you?'], 'fb.platz': ['z.B. Handbuch fehlt, Schritt unklar, Idee …', 'e.g. manual missing, step unclear, idea …'],
+    'fb.senden': ['Senden', 'Send'], 'fb.wo': ['Wird mit {0}, Schritt «{1}» gespeichert.', 'Saved with {0}, step “{1}”.'], 'fb.danke': ['Danke! Feedback ist gespeichert.', 'Thanks! Feedback saved.'], 'fb.leer': ['Bitte zuerst etwas hineinschreiben.', 'Please write something first.'],
+    'nav.sektion': ['Analyse', 'Analysis'], 'nav.scan': ['Analysieren', 'Analyse'], 'nav.liste': ['Warteschlange', 'Queue'], 'nav.teile': ['Ersatzteile', 'Spare parts'], 'nav.admin': ['Admin', 'Admin'],
+    'fuss.kuerzel': ['Kürzel', 'Initials'], 'fuss.ende': ['Beenden', 'End'], 'fuss.laeuft': ['Zuerst die laufende Analyse abschliessen oder abbrechen.', 'Finish or cancel the running analysis first.'],
+    'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'],
+    'start.titel': ['Session starten', 'Start session'],
+    'start.platz': ['z.B. SW', 'e.g. SW'], 'start.knopf': ['Los', 'Go'], 'start.fehler': ['Bitte 2 bis 4 Buchstaben eingeben.', 'Please enter 2 to 4 letters.'],
+    'such.platz': ['Barcode scannen, PG-ID oder Produktname eingeben', 'Scan barcode, enter PG-ID or product name'],
+    'such.keine': ['Nicht in der Warteschlange. Zuerst im Return Tool erfassen, oder unten als Stück ohne Inventar anlegen.', 'Not in the queue. Record it in the Return Tool first, or create it below as an item without inventory.'],
+    'such.erledigt': ['Dieses Stück ist nicht mehr in der Warteschlange.', 'This item is no longer in the queue.'], 'such.mehrere': ['Mehrere Stücke passen. Welches liegt vor dir?', 'Several items match. Which one is in front of you?'],
+    'such.start': ['Analysieren', 'Analyse'], 'th.id': ['ID', 'ID'], 'th.produkt': ['Produkt', 'Product'], 'th.kat': ['Kategorie', 'Category'], 'th.ovp': ['OVP CHF', 'RRP CHF'],
+    'th.rech': ['Recherche', 'Research'], 'th.budget': ['Budget', 'Budget'], 'min': ['Min', 'min'],
+    'ohne.link': ['Stück ohne Inventar analysieren', 'Analyse an item without inventory'], 'ohne.titel': ['Stück ohne Inventar', 'Item without inventory'],
+    'ohne.name': ['Produktname', 'Product name'], 'ohne.name.platz': ['Marke, Modell, Produkt', 'Brand, model, product'], 'ohne.link2': ['Link zum Produkt', 'Link to the product'],
+    'ohne.vp': ['Verkaufspreis CHF', 'Selling price CHF'], 'ohne.kat': ['Kategorie', 'Category'], 'ohne.knopf': ['Anlegen und analysieren', 'Create and analyse'],
+    'a.abbruch': ['Analyse abbrechen', 'Cancel analysis'], 'a.abbruch2': ['Wirklich abbrechen?', 'Really cancel?'], 'a.abgebrochen': ['Analyse abgebrochen. Nichts wurde gespeichert.', 'Analysis cancelled. Nothing was saved.'],
+    'a.teil': ['Ersatzteil suchen', 'Find a spare part'], 'a.anzahl': ['Anzahl {0}', 'Quantity {0}'], 'a.ovp': ['OVP CHF {0}', 'RRP CHF {0}'], 'a.seite': ['Produktseite', 'Product page'],
+    's.handbuch': ['Handbuch', 'Manual'], 'hb.oeffnen': ['Handbuch', 'Manual'], 'hv.suche': ['Im Handbuch suchen, z.B. Reset, Fehler, E3', 'Search the manual, e.g. reset, error, E3'], 'hv.zu': ['Schliessen', 'Close'], 'hv.drive': ['Im Drive öffnen', 'Open in Drive'],
+    'hv.laedt': ['Handbuch wird geladen …', 'Loading the manual …'], 'hv.gross': ['Das Handbuch ist zu gross für die Ansicht im Tool. Bitte im Drive öffnen.', 'The manual is too large to show here. Please open it in Drive.'],
+    'hv.fehler': ['Das Handbuch lässt sich hier nicht anzeigen. Bitte im Drive öffnen.', 'The manual cannot be shown here. Please open it in Drive.'], 'hv.nr': ['Seite {0} von {1}', 'Page {0} of {1}'],
+    'hv.nichts': ['Nichts gefunden.', 'Nothing found.'], 'hv.sucht': ['Das Handbuch wird noch durchsucht …', 'Still searching the manual …'], 'hb.gross': ['Das PDF ist zu gross (höchstens 23 MB).', 'The PDF is too large (max. 23 MB).'], 'hb.keinpdf': ['Bitte ein PDF wählen.', 'Please choose a PDF.'],
+    'hb.frage': ['Kein Handbuch gefunden. Bitte von ManualsLib holen und hier hochladen.', 'No manual found. Please get it from ManualsLib and upload it here.'],
+    'hb.falsch': ['Das PDF passt nicht zu diesem Modell. Bitte das richtige holen und hochladen.', 'The PDF does not match this model. Please get the right one and upload it.'],
+    'hb.fehler': ['Das Lesen hat nicht geklappt. Bitte das PDF noch einmal hochladen.', 'Reading failed. Please upload the PDF again.'],
+    'hb.n1': ['1 · Herunterladen', '1 · Download'], 'hb.n2': ['2 · Hochladen', '2 · Upload'], 'hb.ml': ['ManualsLib öffnen', 'Open ManualsLib'], 'hb.mlsuche': ['Auf ManualsLib suchen', 'Search ManualsLib'],
+    'hb.mlexakt': ['Direkt auf das Handbuch. Modell auf der Seite prüfen: {0}', 'Goes straight to the manual. Check the model on the page: {0}'], 'hb.mlsucht': ['Suche nach {0}. Das passende Handbuch wählen.', 'Search for {0}. Pick the matching manual.'],
+    'hb.ablage1': ['PDF hierher ziehen', 'Drop the PDF here'], 'hb.ablage2': ['oder antippen zum Auswählen', 'or tap to choose'], 'hb.ohne': ['Ohne Handbuch weiter', 'Continue without manual'], 'hb.keins': ['Kein Handbuch auffindbar', 'No manual available'],
+    'hb.liest': ['Das Handbuch wird gelesen. Die Angaben erscheinen in den nächsten Schritten, sobald sie da sind.', 'Reading the manual. The details appear in the next steps as soon as they are ready.'],
+    'hb.fertig': ['Handbuch gelesen.', 'Manual read.'], 'hb.keinsok': ['Für dieses Modell gibt es kein Handbuch.', 'There is no manual for this model.'],
+    'hb.aus': ['Aus dem Handbuch', 'From the manual'], 'hb.kommt': ['Handbuch wird gelesen, die Angaben kommen gleich.', 'Reading the manual, the details will appear shortly.'],
+    'hb.chipLiest': ['Handbuch wird gelesen', 'Reading manual'], 'hb.chipFalsch': ['Handbuch passt nicht', 'Manual does not match'], 'hb.chipFehler': ['Handbuch: Fehler', 'Manual: error'],
+    /* Die Schritte des Ablaufs: Die Schlüssel sind die Namen, die der Server liefert (SCHRITTE in Code.gs). */
+    's.ident': ['Produkt', 'Product'], 's.hygiene': ['Hygiene', 'Hygiene'], 's.sicher': ['Sicherheit', 'Safety'], 's.voll': ['Vollständigkeit', 'Completeness'], 's.sperre': ['Kontosperre', 'Account lock'],
+    's.funktion': ['Funktion', 'Function'], 's.reset': ['Zurücksetzen', 'Reset'], 's.zustand': ['Zustand', 'Condition'], 's.entscheid': ['Entscheid', 'Decision'],
+    'zurueck': ['Zurück', 'Back'], 'infos': ['Infos zum Produkt', 'Product info'], 'kopie.produkt': ['Produkt kopieren', 'Copy product'], 'raus': ['Aus anderem Grund nicht reusable', 'Not reusable for another reason'],
+    'raus.frage': ['Warum ist das Produkt nicht reusable?', 'Why is the product not reusable?'], 'raus.platz': ['z.B. riecht stark nach Rauch', 'e.g. smells strongly of smoke'], 'raus.knopf': ['Nicht reusable', 'Not reusable'],
+    're.keine': ['Für dieses Produkt gibt es noch keine Recherche.', 'There is no research for this product yet.'], 're.jetzt': ['Jetzt recherchieren', 'Research now'],
+    're.laeuft': ['Die Recherche läuft, das dauert etwa eine Minute.', 'Research is running, this takes about a minute.'],
+    'id.frage': ['Ist es genau dieses Produkt?', 'Is it exactly this product?'], 'id.marke': ['Marke', 'Brand'], 'id.modell': ['Modell', 'Model'], 'id.nr': ['Herstellernr.', 'Manufacturer no.'],
+    'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
+    'id.welches': ['Welches Modell ist es?', 'Which model is it?'], 'id.platz': ['Modell, wie es auf dem Gerät steht', 'Model as written on the device'], 'id.neu': ['Neu recherchieren', 'Research again'], 'id.doch': ['Doch richtig', 'It is correct after all'],
+    'id.rueckruf': ['Rückruf', 'Recall'], 'id.rfrage': ['Betrifft der Rückruf dieses Gerät?', 'Does the recall affect this device?'], 'id.rnein': ['Nein, nicht betroffen', 'No, not affected'], 'id.rja': ['Ja, betroffen', 'Yes, affected'],
+    'hy.frage': ['Wurde das Produkt benutzt?', 'Has the product been used?'], 'hy.nein': ['Unbenutzt', 'Unused'], 'hy.ja': ['Benutzt', 'Used'],
+    'si.frage': ['Schau das Produkt an, bevor du es einsteckst oder benutzt.', 'Look at the product before you plug it in or use it.'], 'si.eigen': ['für dieses Produkt', 'for this product'], 'si.ok': ['Alles in Ordnung', 'Everything is fine'], 'si.nein': ['Etwas stimmt nicht', 'Something is wrong'],
+    'si.was': ['Was stimmt nicht?', 'What is wrong?'], 'si.nok': ['nicht ok', 'not ok'], 'si.doch': ['Doch alles in Ordnung', 'Everything is fine after all'],
+    'vo.frage': ['Was fehlt?', 'What is missing?'], 'vo.da': ['da', 'present'], 'vo.fehlt': ['fehlt', 'missing'],
+    'vo.unsicher': ['Unsicher: mit der Verpackung vergleichen', 'Uncertain: compare with the packaging'], 'vo.alles': ['Alles da', 'Everything is there'],
+    'vo.weiter1': ['Weiter, {0} Teil fehlt', 'Continue, {0} part is missing'], 'vo.weitern': ['Weiter, {0} Teile fehlen', 'Continue, {0} parts are missing'],
+    'vo.unbekannt': ['Der Lieferumfang ist nicht bekannt. Fehlt offensichtlich etwas?', 'The scope of delivery is unknown. Is something obviously missing?'], 'vo.platz': ['Was fehlt? Leer lassen, wenn nichts fehlt.', 'What is missing? Leave empty if nothing is missing.'],
+    'sp.frage': ['Ist das Gerät noch mit einem Konto verbunden?', 'Is the device still linked to an account?'], 'sp.wie': ['So prüfst du es', 'How to check'], 'sp.frei': ['Keine Sperre', 'No lock'], 'sp.ja': ['Gesperrt', 'Locked'], 'sp.unklar': ['Nicht ausschliessbar', 'Cannot rule it out'],
+    'fu.brauchst': ['Du brauchst:', 'You need:'], 'fu.fehlt': ['fehlt', 'missing'],
+    'fu.wlan': ['WLAN {0} · Passwort {1}', 'Wi-Fi {0} · password {1}'], 'fu.wlanohne': ['WLAN {0}', 'Wi-Fi {0}'],
+    'fu.Kern': ['Kernfunktionen', 'Key functions'], 'fu.Weitere': ['Weitere Funktionen', 'Further functions'], 'fu.ok': ['OK', 'OK'], 'fu.nok': ['Nicht OK', 'Not OK'], 'fu.np': ['Nicht prüfbar', 'Cannot test'],
+    'fu.achte': ['Achte auf', 'Watch out for'], 'fu.schwach': ['Bekannte Schwachstelle:', 'Known weak point:'], 'fu.ki': ['(Hinweis der KI, ohne Beleg)', '(hint from the AI, not sourced)'], 'fu.handbuch': ['Handbuch öffnen', 'Open the manual'],
+    'fu.weiter': ['Weiter', 'Continue'], 'fu.rep': ['Weiter zur Reparaturfrage', 'Continue to the repair question'],
+    'ga.titel': ['Reparieren?', 'Repair?'], 'ga.frage': ['Wie lange dauert die Reparatur, und braucht es ein Teil?', 'How long does the repair take, and does it need a part?'], 'ga.nok': ['Nicht in Ordnung', 'Not ok'],
+    'ga.nichterfuellt': ['Nicht erfüllt: {0}', 'Not met: {0}'], 'ga.min': ['Geschätzte Dauer in Minuten', 'Estimated duration in minutes'], 'ga.teil': ['Ersatzteil in CHF (leer, wenn es keines braucht)', 'Spare part in CHF (empty if none is needed)'],
+    'ga.ja': ['Ja, reparieren', 'Yes, repair'], 'ga.nein': ['Nein, nicht reparieren', 'No, do not repair'], 'ga.los': ['Ich repariere', 'I will repair it'], 'ga.nicht': ['Nicht reparieren', 'Do not repair'], 'ga.spaeter': ['Später reparieren', 'Repair later'],
+    'sp.was': ['Was ist zu tun?', 'What needs to be done?'], 'sp.teil': ['Teil (leer lassen, wenn es keines braucht)', 'Part (leave empty if none is needed)'], 'sp.nr': ['Teilenummer', 'Part number'],
+    'sp.shop': ['Shop', 'Shop'], 'sp.preis': ['Preis CHF', 'Price CHF'], 'sp.link': ['Link zum Teil', 'Link to the part'], 'sp.aus': ['Aus der Ersatzteil-Suche übernehmen:', 'Take from the spare part search:'],
+    'sp.knopf': ['Ins Regal «Reparatur»', 'To the shelf “Reparatur”'],
+    'rp.titel': ['Im Regal «Reparatur»', 'On the shelf “Reparatur”'], 'rp.weiter': ['Fortsetzen', 'Continue'], 'rp.keinTeil': ['kein Teil', 'no part'],
+    'rp.neu': ['Der gespeicherte Stand fehlt: Die Analyse beginnt neu.', 'The saved state is missing: the analysis starts over.'], 'rp.zurueck': ['Aus dem Regal «Reparatur»', 'From the shelf “Reparatur”'],
+    'fertig.reparatur': ['Zettel mit {0} aufs Produkt, ins Regal «Reparatur».', 'Put a note with {0} on the product, onto the shelf “Reparatur”.'], 'fertig.pausiert': ['{0} wartet auf die Reparatur', '{0} is waiting for the repair'],
+    'fertig.bestellt': ['Das Teil steht in der Bestellliste.', 'The part is on the order list.'],
+    'ga.laeuft': ['Reparatur läuft', 'Repair in progress'], 'ga.mach': ['Repariere das Produkt.', 'Repair the product.'], 'ga.was': ['Was hast du gemacht?', 'What did you do?'], 'ga.platz': ['z.B. Netzkabel ersetzt', 'e.g. replaced the power cord'],
+    'ga.fertig': ['Fertig, nochmals prüfen', 'Done, test again'], 'ga.fehl': ['Hat nicht geklappt', 'It did not work'],
+    'ke.titel': ['Kernfunktion nicht prüfbar', 'Key function cannot be tested'], 'ke.text': ['Brich die Analyse ab, bis das Testmittel da ist, oder schliesse sie als nicht reusable ab.', 'Cancel the analysis until the test equipment is there, or finish it as not reusable.'],
+    'rs.ok': ['Erledigt', 'Done'], 'rs.done': ['erledigt', 'done'], 'rs.fw': ['Installierte Firmware-Version', 'Installed firmware version'], 'rs.fwab': ['Update abgebrochen, dauerte länger als 10 Minuten', 'Update cancelled, took longer than 10 minutes'],
+    'rs.nein': ['Zurücksetzen geht nicht', 'Reset is not possible'],
+    'zu.frage': ['Schreib auf, was Käuferinnen und Käufer wissen müssen: jeden Mangel und alles, was du nicht prüfen konntest.', 'Write down what buyers need to know: every defect and everything you could not test.'],
+    'zu.platz': ['z.B. Kratzer auf dem Deckel, linke Taste klemmt leicht, Bluetooth nicht geprüft', 'e.g. scratch on the lid, left button sticks slightly, Bluetooth not tested'], 'zu.schon': ['Steht schon im Befund', 'Already in the finding'],
+    'zu.grade': ['Grade', 'Grade'],
+    'en.ja': ['Reusable', 'Reusable'], 'en.nein': ['Nicht reusable', 'Not reusable'], 'en.stufe': ['Stufe', 'Level'], 'en.dauer': ['Dauer', 'Duration'], 'en.dauerwert': ['{0} Min von {1} Min Budget', '{0} min of {1} min budget'],
+    'en.rep': ['Reparatur', 'Repair'], 'en.repwert': ['{0} ({1} Min, Kosten CHF {2})', '{0} ({1} min, cost CHF {2})'], 'en.befund': ['Befund', 'Finding'],
+    'en.htitel': ['Analysehinweis', 'Analysis note'], 'en.hinweis': ['Es fehlt etwas. Fülle einen Analysehinweis aus und klebe ihn aufs Produkt.', 'Something is missing. Fill in an analysis note and stick it on the product.'],
+    'en.knopf': ['Analyse abschliessen', 'Finish analysis'], 'en.offen': ['Noch offen', 'Still open'],
+    /* Offene Punkte: Die Schlüssel sind die Codes, die der Server liefert (urteil_ in Code.gs). */
+    'o.recherche': ['Zuerst recherchieren', 'Research first'], 'o.rueckruf': ['Rückruf klären', 'Clarify the recall'], 'o.hygiene': ['Hygiene beantworten', 'Answer the hygiene question'], 'o.sicher': ['Sicherheit prüfen', 'Check safety'],
+    'o.sperre': ['Kontosperre prüfen', 'Check the account lock'], 'o.funktion': ['Alle Funktionen beantworten', 'Answer all functions'], 'o.defekt': ['Eine Funktion ist nicht OK: reparieren oder nicht reusable', 'A function is not OK: repair or not reusable'],
+    'o.kern': ['Eine Kernfunktion ist nicht prüfbar', 'A key function cannot be tested'], 'o.reset': ['Zurücksetzen fertig machen', 'Finish the reset'], 'o.zustand': ['Grade wählen', 'Choose the grade'],
+    'o.grund': ['Grund angeben', 'Give the reason'],
+    'ub.titel': ['Infos zum Produkt', 'Product info'], 'ub.quelle': ['Quelle', 'Source'], 'ub.treffer': ['Modelltreffer', 'Model match'], 'ub.stimmt': ['Stimmt', 'Correct'], 'ub.falsch': ['Stimmt nicht', 'Wrong'],
+    'ub.unbekannt': ['unbekannt', 'unknown'], 'ub.hinweis': ['Allgemeine Hinweise der KI, ohne Beleg', 'General hints from the AI, not sourced'], 'ub.oeffnen': ['Öffnen', 'Open'],
+    'stufe.Gruen': ['Verlässlich', 'Reliable'], 'stufe.Gelb': ['Gegenprüfen', 'Double-check'], 'stufe.Rot': ['Vermutung', 'Guess'],
+    'fertig.regal': ['Produkt aufs Regal stellen.', 'Put the product on the shelf.'], 'fertig.analysiert': ['Ins Regal «Analysiert».', 'Put it on the shelf “Analysiert”.'],
+    'fertig.ricardo': ['Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Put a note with {0} on the product, shelf “Ricardo Offline”.'],
+    'fertig.mm': ['Zettel mit {0} aufs Produkt, ins Regal «Matchmaker».', 'Put a note with {0} on the product, shelf “Matchmaker”.'],
+    'mm.prueft': ['Matchmaker prüft die offenen Suchaufträge …', 'Matchmaker is checking the open search requests …'], 'mm.fehler': ['Der Matchmaker-Abgleich ging nicht: {0}', 'The Matchmaker check failed: {0}'],
+    'mm.nochmal': ['Nochmals prüfen', 'Check again'], 'mm.titel': ['Suchauftrag passt', 'Search request matches'], 'mm.gesucht': ['Gesucht: {0}', 'Wanted: {0}'], 'mm.limit': ['Limit CHF {0}', 'Limit CHF {0}'],
+    'mm.knopf': ['Regal Matchmaker', 'Shelf “Matchmaker”'], 'mm.aehnlich': ['Ähnlich wie ein Suchauftrag, geht aber nicht in den Matchmaker:', 'Similar to a search request, but does not go to Matchmaker:'],
+    'mm.liegt': ['Liegt im Regal «Matchmaker»: {0}', 'On the shelf “Matchmaker”: {0}'], 'mm.zurueck': ['Matchmaker hat nicht geklappt', 'Matchmaker did not work out'],
+    'mm.nach': ['Zurück aus dem Regal «Matchmaker». Die Analyse gilt, nur der Ausgang ist neu.', 'Back from the shelf “Matchmaker”. The analysis stands; only the exit is new.'],
+    'ri.wohin': ['Wohin kommt das Produkt?', 'Where does the product go?'], 'ri.ricardo': ['Auf Ricardo', 'On Ricardo'], 'ri.regal': ['Regal Analysiert', 'Shelf “Analysiert”'], 'ri.vorschlag': ['Vorschlag', 'Suggested'],
+    'ri.titel': ['Ricardo', 'Ricardo'], 'ri.zurueck': ['Doch nicht auf Ricardo', 'Not on Ricardo after all'], 'ri.n1': ['1 · Fotos mit dem Handy', '1 · Photos with the phone'], 'ri.qr': ['QR-Code mit dem Handy scannen.', 'Scan the QR code with the phone.'],
+    'ri.link': ['Seite öffnen', 'Open page'], 'ri.haupt': ['Hauptbild', 'Main photo'], 'ri.weitere': ['Weitere, mind. 2', 'More, at least 2'], 'ri.typ': ['Typenschild', 'Type plate'], 'ri.mangel': ['Mangel', 'Defect'],
+    'ri.ohneTyp': ['Kein Typenschild am Gerät', 'No type plate on the device'], 'ri.ohneMangel': ['Mängel auf Fotos nicht sichtbar', 'Defects not visible on photos'], 'ri.keinMangel': ['entfällt, keine Mängel', 'not needed, no defects'],
+    'ri.n2': ['2 · Titel und Artikelbeschrieb', '2 · Title and description'], 'ri.schreibt': ['Die KI schreibt einen Entwurf …', 'The AI is writing a draft …'], 'ri.neu': ['Neu schreiben lassen', 'Write again'],
+    'ri.ftitel': ['Titel', 'Title'], 'ri.zeichen': ['{0} von 60 Zeichen', '{0} of 60 characters'], 'ri.fbeschrieb': ['Artikelbeschrieb', 'Description'],
+    'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Übernommen', '4 · Taken over'], 'ri.preis': ['Startpreis', 'Starting price'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
+    'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
+    'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
+    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
+    'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
+    'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
+    'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
+    'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
+    'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pause', 'Pause'], 'weiter': ['Weiter', 'Resume'],
+    'liste.titel': ['Warteschlange', 'Queue'], 'liste.zahlen': ['{0} offen · {1} mit Recherche · {2} in Recherche · {3} mit Fehler', '{0} open · {1} researched · {2} in research · {3} with error'],
+    'liste.zuletzt': ['Letzter Abgleich: {0}', 'Last sync: {0}'], 'liste.nie': ['noch nie', 'never'], 'liste.neu': ['Aktualisieren', 'Refresh'], 'liste.fehler': ['Fehler erneut versuchen', 'Retry errors'],
+    'liste.leer': ['Die Warteschlange ist leer.', 'The queue is empty.'],
+    'liste.abgleich': ['Abgleich fertig: {0} neu, {1} entfallen, {2} Recherchen fertig, {3} gestartet, {4} mit Fehler.', 'Sync done: {0} new, {1} dropped, {2} researches ready, {3} started, {4} with error.'],
+    'liste.beschaeftigt': ['Ein Abgleich läuft gerade. Bitte in einer Minute noch einmal versuchen.', 'A sync is running right now. Please try again in a minute.'],
+    'liste.ohnekey': ['Der Claude-Schlüssel fehlt. Ohne ihn startet keine Recherche.', 'The Claude key is missing. Without it no research starts.'],
+    'teil.titel': ['Ersatzteil suchen', 'Find a spare part'],
+    'teil.produkt': ['Produkt', 'Product'], 'teil.welches': ['Welches Teil?', 'Which part?'], 'teil.platz': ['z.B. Akku, Netzteil, Filter', 'e.g. battery, power supply, filter'], 'teil.knopf': ['Suchen', 'Search'],
+    'teil.laeuft': ['Die Suche läuft, das dauert bis zu einer Minute.', 'The search is running, this takes up to a minute.'], 'teil.liste': ['Letzte Suchen', 'Latest searches'], 'teil.leer': ['Noch keine Suchen.', 'No searches yet.'],
+    'teil.gefunden': ['Angebote gefunden: {0}', 'Offers found: {0}'], 'teil.begriff': ['Suchbegriff:', 'Search term:'], 'teil.ungeprueft': ['nicht geprüft', 'not checked'], 'teil.keins': ['Kein Angebot gefunden. Der Hinweis dazu steht in der Liste.', 'No offer found. See the hint in the list.'], 'teil.nichts': ['nichts gefunden', 'nothing found'], 'teil.anteil': ['{0} % vom VP', '{0} % of the price'], 'teil.lohnt': ['lohnt sich', 'worth it'],
+    'teil.rechnen': ['genau rechnen', 'do the maths'], 'teil.lieferbar': ['lieferbar', 'in stock'], 'teil.nichtlieferbar': ['nicht lieferbar', 'not in stock'],
+    'adm.titel': ['Admin', 'Admin'], 'adm.test': ['Verbindungen testen', 'Test connections'], 'adm.testet': ['Die Verbindungen werden geprüft, das dauert bis zu einer Minute.', 'The connections are being tested, this takes up to a minute.'],
+    'adm.sheet': ['Sheet öffnen', 'Open sheet'], 'adm.batches': ['Letzte Recherche-Läufe', 'Latest research runs'], 'adm.ki': ['Claude ist verbunden.', 'Claude is connected.'], 'adm.keinki': ['Der Claude-Schlüssel fehlt.', 'The Claude key is missing.'],
+    'adm.an': ['Der Import aus dem Return Tool ist an.', 'The import from the Return Tool is on.'], 'adm.aus': ['Der Import aus dem Return Tool ist aus.', 'The import from the Return Tool is off.'],
+    'adm.auto': ['Der Abgleich läuft von selbst.', 'The sync runs by itself.'], 'adm.keinauto': ['Der Auslöser fehlt: im Apps Script «einrichten» ausführen.', 'The trigger is missing: run "einrichten" in Apps Script.'],
+    'adm.leer': ['Noch keine Läufe.', 'No runs yet.'], 'adm.ok': ['ok', 'ok'], 'adm.fehler': ['Fehler', 'Error'],
+    'adm.th.zeit': ['Erstellt', 'Created'], 'adm.th.anzahl': ['Produkte', 'Products'], 'adm.th.status': ['Status', 'Status'], 'adm.th.id': ['Auftrag bei Claude', 'Batch at Claude']
+  };
+  /* Werte aus dem Sheet und vom Server bleiben deutsch; auf Englisch wird nur die Anzeige übersetzt. Was die Recherche liefert (Funktionen, Lieferumfang), bleibt, wie es ist. */
+  var W = { 'Ja': 'Yes', 'Nein': 'No',
+    'Offen': 'Open', 'Bestellt': 'Ordered', 'Da': 'Arrived', 'Reparatur': 'Repair', 'Läuft': 'Running', 'Bereit': 'Ready', 'Fehler': 'Error', 'Erledigt': 'Done', 'Entfällt': 'Dropped', 'Abgeholt': 'Fetched',
+    'Netzkabel und Stecker ohne Schäden': 'Power cord and plug without damage', 'Kabel sitzt fest am Gerät': 'Cord is firmly attached to the device', 'Ladegerät und Ladekabel ohne Schäden': 'Charger and charging cable without damage',
+    'Gehäuse ohne Risse und offene Stellen': 'Housing without cracks or openings', 'Keine Spuren von Hitze, Brand oder Flüssigkeit': 'No traces of heat, fire or liquid', 'Keine Spuren von Umbau oder Öffnung': 'No traces of modification or opening',
+    'Akku nicht aufgebläht oder beschädigt': 'Battery not swollen or damaged', 'CH-Stecker oder fest montierter Adapter': 'Swiss plug or permanently fitted adapter',
+    'Gerät einschalten und prüfen, ob eine Anmeldung oder ein fremdes Konto erscheint.': 'Switch the device on and check whether a login or someone else\'s account appears.',
+    'Firmware aktualisieren': 'Update the firmware', 'Auf dem offiziellen Weg des Herstellers.': 'Using the official method of the manufacturer.',
+    'Testkonto und Kopplungen entfernen': 'Remove test account and pairings', 'Gerät aus dem Testkonto entfernen und Kopplungen mit Testgeräten löschen.': 'Remove the device from the test account and delete pairings with test devices.',
+    'Auf Werkseinstellungen zurücksetzen': 'Reset to factory settings', 'Anleitung unbekannt: im Handbuch nachsehen oder die KI fragen.': 'Instructions unknown: check the manual or ask the AI.',
+    'Kontrolle': 'Check', 'Das Gerät startet mit der Ersteinrichtung.': 'The device starts with the initial setup.',
+    'Unbenutzt': 'Unused', 'Versiegelt oder ausgepackt, keine Gebrauchsspuren.': 'Sealed or unpacked, no signs of use.', 'Gebraucht': 'Used',
+    'Keine oder leichte Spuren, nur aus der Nähe sichtbar.': 'No or light signs of use, only visible up close.', 'Deutliche Spuren, auf den ersten Blick sichtbar.': 'Clear signs of use, visible at first glance.',
+    'Neu und originalverpackt': 'New, in original sealed packaging', 'Neu (gemäss Beschreibung)': 'New (as described)',
+    'Firmware prüfen': 'Check firmware', 'Wie neu': 'Like new', 'Keine sichtbaren Gebrauchsspuren.': 'No visible signs of use.', 'Leichte Spuren': 'Light signs of use', 'Feine Kratzer, nur aus der Nähe sichtbar.': 'Fine scratches, only visible up close.',
+    'Deutliche Spuren': 'Clear signs of use', 'Kratzer oder Dellen, auf den ersten Blick sichtbar.': 'Scratches or dents, visible at first glance.',
+    'Kontosperre: Gerät ist noch mit einem Konto verbunden': 'Account lock: the device is still linked to an account', 'Kontobindung am Prüfplatz nicht ausschliessbar': 'An account link cannot be ruled out at the test station', 'Körpernahes Produkt, benutzt': 'Personal care product, used', 'Rückruf des Herstellers': 'Recall by the manufacturer',
+    'Gerät lässt sich nicht zurücksetzen': 'The device cannot be reset', 'Kernfunktion nicht prüfbar': 'Key function cannot be tested',
+    'Alle Teile sind unbeschädigt und benutzbar': 'All parts are undamaged and usable', 'Zustand der Teile': 'Condition of the parts',
+    'Lieferumfang': 'Scope of delivery', 'Prüfrelevante Specs': 'Specs relevant for testing', 'Handbuch': 'Manual', 'Top-Defekt 1': 'Top defect 1', 'Top-Defekt 2': 'Top defect 2', 'Top-Defekt 3': 'Top defect 3', 'Prüfhinweise': 'Test hints',
+    'Kontosperre prüfen': 'Check the account lock', 'Zurücksetzen': 'Reset', 'Akku': 'Rechargeable battery', 'Rückruf': 'Recall', 'Reparierbarkeit': 'Repairability', 'Firmware und Support': 'Firmware and support',
+    'Hersteller': 'Manufacturer', 'Händler': 'Retailer', 'Forum oder Community': 'Forum or community', 'KI-Einschätzung': 'AI estimate', 'Exakt': 'Exact', 'Serie': 'Series', 'Kategorie': 'Category',
+    'Nachbau': 'Replica', 'Claude, Recherche-Modell mit Websuche': 'Claude, research model with web search' };
+
+  /* ---------- Helfer ---------- */
+  function t(k) {
+    var e = T[k], s = e ? e[L === 'en' ? 1 : 0] : k;
+    for (var i = 1; i < arguments.length; i++) s = s.split('{' + (i - 1) + '}').join(arguments[i]);
+    return s;
+  }
+  function w(s) { return L === 'en' && W[s] ? W[s] : s; }
+  function $(id) { return document.getElementById(id); }
+  function alle(auswahl, f) { Array.prototype.forEach.call(document.querySelectorAll(auswahl), f); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  /* Text aus T, fertig für innerHTML. */
+  function tx() { return esc(t.apply(null, arguments)); }
+  function istUrl(s) { return /^https?:\/\/\S+$/i.test(s); }
+  function link(url, text) { return istUrl(url) ? '<a href="' + esc(url) + '" rel="noopener noreferrer">' + esc(text) + '</a>' : esc(text); }
+  function box(text, klasse) { return '<div class="meldung ' + klasse + '">' + esc(text) + '</div>'; }
+  function unbekannt(s) { return /^(unbekannt)?$/i.test(String(s).trim()); }
+  function melde(text, stop) {
+    var e = $('toast');
+    e.textContent = text; e.className = stop ? 'stop' : ''; e.hidden = false;
+    clearTimeout(toastZeit); toastZeit = setTimeout(function () { e.hidden = true; }, stop ? 9000 : 4000);
+  }
+  function merke(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* ohne Speicher gilt es bis zum Schliessen */ } }
+  function lies(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  /**
+   * Einziger Weg zum Server. Solange ein Aufruf mit demselben Namen läuft, geht kein zweiter hinaus (Doppelklick); dann ist das Ergebnis false.
+   * Ohne eigene Fehlerbehandlung erscheint der Fehler unten als Meldung.
+   */
+  function ruf(name, args, ok, fehler) {
+    if (OFFEN[name]) return false;
+    OFFEN[name] = true; $('lade').hidden = false;
+    var fertig = function (f, x) { delete OFFEN[name]; $('lade').hidden = !Object.keys(OFFEN).length; f(x); };
+    google.script.run.withSuccessHandler(function (x) { fertig(ok, x); })
+      .withFailureHandler(function (e) { fertig(fehler || function (m) { melde(m, true); }, String((e && e.message) || e).replace(/^Error:\s*/, '')); })
+      .api(L, name, args);
+    return true;
+  }
+  /* Aufruf, der bis zu einer Minute dauert: Der Knopf ist solange gesperrt, im Feld steht der Wartetext und danach, wenn nötig, der Fehler. */
+  function rufLang(name, args, knopf, feld, text, ok) {
+    if (!ruf(name, args, function (x) { $(knopf).disabled = false; $(feld).innerHTML = ''; ok(x); }, function (m) { $(knopf).disabled = false; $(feld).innerHTML = box(m, 'stop'); })) return;
+    $(knopf).disabled = true; $(feld).innerHTML = box(text, 'warn');
+  }
+  /* Auswahlknöpfe. Aktion, Schlüssel und Wert stehen als data-Attribute am Knopf; aktiv ist ein Wert oder eine Liste. */
+  function knoepfe(werte, aktiv, aktion, k, klasse) {
+    return werte.map(function (v) {
+      var an = Array.isArray(aktiv) ? aktiv.indexOf(v) > -1 : aktiv === v;
+      return '<button class="' + (klasse || '') + (an ? ' an' : '') + '" data-a="' + aktion + '" data-k="' + esc(k || '') + '" data-v="' + esc(v) + '">' + esc(w(v)) + '</button>';
+    }).join('');
+  }
+
+  /* ---------- Sprache, Ansicht, Session ---------- */
+  function texte() {
+    document.documentElement.lang = L;
+    alle('[data-t]', function (e) { e.textContent = t(e.getAttribute('data-t')); });
+    alle('[data-tp]', function (e) { e.placeholder = t(e.getAttribute('data-tp')); });
+    $('l-de').className = L === 'de' ? 'an' : ''; $('l-en').className = L === 'en' ? 'an' : '';
+    $('lade').textContent = t('lade');
+    unterTitel();
+  }
+  /* Neben «Analyse» steht die Ansicht, während einer Analyse die PG-ID des Stücks. */
+  function unterTitel() { $('top-sub').textContent = ANSICHT === 'scan' ? '' : t('nav.' + ANSICHT); }
+  function sprache(neu) {
+    if (neu === L || !S) return;
+    L = neu; merke('at-lang', L); texte();
+    $('treffer').innerHTML = ''; $('such-meldung').innerHTML = '';
+    ohneKat(); zeichneFertig();
+    if (AN) zeichneAnalyse();
+    if (SEITEN[ANSICHT]) zeige(ANSICHT);
+  }
+  function zeige(a) {
+    ANSICHT = a;
+    Object.keys(SEITEN).forEach(function (x) { $('s-' + x).hidden = x !== a; $('nav-' + x).className = x === a ? 'an' : ''; });
+    unterTitel();
+    if (a === 'teile') {                                                    // läuft eine Analyse, gilt die Suche diesem Stück
+      if (AN) $('t-name').value = AN.d.produkt.bezeichnung; else if ($('t-name').readOnly) $('t-name').value = '';
+      $('t-name').readOnly = !!AN;
+    }
+    if (SEITEN[a]) ruf(SEITEN[a][0], [], SEITEN[a][1]);
+    if (a === 'scan' && !AN) $('q').focus();
+  }
+  function zahlen(z) { $('z-liste').textContent = z.offen; $('z-liste').hidden = !z.offen; }
+  function sessionStart() {
+    var k = $('kuerzel').value.trim().toUpperCase();
+    if (!/^[A-ZÄÖÜ]{2,4}$/.test(k)) { $('start-meldung').innerHTML = box(t('start.fehler'), 'warn'); return; }
+    K = k; merke('at-kuerzel', K); $('wer').textContent = K; $('start').hidden = true;
+    if (!AN) $('q').focus();
+  }
+  function sessionEnde() {
+    if (AN) { melde(t('fuss.laeuft'), true); return; }
+    K = ''; merke('at-kuerzel', null); $('wer').textContent = ''; $('kuerzel').value = ''; $('start-meldung').innerHTML = ''; $('start').hidden = false; $('kuerzel').focus();
+  }
+
+  /* ---------- Suche, Stück ohne Inventar ---------- */
+  function suchen() {
+    var q = $('q').value.trim(), t0 = Date.now();
+    $('such-meldung').innerHTML = ''; $('treffer').innerHTML = ''; FERTIG = null; zeichneFertig();
+    if (!q) return;
+    ruf('suche', [q], function (r) {
+      if (r.inSchlange && r.treffer.length === 1) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else analyse(r.treffer[0].id, t0); return; }
+      var mm = r.inSchlange ? [] : r.treffer.filter(function (x) { return x.mm; });
+      if (mm.length) {                                                          // im Regal «Matchmaker»: Wiedereinstieg, wenn es dort nicht geklappt hat
+        $('such-meldung').innerHTML = mm.map(function (x) { return '<div class="meldung warn"><p><strong>' + esc(x.id) + '</strong> · ' + esc(x.bezeichnung) + '<br>' + tx('mm.liegt', x.mm) + '</p><div class="knoepfe">' + taste('mmZurueck', 'mm.zurueck', 'pink', ' data-v="' + esc(x.id) + '"') + '</div></div>'; }).join('');
+        return;
+      }
+      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? 'such.mehrere' : 'such.erledigt')), r.inSchlange ? '' : 'warn');
+      $('treffer').innerHTML = r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '';
+    }, function (m) { $('such-meldung').innerHTML = box(m, 'warn'); });
+  }
+  function tabelle(liste, mitKnopf) {
+    return '<div class="tabelle"><table><thead><tr><th>' + tx('th.id') + '</th><th>' + tx('th.produkt') + '</th><th>' + tx('th.kat') + '</th><th>' + tx('th.ovp') + '</th><th>' + tx('th.rech') + '</th><th>' + tx('th.budget') + '</th><th></th></tr></thead><tbody>'
+      + liste.map(function (p) {
+        return '<tr><td><span class="pgid klein">' + esc(p.id) + '</span></td><td>' + esc(p.bezeichnung) + '</td><td>' + esc(p.kategorie) + '</td><td>' + esc(p.ovp) + '</td><td><span class="etikett' + (p.recherche === 'Bereit' ? ' hell' : '') + '">' + esc(w(p.recherche)) + '</span></td><td>'
+          + (p.budget ? esc(p.budget) + ' ' + tx('min') : '') + '</td><td>' + (mitKnopf ? (p.status === 'Reparatur' ? '<button class="mini" data-a="repWeiter" data-v="' + esc(p.id) + '">' + tx('rp.weiter') + '</button>' : '<button class="mini" data-a="starten" data-v="' + esc(p.id) + '">' + tx('such.start') + '</button>') : '<span class="etikett">' + esc(w(p.status)) + '</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  function ohneKat(v) {
+    if (v) OKAT = OKAT === v ? '' : v;
+    $('o-kat').innerHTML = knoepfe(S.listen.kategorie, OKAT, 'ohneKat');
+  }
+  function ohneZeigen() { $('ohne').hidden = !$('ohne').hidden; if (!$('ohne').hidden) $('o-name').focus(); }
+  /* Legt das Stück an und recherchiert sofort. Klappt die Recherche nicht, beginnt die Analyse trotzdem; der Grund steht dann im ersten Schritt. */
+  function ohneAnlegen() {
+    var t0 = Date.now();
+    rufLang('ohneInventar', [$('o-name').value, $('o-link').value, $('o-vp').value, OKAT], 'o-knopf', 'ohne-meldung', t('re.laeuft'), function (r) {
+      var frei = function (m) { $('o-knopf').disabled = false; $('ohne-meldung').innerHTML = m ? box(m, 'stop') : ''; };
+      var los = function (d, fehler) { frei(''); $('o-name').value = ''; $('o-link').value = ''; $('o-vp').value = ''; $('ohne').hidden = true; beginne(d, t0, fehler); };
+      var ohne = function (m) { ruf('starteAnalyse', [r.id], function (d) { los(d, m); }, frei); };
+      $('o-knopf').disabled = true; $('ohne-meldung').innerHTML = box(t('re.laeuft'), 'warn');
+      if (!ruf('rechercheJetzt', [r.id], los, ohne)) ohne('');
+    });
+  }
+
+  /* ---------- Analyse starten, recherchieren, beenden ---------- */
+  function starten(id) { analyse(id, Date.now()); }
+  function analyse(id, t0) {
+    if (AN) { melde(t('fuss.laeuft'), true); return; }
+    ruf('starteAnalyse', [id], function (d) { beginne(d, t0); });
+  }
+  /* Was die Person im Lauf einer Analyse antwortet. Daraus entsteht in daten() das, was der Server beurteilt. Testmittel, die im Sheet auf «Nein» stehen, sind von Anfang an als fehlend markiert. */
+  function leer(d) {
+    return { versiegelt: false, rueckrufFrei: false, unbenutzt: false, sicher: false, sicherNein: false, sicherWahl: {}, fehlt: {}, fehltText: '', sperreFrei: false, fn: {},
+      mittelFehlt: d.funktion.mittel.filter(function (m) { return m.vorhanden === 'Nein'; }).map(function (m) { return m.name; }),
+      reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '' };
+  }
+  /* d = Überblick vom Server, t0 = Zeitpunkt des Scans, fehler = Grund, warum die Recherche nicht geklappt hat. */
+  function beginne(d, t0, fehler) {
+    var jetzt = Date.now();
+    AN = { v: VERSION, d: d, start: t0, aktiv: jetzt - t0, seit: jetzt, i: 0, s: leer(d), gate: null, rm: {}, hb: null };
+    if (d.handbuch && d.handbuch.status === 'Hochgeladen') { d.handbuch.status = 'liest'; AN.hb = 'liest'; }   // wird gerade gelesen (anderes Gerät oder Abgleich)
+    LAUF = { suchFehler: fehler || '' };
+    if (ANSICHT !== 'scan') zeige('scan');
+    sichern(); zeichneAnalyse(); window.scrollTo(0, 0);
+  }
+  /* Recherche sofort (etwa eine Minute). Mit modell (am Gerät abgelesen) ersetzt sie die bisherige Recherche. */
+  function recherche(modell) {
+    var id = AN.d.produkt.id, meins = function () { return AN && AN.d.produkt.id === id; };
+    if (!ruf('rechercheJetzt', modell ? [id, modell] : [id], function (d) { if (meins()) uebernimm(d); },
+      function (m) { if (meins()) { LAUF.sucht = false; LAUF.suchFehler = m; zeichneSchritt(); } })) return;
+    LAUF.sucht = true; LAUF.suchFehler = ''; zeichneSchritt();
+  }
+  /* Neue Recherche während der Analyse: Der Ablauf beginnt von vorn, die Uhr läuft weiter. */
+  function uebernimm(d) {
+    AN.d = d; AN.i = 0; AN.s = leer(d); AN.gate = null; AN.rm = {}; AN.mm = null;
+    LAUF = { infosAuf: LAUF.infosAuf };
+    sichern(); zeichneAnalyse();
+  }
+  function modellFrage() { LAUF.modellFrage = !LAUF.modellFrage; zeichneSchritt(); if (LAUF.modellFrage) $('modell-neu').focus(); }
+  function modellNeu() {
+    var m = $('modell-neu').value.trim();
+    if (m) recherche(m); else $('modell-neu').focus();
+  }
+  function ende() {
+    AN = null; LAUF = {}; sichern(); uhr(); unterTitel();
+    $('arbeit').hidden = true; $('scan-suche').hidden = false; $('q').value = ''; $('treffer').innerHTML = ''; $('such-meldung').innerHTML = '';
+  }
+  function abbruch(v, k, el) {
+    if (!LAUF.abbruch) { LAUF.abbruch = true; el.textContent = t('a.abbruch2'); setTimeout(function () { LAUF.abbruch = false; el.textContent = t('a.abbruch'); }, 4000); return; }
+    ende(); melde(t('a.abgebrochen')); $('q').focus();
+  }
+
+  /* ---------- Uhr: zählt die aktive Zeit ---------- */
+  function aktivMs() { return AN.aktiv + (AN.seit ? Date.now() - AN.seit : 0); }
+  /* Speichert den Lauf. Die Zeit bis jetzt ist dann in «aktiv» gezählt: Nach einem Neuladen läuft die Uhr dort weiter, die Zeit dazwischen zählt nicht. */
+  function sichern() {
+    if (AN && AN.seit) { var jetzt = Date.now(); AN.aktiv += jetzt - AN.seit; AN.seit = jetzt; }
+    merke('at-lauf', AN ? JSON.stringify(AN) : null);
+  }
+  function uhr() {
+    $('uhr').hidden = !AN;
+    if (!AN) { hbChip(); return; }
+    var s = Math.floor(aktivMs() / 1000), b = AN.d.produkt.budget, z = function (n) { return (n < 10 ? '0' : '') + n; };
+    $('uhr-zeit').textContent = z(Math.floor(s / 60)) + ':' + z(s % 60) + (b ? ' / ' + b + ':00' : '');
+    $('uhr-zeit').className = 'zeit' + (!AN.seit ? ' pause' : (b && s > b * 60 ? ' ueber' : ''));
+    $('uhr-knopf').textContent = t(AN.seit ? 'pause' : 'weiter');
+    if (AN.seit && Date.now() - AN.seit > 5000) sichern();
+    hbChip(); hbWarten(); ricTakt();
+  }
+  function pause() {
+    sichern();
+    AN.seit = AN.seit ? null : Date.now();
+    sichern(); uhr();
+  }
+
+  /* ---------- Der Ablauf: ein Schritt pro Bildschirm ---------- */
+  /* Welche Schritte ein Produkt hat, sagt der Server (d.ablauf). Hier steht nur, wie jeder Schritt aussieht. */
+  function schritt() { return AN.d.ablauf[AN.i]; }
+  function zeichneAnalyse() {
+    var p = AN.d.produkt;
+    $('scan-suche').hidden = true; $('arbeit').hidden = false;
+    $('a-titel').textContent = p.bezeichnung;
+    unterTitel();
+    /* Nur was man am Tisch braucht: Stufe, Preis (für die Reparaturfrage), Anzahl, die ID zum Abgleichen und der Link zur Produktseite. */
+    $('a-unter').innerHTML = '<span class="pgid">' + esc(p.id) + '</span><span class="etikett hell">' + esc(p.stufe) + '</span>' + (p.ovp === '' || p.ovp == null ? '' : '<span class="etikett">' + tx('a.ovp', p.ovp) + '</span>')
+      + (p.anzahl > 1 ? '<span class="etikett">' + tx('a.anzahl', p.anzahl) + '</span>' : '') + (istUrl(p.link) ? link(p.link, t('a.seite')) : '') + handbuchTeil(AN.d.handbuch);
+    $('a-abbruch').textContent = t('a.abbruch');
+    zeichneSchritt(); zeichneInfos(); uhr();
+  }
+  /* ---------- Handbuch ---------- */
+  /* Gelesen: Link «Handbuch» bei den Angaben zum Produkt. Fehlt es, hat das Produkt den Schritt «Handbuch» (nach «Produkt»): von ManualsLib holen und hochladen.
+   * Das Tool liest ein hochgeladenes PDF sofort im Hintergrund, die Person prüft weiter. Neben der Uhr steht der Stand, in den Schritten erscheint der Auszug, sobald er da ist. */
+  function hbBereit(h) { return !!h && (h.status === 'gelesen' || h.status === 'nur Bild'); }
+  function handbuchTeil(h) { return hbBereit(h) && istUrl(h.datei) ? '<button class="seite-link" data-a="hbZeig">' + tx('hb.oeffnen') + '</button>' : ''; }
+  function hbChip() {
+    var e = $('hb-chip'), h = AN && AN.d.handbuch, a = AN && AN.hb, k = AN && h && a ? h.status + '/' + a + '/' + L : '';
+    if (e.getAttribute('data-k') === k) return;
+    e.setAttribute('data-k', k); e.removeAttribute('data-a'); e.hidden = !k;
+    if (!k) return;
+    if (h.status === 'liest') { e.className = 'hb-chip'; e.innerHTML = '<span class="dreh"></span>' + tx('hb.chipLiest'); }
+    else if (hbBereit(h)) { e.className = 'hb-chip ok'; e.innerHTML = '✓ ' + tx('hb.oeffnen'); e.setAttribute('data-a', 'hbZeig'); e.setAttribute('data-v', '0'); }
+    else { e.className = 'hb-chip rot'; e.innerHTML = tx(h.status === 'falsches Modell' ? 'hb.chipFalsch' : 'hb.chipFehler'); e.setAttribute('data-a', 'springe'); e.setAttribute('data-v', AN.d.ablauf.indexOf('handbuch')); }
+  }
+  function handbuchHoch(datei) {
+    if (!datei || !AN) return;
+    if (!/pdf/i.test(datei.type) && !/\.pdf$/i.test(datei.name)) { melde(t('hb.keinpdf'), true); return; }
+    if (datei.size > 23 * 1048576) { melde(t('hb.gross'), true); return; }
+    var r = new FileReader(), id = AN.d.produkt.id, vorher = AN.d.handbuch || { themen: {} };
+    r.onload = function () {
+      /* direkt, nicht über ruf: Das Lesen dauert bis zu einer Minute und soll nichts anderes sperren */
+      google.script.run.withSuccessHandler(function (x) { hbNeu(id, x); })
+        .withFailureHandler(function (e) { hbNeu(id, Object.assign({}, vorher, { status: 'Fehler' })); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); })
+        .api(L, 'handbuchHochladen', [id, String(r.result)]);
+      LAUF.hbDirekt = true;
+      AN.d.handbuch = Object.assign({}, vorher, { status: 'liest' }); AN.hb = 'liest';
+      if (schritt() === 'handbuch') AN.i++;                              // nicht warten: gleich weiter prüfen
+      stand(); hbChip();
+    };
+    r.readAsDataURL(datei);
+  }
+  function hbNeu(id, x) {
+    if (!AN || AN.d.produkt.id !== id) return;
+    AN.d.handbuch = x || { status: 'Fehler', themen: {} };
+    AN.hb = hbBereit(AN.d.handbuch) ? 'ok' : (AN.d.handbuch.status === 'kein Handbuch' ? null : 'fehler');
+    sichern(); zeichneAnalyse();
+  }
+  /* Nach einem Neuladen während des Lesens: alle 10 Sekunden nachfragen, bis die Zeile im Handbuch-Sheet nicht mehr «Hochgeladen» heisst. */
+  function hbWarten() {
+    var h = AN && AN.d.handbuch;
+    if (!h || h.status !== 'liest' || LAUF.hbDirekt || LAUF.hbFrage || Date.now() - (LAUF.hbZeit || 0) < 10000) return;
+    LAUF.hbFrage = true; LAUF.hbZeit = Date.now();
+    var id = AN.d.produkt.id;
+    google.script.run.withSuccessHandler(function (x) { LAUF.hbFrage = false; if (!x || x.status !== 'Hochgeladen') hbNeu(id, x); })
+      .withFailureHandler(function () { LAUF.hbFrage = false; }).api(L, 'handbuchStand', [id]);
+  }
+  function hbKeins() {
+    var id = AN.d.produkt.id;
+    ruf('handbuchKeins', [id], function (x) { if (!AN || AN.d.produkt.id !== id) return; AN.d.handbuch = x || { status: 'kein Handbuch', themen: {} }; AN.hb = null; hbChip(); weiter(); });
+  }
+  /* Auszug aus dem Handbuch für einen Schritt. Jede Seitenangabe wird zum Link auf die Seite im PDF (Original-Link, sonst die Datei im Drive). */
+  function hbAuszug(themen) {
+    var h = AN.d.handbuch, z = [];
+    if (!h) return '';
+    if (h.status === 'liest') return '<div class="meldung warn"><h3>' + tx('hb.aus') + '</h3><p class="hb-warte"><span class="dreh"></span>' + tx('hb.kommt') + '</p></div>';
+    if (!hbBereit(h)) return '';
+    themen.forEach(function (k) { String((h.themen || {})[k] || '').split('\n').forEach(function (l) { l = l.trim(); if (l && !/^nicht im handbuch\.?$/i.test(l)) z.push(l); }); });
+    if (!z.length) return '';
+    return '<div class="meldung warn"><h3>' + tx('hb.aus') + '</h3><ul>' + z.map(function (l) {
+      return '<li>' + esc(l).replace(/\s*\(S\. (\d+): «([^»]*)»\)/g, function (m, n, q) {
+        return ' <button class="seite-link" data-a="hbZeig" data-v="' + n + '" title="' + q + '">S. ' + n + '</button>'; }) + '</li>'; }).join('') + '</ul></div>';
+  }
+
+  /* ---------- Handbuch im Tool: blättern und suchen ---------- */
+  /* Das PDF kommt aus dem Ordner «HANDBÜCHER PDF» und erscheint mit pdf.js über der Analyse. Die Suche geht durch den Text aller Seiten. Startseite ist der deutsche Teil. */
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/', HV = { id: null };
+  function pdfjs(fertig) {
+    if (window.pdfjsLib) { fertig(true); return; }
+    import(PDFJS + 'pdf.min.mjs').then(function (m) { m.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.mjs'; window.pdfjsLib = m; fertig(true); }, function () { fertig(false); });
+  }
+  function hvMeldung(text) { HV.laedt = false; $('hv-seite').innerHTML = box(text, 'warn'); }
+  function hbZeig(v) {
+    var h = AN && AN.d.handbuch, id = AN && AN.d.produkt.id, seite = parseInt(v, 10) || 0;
+    if (!hbBereit(h)) return;
+    $('hv-titel').textContent = [AN.d.ident.marke, AN.d.ident.modell].filter(String).join(' ') || t('hb.oeffnen');
+    $('hv-suche').placeholder = t('hv.suche'); $('hv-zu').textContent = t('hv.zu');
+    $('hv-drive').textContent = t('hv.drive') + ' ↗'; $('hv-drive').href = h.datei;
+    $('hb-ansicht').hidden = false;
+    if (HV.id === id && HV.doc) { hvSeite(seite || HV.n); return; }
+    if (HV.id === id && HV.laedt) { HV.wartet = seite; return; }
+    HV = { id: id, doc: null, n: 1, texte: [], laedt: true, wartet: seite, ab: 1 };
+    $('hv-seite').innerHTML = '<p class="hb-warte"><span class="dreh"></span>' + tx('hv.laedt') + '</p>'; $('hv-treffer').innerHTML = ''; $('hv-nr').textContent = ''; $('hv-suche').value = '';
+    google.script.run.withSuccessHandler(function (r) {
+      if (HV.id !== id) return;
+      if (r.gross) { hvMeldung(t('hv.gross')); return; }
+      pdfjs(function (ok) {
+        if (!ok) { hvMeldung(t('hv.fehler')); return; }
+        var bin = atob(r.daten), b = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+        window.pdfjsLib.getDocument({ data: b }).promise.then(function (doc) {
+          if (HV.id !== id) return;
+          HV.doc = doc; HV.laedt = false; HV.ab = Math.min(r.ab || 1, doc.numPages);
+          hvSeite(HV.wartet || HV.ab); hvTexte(id, 1);
+        }, function () { hvMeldung(t('hv.fehler')); });
+      });
+    }).withFailureHandler(function (e) { if (HV.id === id) { hvMeldung(String((e && e.message) || e).replace(/^Error:\s*/, '')); HV.id = null; } }).api(L, 'handbuchPdf', [id]);
+  }
+  function hbZu() { $('hb-ansicht').hidden = true; }
+
+  /* ---------- Feedback ---------- */
+  /* Immer erreichbar, auch mitten in einer Analyse. Die Analyse läuft weiter, PG-ID und Schritt gehen mit. */
+  function fbAuf() {
+    var k = AN && schritt();
+    $('fb-wo').textContent = AN ? t('fb.wo', AN.d.produkt.id, k ? t('s.' + k) : '–') : '';
+    $('fb').hidden = false; $('fb-text').focus();
+  }
+  function fbZu() { $('fb').hidden = true; }
+  function fbSenden() {
+    var text = $('fb-text').value.trim();
+    if (!text) { melde(t('fb.leer'), true); return; }
+    ruf('feedback', [text, K, AN ? AN.d.produkt.id : '', (AN && schritt()) || ''], function () { $('fb-text').value = ''; fbZu(); melde(t('fb.danke')); });
+  }
+  function hbBlatt(v) { if (HV.doc) hvSeite(HV.n + Number(v)); }
+  /* Eine Seite zeichnen, so breit wie der Platz es zulässt, scharf auch auf Retina. Wer schnell blättert, bekommt nur die letzte Seite. */
+  function hvSeite(n) {
+    var doc = HV.doc, feld = $('hv-seite');
+    if (!doc) return;
+    n = Math.max(1, Math.min(doc.numPages, n)); HV.n = n;
+    $('hv-nr').textContent = t('hv.nr', n, doc.numPages);
+    alle('#hv-treffer button', function (b) { b.classList.toggle('an', Number(b.getAttribute('data-v')) === n); });
+    doc.getPage(n).then(function (pg) {
+      if (HV.n !== n) return;
+      var roh = pg.getViewport({ scale: 1 }), breite = Math.max(280, feld.clientWidth - 28), scale = Math.min(2.5, breite / roh.width), vp = pg.getViewport({ scale: scale });
+      var dpr = window.devicePixelRatio || 1, c = document.createElement('canvas');
+      c.width = Math.floor(vp.width * dpr); c.height = Math.floor(vp.height * dpr); c.style.width = Math.floor(vp.width) + 'px';
+      pg.render({ canvas: c, canvasContext: c.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise.then(function () {
+        if (HV.n !== n) return;
+        feld.innerHTML = ''; feld.appendChild(c); feld.scrollTop = 0;
+      });
+    });
+  }
+  /* Den Text aller Seiten im Hintergrund lesen, eine nach der anderen. Eine laufende Suche wird nachgeführt. */
+  function hvTexte(id, n) {
+    if (HV.id !== id || !HV.doc || n > HV.doc.numPages) return;
+    HV.doc.getPage(n).then(function (pg) { return pg.getTextContent(); }).then(function (tc) {
+      if (HV.id !== id) return;
+      HV.texte[n - 1] = tc.items.map(function (i) { return i.str + (i.hasEOL ? ' ' : ''); }).join('').replace(/\s+/g, ' ');
+      if ($('hv-suche').value.trim() && (n % 10 === 0 || n === HV.doc.numPages)) hvSuche();
+      hvTexte(id, n + 1);
+    }, function () { HV.texte[n - 1] = ''; hvTexte(id, n + 1); });
+  }
+  function hvSuche() {
+    var q = $('hv-suche').value.trim().toLowerCase(), aus = [], fertig = HV.doc && HV.texte.length >= HV.doc.numPages;
+    if (!HV.doc) return;
+    if (q.length < 2) { $('hv-treffer').innerHTML = ''; return; }
+    HV.texte.forEach(function (tx0, i) {
+      var klein = (tx0 || '').toLowerCase(), p = klein.indexOf(q), mal = 0;
+      while (p > -1 && mal < 3 && aus.length < 60) {
+        var a = Math.max(0, p - 50), z = Math.min(tx0.length, p + q.length + 70);
+        aus.push('<button data-a="hbTreffer" data-v="' + (i + 1) + '"><strong>S. ' + (i + 1) + '</strong> ' + (a ? '…' : '') + esc(tx0.slice(a, p)) + '<mark>' + esc(tx0.slice(p, p + q.length)) + '</mark>' + esc(tx0.slice(p + q.length, z)) + (z < tx0.length ? '…' : '') + '</button>');
+        p = klein.indexOf(q, p + q.length); mal++;
+      }
+    });
+    $('hv-treffer').innerHTML = (aus.length ? aus.join('') : '<p class="still">' + tx(fertig ? 'hv.nichts' : 'hv.sucht') + '</p>') + (aus.length && !fertig ? '<p class="still">' + tx('hv.sucht') + '</p>' : '');
+    alle('#hv-treffer button', function (b) { b.classList.toggle('an', Number(b.getAttribute('data-v')) === HV.n); });
+  }
+  function hbTreffer(v) { hvSeite(Number(v)); }
+  function zeichneSchritt() {
+    var d = AN.d, s = AN.s, ohne = !d.recherche, ort;
+    $('schiene').innerHTML = d.ablauf.map(function (k, n) {
+      var kl = n === AN.i ? 'aktiv' : (n < AN.i ? (s.ab !== null && n > s.ab ? 'aus' : 'fertig') : '');
+      return '<li class="' + kl + '"' + (kl === 'aus' || kl === 'aktiv' ? '' : ' data-a="springe" data-v="' + n + '"') + '><span class="nr">' + (n + 1) + '</span><span class="name">' + tx('s.' + k) + '</span></li>'; }).join('');
+    /* Zustand und Entscheid zeigen, was der Server sagt. Hat sich seit dem letzten Mal etwas geändert, wird es zuerst verworfen und neu geholt: So steht nie ein altes Urteil da. */
+    if (!AN.gate && (ohne ? !!s.ko : (schritt() === 'zustand' || schritt() === 'entscheid'))) urteilHolen();
+    $('schritt').innerHTML = AN.gate ? GATE[AN.gate.art]() : (ohne ? (s.ko ? SEITE.entscheid() : ohneRecherche()) : SEITE[schritt()]());
+    $('infos').hidden = !LAUF.infosAuf;
+    ort = d.produkt.id + '/' + AN.i + '/' + (AN.gate ? AN.gate.art + AN.gate.phase : '') + '/' + !!s.ko;
+    if (ort !== LAUF.ort) { LAUF.ort = ort; window.scrollTo(0, 0); }
+  }
+  function kopf(k) { return '<div class="kopf"><span class="nr">' + (AN.d.ablauf.indexOf(k) + 1 || '!') + '</span><h2>' + tx('s.' + k) + '</h2></div>'; }
+  function fragt(k) { return '<p class="frage">' + tx(k) + '</p>'; }
+  function taste(aktion, text, klasse, mehr) { return '<button class="knopf ' + (klasse || '') + '" data-a="' + aktion + '"' + (mehr || '') + '>' + tx(text) + '</button>'; }
+  function leiste(nurZurueck) {
+    return '<div class="leiste">' + (AN.i > 0 || AN.gate || AN.s.ko ? '<button class="link" data-a="zurueck">' + tx('zurueck') + '</button>' : '')
+      + (nurZurueck ? '' : '<button class="link" data-a="infosAuf">' + tx('infos') + '</button><button class="link" data-a="produktKopieren">' + tx('kopie.produkt') + '</button>'
+        + '<button class="link rechts" data-a="raus">' + tx('raus') + '</button>') + '</div>'
+      + (LAUF.raus && !nurZurueck ? '<label for="raus-grund">' + tx('raus.frage') + '</label><input type="text" id="raus-grund" data-enter="rausOk" placeholder="' + tx('raus.platz') + '" autocomplete="off">'
+        + '<div class="knoepfe">' + taste('rausOk', 'raus.knopf', 'schwarz') + '</div>' : '');
+  }
+  function karte(k, innen) { return '<div class="karte">' + kopf(k) + innen + leiste() + '</div>'; }
+  function wahlzeile(text, an, aktion, n, marke) {
+    return '<li class="wahlzeile' + (an ? ' rot' : '') + '"><button class="zeile" data-a="' + aktion + '" data-v="' + n + '" aria-pressed="' + !!an + '"><span class="txt">' + esc(text) + '</span>' + (marke || '') + '</button></li>';
+  }
+  function etikett(text, farbe) { return '<span class="etikett ' + farbe + '">' + tx(text) + '</span>'; }
+
+  function ohneRecherche() {
+    return '<div class="karte">' + fragt('re.keine') + (LAUF.sucht ? box(t('re.laeuft'), 'warn') : (LAUF.suchFehler ? box(LAUF.suchFehler, 'stop') : ''))
+      + '<div class="knoepfe">' + taste('recherche', 're.jetzt', 'pink', LAUF.sucht ? ' disabled' : '') + '</div>' + leiste() + '</div>';
+  }
+  var SEITE = {
+    ident: function () {
+      var d = AN.d, i = d.ident, h = '';
+      if (d.rueckruf && !AN.s.rueckrufFrei) {                                  // ein belegter Rückruf wird zuerst geklärt
+        return karte('ident', '<div class="meldung stop"><h3>' + tx('id.rueckruf') + '</h3>' + esc(d.rueckruf.text) + (istUrl(d.rueckruf.quelle) ? ' ' + link(d.rueckruf.quelle, t('ub.quelle')) : '') + '</div>'
+          + fragt('id.rfrage') + '<div class="knoepfe">' + taste('rueckrufFrei', 'id.rnein', 'pink') + taste('koFest', 'id.rja', 'schwarz', ' data-v="rueckruf"') + '</div>');
+      }
+      h = fragt('id.frage') + '<dl class="werte">' + [['id.marke', i.marke], ['id.modell', i.modell], ['id.nr', i.herstellernr]].map(function (x) { return x[1] ? '<dt>' + tx(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>' : ''; }).join('') + '</dl>';
+      if (LAUF.sucht) h += box(t('re.laeuft'), 'warn'); else if (LAUF.suchFehler) h += box(LAUF.suchFehler, 'stop');
+      if (LAUF.modellFrage) h += '<label for="modell-neu">' + tx('id.welches') + '</label><input type="text" id="modell-neu" maxlength="80" data-enter="modellNeu" placeholder="' + tx('id.platz') + '" autocomplete="off"' + (LAUF.sucht ? ' disabled' : '') + '>'
+        + '<div class="knoepfe">' + taste('modellNeu', 'id.neu', 'pink', LAUF.sucht ? ' disabled' : '') + taste('modellFrage', 'id.doch', '', LAUF.sucht ? ' disabled' : '') + '</div>';
+      else h += '<div class="knoepfe">' + taste('weiter', 'id.ja', 'pink') + taste('versiegelt', 'id.versiegelt') + taste('modellFrage', 'id.nein') + '</div>';
+      return karte('ident', h);
+    },
+    handbuch: function () {
+      var h = AN.d.handbuch || { status: 'Hochladen nötig', themen: {} }, st = h.status, i = AN.d.ident, weiterKnopf = '<div class="knoepfe">' + taste('weiter', 'fu.weiter', 'pink') + '</div>', x;
+      if (st === 'liest') return karte('handbuch', box(t('hb.liest'), 'warn') + weiterKnopf);
+      if (hbBereit(h)) return karte('handbuch', '<div class="meldung ok">' + tx('hb.fertig') + ' ' + handbuchTeil(h) + '</div>' + weiterKnopf);
+      if (st === 'kein Handbuch') return karte('handbuch', '<p class="frage">' + tx('hb.keinsok') + '</p>' + weiterKnopf);
+      x = /\/manual\//.test(h.manualslib);
+      return karte('handbuch', fragt(st === 'falsches Modell' ? 'hb.falsch' : (st === 'Fehler' ? 'hb.fehler' : 'hb.frage')) + '<div class="hb-wege">'
+        + '<div class="hb-box"><div class="n">' + tx('hb.n1') + '</div>' + (istUrl(h.manualslib) ? '<a class="knopf" href="' + esc(h.manualslib) + '" target="_blank" rel="noopener noreferrer">' + tx(x ? 'hb.ml' : 'hb.mlsuche') + ' ↗</a>' : '')
+        + '<p class="still">' + tx(x ? 'hb.mlexakt' : 'hb.mlsucht', [i.marke, i.herstellernr || i.modell].filter(String).join(' ')) + '</p></div>'
+        + '<div class="hb-box"><div class="n">' + tx('hb.n2') + '</div><label class="ablage" id="hb-ablage"><span>' + tx('hb.ablage1') + '</span><span>' + tx('hb.ablage2') + '</span><input type="file" id="hb-datei" accept="application/pdf,.pdf" hidden></label></div></div>'
+        + '<div class="knoepfe">' + taste('weiter', 'hb.ohne') + taste('hbKeins', 'hb.keins') + '</div>');
+    },
+    hygiene: function () {
+      return karte('hygiene', fragt('hy.frage') + '<div class="knoepfe">' + taste('setze', 'hy.nein', 'pink', ' data-v="unbenutzt"') + taste('koFest', 'hy.ja', 'schwarz', ' data-v="hygiene"') + '</div>');
+    },
+    sicher: function () {
+      var s = AN.s, punkte = AN.d.sicher, ab = AN.d.sicherAllgemein === undefined ? punkte.length : AN.d.sicherAllgemein, eigen = function (n) { return n >= ab ? '<span class="sicher-eigen">' + tx('si.eigen') + '</span>' : ''; };
+      if (!s.sicherNein) return karte('sicher', fragt('si.frage') + '<ul class="liste">' + punkte.map(function (x, n) { return '<li><span class="punkt"></span><span class="txt">' + esc(w(x)) + eigen(n) + '</span></li>'; }).join('') + '</ul>'
+        + '<div class="knoepfe">' + taste('setze', 'si.ok', 'pink', ' data-v="sicher"') + taste('sicherNein', 'si.nein') + '</div>');
+      return karte('sicher', fragt('si.was') + '<ul class="liste">' + punkte.map(function (x, n) { return wahlzeile(w(x), s.sicherWahl[n], 'sicherPunkt', n, s.sicherWahl[n] ? etikett('si.nok', '') : ''); }).join('') + '</ul>'
+        + '<div class="knoepfe">' + taste('sicherGate', 'fu.weiter', 'schwarz', Object.keys(s.sicherWahl).length ? '' : ' disabled') + taste('sicherDoch', 'si.doch') + '</div>');
+    },
+    voll: function () {
+      var s = AN.s, l = AN.d.liefer, n = Object.keys(s.fehlt).length, h;
+      if (l.teile.length) h = fragt('vo.frage') + '<ul class="liste">' + l.teile.map(function (x, i) { return wahlzeile(x, s.fehlt[i], 'fehlt', i, etikett(s.fehlt[i] ? 'vo.fehlt' : 'vo.da', s.fehlt[i] ? '' : 'gruen')); }).join('') + '</ul>'
+        + (l.unsicher ? '<p class="abstand">' + etikett('vo.unsicher', 'gelb') + '</p>' : '');
+      else h = fragt('vo.unbekannt') + '<input type="text" data-e="fehltText" value="' + esc(s.fehltText) + '" placeholder="' + tx('vo.platz') + '" autocomplete="off">';
+      h += hbAuszug(['Lieferumfang']);
+      return karte('voll', h + '<div class="knoepfe"><button class="knopf pink" data-a="weiter">' + (n ? tx(n === 1 ? 'vo.weiter1' : 'vo.weitern', n) : tx(l.teile.length ? 'vo.alles' : 'fu.weiter')) + '</button>'
+        + (n ? '<button class="knopf" data-a="zeige" data-v="teile">' + tx('a.teil') + '</button>' : '') + '</div>');
+    },
+    sperre: function () {
+      return karte('sperre', fragt('sp.frage') + '<div class="meldung warn"><h3>' + tx('sp.wie') + '</h3>' + esc(w(AN.d.sperre)) + '</div>' + wlan()
+        + '<div class="knoepfe">' + taste('setze', 'sp.frei', 'pink', ' data-v="sperreFrei"') + taste('koFest', 'sp.ja', 'schwarz', ' data-v="sperre"') + taste('koFest', 'sp.unklar', '', ' data-v="sperreUnklar"') + '</div>');
+    },
+    funktion: function () {
+      var s = AN.s, f = AN.d.funktion, komplett = f.liste.every(function (x, i) { return s.fn[i]; }), nok = f.liste.some(function (x, i) { return s.fn[i] === 'nok'; });
+      var gruppen = f.liste.some(function (x) { return x.g !== f.liste[0].g; }), h = f.regel ? '<p class="frage">' + esc(f.regel) + '</p>' : '';
+      if (f.mittel.length) h += '<p class="reihe"><span class="still">' + tx('fu.brauchst') + '</span>' + f.mittel.map(function (m, n) {
+        var weg = s.mittelFehlt.indexOf(m.name) > -1;
+        return '<button class="chip' + (weg ? ' rot' : '') + '" data-a="mittelFehlt" data-v="' + n + '" aria-pressed="' + weg + '">' + esc(m.name) + (weg ? ' · ' + tx('fu.fehlt') : '') + '</button>'; }).join('') + '</p>';
+      h += wlan();
+      if (f.defekte.length || f.hinweise.length || f.handbuch) h += '<div class="meldung warn"><h3>' + tx('fu.achte') + '</h3><ul>'
+        + f.defekte.map(function (x) { return '<li>' + tx('fu.schwach') + ' ' + esc(x.text) + (istUrl(x.quelle) ? ' ' + link(x.quelle, t('ub.quelle')) : '') + '</li>'; }).join('')
+        + f.hinweise.map(function (x) { return '<li>' + esc(x) + ' <span class="still">' + tx('fu.ki') + '</span></li>'; }).join('')
+        + (f.handbuch ? '<li>' + link(f.handbuch, t('fu.handbuch')) + '</li>' : '') + '</ul></div>';
+      h += hbAuszug(['Inbetriebnahme und Bedienung', 'Anzeigen und Fehler']);
+      f.liste.forEach(function (x, i) {
+        if (i === 0 || x.g !== f.liste[i - 1].g) h += (i ? '</ul>' : '') + (gruppen ? '<h3 class="gruppe">' + tx('fu.' + x.g) + '</h3>' : '') + '<ul class="liste">';
+        h += '<li class="fn"><span class="txt">' + esc(w(x.t)) + '</span><span class="jn">' + [['ok', 'fu.ok'], ['nok', 'fu.nok'], ['np', 'fu.np']].map(function (o) {
+          return '<button class="' + o[0] + (s.fn[i] === o[0] ? ' an' : '') + '" data-a="fn" data-k="' + i + '" data-v="' + o[0] + '" aria-pressed="' + (s.fn[i] === o[0]) + '">' + tx(o[1]) + '</button>'; }).join('') + '</span></li>';
+      });
+      h += '</ul>';
+      return karte('funktion', h + '<div class="knoepfe">' + taste('fnWeiter', nok ? 'fu.rep' : 'fu.weiter', nok ? 'schwarz' : 'pink', komplett ? '' : ' disabled') + '</div>');
+    },
+    reset: function () {
+      var s = AN.s, punkte = AN.d.reset;
+      return karte('reset', '<ul class="liste">' + punkte.map(function (x, i) {
+        var fertig = i < s.reset, dran = i === s.reset;
+        return '<li class="fn' + (!fertig && !dran ? ' gesperrt' : '') + '"><span class="txt">' + esc(w(x[0])) + '<span class="zeilen-hinweis">' + esc(w(x[1])) + '</span></span><span class="jn">'
+          + (fertig ? etikett('rs.done', 'gruen') : '<button data-a="resetOk"' + (dran ? '' : ' disabled') + '>' + tx('rs.ok') + '</button>') + '</span></li>'; }).join('') + '</ul>'
+        + hbAuszug(['Reset'])
+        + (AN.d.firmware ? '<label for="fw-version">' + tx('rs.fw') + '</label><input type="text" id="fw-version" data-e="fw" value="' + esc(s.fw) + '" autocomplete="off">'
+          + '<label class="ric-check" style="margin-top:10px"><input type="checkbox" data-a="fwAbbruch"' + (s.fwAbbruch ? ' checked' : '') + '>' + tx('rs.fwab') + '</label>' : '')
+        + '<div class="knoepfe">' + taste('weiter', 'fu.weiter', 'pink', s.reset >= punkte.length ? '' : ' disabled') + taste('koFest', 'rs.nein', '', ' data-v="reset"') + '</div>');
+    },
+    /* Zuerst die Mängel, dann das Grade. Was das Tool schon weiss (fehlt, nicht geprüft, repariert), liefert der Server; die Person schreibt dazu, was nur sie sieht. */
+    zustand: function () {
+      var s = AN.s, z = AN.d.zustand;
+      return karte('zustand', fragt('zu.frage') + '<textarea id="maengel" data-e="maengel" placeholder="' + tx('zu.platz') + '">' + esc(s.maengel) + '</textarea><div id="befund-auto">' + befundAuto() + '</div>'
+        + '<h3 class="gruppe" id="grade-label">' + tx('zu.grade') + '</h3><div class="grade" role="group" aria-labelledby="grade-label">' + z.grade.map(function (g) {
+          return '<button data-a="grade" data-v="' + esc(g[0]) + '" class="' + (s.grade === g[0] ? 'an' : '') + '" aria-pressed="' + (s.grade === g[0]) + '"><b>' + esc(g[0]) + '</b><strong>' + esc(w(g[1])) + '</strong><span>' + esc(w(g[2])) + '</span></button>'; }).join('') + '</div>'
+        + '<div class="knoepfe">' + taste('weiter', 'fu.weiter', 'pink', s.grade ? '' : ' disabled') + '</div>');
+    },
+    /* Das Urteil kommt vom Server (pruefen). Bis es da ist, steht hier nur der Wartetext. */
+    entscheid: function () {
+      var p = AN.d.produkt, r = LAUF.urteil, h = (AN.d.ablauf.length ? kopf('entscheid') : '') + (AN.nachMm ? '<p class="still">' + tx('mm.nach') + '</p>' : ''), g, m;
+      if (LAUF.urteilFehler) return '<div class="karte">' + h + box(LAUF.urteilFehler, 'stop') + leiste(true) + '</div>';
+      if (!r) return '<div class="karte">' + h + '<p class="still">' + tx('lade') + '</p>' + leiste(true) + '</div>';
+      if (r.offen) return '<div class="karte">' + h + '<div class="meldung warn"><h3>' + tx('en.offen') + '</h3><ul>' + r.offen.map(function (o) { var n = AN.d.ablauf.indexOf(OFFEN_SCHRITT[o[0]]); return '<li>' + (n > -1 ? '<button class="link" data-a="springe" data-v="' + n + '">' + tx(o[0]) + '</button>' : tx(o[0])) + '</li>'; }).join('') + '</ul></div>' + leiste(true) + '</div>';
+      g = AN.d.zustand.grade.filter(function (x) { return x[0] === r.grade; })[0];
+      h += '<div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.reusable ? '' : '<small>' + esc(w(r.grund)) + '</small>') + '</div><dl class="werte">'
+        + (g ? '<dt>' + tx('zu.grade') + '</dt><dd>' + esc(g[0]) + ' · ' + esc(w(g[1])) + '</dd>' : '')
+        + '<dt>' + tx('en.stufe') + '</dt><dd>' + esc(p.stufe) + '</dd><dt>' + tx('en.dauer') + '</dt><dd>' + tx('en.dauerwert', (Math.round(aktivMs() / 6000) / 10).toFixed(1), p.budget || '–') + '</dd>'
+        + (r.rep.length ? '<dt>' + tx('en.rep') + '</dt><dd>' + r.rep.map(function (x) { return tx('en.repwert', x.text || x.was, x.min, x.kosten.toFixed(2)); }).join('<br>') + '</dd>' : '') + '</dl>'
+        + (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund) + '</div>' : '')
+        + (r.hinweis ? '<div class="meldung gelb"><h3>' + tx('en.htitel') + '</h3>' + tx('en.hinweis') + '</div>' : '')
+        + (!r.reusable ? '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink') + '</div>' : (m = mmTeil()).html + (m.sperrt ? ''
+          : (AN.s.kanal === 'ricardo' ? ricardoTeil(r) : '<p class="frage">' + tx('ri.wohin') + '</p><div class="kanal"><div>' + taste('kanal', 'ri.ricardo', 'pink', ' data-v="ricardo"')
+            + (AN.d.ricardo && AN.d.ricardo.vorschlag ? '<span class="vorschlag">' + tx('ri.vorschlag') + '</span>' : '') + '</div><div>' + taste('kanal', 'ri.regal', '', ' data-v="regal"') + '</div></div>')));
+      return '<div class="karte">' + h + leiste(true) + '</div>';
+    }
+  };
+  /* ---------- Matchmaker ---------- */
+  /* Läuft einmal pro Analyse im Hintergrund, nach der bestätigten Identität (oder beim Entscheid, falls noch nicht). aus = Aufträge, die beim Wiedereinstieg nicht mehr zählen. */
+  function mmStart() {
+    if (!AN || (AN.mm && !AN.mm.fehler)) return;
+    var id = AN.d.produkt.id, i = AN.d.ident || {}, neu = function () { return AN && AN.d.produkt.id === id && schritt() === 'entscheid'; };
+    AN.mm = { laeuft: true }; sichern();
+    google.script.run.withSuccessHandler(function (r) { if (!AN || AN.d.produkt.id !== id) return; AN.mm = r; sichern(); if (neu()) zeichneSchritt(); })
+      .withFailureHandler(function (e) { if (!AN || AN.d.produkt.id !== id) return; AN.mm = { fehler: String((e && e.message) || e).replace(/^Error:\s*/, '') }; sichern(); if (neu()) zeichneSchritt(); })
+      .api(L, 'matchmaker', [id, { marke: i.marke || '', modell: i.modell || '', nr: i.herstellernr || '' }, AN.mmAus || []]);
+  }
+  function mmNochmal() { AN.mm = null; mmStart(); zeichneSchritt(); }
+  /* Im Entscheid: Passt ein Auftrag, gibt es nur den Ausgang «Regal Matchmaker» (sperrt). Ähnliches steht als Hinweis über den üblichen Ausgängen. */
+  function mmTeil() {
+    var x = AN.mm, auftrag = function (a) { return '<p><strong>' + tx('mm.gesucht', a.gesucht) + '</strong>' + (a.mehr ? ' · ' + esc(a.mehr) : '') + (a.limit ? ' · ' + tx('mm.limit', a.limit) : '') + (a.hinweis ? '<br><span class="still">' + esc(a.hinweis) + '</span>' : '') + '</p>'; };
+    if (!x) { mmStart(); x = AN.mm; }
+    if (x.laeuft) return { sperrt: true, html: '<p class="hb-warte"><span class="dreh"></span>' + tx('mm.prueft') + '</p>' };
+    if (x.fehler) return { sperrt: false, html: '<div class="meldung warn">' + tx('mm.fehler', x.fehler) + '<div class="knoepfe">' + taste('mmNochmal', 'mm.nochmal') + '</div></div>' };
+    if (x.passt && x.passt.length) return { sperrt: true, html: '<div class="meldung ok"><h3>' + tx('mm.titel') + '</h3>' + auftrag(x.passt[0]) + '</div><div class="knoepfe">' + taste('kanal', 'mm.knopf', 'pink', ' data-v="matchmaker"') + '</div>' };
+    return { sperrt: false, html: x.aehnlich && x.aehnlich.length ? '<div class="meldung"><h3>' + tx('mm.aehnlich') + '</h3>' + x.aehnlich.map(auftrag).join('') + '</div>' : '' };
+  }
+  /* Wiedereinstieg aus dem Regal «Matchmaker»: Stand der Analyse zurück, direkt zum Entscheid. Der alte Auftrag zählt nicht mehr, die anderen werden neu geprüft. */
+  function mmZurueck(id) {
+    if (AN) { melde(t('fuss.laeuft'), true); return; }
+    ruf('matchmakerZurueck', [id], function (r) {
+      var x = r.stand;
+      FERTIG = null; zeichneFertig(); $('such-meldung').innerHTML = ''; $('treffer').innerHTML = '';
+      x.s.kanal = '';
+      AN = { v: VERSION, d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: r.d.ablauf.length ? r.d.ablauf.length - 1 : 0, s: x.s, rm: x.rm || {}, hb: null, gate: null,
+        nachMm: true, mmAus: x.mm && x.mm.schluessel ? [x.mm.schluessel] : [], mm: null };
+      LAUF = {};
+      if (ANSICHT !== 'scan') zeige('scan');
+      sichern(); zeichneAnalyse(); window.scrollTo(0, 0);
+    });
+  }
+
+  /* Was schon im Befund steht. Kommt vom Server und wird nachgetragen, ohne den Schritt neu zu zeichnen: Das Feld darüber behält den Cursor. */
+  function befundAuto() {
+    var r = LAUF.urteil;
+    return r && r.befundAuto ? '<div class="meldung"><h3>' + tx('zu.schon') + '</h3>' + esc(r.befundAuto) + '</div>' : '';
+  }
+  function wlan() {
+    var x = AN.d.funktion.wlan;
+    return x && x.name ? '<p class="wlan">' + esc(x.passwort ? t('fu.wlan', x.name, x.passwort) : t('fu.wlanohne', x.name)) + '</p>' : '';
+  }
+
+  /* ---------- Reparaturfrage und Kernfunktion ohne Prüfung ---------- */
+  /* Gleiche Rechnung wie reparatur_ im Server, der sie für das Protokoll wiederholt: Arbeit zum Stundenansatz plus Teil, höchstens der Anteil am Verkaufspreis aus den Einstellungen. */
+  function lohnt(g) {
+    var r = AN.d.reparatur, vp = Number(AN.d.produkt.vp) || 0, kosten = Math.round(((g.min || 0) / 60 * r.stundenansatz + (g.teil || 0)) * 100) / 100;
+    return !vp || !r.grenze || kosten <= vp * r.grenze / 100;
+  }
+  /* Nach der Schätzung steht nur Ja oder Nein. */
+  function gateUrteil() {
+    var g = AN.gate;
+    if (g.min === null) return '';
+    if (lohnt(g)) return '<div class="urteil ja">' + tx('ga.ja') + '</div><div class="knoepfe">' + taste('repStart', 'ga.los', 'pink') + taste('repSpaeter', 'ga.spaeter') + taste('repKo', 'ga.nicht') + '</div>';
+    return '<div class="urteil nein">' + tx('ga.nein') + '</div><div class="knoepfe">' + taste('repKo', 'fu.weiter', 'pink') + '</div>';
+  }
+  var GATE = {
+    defekt: function () {
+      var g = AN.gate, was = '<div class="meldung warn"><h3>' + tx('ga.nok') + '</h3><ul>' + g.was.map(function (x) { return '<li>' + esc(g.von === 'sicher' ? t('ga.nichterfuellt', w(x)) : w(x)) + '</li>'; }).join('') + '</ul></div>', r = AN.d.reparatur, h;
+      if (g.sp) h = spaeterTeil(g, was);
+      else if (g.phase === 'laeuft') h = '<div class="kopf"><span class="nr">!</span><h2>' + tx('ga.laeuft') + '</h2></div>' + (g.weiter ? '<p class="still">' + tx('rp.zurueck') + '</p>' : '') + fragt('ga.mach') + was
+        + '<label for="rep-text">' + tx('ga.was') + '</label><input type="text" id="rep-text" placeholder="' + tx('ga.platz') + '" autocomplete="off">'
+        + '<div class="knoepfe">' + taste('repFertig', 'ga.fertig', 'pink') + taste('repNein', 'ga.fehl', 'schwarz') + '</div>';
+      else h = '<div class="kopf"><span class="nr">?</span><h2>' + tx('ga.titel') + '</h2></div>' + fragt('ga.frage') + was + (r.hinweis ? '<p class="still">' + esc(r.hinweis) + '</p>' : '')
+        + '<label id="min-label">' + tx('ga.min') + '</label><div class="wahl" role="group" aria-labelledby="min-label">' + [5, 10, 15, 20, 30, 45, 60].map(function (m) {
+          return '<button class="' + (g.min === m ? 'an' : '') + '" data-a="repMin" data-v="' + m + '" aria-pressed="' + (g.min === m) + '">' + m + '</button>'; }).join('') + '</div>'
+        + '<label for="rep-teil">' + tx('ga.teil') + '</label><input type="number" id="rep-teil" data-e="teil" min="0" step="0.5" inputmode="decimal" value="' + (g.teil || '') + '">'
+        + '<p class="abstand"><button class="link" data-a="zeige" data-v="teile">' + tx('a.teil') + '</button></p><div id="rep-urteil">' + gateUrteil() + '</div>';
+      return '<div class="karte stop">' + h + leiste(true) + '</div>';
+    },
+    kern: function () {
+      return '<div class="karte stop"><div class="kopf"><span class="nr">!</span><h2>' + tx('ke.titel') + '</h2></div>' + fragt('ke.text')
+        + '<div class="knoepfe">' + taste('abbruchJetzt', 'a.abbruch', 'pink') + taste('koFest', 'raus.knopf', 'schwarz', ' data-v="kern"') + '</div>' + leiste(true) + '</div>';
+    }
+  };
+
+  /* Später reparieren: was zu tun ist und das Teil für die Bestellliste. Angebote aus der Ersatzteil-Suche zu diesem Stück lassen sich übernehmen. */
+  function spaeterTeil(g, was) {
+    var v = g.sp, feld = function (k, text, typ) {
+      return '<div class="breit"><label for="sp-' + k + '">' + tx(text) + '</label><input type="' + (typ || 'text') + '" id="sp-' + k + '" value="' + esc(v[k]) + '"' + (typ ? ' min="0" step="0.05" inputmode="decimal"' : '') + ' autocomplete="off"></div>'; };
+    return '<div class="kopf"><span class="nr">?</span><h2>' + tx('ga.spaeter') + '</h2></div>' + was
+      + '<label for="sp-was">' + tx('sp.was') + '</label><input type="text" id="sp-was" value="' + esc(v.was) + '" autocomplete="off">'
+      + ((g.spAng || []).length ? '<p class="still abstand">' + tx('sp.aus') + '</p><div class="knoepfe">' + g.spAng.map(function (a, i) {
+          return '<button class="mini" data-a="spNimm" data-v="' + i + '">' + esc([a.teil, a.shop, a.preis ? 'CHF ' + Number(a.preis).toFixed(2) : ''].filter(String).join(' · ')) + '</button>'; }).join('') + '</div>' : '')
+      + '<label for="sp-teil">' + tx('sp.teil') + '</label><input type="text" id="sp-teil" value="' + esc(v.teil) + '" autocomplete="off">'
+      + '<div class="reihe">' + feld('nummer', 'sp.nr') + feld('shop', 'sp.shop') + feld('preis', 'sp.preis', 'number') + '</div>'
+      + '<label for="sp-link">' + tx('sp.link') + '</label><input type="text" id="sp-link" value="' + esc(v.link) + '" autocomplete="off">'
+      + '<div class="knoepfe">' + taste('repPause', 'sp.knopf', 'pink') + '</div>';
+  }
+
+  /* ---------- Was im Ablauf geklickt wird ---------- */
+  function stand() { if (LAUF.urteilFehler) LAUF.urteilBild = ''; sichern(); zeichneSchritt(); }      // nach einem Fehler holt der nächste Klick das Urteil noch einmal
+  function weiter() { if (schritt() === 'ident') mmStart(); AN.i++; LAUF.raus = false; stand(); }       // nach der bestätigten Identität: Matchmaker im Hintergrund
+  /* Ohne weitere Prüfung nicht reusable: Der Ablauf springt zum Entscheid, die Schritte dazwischen entfallen. */
+  function ko(art, text, mehr) {
+    var k = { schritt: schritt() || '', art: art, text: text || '' };
+    Object.keys(mehr || {}).forEach(function (x) { k[x] = mehr[x]; });
+    AN.s.ko = k; AN.s.ab = AN.i; AN.gate = null; LAUF.raus = false;
+    if (AN.d.ablauf.length) AN.i = AN.d.ablauf.length - 1;
+    stand();
+  }
+  function koFest(art) { ko(art); }
+  /* Schritt direkt wählen. Wer nach einem K.-o. einen früheren Schritt wählt, nimmt das K.-o. zurück wie mit «Zurück». Abschliessen geht erst, wenn der Server nichts Offenes mehr meldet. */
+  function springe(v) {
+    var s = AN.s, n = Number(v);
+    if (isNaN(n) || n < 0 || n >= AN.d.ablauf.length) return;
+    LAUF.raus = false; AN.gate = null;
+    if ((s.ko || s.versiegelt) && n <= (s.ab || 0)) { s.ko = null; s.versiegelt = false; s.ab = null; }
+    AN.i = n;
+    stand();
+  }
+  /* Offene Punkte im Entscheid: Schritt, in dem man sie erledigt */
+  var OFFEN_SCHRITT = { 'o.rueckruf': 'ident', 'o.hygiene': 'hygiene', 'o.sicher': 'sicher', 'o.sperre': 'sperre', 'o.funktion': 'funktion', 'o.defekt': 'funktion', 'o.kern': 'funktion', 'o.reset': 'reset', 'o.zustand': 'zustand' };
+  function zurueck() {
+    var s = AN.s;
+    LAUF.raus = false;
+    if (AN.gate && AN.gate.sp) { delete AN.gate.sp; delete AN.gate.spAng; }          // aus «Später reparieren» zurück zur Reparaturfrage
+    else if (AN.gate) AN.gate = null;
+    else if (s.ko || s.versiegelt) { AN.i = s.ab || 0; s.ko = null; s.versiegelt = false; s.ab = null; }
+    else AN.i--;
+    stand();
+  }
+  function infosAuf() { LAUF.infosAuf = !LAUF.infosAuf; zeichneSchritt(); if (LAUF.infosAuf) $('infos').scrollIntoView({ block: 'nearest' }); }
+  /* Für eine Frage an ein KI-Modell in einem anderen Fenster: was man dort über das Produkt braucht. */
+  function produktKopieren(v, k, el) {
+    var d = AN.d, i = d.ident;
+    kopiereText([d.produkt.bezeichnung, [i.marke, i.modell].filter(String).join(' '), i.herstellernr ? t('id.nr') + ' ' + i.herstellernr : '', d.produkt.link].filter(String).join('\n'), el);
+  }
+  function raus() { LAUF.raus = !LAUF.raus; zeichneSchritt(); if (LAUF.raus) $('raus-grund').focus(); }
+  function rausOk() { var g = $('raus-grund').value.trim(); if (g) ko('frei', g); else $('raus-grund').focus(); }
+  function rueckrufFrei() { AN.s.rueckrufFrei = true; stand(); }
+  function versiegelt() { AN.s.versiegelt = true; AN.s.ab = 0; AN.i = AN.d.ablauf.length - 1; mmStart(); stand(); }
+  function setze(feld) { AN.s[feld] = true; weiter(); }
+  function schalte(m, n) { if (m[n]) delete m[n]; else m[n] = 1; stand(); }
+  function sicherNein() { AN.s.sicherNein = true; stand(); }
+  function sicherDoch() { AN.s.sicherNein = false; AN.s.sicherWahl = {}; setze('sicher'); }
+  function sicherPunkt(n) { schalte(AN.s.sicherWahl, n); }
+  function sicherGate() {
+    AN.gate = { art: 'defekt', von: 'sicher', phase: 'rechnen', min: null, teil: 0, was: Object.keys(AN.s.sicherWahl).map(function (n) { return AN.d.sicher[n]; }) };
+    stand();
+  }
+  function fehlt(n) { schalte(AN.s.fehlt, n); }
+  function mittelFehlt(n) {
+    var name = AN.d.funktion.mittel[n].name, m = AN.s.mittelFehlt;
+    AN.s.mittelFehlt = m.indexOf(name) > -1 ? m.filter(function (x) { return x !== name; }) : m.concat([name]);
+    stand();
+  }
+  function fn(v, i) { AN.s.fn[i] = v; stand(); }
+  function fnWeiter() {
+    var l = AN.d.funktion.liste, s = AN.s, nok = l.filter(function (x, i) { return s.fn[i] === 'nok'; }).map(function (x) { return x.n; });
+    if (nok.length) AN.gate = { art: 'defekt', von: 'funktion', phase: 'rechnen', min: null, teil: 0, was: nok };
+    else if (l.some(function (x, i) { return x.g === 'Kern' && s.fn[i] === 'np'; })) AN.gate = { art: 'kern' };
+    else { weiter(); return; }
+    stand();
+  }
+  /* Was nicht in Ordnung ist, so wie es im Protokoll steht: immer deutsch, auch wenn die Oberfläche englisch ist. */
+  function wasText(g) { return g.was.map(function (x) { return g.von === 'sicher' ? T['ga.nichterfuellt'][0].split('{0}').join(x) : x; }).join('; '); }
+  function repMin(v) { AN.gate.min = Number(v); stand(); }
+  function repStart() { AN.gate.phase = 'laeuft'; stand(); $('rep-text').focus(); }
+  /* Später reparieren: Felder vorbelegen, dann die Angebote aus der Ersatzteil-Suche zu diesem Stück nachladen. */
+  function repSpaeter() {
+    var g = AN.gate, id = AN.d.produkt.id;
+    g.sp = { was: wasText(g), teil: '', nummer: '', shop: '', preis: g.teil || '', link: '' }; g.spAng = [];
+    stand(); $('sp-was').focus();
+    ruf('ersatzteile', [], function (l) {
+      if (!AN || AN.d.produkt.id !== id || !AN.gate || !AN.gate.sp) return;
+      spLesen(); AN.gate.spAng = l.filter(function (x) { return x.id === id && x.teil; }).slice(0, 3); stand();
+    }, function () { /* ohne Angebote bleibt das Formular */ });
+  }
+  function spLesen() { var v = AN.gate.sp; ['was', 'teil', 'nummer', 'shop', 'preis', 'link'].forEach(function (k) { if ($('sp-' + k)) v[k] = $('sp-' + k).value.trim(); }); }
+  function spNimm(i) {
+    var a = AN.gate.spAng[Number(i)], v = AN.gate.sp;
+    spLesen(); v.teil = a.teil; v.nummer = a.nummer; v.shop = a.shop; v.preis = a.preis || ''; v.link = a.link; stand();
+  }
+  /* Stand speichern, Stück ins Regal «Reparatur». Beim Fortsetzen geht es mit «Reparatur läuft» weiter; die Zeit zählt weiter, wo sie war. */
+  function repPause() {
+    spLesen();
+    var g = AN.gate, v = g.sp, p = AN.d.produkt;
+    if (!v.was) { $('sp-was').focus(); return; }
+    sichern();
+    var stand = { s: AN.s, i: AN.i, aktiv: AN.aktiv, start: AN.start, rm: AN.rm, gate: { von: g.von, was: g.was, min: g.min, teil: Number(v.preis) || g.teil || 0 } };
+    ruf('reparaturPause', [{ id: p.id, kuerzel: K, was: v.was, teil: v.teil ? { teil: v.teil, nummer: v.nummer, shop: v.shop, preis: v.preis, link: v.link } : null, stand: stand }], function (r) {
+      if (!AN || AN.d.produkt.id !== p.id) return;
+      FERTIG = { titel: p.bezeichnung, r: { pause: true, id: p.id, teil: !!v.teil } }; RIC = null;
+      ende(); zahlen(r.zahlen); REP = r.liste; zeichneRep(); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+    });
+  }
+  /* Fortsetzen aus dem Regal «Reparatur»: gleicher Stand wie beim Pausieren, die Reparatur läuft. */
+  function repWeiter(id) {
+    if (AN) { melde(t('fuss.laeuft'), true); return; }
+    ruf('reparaturWeiter', [id], function (r) {
+      var x = r.stand;
+      FERTIG = null; zeichneFertig();
+      if (!x) { melde(t('rp.neu'), true); beginne(r.d, Date.now()); return; }
+      AN = { v: VERSION, d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: Number(x.i) || 0, s: x.s, rm: x.rm || {}, hb: null,
+        gate: { art: 'defekt', von: x.gate.von, was: x.gate.was, min: x.gate.min, teil: x.gate.teil, phase: 'laeuft', weiter: true } };
+      LAUF = {};
+      if (ANSICHT !== 'scan') zeige('scan');
+      sichern(); zeichneAnalyse(); window.scrollTo(0, 0);
+    });
+  }
+  function zeichneRep() {
+    $('rep-liste').innerHTML = !REP.length ? '' : '<div class="karte"><h2>' + tx('rp.titel') + '</h2><div class="tabelle"><table><tbody>' + REP.map(function (x) {
+      return '<tr><td><span class="pgid klein">' + esc(x.id) + '</span></td><td>' + esc(x.bezeichnung) + (x.was ? '<br><small class="still">' + esc(x.was) + '</small>' : '') + '</td><td>'
+        + (x.teil ? esc(x.teil) + ' <span class="etikett' + (x.status === 'Da' ? ' gruen' : ' hell') + '">' + esc(w(x.status)) + '</span>' : '<span class="still">' + tx('rp.keinTeil') + '</span>') + '</td>'
+        + '<td class="mono">' + esc([x.kuerzel, x.zeit.slice(0, 10)].filter(String).join(' · ')) + '</td><td><button class="mini" data-a="repWeiter" data-v="' + esc(x.id) + '">' + tx('rp.weiter') + '</button></td></tr>';
+    }).join('') + '</tbody></table></div></div>';
+  }
+  function repKo() { var g = AN.gate; ko('defekt', wasText(g), { min: g.min, teil: g.teil }); }
+  function repNein() { ko('reparatur', wasText(AN.gate)); }
+  /* Nach der Reparatur geht es zurück in den Schritt: Was nicht in Ordnung war, wird nochmals geprüft. */
+  function repFertig() {
+    var g = AN.gate, s = AN.s;
+    s.rep.push({ was: wasText(g), text: $('rep-text').value.trim(), min: g.min, teil: g.teil });
+    if (g.von === 'sicher') { s.sicherNein = false; s.sicherWahl = {}; }
+    else Object.keys(s.fn).forEach(function (i) { if (s.fn[i] === 'nok') delete s.fn[i]; });
+    AN.gate = null; stand();
+  }
+  function abbruchJetzt() { ende(); melde(t('a.abgebrochen')); $('q').focus(); }
+  function resetOk() { AN.s.reset++; stand(); }
+  function grade(g) { AN.s.grade = g; stand(); }
+
+  /* ---------- Ricardo: Wahl im Entscheid, Fotos, Titel und Artikelbeschrieb ---------- */
+  /* Die Fotos macht das Handy über den QR-Code (Foto-Seite unten). Der Analyseplatz fragt alle 5 Sekunden nach, was schon da ist, und zeichnet nur den Foto-Teil neu. */
+  var RIC = null, QRLIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+  function kanal(v) {
+    if (v === 'regal' || v === 'matchmaker') { AN.s.kanal = v; sichern(); abschluss(); return; }
+    AN.s.kanal = 'ricardo'; sichern(); zeichneSchritt();
+    fotoHolen(); if (!AN.s.ricTitel && !AN.s.ricBeschrieb) ricText();
+  }
+  function fwAbbruch(v, k, el) { AN.s.fwAbbruch = !!el.checked; sichern(); }
+  function kanalZurueck() { AN.s.kanal = ''; sichern(); zeichneSchritt(); }
+  function ricFehlt() {
+    var s = AN.s, f = [], st = RIC && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = !!s.maengel.trim();
+    if (!st) f.push(t('ri.haupt'));
+    else {
+      if (st.zahl.hauptbild < 1) f.push(t('ri.haupt'));
+      if (st.zahl.weitere < 2) f.push(t('ri.weitere'));
+      if (st.zahl.typenschild < 1 && !st.ohneTypenschild) f.push(t('ri.typ'));
+      if (mangel && st.zahl.mangel < 1 && !st.ohneMangel) f.push(t('ri.mangel'));
+    }
+    if (!s.ricTitel.trim() || s.ricTitel.trim().length > 60) f.push(t('ri.fTitel'));
+    if (!s.ricBeschrieb.trim()) f.push(t('ri.fBeschrieb'));
+    if (!s.ricVersand) f.push(t('ri.fVersand'));
+    if (!(Number(AN.d.produkt.vp) > 0) && !(Number(s.ricPreis) > 0)) f.push(t('ri.fPreis'));
+    return f;
+  }
+  function ricardoTeil(r) {
+    var s = AN.s, d = AN.d, vp = Number(d.produkt.vp) || 0, fehlt = ricFehlt();
+    return '<div class="ric"><div class="leiste"><h3 class="gruppe" style="margin:0">' + tx('ri.titel') + '</h3><button class="link rechts" data-a="kanalZurueck">' + tx('ri.zurueck') + '</button></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n1') + '</div><div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(d.ricardo.fotoUrl) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
+      + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n2') + '</div>' + (LAUF.ricLaeuft ? '<p class="hb-warte"><span class="dreh"></span>' + tx('ri.schreibt') + '</p>' : '')
+      + '<label for="r-titel">' + tx('ri.ftitel') + ' <span class="ric-zahl" id="ric-zahl">' + tx('ri.zeichen', s.ricTitel.length) + '</span></label><input type="text" id="r-titel" data-e="ricTitel" maxlength="60" value="' + esc(s.ricTitel) + '" autocomplete="off">'
+      + '<label for="r-beschrieb">' + tx('ri.fbeschrieb') + '</label><textarea id="r-beschrieb" data-e="ricBeschrieb">' + esc(s.ricBeschrieb) + '</textarea>'
+      + '<div class="knoepfe">' + taste('ricText', 'ri.neu', '', LAUF.ricLaeuft ? ' disabled' : '') + '</div></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n3') + '</div><div class="ric-versand">' + d.ricardo.versand.map(function (v, i) {
+          return '<button data-a="ricVersand" data-v="' + i + '" class="' + (s.ricVersand === v.name ? 'an' : '') + '" aria-pressed="' + (s.ricVersand === v.name) + '">' + esc(v.name) + ' · CHF ' + esc(v.preis) + '</button>'; }).join('') + '</div></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n4') + '</div><dl class="werte" style="margin:0"><dt>' + tx('ri.preis') + '</dt><dd>' + (vp ? 'CHF ' + vp.toFixed(2)
+          : '<input type="number" min="1" step="1" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
+      + '<div class="meldung warn">' + tx('ri.zettel', d.produkt.id) + '</div>'
+      + '<p class="still" id="ric-fehlt">' + (fehlt.length ? tx('ri.fehlt', fehlt.join(', ')) : '') + '</p>'
+      + '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink', fehlt.length ? ' disabled id="ric-ab"' : ' id="ric-ab"') + '</div></div>';
+  }
+  function fotoSlots() {
+    var st = RIC && AN && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = AN && !!AN.s.maengel.trim();
+    var art = function (a, titel, soll, extra) {
+      var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length;
+      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><img src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160" alt="' + esc(x.name) + '"><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
+        + '</div><strong>' + tx(titel) + '</strong>' + (extra || '') + (soll === null ? '' : '<span class="etikett ' + (n >= soll ? 'gruen' : '') + '" style="align-self:flex-start">' + (n >= soll ? tx('fs.da', n) : tx('fs.fehlt')) + '</span>') + '</div>';
+    };
+    var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fotoOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
+    return art('hauptbild', 'ri.haupt', 1) + art('weitere', 'ri.weitere', 2)
+      + art('typenschild', 'ri.typ', st && st.ohneTypenschild ? null : 1, cb('typenschild', st && st.ohneTypenschild, 'ri.ohneTyp'))
+      + (mangel ? art('mangel', 'ri.mangel', st && st.ohneMangel ? null : 1, cb('mangel', st && st.ohneMangel, 'ri.ohneMangel')) : '<div class="ric-slot"><span class="ric-leer"></span><strong>' + tx('ri.mangel') + '</strong><span class="still">' + tx('ri.keinMangel') + '</span></div>');
+  }
+  /* Nach jeder Änderung an den Fotos: nur den Foto-Teil und die Liste «Es fehlt noch» neu zeichnen, die Textfelder behalten den Cursor. */
+  function ricNachfuehren() {
+    if (!AN || AN.s.kanal !== 'ricardo' || !$('ric-slots')) return;
+    $('ric-slots').innerHTML = fotoSlots();
+    var f = ricFehlt();
+    $('ric-fehlt').textContent = f.length ? t('ri.fehlt', f.join(', ')) : '';
+    $('ric-ab').disabled = f.length > 0;
+    if ($('ric-zahl')) $('ric-zahl').textContent = t('ri.zeichen', AN.s.ricTitel.length);
+  }
+  function fotoHolen() {
+    var id = AN && AN.d.produkt.id;
+    if (!id || (RIC && RIC.holt)) return;
+    RIC = RIC && RIC.id === id ? RIC : { id: id, st: null };
+    RIC.holt = true; RIC.zeit = Date.now();
+    google.script.run.withSuccessHandler(function (st) { if (!RIC || RIC.id !== id) return; RIC.holt = false; var neu = JSON.stringify(st) !== JSON.stringify(RIC.st); RIC.st = st; if (neu) ricNachfuehren(); })
+      .withFailureHandler(function () { if (RIC) RIC.holt = false; }).api(L, 'fotoStand', [id]);
+  }
+  /* Läuft jede Sekunde mit der Uhr: alle 5 Sekunden nachfragen, solange der Ricardo-Teil offen ist. Den QR-Code zeichnen, sobald sein Platz da ist. */
+  function ricTakt() {
+    if (!AN || AN.s.kanal !== 'ricardo' || !$('ric-slots')) return;
+    if (!RIC || RIC.id !== AN.d.produkt.id || Date.now() - (RIC.zeit || 0) > 5000) fotoHolen();
+    qrZeichnen();
+  }
+  function qrZeichnen() {
+    var feld = $('ric-qr'), url = AN && AN.d.ricardo && AN.d.ricardo.fotoUrl;
+    if (!feld || !url || feld.getAttribute('data-url') === url) return;
+    var mal = function () { try { var q = window.qrcode(0, 'M'); q.addData(url); q.make(); feld.innerHTML = q.createSvgTag(4, 2); feld.setAttribute('data-url', url); } catch (e) { /* ohne QR bleibt der Link */ } };
+    if (window.qrcode) { mal(); return; }
+    if (LAUF.qrLaedt) return;
+    LAUF.qrLaedt = true;
+    var sc = document.createElement('script'); sc.src = QRLIB; sc.onload = function () { LAUF.qrLaedt = false; mal(); }; sc.onerror = function () { LAUF.qrLaedt = false; };
+    document.head.appendChild(sc);
+  }
+  function fotoWeg(fileId) {
+    var id = AN.d.produkt.id;
+    ruf('fotoLoeschen', [id, fileId], function (st) { if (RIC && RIC.id === id) { RIC.st = st; ricNachfuehren(); } });
+  }
+  function fotoOhne(art, k, el) {
+    var id = AN.d.produkt.id;
+    ruf('fotoOhne', [id, art, !!el.checked], function (st) { if (RIC && RIC.id === id) { RIC.st = st; ricNachfuehren(); } });
+  }
+  function ricVersand(i) { AN.s.ricVersand = AN.d.ricardo.versand[Number(i)].name; sichern(); zeichneSchritt(); }
+  /* Entwurf der KI für Titel und Artikelbeschrieb. Was die Person schon geschrieben hat, wird ersetzt: darum nur auf Knopfdruck neu. */
+  function ricText() {
+    var id = AN.d.produkt.id;
+    if (LAUF.ricLaeuft) return;
+    LAUF.ricLaeuft = true; zeichneSchritt();
+    google.script.run.withSuccessHandler(function (x) {
+      if (!AN || AN.d.produkt.id !== id) return;
+      LAUF.ricLaeuft = false; AN.s.ricTitel = x.titel || ''; AN.s.ricBeschrieb = x.beschrieb || ''; sichern(); zeichneSchritt();
+    }).withFailureHandler(function (e) { LAUF.ricLaeuft = false; if (AN && AN.d.produkt.id === id) zeichneSchritt(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'ricardoText', [daten()]);
+  }
+
+  /* ---------- Foto-Seite auf dem Handy (Adresse mit ?foto=PG-ID aus dem QR-Code) ---------- */
+  var FS = null;
+  function fotoModus(id) {
+    FS = { id: id, st: null, art: '', laedt: '' };
+    document.querySelector('.app').hidden = true; $('start').hidden = true; $('foto-seite').hidden = false;
+    $('fs-id').textContent = id; fsZeichnen();
+    ruf('fotoStand', [id], function (st) { FS.st = st; fsZeichnen(); });
+  }
+  function fsZeichnen() {
+    var st = FS.st, z = st ? st.zahl : {};
+    $('fs-name').textContent = st ? st.bezeichnung : '';
+    var zeile = function (a, titel, hilfe, soll, extra) {
+      var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length, offen = soll !== null && n < soll;
+      return '<div class="fs-zeile' + (offen ? ' offen' : '') + '"><div class="fs-titel"><div><strong>' + tx(titel) + '</strong><span class="still">' + tx(hilfe) + '</span></div>'
+        + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx('fs.fehlt') : tx('fs.da', n)) + '</span>') + '</div>'
+        + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
+        + (extra || '') + (FS.laedt === a ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt') + '</p>' : '<button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button>') + '</div>';
+    };
+    var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fsOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
+    $('fs-liste').innerHTML = zeile('hauptbild', 'ri.haupt', 'fs.haupt', 1) + zeile('weitere', 'ri.weitere', 'fs.weitere', 2)
+      + zeile('typenschild', 'ri.typ', 'fs.typ', st && st.ohneTypenschild ? null : 1, cb('typenschild', st && st.ohneTypenschild, 'ri.ohneTyp'))
+      + zeile('mangel', 'ri.mangel', 'fs.mangel', null, cb('mangel', st && st.ohneMangel, 'ri.ohneMangel'));
+  }
+  function fsFoto(art) { FS.art = art; $('fs-datei').value = ''; $('fs-datei').click(); }
+  /* Fotos werden vor dem Hochladen auf höchstens 1600 Pixel verkleinert: schneller und für Ricardo mehr als genug. */
+  function verkleinern(datei, fertig) {
+    var r = new FileReader();
+    r.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var m = 1600, f = Math.min(1, m / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * f); c.height = Math.round(img.height * f);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        fertig(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { fertig(null); };
+      img.src = r.result;
+    };
+    r.readAsDataURL(datei);
+  }
+  function fsHoch(datei) {
+    var art = FS.art;
+    if (!datei || !art) return;
+    FS.laedt = art; fsZeichnen();
+    verkleinern(datei, function (daten) {
+      if (!daten) { FS.laedt = ''; fsZeichnen(); melde(t('hb.keinpdf'), true); return; }
+      google.script.run.withSuccessHandler(function (st) { FS.laedt = ''; FS.st = st; fsZeichnen(); })
+        .withFailureHandler(function (e) { FS.laedt = ''; fsZeichnen(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'fotoHochladen', [FS.id, art, daten]);
+    });
+  }
+  function fsWeg(fileId) { ruf('fotoLoeschen', [FS.id, fileId], function (st) { FS.st = st; fsZeichnen(); }); }
+  function fsOhne(art, k, el) { ruf('fotoOhne', [FS.id, art, !!el.checked], function (st) { FS.st = st; fsZeichnen(); }); }
+
+  /* ---------- Entscheid und Abschluss ---------- */
+  /* Alles, was der Server zum Urteilen braucht (urteil_ in Code.gs). */
+  function daten() {
+    var s = AN.s, d = AN.d;
+    return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), versiegelt: s.versiegelt, rueckrufFrei: s.rueckrufFrei, unbenutzt: s.unbenutzt, sicher: s.sicher,
+      sicherNok: Object.keys(s.sicherWahl).map(function (n) { return d.sicher[n]; }), fehlt: Object.keys(s.fehlt).map(function (n) { return d.liefer.teile[n]; }).concat(s.fehltText.trim() ? [s.fehltText.trim()] : []),
+      sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), mittelFehlt: s.mittelFehlt, reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
+      rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
+      mm: s.kanal === 'matchmaker' && AN.mm && AN.mm.passt ? AN.mm.passt[0] : null, nachMm: !!AN.nachMm,
+      stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null };
+  }
+  /* Holt das Urteil, wenn sich seit dem letzten Mal etwas geändert hat. Im Schritt «Zustand» zählt davon nur, was schon im Befund steht. */
+  function urteilHolen() {
+    var x = daten(), id = x.id, bild, da = function () { return AN && AN.d.produkt.id === id; };
+    /* Im Schritt «Zustand» wird nur nachgetragen, was schon im Befund steht. Ist inzwischen etwas anders, holt der zweite Aufruf es noch einmal. */
+    var nach = function () { if (!AN.gate && schritt() === 'zustand' && $('befund-auto')) { $('befund-auto').innerHTML = befundAuto(); urteilHolen(); } else zeichneSchritt(); };
+    delete x.aktivSek; delete x.rueckmeldung; delete x.kanal; delete x.ricardo; delete x.mm; delete x.nachMm; delete x.stand;
+    bild = JSON.stringify(x);
+    if (LAUF.urteilBild === bild) return;
+    LAUF.urteil = null; LAUF.urteilFehler = '';
+    ruf('pruefen', [daten()], function (r) { if (da()) { LAUF.urteil = r; LAUF.urteilBild = bild; nach(); } },
+      function (m) { if (da()) { LAUF.urteilFehler = m; LAUF.urteilBild = bild; nach(); } });
+  }
+  function abschluss() {
+    var p = AN.d.produkt;
+    ruf('abschliessen', [daten()], function (r) {
+      if (!AN || AN.d.produkt.id !== p.id) return;
+      if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
+      r.id = p.id; FERTIG = { titel: p.bezeichnung, r: r }; RIC = null;
+      REP = REP.filter(function (x) { return x.id !== p.id; }); zeichneRep();
+      ende(); zahlen(r.zahlen); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+    });
+  }
+  function zeichneFertig() {
+    var r = FERTIG && FERTIG.r, zeileF = function (name, id, text) {
+      return '<div class="feld"><div class="name">' + tx(name) + '</div><div class="wert" id="' + id + '">' + esc(text) + '</div><div class="seite"><button class="mini" data-a="kopiere" data-v="' + id + '">' + tx('kopieren') + '</button></div></div>'; };
+    if (r && r.pause) { $('fertig').innerHTML = '<div class="karte"><div class="urteil ja">' + tx('fertig.reparatur', r.id) + '</div><h2>' + tx('fertig.pausiert', FERTIG.titel) + '</h2>' + (r.teil ? '<p class="still">' + tx('fertig.bestellt') + '</p>' : '') + '</div>'; return; }
+    $('fertig').innerHTML = !r ? '' : '<div class="karte"><div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + (r.regal === 'Matchmaker' ? tx('fertig.mm', r.id || '') : r.regal === 'Ricardo Offline' ? tx('fertig.ricardo', r.id || '') : tx(r.regal === 'Analysiert' ? 'fertig.analysiert' : (r.reusable ? 'fertig.regal' : 'fertig.weg'))) + '</div><h2>' + tx('fertig.titel', FERTIG.titel) + '</h2>'
+      + '<p class="still">' + esc(r.nr) + ' · ' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.grade ? ' · ' + tx('zu.grade') + ' ' + esc(r.grade) : '') + ' · ' + tx('fertig.dauer', r.dauerMin, r.budget || '–') + '</p>'
+      + (r.befund ? zeileF('fertig.befund', 'f-befund', r.befund) : '') + (r.verkaufsinfo ? zeileF('fertig.verkauf', 'f-verkauf', r.verkaufsinfo) : '') + '</div>';
+  }
+  function kopiere(id, k, el) { kopiereText($(id).textContent, el); }
+  /* In die Zwischenablage; der Knopf sagt kurz «Kopiert». Wo der Browser das im eingebetteten Fenster nicht erlaubt, geht es über ein unsichtbares Feld. */
+  function kopiereText(text, el) {
+    var fertig = function () { var alt = el.textContent; if (alt === t('kopiert')) return; el.textContent = t('kopiert'); setTimeout(function () { el.textContent = alt; }, 1500); };
+    var ersatz = function () {
+      var a = document.createElement('textarea');
+      a.value = text; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select();
+      try { if (document.execCommand('copy')) fertig(); } catch (e) { /* dann bleibt es beim Markieren von Hand */ }
+      document.body.removeChild(a);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, ersatz); else ersatz();
+  }
+
+  /* ---------- Infos zum Produkt: alles aus der Recherche, mit Quelle und Score ---------- */
+  /* Eine Info pro Zeile. Der Score erscheint nur, wenn das Sheet einen gerechnet hat; zu «unbekannt» gibt es weder Quelle noch Rückmeldung. «Prüfhinweise» sind ausdrücklich ohne Beleg. */
+  function zeichneInfos() {
+    $('ub-infos').innerHTML = AN.d.infos.map(function (i, n) {
+      var anfang = '<div class="feld"><div class="name">' + esc(w(i.feld)) + '</div><div class="wert">', stufe = /^(Gruen|Gelb|Rot)$/.test(i.stufe) ? i.stufe : '';
+      if (unbekannt(i.inhalt)) return anfang + '<span class="still">' + tx('ub.unbekannt') + '</span></div><div class="seite"></div></div>';
+      return anfang + (istUrl(i.inhalt) ? link(i.inhalt, t('ub.oeffnen')) : esc(i.inhalt))
+        + '<small>' + (i.feld === 'Prüfhinweise' ? tx('ub.hinweis') : esc(w(i.quellentyp)) + ' · ' + tx('ub.treffer') + ' ' + esc(w(i.modelltreffer)) + (istUrl(i.quelle) ? ' · ' + link(i.quelle, t('ub.quelle')) : '')) + '</small></div><div class="seite">'
+        + (i.score === null ? '' : '<span class="score ' + stufe + '">' + tx('stufe.' + stufe) + ' <b>' + Math.round(i.score) + '</b></span>')
+        + '<span class="wahl">' + [['ok', 'ub.stimmt'], ['falsch', 'ub.falsch']].map(function (x) {
+          return '<button class="mini' + (AN.rm[i.feld] === x[0] ? ' an' : '') + '" data-a="rueck" data-k="' + n + '" data-v="' + x[0] + '">' + tx(x[1]) + '</button>'; }).join('') + '</span></div></div>';
+    }).join('') || '<p class="still">' + tx('re.keine') + '</p>';
+  }
+  function rueck(urteil, n) {
+    var feld = AN.d.infos[n].feld;
+    if (AN.rm[feld] === urteil) delete AN.rm[feld]; else AN.rm[feld] = urteil;
+    sichern(); zeichneInfos();
+  }
+
+  /* ---------- Warteschlange ---------- */
+  function zeichneListe(r) {
+    var z = r.zahlen, a = r.abgleich;
+    zahlen(z);
+    $('liste-zahlen').textContent = t('liste.zahlen', z.offen, z.bereit, z.laeuft, z.fehler) + ' · ' + t('liste.zuletzt', r.zuletzt || t('liste.nie'));
+    $('liste-fehler').hidden = !z.fehler;
+    $('liste-meldung').innerHTML = !a ? '' : (a.beschaeftigt ? box(t('liste.beschaeftigt'), 'warn') : box(t('liste.abgleich', a.neu, a.entfaellt, a.fertig, a.gestartet, a.fehler), 'ok')
+      + a.hinweise.map(function (x) { return box(x === 'OHNE_SCHLUESSEL' ? t('liste.ohnekey') : x, 'warn'); }).join(''));
+    $('liste').innerHTML = r.liste.length ? tabelle(r.liste, true) : '<p class="still" style="margin:12px 0 0">' + tx('liste.leer') + '</p>';
+  }
+  /* Abgleich jetzt; mitFehlern = Recherchen mit Fehler noch einmal versuchen. */
+  function aktualisieren(mitFehlern) { ruf('aktualisieren', [!!mitFehlern], zeichneListe); }
+
+  /* ---------- Ersatzteile ---------- */
+  function teilSuchen() {
+    rufLang('ersatzteilSuche', [AN ? AN.d.produkt.id : '', AN ? '' : $('t-name').value, $('t-teil').value, K], 't-knopf', 't-meldung', t('teil.laeuft'), function (r) {
+      $('t-meldung').innerHTML = (r.gefunden ? box(t('teil.gefunden', r.gefunden), 'ok') : box(t('teil.keins'), 'warn'))
+        + teilShops(r);
+      $('t-teil').value = ''; zeichneTeile(r.liste);
+    });
+  }
+  /* Suchbegriff mit Art und Quelle, dann die Shops: gefundene mit Link aufs Teil, Login-Shops als Rückfall. Info (z.B. Versandkosten) beim Antippen oder Darüberfahren. */
+  function teilShops(r) {
+    var q = r.suchbegriff || {}, h = '';
+    if (q.text) h += '<p class="teil-q">' + tx('teil.begriff') + ' <span class="mono">' + esc(q.text) + '</span>' + (q.art ? ' · ' + esc(q.art) : '') + (istUrl(q.quelle) ? ' · <a href="' + esc(q.quelle) + '" target="_blank" rel="noopener noreferrer">' + tx('ub.quelle') + ' ↗</a>' : '') + '</p>';
+    if (r.shops && r.shops.length) h += '<div class="shops">' + r.shops.map(function (s) {
+      return '<span class="shop"><a class="knopf" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer">' + esc(s.shop) + ' ↗</a>' + (s.login ? '<span class="etikett hell">' + tx('teil.ungeprueft') + '</span>' : '')
+        + (s.info ? '<span class="infoknopf" tabindex="0" role="button" aria-label="' + esc(s.info) + '">i<span class="tipp" role="tooltip">' + esc(s.info) + '</span></span>' : '') + '</span>'; }).join('') + '</div>';
+    return h;
+  }
+  /* Neueste Suche zuerst. Produkt, Zeit und Hinweis stehen einmal pro Suche, beim ersten ihrer Angebote. */
+  function zeichneTeile(liste) {
+    $('teile').innerHTML = liste.length ? liste.map(function (x, n) {
+      var v = liste[n - 1], erste = !v || v.zeit !== x.zeit || v.gesucht !== x.gesucht || v.produkt !== x.produkt, klein = function (s) { return s ? '<small>' + s + '</small>' : ''; };
+      var angaben = [x.nummer, w(x.art), x.lieferbar ? t(x.lieferbar === 'Ja' ? 'teil.lieferbar' : 'teil.nichtlieferbar') : ''].filter(String).map(esc).concat(x.shop || x.link ? [link(x.link, x.shop || t('ub.oeffnen'))] : []);
+      return '<div class="feld"><div class="name">' + (erste ? esc(x.gesucht) : '') + '</div><div class="wert">' + (x.teil ? esc(x.teil) : '<span class="still">' + tx('teil.nichts') + '</span>') + klein(angaben.join(' · '))
+        + (erste ? klein(esc([x.produkt, x.id, x.zeit].filter(String).join(' · '))) + klein(esc(x.hinweis)) : '') + '</div><div class="seite">' + (x.preis === null ? '' : '<span class="etikett">CHF ' + x.preis.toFixed(2) + '</span>')
+        + (x.anteil === null ? '' : '<span class="score ' + (x.lohnt === null ? '' : (x.lohnt ? 'Gruen' : 'Gelb')) + '">' + tx('teil.anteil', x.anteil) + (x.lohnt === null ? '' : ' · ' + tx(x.lohnt ? 'teil.lohnt' : 'teil.rechnen')) + '</span>') + '</div></div>';
+    }).join('') : '<p class="still">' + tx('teil.leer') + '</p>';
+  }
+
+  /* ---------- Admin ---------- */
+  function zeichneAdmin(r) {
+    var bloecke = [], akt = null;
+    $('adm-status').textContent = [t(r.ki ? 'adm.ki' : 'adm.keinki'), t(r.importAn ? 'adm.an' : 'adm.aus'), t(r.ausloeser ? 'adm.auto' : 'adm.keinauto')].join(' ');
+    $('adm-sheet').href = r.url;
+    /* Tab «Auswertung», wie er im Sheet steht: Blöcke sind durch Leerzeilen getrennt, die erste Zeile jedes Blocks ist der Titel, die zweite die Kopfzeile. */
+    r.auswertung.slice(2).forEach(function (z) {
+      if (!z.join('').trim()) { akt = null; return; }
+      if (!akt) { akt = { titel: z[0], zeilen: [] }; bloecke.push(akt); } else akt.zeilen.push(z);
+    });
+    $('adm-aus').innerHTML = bloecke.map(function (b) {
+      var breite = b.zeilen.length ? b.zeilen[0].filter(String).length : 0, zeile = function (z, zelle) { return '<tr>' + z.slice(0, breite).map(function (c) { return '<' + zelle + '>' + esc(c) + '</' + zelle + '>'; }).join('') + '</tr>'; };
+      return !breite ? '' : '<div class="karte"><h2>' + esc(b.titel) + '</h2><div class="tabelle" style="margin-top:0"><table><thead>' + zeile(b.zeilen[0], 'th') + '</thead><tbody>'
+        + b.zeilen.slice(1).map(function (z) { return zeile(z, 'td'); }).join('') + '</tbody></table></div></div>';
+    }).join('');
+    $('adm-batches').innerHTML = r.batches.length ? '<div class="tabelle" style="margin-top:0"><table><thead><tr><th>' + tx('adm.th.zeit') + '</th><th>' + tx('adm.th.anzahl') + '</th><th>' + tx('adm.th.status') + '</th><th>' + tx('adm.th.id') + '</th></tr></thead><tbody>'
+      + r.batches.map(function (b) { return '<tr><td class="mono">' + esc(b.erstellt) + '</td><td>' + esc(b.anzahl) + '</td><td><span class="etikett' + (b.status === 'Läuft' ? ' hell' : '') + '">' + esc(w(b.status)) + '</span></td><td class="mono">' + esc(b.id) + '</td></tr>'; }).join('')
+      + '</tbody></table></div>' : '<p class="still">' + tx('adm.leer') + '</p>';
+  }
+  function test() {
+    rufLang('verbindungTest', [], 'adm-knopf', 'adm-test', t('adm.testet'), function (r) {
+      $('adm-test').innerHTML = r.map(function (x) { return '<div class="meldung ' + (x.ok ? '' : 'stop') + '"><strong>' + esc(w(x.name)) + ': ' + tx(x.ok ? 'adm.ok' : 'adm.fehler') + '</strong> · ' + esc(x.sek) + ' s<br>' + esc(x.detail) + '</div>'; }).join('');
+    });
+  }
+
+  /* ---------- Seiten und Aktionen ---------- */
+  /* Seite: [Aufruf beim Öffnen, Funktion für die Antwort]. */
+  var SEITEN = { scan: null, liste: ['warteschlange', zeichneListe], teile: ['ersatzteile', zeichneTeile], admin: ['adminDaten', zeichneAdmin] };
+  /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
+  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
+    abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
+    versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, fn: fn, fnWeiter: fnWeiter,
+    repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test };
+
+  /* ---------- Start ---------- */
+  (function () {
+    var logo = $('logo'), ohneLogo = function () { logo.hidden = true; $('wort').hidden = false; }, lauf = null;
+    try { lauf = JSON.parse(lies('at-lauf')); } catch (e) { /* nicht lesbar: wird unten verworfen */ }
+    if (lies('at-lang') === 'en') L = 'en';
+    K = lies('at-kuerzel') || '';
+    texte(); $('wer').textContent = K;
+    logo.addEventListener('error', ohneLogo);
+    if (logo.complete && !logo.naturalWidth) ohneLogo();
+    document.addEventListener('click', function (ev) {
+      var e = ev.target.closest('[data-a]');
+      if (!e || e.disabled) return;
+      if (e.tagName === 'A') ev.preventDefault();
+      A[e.getAttribute('data-a')](e.getAttribute('data-v'), e.getAttribute('data-k'), e);
+    });
+    document.addEventListener('change', function (ev) { if (ev.target.id === 'hb-datei') handbuchHoch(ev.target.files[0]); if (ev.target.id === 'fs-datei') fsHoch(ev.target.files[0]); });
+    ['dragover', 'dragleave', 'drop'].forEach(function (art) {
+      document.addEventListener(art, function (ev) {
+        var z = ev.target.closest && ev.target.closest('#hb-ablage');
+        if (!z) return;
+        ev.preventDefault(); z.classList.toggle('drueber', art === 'dragover');
+        if (art === 'drop') handbuchHoch(ev.dataTransfer.files[0]);
+      });
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (!$('fb').hidden && ev.key === 'Escape') { fbZu(); return; }
+      if (!$('hb-ansicht').hidden) {
+        if (ev.key === 'Escape') { hbZu(); return; }
+        if (ev.target.id !== 'hv-suche' && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft')) { hbBlatt(ev.key === 'ArrowRight' ? 1 : -1); return; }
+      }
+      var a = ev.key === 'Enter' && !ev.shiftKey && ev.target.getAttribute('data-enter');
+      if (a) { ev.preventDefault(); A[a](); }
+    });
+    /* Eingaben der laufenden Analyse: data-e = Feld in AN.s. Der Preis des Ersatzteils rechnet sofort mit, ohne dass das Feld den Cursor verliert. */
+    document.addEventListener('input', function (ev) {
+      if (ev.target.id === 'hv-suche') { clearTimeout(HV.suchZeit); HV.suchZeit = setTimeout(hvSuche, 250); return; }
+      var e = ev.target.getAttribute('data-e'), v;
+      if (!e || !AN) return;
+      if (e === 'teil') { v = parseFloat(ev.target.value); AN.gate.teil = isFinite(v) && v > 0 ? v : 0; $('rep-urteil').innerHTML = gateUrteil(); }
+      else AN.s[e] = ev.target.value;
+      if (e === 'ricTitel' || e === 'ricBeschrieb' || e === 'ricPreis') ricNachfuehren();
+      sichern();
+    });
+    setInterval(uhr, 1000);
+    window.addEventListener('pagehide', sichern);                              // beim Neuladen oder Schliessen: die Zeit bis jetzt zählt noch
+    /* Foto-Seite fürs Handy: Die Adresse aus dem QR-Code trägt ?foto=PG-ID. Dann gibt es weder Kürzel noch Analyse. */
+    try { google.script.url.getLocation(function (loc) { var f = loc && loc.parameter && loc.parameter.foto; if (f) fotoModus(String(f)); }); } catch (e) { /* ausserhalb von Apps Script */ }
+    ruf('startDaten', [], function (s) {
+      S = s;
+      if (FS) return;
+      $('version').textContent = 'Version ' + s.version; $('nav-admin').hidden = !s.admin; zahlen(s.zahlen); ohneKat(); REP = s.reparatur || []; zeichneRep();
+      if (lauf && lauf.v === VERSION) { AN = lauf; AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; zeichneAnalyse(); } else merke('at-lauf', null);      // ein Abgleich, der beim Neuladen lief, startet neu
+      if (!K) { $('start').hidden = false; $('kuerzel').focus(); } else if (!AN) $('q').focus();
+    });
+  })();
+</script>
+</body>
+</html>

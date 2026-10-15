@@ -1,0 +1,52 @@
+# Betrieb
+
+## Änderung einspielen (Test)
+
+| # | Schritt | Prüfung |
+|---|---|---|
+| 1 | Änderung lokal in `src/Code.gs` / `src/Index.html`, `VERSION` in beiden Dateien erhöhen | |
+| 2 | `node --check` auf Code.gs (als .js) und auf die `<script>`-Blöcke aus Index.html | Syntax OK |
+| 3 | Code.gs in `vm.runInNewContext` mit Stubs (Session, PropertiesService, Utilities, SpreadsheetApp, DriveApp, ScriptApp, HtmlService, LockService, UrlFetchApp) | «top-level OK» (fängt `ReferenceError … before initialization`) |
+| 4 | Oberfläche lokal mit Playwright, `google.script.run` gestubbt | keine `pageerror`, Screenshots ansehen |
+| 5 | Zeilen-Patch in den Monaco-Editor des Scripts (prüft Zeilenzahl vorher) | djb2-Hash und Länge im Editor = lokal |
+| 6 | Speichern (Strg+S / Symbol) | «In Google Drive gespeichert» |
+| 7 | Test-Adresse `/dev` neu laden | Version unten links |
+| 8 | Commit ins Repo mit Doku-Update | |
+
+Wichtig: Konstanten, die in Top-Level-Objekten (`SPALTEN`, `NEUE_EINSTELLUNGEN`) vorkommen, müssen **vor** diesen deklariert sein (`const` hat eine Temporal Dead Zone). Fehler vom 15.10.2026: `RICARDO_VERSAND`.
+
+## Go-live-Checkliste
+
+| # | Punkt | Wer |
+|---|---|---|
+| 1 | Jonas hat Ricardo im Test durchgespielt | Jonas |
+| 2 | Einstellung «Web-App-Adresse für Fotos» leeren | Claude/Jonas |
+| 3 | Trigger `pg.inventarisierung` löschen | Jonas |
+| 4 | Icecat: eigenes Konto statt `openIcecat-live` | Jonas |
+| 5 | Recherche-Guthaben und Handbuch-Guthaben setzen | Jonas |
+| 6 | Testkonten angelegt, im Tab Testmittel auf «Ja» | Team |
+| 7 | Operations-Konto auf pretty-good.ch fürs Foto-Handy | Jonas |
+| 8 | Bereitstellung: neue Version, Zugriff «Jeder in pretty-good.ch», Ausführen als Jonas | Jonas (Go) |
+| 9 | Matchmaker: erster echter Treffer, Spalte «Aus Analyse» im Matchmaker Sheet prüfen | Jonas |
+
+## Kosten (Preise je 1 Mio. Tokens, `PREISE` in Code.gs)
+
+| Modell | Input | Output | Einsatz |
+|---|---|---|---|
+| `claude-sonnet-5-5` | USD 2 | USD 10 | Recherche, Ersatzteile, Matchmaker |
+| `claude-haiku-5-5` | USD 0.10 | USD 0.50 | Handbuch lesen, Ricardo-Text |
+| Websuche | USD 0.01 pro Suche | | Recherche, Ersatzteile, Handbuch-Suche |
+| Batch API | −50 % | | Vorab-Recherche |
+
+Jeder KI-Aufruf schreibt eine Zeile in den Tab «Kosten» (`kostenzeile_`). Richtwerte: Vorab-Recherche ≈ USD 0.28/Produkt, Handbuch USD 0.05–0.10, Matchmaker ≈ USD 0.01/Produkt (Sonnet, ~70 Aufträge).
+
+## Tests (lokal, nicht im Repo-CI)
+
+| Skript | Prüft |
+|---|---|
+| `t_hv.py` | Handbuch-Ansicht, Suche |
+| `t_shop.py` | Ersatzteil-Shops, Infoknopf |
+| `t_fb.py` | Feedback |
+| `t_ric.py` | Ricardo-Teil, Foto-Seite |
+| `t_rep.py` | Später reparieren, Fortsetzen |
+| `t_mm.py` / `t_mm.js` | Matchmaker-Entscheid, Wiedereinstieg, Server-Auswertung |

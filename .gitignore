@@ -1,0 +1,4 @@
+*.png
+*.xlsx
+node_modules/
+__pycache__/
