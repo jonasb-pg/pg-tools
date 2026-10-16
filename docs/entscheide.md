@@ -68,3 +68,13 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - **Fotos für Simon (Analyse .16.4):** Die Vorschaubilder kommen neu vom Server (fotoBild_, Thumbnail als data-URL, 6 h gemerkt). Vorher lud der Browser sie direkt aus Drive, was nur mit Zugriff auf den Ordner «RICARDO FOTOS» ging. Hat Drive für ein frisch hochgeladenes Foto noch keine Vorschau, bleibt der alte Weg als Ersatz.
 - **Ricardo-Knöpfe:** Feste Höhe 40px entfernt (min-height, Zeilenumbruch erlaubt). In Tabellen bricht der Knopftext nicht um, die Tabelle scrollt. Grund: «Bezahlt und versendet» lief über den Knopf hinaus.
 - **Recherchen mit Status «Fehler»:** 98 Produkte auf «Offen» zurückgesetzt, der Abgleich startet sie neu, solange das Recherche-Guthaben reicht. Guthaben erhöhen macht Jonas selbst.
+
+### 16.10.2026, Nacht: Ricardo automatisieren (Plan, noch nicht gebaut)
+- Ricardo-API ist seit 1.9.2026 abgeschaltet. Automatisierung läuft über die Ricardo-Mails (an care@, Google-Gruppe), Kontoauszug/Bank-Mails und die Post-API.
+- Käuferschutz+ nicht möglich: nur für natürliche Personen (Zusatzbedingungen Ziffer 2).
+- Mails lesen: 07:00–19:00 alle 30 Min. plus beim Öffnen des Tools. Nur echte Ricardo-Mails (Original-Absender ricardo.ch, DKIM). Mails von Käufer:innen an care@ werden nicht verarbeitet.
+- Zahlungen: automatisch nur bei Artikel-/Verkaufs-Nr. im Zweck UND Betrag = Total; sonst Vorschlag mit Klick «Passt». Test 16.10.: 9–10 automatisch, 4 Vorschläge, 0 falsch. Verkaufs-Nr. der Mail = Order ID im Verkaufsbericht (geprüft).
+- Bevorzugt Gutschrift-Mails der ABS (ab 16.10. an care@), sonst CSV-Kontoauszug; CSV 1×/Woche als Gegenkontrolle. Aufbau der ABS-Mail noch prüfen.
+- Preisvorschläge: immer annehmen, wenn bis 24 h nach Auktionsende (Ricardo begrenzt Vorschläge auf max. 20 % unter Preis).
+- Verkaufsbericht bleibt nötig (Adressen) und dient als Gegenkontrolle.
+- Post: Application «Ricardo Tool Pretty Good» im Developer Portal; Barcode (Standard) und Address query Webservice (Medium) beantragt, Status pending. Tracking nur auf Anfrage (Mail an digitalintegration@swisspost.ch). Frankierlizenz Pakete Inland: 60162228. Debitor 32359747.
