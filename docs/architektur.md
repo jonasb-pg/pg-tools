@@ -6,7 +6,7 @@ Stand: Version `2026-10-15.13` (Test, nicht live). Live: Bereitstellung Version 
 
 | Komponente | Typ | ID / Adresse | Rolle |
 |---|---|---|---|
-| Analyse Tool (Code) | Apps Script, an Sheet gebunden | Script `1ozOL9GJODtKBjLWFb3k_P5XWik5tQbhkNCuQpYSSzFGNHWPzoJe9TIUd` | Server (`Code.gs`) und Oberfläche (`Index.html`) |
+| Analyse Tool (Code) | Apps Script, an Sheet gebunden | Script `1UahLr-Ek_4QzRuGzyk4YhuZf1WrslrvJDlls-Eee5iFHiuQZORuiYLqN` (neu seit 16.10.2026) | Server (`Code.gs`) und Oberfläche (`Index.html`) |
 | Web-App Test | Apps Script `/dev` | `https://script.google.com/a/macros/pretty-good.ch/s/AKfycbz-CuQ5QOygYatY8Sq7L8EK0FaulltyecT3u_wTjKEe/dev` | immer der gespeicherte Stand (HEAD), nur für Bearbeiter:innen des Scripts |
 | Web-App Live | Apps Script Bereitstellung | Bereitstellung Version 7 | Analyseplatz; neue Version nur mit Go von Jonas |
 | ANALYSE TOOL | Google Sheet | `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM` | Datenbank des Tools (siehe `datenmodell.md`) |
