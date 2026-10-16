@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.4';
+const VERSION = '2026-10-17.5';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1905,6 +1905,8 @@ function geprueft_(u, d) {
   if (u.funktion.ersatz) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
   const fn = d && Array.isArray(d.fn) ? d.fn : [];
   const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return kurzName_(x.n || x.t); }).filter(function (x) { return x && x.length <= 50; });
+  /* Bei Produkten ohne Technik heisst die einzige «Funktion» oft «Unbeschädigt und benutzbar»: dann der Satz zur Vollständigkeit */
+  if (ok.length && ok.every(function (x) { return /unbeschädigt|benutzbar|zustand der teile/i.test(x); })) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
   if (!ok.length) return 'Wir haben es bei uns getestet, es funktioniert einwandfrei.';
   const l = ok.length > 6 ? ok.slice(0, 6) : ok;
   return 'Wir haben es bei uns getestet: ' + undListe_(l) + (ok.length > 6 ? ' und weitere Funktionen' : '') + (l.length > 1 || ok.length > 6 ? ' funktionieren' : ' funktioniert') + ' einwandfrei.';
@@ -1924,10 +1926,17 @@ function kaeuferSaetze_(x, u, d) {
   const rep = (x.rep || []).map(function (r) { return String(r.text || r.was || '').trim(); }).filter(String);
   abs.push([geprueft_(u, d), rep.length ? 'Ausserdem haben wir es repariert: ' + satz(rep.join('; ')) : ''].filter(String).join(' '));
   const fehlt = (x.fehlt || []).map(kurzName_).filter(String), fehltN = fehlt.map(norm_);
-  const dabei = u.liefer && !u.liefer.unsicher ? (u.liefer.teile || []).filter(function (t) { return fehltN.indexOf(norm_(kurzName_(t))) < 0; }).map(kurzName_).filter(String) : [];
-  const paket = [];
-  if (dabei.length) paket.push('Im Paket ' + (dabei.length > 1 ? 'sind ' : 'ist ') + undListe_(dabei) + '.');
+  /* Nur klare Teile nennen: Zeilen der Recherche mit Doppelpunkt, «unbekannt», «ablesen» usw. sind Hinweise fürs Prüfen, keine Teile.
+     «Kein Akku» heisst: gehört nicht zum Lieferumfang (anders als «fehlt»). Höchstens zehn Teile. */
+  const teil = function (t) { return t && t.length <= 40 && !/[:;«»%]/.test(t) && !/unbekannt|unklar|ablesen|laut |nennt|liegen .* bei/i.test(t); };
+  const kein = /^keine?n?\s+(.+?)(\s+im lieferumfang)?$/i;
+  const alle = u.liefer && !u.liefer.unsicher ? (u.liefer.teile || []).map(kurzName_) : [];
+  const ohne = alle.map(function (t) { const k = kein.exec(t); return k ? k[1] : ''; }).filter(teil);
+  const dabei = alle.filter(function (t) { return !kein.test(t) && teil(t) && fehltN.indexOf(norm_(t)) < 0; });
+  const paket = [], zehn = dabei.length > 10 ? dabei.slice(0, 10).concat(['weiteres Zubehör']) : dabei;
+  if (zehn.length) paket.push('Im Paket ' + (zehn.length > 1 ? 'sind ' : 'ist ') + undListe_(zehn) + '.');
   if (fehlt.length) paket.push(gross(undListe_(fehlt)) + (fehlt.length > 1 ? ' fehlen.' : ' fehlt.'));
+  if (ohne.length) paket.push('Nicht im Lieferumfang ' + (ohne.length > 1 ? 'sind ' : 'ist ') + undListe_(ohne) + '.');
   abs.push(paket.join(' '));
   return abs.filter(String);
 }

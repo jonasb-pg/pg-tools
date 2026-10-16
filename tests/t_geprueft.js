@@ -32,4 +32,9 @@ const NEU_E = vm.runInContext('NEUE_EINSTELLUNGEN', c), UMBAU = vm.runInContext(
   assert.ok(neu && um && neu[1] === um[3] && neu[2] === um[2], 'Umbau Grade ' + g + ' passt zur Vorgabe');
 });
 assert.strictEqual(NEU_E.filter(function (n) { return n[0] === 'Grade A'; })[0][1].split(':')[0], 'Neu und originalverpackt');
+/* Hinweise aus der Recherche erscheinen nicht als Teile */
+t = c.kaeuferSaetze_({ grade: 'B', fehlt: [], rep: [] }, { funktion: u.funktion, liefer: { teile: ['Gefrierschüssel', 'Gedruckte Anleitung: unbekannt', 'AT957A (Major) liegen 2 Paddel («C» und «M») bei', 'Ladegerät (Steckertyp am Gerät ablesen)', 'Ausführungen AT956A/AT956B: Unterschied unbekannt; Farbe am Gerät ablesen'], unsicher: false } }, { fn: [] });
+assert.strictEqual(t[2], 'Im Paket sind Gefrierschüssel und Ladegerät.');
+t = c.kaeuferSaetze_({ grade: 'B', fehlt: [], rep: [] }, { funktion: { liste: [{ n: 'Unbeschädigt und benutzbar' }] }, liefer: { teile: ['Akku-Handkreissäge', 'Kein Akku', 'Kein Ladegerät', 'Kein Ladenetzteil im Lieferumfang', 'Eichenstücke 10 cm, bis 25 %'], unsicher: false } }, { fn: ['ok'] });
+assert.deepStrictEqual(JSON.parse(JSON.stringify(t.slice(1))), ['Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.', 'Im Paket ist Akku-Handkreissäge. Nicht im Lieferumfang sind Akku, Ladegerät und Ladenetzteil.']);
 console.log('t_geprueft ok');
