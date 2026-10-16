@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.2';
+const VERSION = '2026-10-17.3';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -167,9 +167,9 @@ const NEUE_EINSTELLUNGEN = [
   ['Hausregeln', HAUSREGELN, 'Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar.'],
   ['Test-WLAN Name', 'TEST WLAN', 'Das Tool zeigt Name und Passwort bei Geräten an, die zum Prüfen ein WLAN brauchen.'],
   ['Test-WLAN Passwort', '', 'Bitte selbst eintragen.'],
-  ['Grade A', 'Unbenutzt: Versiegelt oder ausgepackt, keine Gebrauchsspuren.', 'Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand» und in der Verkaufsinfo.'],
-  ['Grade B', 'Gebraucht: Keine oder leichte Spuren, nur aus der Nähe sichtbar.', 'Wie Grade A.'],
-  ['Grade C', 'Gebraucht: Deutliche Spuren, auf den ersten Blick sichtbar.', 'Wie Grade A.'],
+  ['Grade A', 'Neu und originalverpackt: Unbenutzt, in der vollständigen Originalverpackung (versiegelt oder geöffnet).', 'Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand». Der Titel entspricht dem Ricardo-Zustand (Entscheid Jonas 17.10.2026).'],
+  ['Grade B', 'Neu (gemäss Beschreibung): Unbenutzt, keine Gebrauchsspuren, aber ohne Originalverpackung oder mit einer Abweichung, die im Befund steht.', 'Wie Grade A. Neu seit 17.10.2026.'],
+  ['Grade C', 'Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben.', 'Wie Grade A. Neu seit 17.10.2026.'],
   ['Handbuch-Sheet ID', '1GqaJ3mFsVuwJmXVPBo0k-t78Rn5qsEf9ZKMHHR-9IYc', 'Das Sheet «HANDBÜCHER» mit allen gelesenen Handbüchern, eine Zeile pro Modell. Es bleibt bestehen, auch wenn das Analyse Tool ersetzt wird.'],
   ['Handbuch-Ordner ID', '1JUaSaYQpkt3HZn2ByjR4LpFJcwsoFOMJ', 'Der Drive-Ordner «HANDBÜCHER PDF». Das Tool legt jedes Handbuch dort ab (Marke Modell.pdf) und liest es von dort. Hochgeladene Handbücher landen auch hier.'],
   ['Handbuch-Guthaben', 0, 'Kostenbremse: So viele Handbücher darf das Tool noch suchen und lesen (rund USD 0.05 bis 0.10 pro Handbuch). Jedes zieht eins ab, bei 0 macht es keines mehr.'],
@@ -194,7 +194,11 @@ const EINST_UMBAU = [
   ['Ersatzteil lohnt bis Prozent vom VP', 'Reparatur lohnt bis Prozent vom VP', 'Eine Reparatur lohnt sich, wenn Arbeit und Ersatzteil zusammen höchstens so viel Prozent vom Verkaufspreis kosten. Gilt auch auf der Seite «Ersatzteile».'],
   ['Plan-Anweisung', 'Funktions-Anweisung', 'So stellt die KI die Liste der Funktionen und ihre Prüfschritte zusammen.', FUNKTIONS_ANWEISUNG],
   ['KI-Modell Recherche', 'KI-Modell Recherche', 'Für die Vorab-Recherche und die Ersatzteil-Suche.'],
-  ['Recherche-Guthaben', 'KI-Budget USD pro Monat', BUDGET_ERKL, BUDGET_VORGABE]       // seit 2026-10-16.5: Monatsbudget statt Stückzahl
+  ['Recherche-Guthaben', 'KI-Budget USD pro Monat', BUDGET_ERKL, BUDGET_VORGABE],      // seit 2026-10-16.5: Monatsbudget statt Stückzahl
+  /* seit 2026-10-17.3: Grades = Ricardo-Zustände (A neu und originalverpackt, B neu gemäss Beschreibung, C gebraucht) */
+  ['Grade A', 'Grade A', 'Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand». Der Titel entspricht dem Ricardo-Zustand (Entscheid Jonas 17.10.2026).', 'Neu und originalverpackt: Unbenutzt, in der vollständigen Originalverpackung (versiegelt oder geöffnet).'],
+  ['Grade B', 'Grade B', 'Wie Grade A. Neu seit 17.10.2026.', 'Neu (gemäss Beschreibung): Unbenutzt, keine Gebrauchsspuren, aber ohne Originalverpackung oder mit einer Abweichung, die im Befund steht.'],
+  ['Grade C', 'Grade C', 'Wie Grade A. Neu seit 17.10.2026.', 'Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben.']
 ];
 const EINST_WEG = ['Elektrische Messung', 'Prüfgerät (Typ, Seriennummer)', 'Prüfgerät kalibriert bis', 'Schutzleiterwiderstand max. Ohm', 'Isolation min. MOhm, Schutzklasse I',
   'Isolation min. MOhm, Schutzklasse II', 'Schutzleiterstrom max. mA', 'Berührungsstrom max. mA', 'Mängel-Anweisung',
@@ -1888,12 +1892,12 @@ function urteil_(d, u, e) {
  */
 const kurzName_ = function (x) { return String(x || '').replace(/\s*\([^)]*\)/g, '').replace(/^[-•–]\s*/, '').replace(/[.:;,]+$/, '').trim(); };
 const undListe_ = function (l) { return l.length > 1 ? l.slice(0, -1).join(', ') + ' und ' + l[l.length - 1] : (l[0] || ''); };
-/** Zustand in einem Satz. Ungeöffnet heisst «originalverpackt»; ein geöffnetes, unbenutztes Stück (Grade A) ist «neu, ohne Gebrauchsspuren». */
+/** Zustand in einem Satz, in den Worten der Ricardo-Zustände (Grades seit 17.10.2026). */
 function zustandSatz_(x) {
   if (x.versiegelt) return 'Neu und originalverpackt, ungeöffnet.';
-  if (x.grade === 'A') return 'Neu, ohne Gebrauchsspuren. Die Verpackung wurde geöffnet.';
-  if (x.grade === 'B') return 'Gebraucht, kaum Gebrauchsspuren.';
-  if (x.grade === 'C') return 'Gebraucht, mit sichtbaren Gebrauchsspuren.';
+  if (x.grade === 'A') return 'Neu und originalverpackt.';
+  if (x.grade === 'B') return 'Neu, unbenutzt (gemäss Beschreibung).';
+  if (x.grade === 'C') return 'Gebraucht.';
   return '';
 }
 /** Was getestet wurde: die Funktionen, die im Schritt «Funktion» OK waren, ohne Klammern, höchstens sechs. */
@@ -2084,11 +2088,11 @@ function ricardoVersand_(e) {
     return { name: t[0] || '', preis: zahl_(t[1]) };
   }).filter(function (v) { return v.name; });
 }
-/** Ricardo-Zustand aus dem Urteil: versiegelt = neu und originalverpackt, Grade A (unbenutzt) = neu gemäss Beschreibung, B und C = gebraucht. */
+/** Ricardo-Zustand aus dem Urteil: Grade A (und versiegelt) = neu und originalverpackt, B = neu gemäss Beschreibung, C = gebraucht. */
 function ricardoZustand_(x) {
   if (!x.reusable) return '';
-  if (x.versiegelt) return 'Neu und originalverpackt';
-  return x.grade === 'A' ? 'Neu (gemäss Beschreibung)' : 'Gebraucht';
+  if (x.versiegelt || x.grade === 'A') return 'Neu und originalverpackt';
+  return x.grade === 'B' ? 'Neu (gemäss Beschreibung)' : 'Gebraucht';
 }
 /** Der Foto-Ordner eines Produkts in «RICARDO FOTOS», nach der PG-ID benannt. */
 function fotoOrdner_(e, id, anlegen) {

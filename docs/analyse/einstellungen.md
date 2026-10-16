@@ -27,9 +27,9 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Hausregeln | siehe [Hausregeln](#hausregeln) | Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar. |
 | Test-WLAN Name | TEST WLAN | Das Tool zeigt Name und Passwort bei Geräten an, die zum Prüfen ein WLAN brauchen. |
 | Test-WLAN Passwort | [im Sheet, nicht im Repo] | Bitte selbst eintragen. |
-| Grade A | Unbenutzt: Versiegelt oder ausgepackt, keine Gebrauchsspuren. | Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand» und in der Verkaufsinfo. |
-| Grade B | Gebraucht: Keine oder leichte Spuren, nur aus der Nähe sichtbar. | Wie Grade A. |
-| Grade C | Gebraucht: Deutliche Spuren, auf den ersten Blick sichtbar. | Wie Grade A. |
+| Grade A | Neu und originalverpackt: Unbenutzt, in der vollständigen Originalverpackung (versiegelt oder geöffnet). | Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand». Der Titel entspricht dem Ricardo-Zustand (Entscheid Jonas 17.10.2026). |
+| Grade B | Neu (gemäss Beschreibung): Unbenutzt, keine Gebrauchsspuren, aber ohne Originalverpackung oder mit einer Abweichung, die im Befund steht. | Wie Grade A. Neu seit 17.10.2026. |
+| Grade C | Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben. | Wie Grade A. Neu seit 17.10.2026. |
 | Handbuch-Sheet ID | 1GqaJ3mFsVuwJmXVPBo0k-t78Rn5qsEf9ZKMHHR-9IYc | Das Sheet «HANDBÜCHER» mit allen gelesenen Handbüchern, eine Zeile pro Modell. Es bleibt bestehen, auch wenn das Analyse Tool ersetzt wird. |
 | Handbuch-Guthaben | 0 | Kostenbremse: So viele Handbücher darf das Tool noch suchen und lesen (rund USD 0.05 bis 0.10 pro Handbuch). Jedes zieht eins ab, bei 0 macht es keines mehr. |
 | KI-Modell Handbuch | claude-haiku-5-5 | Mit diesem Modell liest das Tool die Handbücher. Haiku reicht dafür (Test vom 14.10.2026: gleiche Qualität wie Sonnet zu einem Zwanzigstel des Preises). |

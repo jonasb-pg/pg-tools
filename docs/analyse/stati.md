@@ -98,12 +98,14 @@ Funktionsarten: `Kern`, `Beworben`, `Weitere`. Stufe wird automatisch nach VP ge
 
 ## Grade und Ricardo-Zustand
 
-| Fall | Grade | Ricardo-Zustand |
-|---|---|---|
-| originalversiegelt | A | Neu und originalverpackt |
-| Grade A (unbenutzt, ausgepackt) | A | Neu (gemäss Beschreibung) |
-| Grade B | B | Gebraucht |
-| Grade C | C | Gebraucht |
+Seit `2026-10-17.3` entspricht das Grade dem Ricardo-Zustand (Entscheid Jonas 17.10.2026). Ältere Zeilen in «Analysen» und «Ricardo» behalten ihre alte Bedeutung (A unbenutzt, B leichte Spuren, C deutliche Spuren).
+
+| Fall | Grade | Ricardo-Zustand | Satz im Käufertext |
+|---|---|---|---|
+| originalversiegelt | A | Neu und originalverpackt | Neu und originalverpackt, ungeöffnet. |
+| unbenutzt, vollständige Originalverpackung (auch geöffnet) | A | Neu und originalverpackt | Neu und originalverpackt. |
+| unbenutzt, ohne Originalverpackung oder mit beschriebener Abweichung | B | Neu (gemäss Beschreibung) | Neu, unbenutzt (gemäss Beschreibung). |
+| mit Gebrauchsspuren | C | Gebraucht | Gebraucht. |
 | defekt | – | (nicht verkauft) |
 
 ## Matchmaker-Urteil
