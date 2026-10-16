@@ -60,3 +60,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 16.10.2026 | Ricardo | Beim Packen steht das Hauptbild aus der Analyse neben dem Stück (vom Server geholt, kein Drive-Zugriff nötig, 6 h Zwischenspeicher); Stücke ohne Analyse ohne Bild | Bild von Ricardo holen |
 | 16.10.2026 | Feedback | SW: OVP beim Entscheid sichtbar (OVP · VP), Stück ohne Inventar mit freiwilligem Feld «Neupreis (OVP) CHF» (Analyse Tool 2026-10-16.2) | |
 | 16.10.2026 | Feedback | SW: eigene Option «Packung geöffnet, Produkt versiegelt» wird nicht umgesetzt (Entscheid Jonas) | dritter Knopf im Schritt Produkt |
+| 16.10.2026 | Ricardo | Verkaufsbericht gibt es erst am Folgetag: bleibt so (Bericht am nächsten Morgen einlesen, dann packen). Kein Erfassen von Hand, kein Mail-Import | Verkauf von Hand erfassen, Verkaufsmails lesen |
