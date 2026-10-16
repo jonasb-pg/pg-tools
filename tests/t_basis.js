@@ -18,7 +18,7 @@ const basis = lies('apps/basis/Basis.gs');
 /* Ricardo: jeder TAB_*-Name (ausser dem alten Doku) steht im Katalog */
 const ric = lies('apps/ricardo/Code.gs'), tabs = ric.match(/^const TAB_L = .*$/m)[0].match(/'([^']+)'/g).map(function (s) { return s.slice(1, -1); });
 const rk = ric.slice(ric.indexOf('const RICARDO_KATALOG'), ric.indexOf('];', ric.indexOf('const RICARDO_KATALOG')));
-tabs.filter(function (t) { return t !== 'Doku'; }).forEach(function (t) { assert.ok(rk.indexOf("tab: '" + t + "'") > -1, 'Ricardo-Katalog ohne ' + t); });
+tabs.filter(function (t) { return t !== 'Doku' && t !== 'Auszahlungen'; })   // beide werden bei «einrichten» entfernt.forEach(function (t) { assert.ok(rk.indexOf("tab: '" + t + "'") > -1, 'Ricardo-Katalog ohne ' + t); });
 
 /* 2. basisEinrichten_ mit einem Mock-Spreadsheet */
 function bereich(sh, r, c, nr, nc) {

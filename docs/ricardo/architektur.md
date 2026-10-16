@@ -1,12 +1,12 @@
 # Architektur Ricardo Tool
 
-Stand: Version `2026-10-16.4`. Live: Bereitstellung Version 11 (neue Version nur mit Go von Jonas).
+Stand: Version `2026-10-17.1`. Live: Bereitstellung Version 11 (neue Version nur mit Go von Jonas).
 
 ## Komponenten
 
 | Komponente | Typ | ID / Adresse | Rolle |
 |---|---|---|---|
-| Ricardo Tool (Code) | Apps Script, an Sheet gebunden | Projekt am Sheet RICARDO TOOL | `Code.gs`, `Index.html`, `Basis.gs` (gemeinsam, siehe `../gemeinsam/sheet-standard.md`) |
+| Ricardo Tool (Code) | Apps Script, an Sheet gebunden | Script `17okxNkNUeGHE_XLKjqxvAE7APSV6D0IusWQsfm1igLX7pvpU9GjYh_hE` | `Code.gs`, `Index.html`, `Basis.gs` (gemeinsam, siehe `../gemeinsam/sheet-standard.md`) |
 | RICARDO TOOL | Google Sheet | `1liRzxIAKCSKGS5-uN3FkFcboN_Luqd2Ar5Ae57cSmvg` | Datenbank; Übersicht im ersten Tab |
 | ANALYSE TOOL | Google Sheet | `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM` | nur lesen: Tab «Ricardo» (fertige Texte aus der Analyse) |
 | Return Tool | Google Sheet | `1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E` | **nur lesen** |
@@ -16,7 +16,7 @@ Stand: Version `2026-10-16.4`. Live: Bereitstellung Version 11 (neue Version nur
 
 ## Tabs
 
-Siehe Tab «Übersicht» im Sheet und `RICARDO_KATALOG` in `apps/ricardo/Code.gs`. Daten: Listings, Verkäufe, Posteingang, Retouren, Wochenübersicht. Verlauf: Log. Hilfstabs: Post-Adressen, Auszahlungen. Einstellungen: Einstellungen, Versand. Der frühere Tab «Doku» ist seit `2026-10-16.4` Teil der Übersicht.
+Siehe Tab «Übersicht» im Sheet und `RICARDO_KATALOG` in `apps/ricardo/Code.gs`. Daten: Listings, Verkäufe, Posteingang, Retouren, Wochenübersicht. Verlauf: Log. Hilfstab: Post-Adressen. Einstellungen: Einstellungen, Versand. Der frühere Tab «Doku» ist seit `2026-10-16.4` Teil der Übersicht.
 
 ## Auslöser
 

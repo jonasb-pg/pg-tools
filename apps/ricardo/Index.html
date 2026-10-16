@@ -349,7 +349,7 @@
           <div id="rt-treffer"></div>
         </div>
         <div class="karte">
-          <div class="kopf"><h2 data-t="rt.offen"></h2><div class="reihe"><button onclick="retourenExport()" data-t="rt.export"></button><button onclick="ladeRetouren()" data-t="aktualisieren"></button></div></div>
+          <div class="kopf"><h2 data-t="rt.offen"></h2><div class="reihe"><button onclick="ladeRetouren()" data-t="aktualisieren"></button></div></div>
           <p class="still" id="rt-info"></p>
           <div id="rt-liste"></div>
         </div>
@@ -521,7 +521,9 @@
     'rt.platz': ['PG-ID, Titel, Käufername oder Verkaufsnummer', 'PG-ID, title, buyer name or sale number'], 'rt.keine': ['Kein bezahlter und versendeter Verkauf gefunden.', 'No paid and shipped sale found.'],
     'rt.notiz': ['Notiz, freiwillig', 'Note, optional'], 'rt.iban': ['IBAN des Käufers', 'Buyer\'s IBAN'], 'rt.adresse': ['Strasse und Hausnummer', 'Street and house number'],
     'rt.iban.fehlt': ['Bitte die IBAN des Käufers eingeben.', 'Please enter the buyer\'s IBAN.'], 'rt.adresse.fehlt': ['Bitte Strasse und Hausnummer des Käufers eingeben.', 'Please enter the buyer\'s street and house number.'], 'rt.eroeffnen': ['Retoure eröffnen', 'Open return'],
-    'rt.offen': ['Offene Retouren', 'Open returns'], 'rt.export': ['Offene Rückzahlungen als Excel', 'Refunds due as Excel'],
+    'rt.offen': ['Offene Retouren', 'Open returns'],
+    'rt.mail.ok': ['Retoure eröffnet. Die Rückzahlung ist per Mail an {0} gegangen.', 'Return opened. The refund was sent by mail to {0}.'],
+    'rt.mail.fehler': ['Retoure eröffnet, aber die Mail an {0} ging nicht raus. Bitte Adresse in Admin › Einstellungen «Rückzahlungen an» prüfen und die Rückzahlung selbst weitergeben.', 'Return opened, but the mail to {0} failed. Check «Rückzahlungen an» in Admin › Settings and pass on the refund yourself.'],
     'rt.info': ['{0} offen, {1} abgeschlossen. Offene Rückzahlungen: {2}.', '{0} open, {1} closed. Refunds due: {2}.'], 'rt.leer': ['Keine offenen Retouren.', 'No open returns.'],
     'th.retoure': ['Retoure', 'Return'], 'th.schritte': ['Schritte', 'Steps'],
     'rt.seit': ['eröffnet {0}', 'opened {0}'], 'rt.verkauf': ['Verkauf {0}', 'Sale {0}'],
@@ -532,8 +534,7 @@
    
     'rt.f.eroeffnen': ['Retoure für {0} eröffnen (Grund: {1})? Der Verkauf zählt danach nicht mehr zum Umsatz.', 'Open a return for {0} (reason: {1})? The sale no longer counts towards revenue afterwards.'],
     'rt.f.zahlung': ['CHF {0} an {1} zurückgezahlt?', 'CHF {0} refunded to {1}?'],
-    'rt.export.leer': ['Keine offenen Rückzahlungen.', 'No refunds due.'],
-    'rt.export.fertig': [' ({0} Rückzahlungen)', ' ({0} refunds)'], 'rt.speichern': ['{0} speichern', 'Save {0}'],
+    'rt.speichern': ['{0} speichern', 'Save {0}'],
     'ad.titel': ['Storno: Einträge löschen', 'Cancel: delete entries'],
     'fb.knopf': ['Feedback', 'Feedback'], 'fb.titel': ['Was fehlt oder stört?', 'What is missing or bothering you?'], 'fb.platz': ['z.B. Schritt unklar, Idee …', 'e.g. step unclear, idea …'],
     'fb.senden': ['Senden', 'Send'], 'fb.danke': ['Danke! Feedback ist gespeichert.', 'Thanks! Feedback saved.'], 'fb.leer': ['Bitte zuerst etwas hineinschreiben.', 'Please write something first.'],
@@ -987,7 +988,10 @@
     if (!$('ri-' + i).value.trim()) { melde(t('rt.iban.fehlt'), 'stop'); $('ri-' + i).focus(); return; }
     if (!$('ra-' + i).value.trim()) { melde(t('rt.adresse.fehlt'), 'stop'); $('ra-' + i).focus(); return; }
     frage(t('rt.f.eroeffnen', o.pgId || o.titel, gr(grund)), function () {
-      ruf('retoureEroeffnen', [o.nr, grund, notiz, $('ri-' + i).value, $('ra-' + i).value], function (r) { RT = r; $('rt-treffer').innerHTML = ''; $('rt-q').value = ''; zeichneRetouren(); });
+      ruf('retoureEroeffnen', [o.nr, grund, notiz, $('ri-' + i).value, $('ra-' + i).value], function (r) {
+        RT = r; $('rt-treffer').innerHTML = ''; $('rt-q').value = ''; zeichneRetouren();
+        if (r.mail) melde(r.mail.ok ? t('rt.mail.ok', r.mail.an) : t('rt.mail.fehler', r.mail.an || '–'), r.mail.ok ? 'ok' : 'stop');
+      });
     });
   }
   function zeichneRetouren() {
@@ -1012,12 +1016,6 @@
     var wert = schritt === 'rueckzahlung' ? $('rb-' + i).value : '';
     var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], function (r) { RT = r; zeichneRetouren(); }); };
     if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
-  }
-  function retourenExport() {
-    ruf('retourenExport', [], function (p) {
-      if (!p.anzahl) { melde(t('rt.export.leer'), ''); return; }
-      ladeDatei(p, $('rt-info'), t('rt.export.fertig', p.anzahl));
-    });
   }
   function ladeDatei(p, ziel, danach) {
     var bin = atob(p.datei), bytes = new Uint8Array(bin.length);

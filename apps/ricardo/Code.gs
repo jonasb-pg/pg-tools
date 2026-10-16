@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-16.5';
+const VERSION = '2026-10-17.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -79,6 +79,7 @@ const DEFAULTS = [
   ['Regal Online', REGAL_VORGABE['Regal Online'], 'Regal für gelistete Stücke'],
   ['Regal Unpaid', REGAL_VORGABE['Regal Unpaid'], 'Regal für verkaufte Stücke, bis sie bezahlt und versendet sind'],
   ['Mails prüfen zwischen', '07:00-19:00', 'In diesem Zeitfenster liest das Tool alle 30 Minuten die Ricardo-Mails (Verkäufe, Fragen, Preisvorschläge). Dazu immer, wenn jemand das Tool öffnet. Leer = nie automatisch.'],
+  ['Rückzahlungen an', 'invoice@pretty-good.ch', 'An diese Adresse schickt das Tool bei jeder neuen Retoure eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto. Wer zahlt, klickt danach im Tool «Rückzahlung gemacht»'],
   ['Mail-Absender', 'care@pretty-good.ch', 'Von dieser Adresse kommen die Ricardo-Mails ins Postfach (Google-Gruppe). Das Tool verarbeitet nur Mails, die nachweislich von Ricardo stammen.'],
   ['Preisvorschlag bis Stunden nach Auktionsende', 24, 'Preisvorschläge, die bis so viele Stunden nach dem Ende der Auktion eintreffen, empfiehlt das Tool anzunehmen. Spätere ablehnen. Entscheid Jonas 16.10.2026.'],
   ['Zahlungserinnerung nach Tagen', 3, 'Ist ein Verkauf nach so vielen Tagen nicht bezahlt und versendet, erscheint er unter «Zu erledigen» mit einem Text für die Erinnerung.'],
@@ -165,8 +166,7 @@ function einrichten() {
   }
   wochen_();
   /* Gemeinsamer Standard (Basis.gs): Übersicht, Reihenfolge, Farben, Schrift, Warnschutz. Ersetzt den früheren Tab «Doku». */
-  const alt = ss.getSheetByName(TAB_D);
-  if (alt && ss.getSheets().length > 1) ss.deleteSheet(alt);
+  [TAB_D, TAB_A].forEach(function (n) { const alt = ss.getSheetByName(n); if (alt && ss.getSheets().length > 1) ss.deleteSheet(alt); });   // früherer Tab «Doku» und Excel-Zwischenablage «Auszahlungen»
   basisEinrichten_(ss, { name: 'Ricardo Tool', version: VERSION, zweck: 'Datenbank des Ricardo Tools. Das Tool schreibt in die weissen Tabs. Angepasst wird nur in den gelben Tabs.' }, RICARDO_KATALOG, ricardoRegeln_());
   // Lesezugriff aufs Return Tool prüfen
   SpreadsheetApp.openById(cfg_('Return Tool ID')).getName();
@@ -269,9 +269,9 @@ const DOKU = [
     'Warnung, wenn tagsüber ' + MAIL_WARNUNG_STUNDEN + ' Stunden keine Ricardo-Mail kommt. Mails mit Ricardo-Betreff ohne Signatur stehen im Log («Mail nicht echt»).'
   ]],
   ['RETOUREN', [
-    'Eröffnen: Verkauf suchen, Grund, IBAN (wird geprüft) und Adresse. Die Rückzahlung ist sofort fällig.',
+    'Eröffnen: Verkauf suchen, Grund, IBAN (wird geprüft) und Adresse. Die Rückzahlung ist sofort fällig: Das Tool schickt eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto an die Adresse in «Rückzahlungen an» (Admin › Einstellungen).',
     'Zwei Schritte: «Rückzahlung gemacht» und «Bei Ricardo storniert» (Provision zurückfordern, Frist 60 Tage nach Verkauf). Danach ist die Retoure abgeschlossen und das Stück wieder frei.',
-    '«Offene Rückzahlungen als Excel» liefert Name, IBAN, Betrag, Adresse und Produkt aller noch nicht bezahlten Retouren. Zuerst exportieren und zahlen, dann «Rückzahlung gemacht» klicken.'
+    'Wer zahlt, klickt danach «Rückzahlung gemacht». Dann löscht das Tool IBAN und Adresse aus dem Tab «Retouren».'
   ]],
   ['SCRIPT-EIGENSCHAFTEN', [
     'Apps-Script-Editor > Zahnrad «Projekteinstellungen» > «Script-Eigenschaften».',
@@ -315,7 +315,6 @@ const RICARDO_KATALOG = [
   { tab: 'Wochenübersicht', art: 'arbeit', inhalt: 'Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.' },
   { tab: 'Post-Adressen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export an die Post, wird nach jedem Export geleert.', kopf: 0 },
-  { tab: 'Auszahlungen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export der Rückzahlungen, wird nach jedem Export geleert.', kopf: 0 },
   { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Von Hand oder im Admin-Teil änderbar (blaue Werte). Bedeutung siehe unten.' },
   { tab: 'Versand', art: 'einstellung', inhalt: 'Versandklassen und Preise wie bei Ricardo. Blaue Werte bei Tarifänderung anpassen.' }
 ];
@@ -1929,7 +1928,7 @@ function api(lang, name, args) {
     uebersicht: uebersicht, importVerkaeufe: importVerkaeufe, verkaeufe: verkaeufe,
     setzeVerkauf: setzeVerkauf, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
-    retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt, retourenExport: retourenExport,
+    retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
@@ -2324,8 +2323,41 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
     }
     wochen_();
     log_('Retoure eröffnet', pg, r['Retoure-Nr'] + ' ' + grund);
-    return retouren();
+    const aus = retouren();
+    aus.mail = rueckzahlungMail_(r);
+    return aus;
   } finally { lock.releaseLock(); }
+}
+
+/**
+ * Mail an die Buchhaltung (Einstellung «Rückzahlungen an»): alles, was es für die Rückzahlung braucht. Betrag = Preis + Porto.
+ * Scheitert der Versand, bleibt die Retoure gültig; das Tool meldet es und schreibt den Fehler ins Log.
+ */
+function rueckzahlungMail_(r) {
+  const an = String(cfg_('Rückzahlungen an') || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(an)) { log_('Rückzahlungs-Mail', String(r['PG-ID']), 'Keine gültige Adresse in «Rückzahlungen an»'); return { ok: false, an: an }; }
+  const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), betrag = runde_(preis + porto).toFixed(2);
+  const zeilen = [
+    'Bitte diese Rückzahlung (Retoure Ricardo) ausführen:', '',
+    'Betrag: CHF ' + betrag + ' (Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')',
+    'Name: ' + (r['Name'] || r['Käufer']),
+    'Adresse: ' + r['Adresse'] + ', ' + String(r['PLZ'] || '') + ' ' + String(r['Ort'] || ''),
+    'IBAN: ' + r['IBAN'],
+    'Zahlungszweck: Rückzahlung Ricardo ' + r['Verkauf-Nr'], '',
+    'PG-ID: ' + r['PG-ID'],
+    'Produkt: ' + r['Titel'],
+    'Retoure: ' + r['Retoure-Nr'] + ' · Grund: ' + r['Grund'] + (r['Notiz'] ? ' · ' + r['Notiz'] : ''),
+    'Ricardo-Verkauf: ' + r['Verkauf-Nr'] + ' · Käufer: ' + r['Käufer'], '',
+    'Nach der Zahlung im Ricardo Tool unter «Retouren» auf «Rückzahlung gemacht» klicken. Danach löscht das Tool IBAN und Adresse.'
+  ];
+  try {
+    MailApp.sendEmail({ to: an, subject: 'Rückzahlung ' + r['Retoure-Nr'] + ' · ' + r['PG-ID'] + ' · CHF ' + betrag, body: zeilen.join('\n'), name: 'Ricardo Tool' });
+    log_('Rückzahlungs-Mail', String(r['PG-ID']), r['Retoure-Nr'] + ' an ' + an);
+    return { ok: true, an: an };
+  } catch (err) {
+    log_('Rückzahlungs-Mail', String(r['PG-ID']), 'FEHLER ' + String(err.message || err));
+    return { ok: false, an: an, fehler: String(err.message || err) };
+  }
 }
 
 /** schritt: 'rueckzahlung' (wert = Betrag) oder 'ricardo'. Sind beide erledigt, ist die Retoure abgeschlossen und das Stück wieder frei. */
@@ -2359,26 +2391,4 @@ function retoureSchritt(rtNr, schritt, wert) {
     log_('Retoure ' + schritt, String(r['PG-ID']), rtNr + (wert ? ' ' + wert : ''));
     return retouren();
   } finally { lock.releaseLock(); }
-}
-
-/** Excel-Liste aller offenen Rückzahlungen. Fällig ist eine Rückzahlung, sobald die Retoure eröffnet ist. */
-function retourenExport() {
-  const ss = SpreadsheetApp.getActive();
-  const a = ss.getSheetByName(TAB_A) || ss.insertSheet(TAB_A);
-  const kopf = ['Retoure-Nr', 'Name', 'IBAN', 'Betrag CHF', 'Adresse', 'PLZ', 'Ort', 'Produkt', 'PG-ID', 'Verkauf-Nr', 'Ricardo-Benutzername', 'Verkauft am', 'Eröffnet am', 'Grund'];
-  const rows = rZeilen_().filter(function (r) { return r['Status'] !== 'Abgeschlossen' && !r['Rückzahlung am']; }).map(function (r) {
-    return [r['Retoure-Nr'], r['Name'], r['IBAN'], runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)), r['Adresse'], String(r['PLZ']), r['Ort'], r['Titel'], r['PG-ID'], String(r['Verkauf-Nr']), r['Käufer'],
-      datum_(r['Verkauft am']), datum_(r['Eröffnet am']), r['Grund']];
-  });
-  a.clear();
-  a.getRange(1, 1, 1, kopf.length).setValues([kopf]).setFontWeight('bold');
-  if (!rows.length) return { anzahl: 0 };
-  a.getRange(2, 1, rows.length, kopf.length).setValues(rows);
-  a.getRange(rows.length + 2, 3, 1, 2).setValues([['Total', runde_(rows.reduce(function (s, r) { return s + r[3]; }, 0))]]).setFontWeight('bold');
-  SpreadsheetApp.flush();
-  log_('Auszahlungsliste', '', rows.length + ' Rückzahlungen');
-  const datei = alsExcel_(ss, a, TAB_A);
-  // IBAN und Adressen werden nur für die Datei gebraucht und bleiben nicht in diesem Tab stehen
-  a.getRange(2, 1, rows.length + 1, kopf.length).clearContent();
-  return { anzahl: rows.length, name: 'Rueckzahlungen-' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') + '.xlsx', datei: datei };
 }
