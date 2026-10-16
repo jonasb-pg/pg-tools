@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-17.7`. Live: Bereitstellungsversion 6 vom 17.10.2026 (die Zählung der Versionen hat Google neu begonnen). Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-17.7`. Live: Bereitstellungsversion 6 vom 17.10.2026. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 
