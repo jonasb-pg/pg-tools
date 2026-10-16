@@ -21,7 +21,7 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Recherche-Anweisung | siehe [Recherche-Anweisung](#recherche-anweisung) | So sucht die KI. In normaler Sprache änderbar. |
 | Funktions-Anweisung | siehe [Funktions-Anweisung](#funktions-anweisung) | So stellt die KI die Liste der Funktionen und ihre Prüfschritte zusammen. |
 | Ersatzteil-Anweisung | siehe [Ersatzteil-Anweisung](#ersatzteil-anweisung) | So sucht die KI auf der Seite «Ersatzteile». Gilt für jede Marke. |
-| Recherche-Guthaben | 0 | Kostenbremse: So viele Vorab-Recherchen darf das Tool noch starten. Jede gestartete Recherche zieht eins ab, bei 0 startet keine mehr. Zum Freigeben eine Zahl eintragen. |
+| KI-Budget USD pro Monat | 150 | Kostenbremse: So viele USD dürfen die KI-Aufrufe dieses Tools pro Kalendermonat kosten (Summe im Tab «Kosten», laufende Recherchen geschätzt). Ist das Budget aufgebraucht, startet das Tool bis zum Monatsende keine Vorab-Recherchen mehr. 0 = keine. Ersetzt seit 16.10.2026 das «Recherche-Guthaben» (einrichten benennt die Zeile um). |
 | Vergleichsmodell |  | Nur zum Testen: Steht hier ein Modell, läuft jede Vorab-Recherche zusätzlich damit. Das Ergebnis steht nur im Tab «Kosten», zum Vergleichen von Preis und Qualität. Kostet doppelt. |
 | Stundenansatz Reparatur CHF | 50 | Mit diesem Ansatz rechnet das Tool die Arbeitszeit einer Reparatur. Quelle: Entscheid von Jonas vom 10.10.2026. |
 | Hausregeln | siehe [Hausregeln](#hausregeln) | Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar. |

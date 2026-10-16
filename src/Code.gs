@@ -12,13 +12,13 @@
  * Ablauf im Hintergrund: abgleichen() läuft alle 10 Minuten und macht vier Dinge nacheinander:
  *   1. spiegeln_  Warteschlange mit dem Tab «Analyse» im Return Tool abgleichen
  *   2. abholen_   fertige Recherchen bei Claude abholen
- *   3. starten_   für alle Produkte ohne Recherche eine neue Recherche in Auftrag geben, solange das Recherche-Guthaben reicht
+ *   3. starten_   für alle Produkte ohne Recherche eine neue Recherche in Auftrag geben, solange das KI-Budget des Monats reicht
  *   4. handbuecher_ für recherchierte Produkte das Handbuch suchen, im Ordner «HANDBÜCHER PDF» ablegen, lesen und ins Sheet «HANDBÜCHER» schreiben, solange das Handbuch-Guthaben reicht
  *
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.4';
+const VERSION = '2026-10-16.5';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -28,6 +28,10 @@ const WELLE = 10;             // Recherchen pro Abgleich. Mehr auf einmal weist 
 /* Preise von Claude in USD: pro Million Token (Eingabe, Ausgabe) und pro Websuche. Quelle: docs.claude.com, Stand 10.10.2026. Vorab-Recherchen laufen als Sammelauftrag zum halben Token-Preis. */
 const PREISE = { 'claude-sonnet-5-5': [2, 10], 'claude-haiku-5-5': [0.1, 0.5] };
 const PREIS_WEBSUCHE = 0.01;
+/* Kostenbremse für die Vorab-Recherchen: höchstens so viele USD pro Kalendermonat (Entscheid Jonas 16.10.2026). Gezählt wird alles im Tab «Kosten». */
+const BUDGET_VORGABE = 150;
+const BUDGET_SCHAETZUNG = 0.3;          // USD pro Recherche, solange es diesen Monat noch keine abgerechnete gibt
+const BUDGET_ERKL = 'Kostenbremse: So viele USD dürfen die KI-Aufrufe dieses Tools pro Kalendermonat kosten (Summe im Tab «Kosten», laufende Recherchen geschätzt). Ist das Budget aufgebraucht, startet das Tool bis zum Monatsende keine Vorab-Recherchen mehr. 0 = keine.';
 const KOSTEN_KOPF = ['Zeit', 'Art', 'ID', 'Bezeichnung', 'Modell', 'Tokens Eingabe', 'Tokens Ausgabe', 'Websuchen', 'Suchfehler', 'Abschluss', 'Belegte Infos', 'USD', 'Batch-ID', 'Antwort', 'Stufe'];
 
 /* Feste Werte, die Code und Sheet gemeinsam verwenden. Im Sheet nicht umbenennen. */
@@ -155,7 +159,7 @@ const MM_ANWEISUNG = 'Du prüfst für Pretty Good, ob ein geprüftes Produkt zu 
   + 'Im Zweifel bei unklarer Produktart: kein Treffer. Im Zweifel zwischen passt und ähnlich: ähnlich.';
 const NEUE_EINSTELLUNGEN = [
   ['Handbücher nicht zwischen', '07:00-18:30', 'In diesem Zeitfenster sucht und liest der Abgleich keine Handbücher (dauert pro Stück rund eine Minute und bremst das Tool). Er macht es am Abend und in der Nacht. Leer = immer.'],
-  ['Recherche-Guthaben', 0, 'Kostenbremse: So viele Vorab-Recherchen darf das Tool noch starten. Jede gestartete Recherche zieht eins ab, bei 0 startet keine mehr. Zum Freigeben eine Zahl eintragen.'],
+  ['KI-Budget USD pro Monat', BUDGET_VORGABE, BUDGET_ERKL],
   ['Vergleichsmodell', '', 'Nur zum Testen: Steht hier ein Modell, läuft jede Vorab-Recherche zusätzlich damit. Das Ergebnis steht nur im Tab «Kosten», zum Vergleichen von Preis und Qualität. Kostet doppelt.'],
   ['Stundenansatz Reparatur CHF', 50, 'Mit diesem Ansatz rechnet das Tool die Arbeitszeit einer Reparatur. Quelle: Entscheid von Jonas vom 10.10.2026.'],
   ['Hausregeln', HAUSREGELN, 'Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar.'],
@@ -187,7 +191,8 @@ const NEUE_EINSTELLUNGEN = [
 const EINST_UMBAU = [
   ['Ersatzteil lohnt bis Prozent vom VP', 'Reparatur lohnt bis Prozent vom VP', 'Eine Reparatur lohnt sich, wenn Arbeit und Ersatzteil zusammen höchstens so viel Prozent vom Verkaufspreis kosten. Gilt auch auf der Seite «Ersatzteile».'],
   ['Plan-Anweisung', 'Funktions-Anweisung', 'So stellt die KI die Liste der Funktionen und ihre Prüfschritte zusammen.', FUNKTIONS_ANWEISUNG],
-  ['KI-Modell Recherche', 'KI-Modell Recherche', 'Für die Vorab-Recherche und die Ersatzteil-Suche.']
+  ['KI-Modell Recherche', 'KI-Modell Recherche', 'Für die Vorab-Recherche und die Ersatzteil-Suche.'],
+  ['Recherche-Guthaben', 'KI-Budget USD pro Monat', BUDGET_ERKL, BUDGET_VORGABE]       // seit 2026-10-16.5: Monatsbudget statt Stückzahl
 ];
 const EINST_WEG = ['Elektrische Messung', 'Prüfgerät (Typ, Seriennummer)', 'Prüfgerät kalibriert bis', 'Schutzleiterwiderstand max. Ohm', 'Isolation min. MOhm, Schutzklasse I',
   'Isolation min. MOhm, Schutzklasse II', 'Schutzleiterstrom max. mA', 'Berührungsstrom max. mA', 'Mängel-Anweisung',
@@ -774,7 +779,8 @@ function starten_(e) {
     (zeilen[k] = zeilen[k] || []).push(r._r);
   });
   gesperrt_(function () { setz_('Produkte', 'Recherche-Status', bereit); });
-  const guthaben = Math.max(0, Math.floor(Number(e['Recherche-Guthaben']) || 0)), liste = Object.keys(offen).slice(0, Math.min(WELLE, guthaben));
+  const guthaben = rechercheFrei_(e), liste = Object.keys(offen).slice(0, Math.min(WELLE, guthaben));
+  if (!guthaben && Object.keys(offen).length) budgetVoll_(e);
   if (!liste.length) return { gestartet: 0 };
   if (!key_()) return { gestartet: 0, hinweis: 'OHNE_SCHLUESSEL' };
 
@@ -800,15 +806,48 @@ function starten_(e) {
     setz_('Produkte', 'Recherche-Status', laeuft);
     setz_('Produkte', 'Recherche-Batch', batchVon);
     schreib_('Quellen-Log', ice.log);
-    if (gestartet) {                                                    // Guthaben abbuchen
-      const neu = {};
-      lies_('Einstellungen').z.forEach(function (x) { if (String(x['Einstellung']).trim() === 'Recherche-Guthaben') neu[x._r] = Math.max(0, (Number(x['Wert']) || 0) - gestartet); });
-      setz_('Einstellungen', 'Wert', neu);
-    }
   });
   if (!hinweis) return { gestartet: gestartet };
   log_('Recherche-Fehler', '', hinweis);
   return { gestartet: gestartet, hinweis: hinweis };
+}
+
+/** Monatsbudget in USD (Einstellung «KI-Budget USD pro Monat»; fehlt sie noch, gilt die Vorgabe). */
+function monatsBudget_(e) {
+  const v = e['KI-Budget USD pro Monat'];
+  return v === undefined || String(v).trim() === '' ? BUDGET_VORGABE : Math.max(0, Number(zahl_(v)) || 0);
+}
+/**
+ * Was die KI diesen Kalendermonat gekostet hat (Tab «Kosten»), dazu die laufenden Recherchen geschätzt, und was eine Recherche im Schnitt kostet.
+ * Liest nur die Spalten Zeit, Art und USD.
+ */
+function monatsKosten_() {
+  const s = blatt_('Kosten'), k = kopf_(s), last = s.getLastRow(), monat = Utilities.formatDate(new Date(), TZ, 'MM.yyyy');
+  const cZ = k.indexOf('Zeit'), cA = k.indexOf('Art'), cU = k.indexOf('USD');
+  let usd = 0, rech = 0, n = 0;
+  if (last > 1 && cZ > -1 && cU > -1) s.getRange(2, 1, last - 1, k.length).getValues().forEach(function (r) {
+    const z = r[cZ], m = z instanceof Date ? Utilities.formatDate(z, TZ, 'MM.yyyy') : String(z).slice(3, 10);
+    if (m !== monat) return;
+    const u = Number(zahl_(r[cU])) || 0; usd += u;
+    if (String(r[cA]) === 'Vorab-Recherche' && u > 0) { rech += u; n++; }
+  });
+  const proRecherche = n ? rech / n : BUDGET_SCHAETZUNG;
+  const laufend = lies_('Produkte').z.filter(function (p) { return p['Recherche-Status'] === 'Läuft'; }).length;
+  return { usd: usd + laufend * proRecherche, proRecherche: proRecherche };
+}
+/** Wie viele Recherchen das Budget diesen Monat noch erlaubt. */
+function rechercheFrei_(e) {
+  const b = monatsBudget_(e);
+  if (!b) return 0;
+  const k = monatsKosten_();
+  return Math.max(0, Math.floor((b - k.usd) / Math.max(k.proRecherche, 0.01) + 1e-9));
+}
+/** Einmal pro Tag ins Log, wenn das Budget aufgebraucht ist (sonst stünde es alle 10 Minuten da). */
+function budgetVoll_(e) {
+  const c = CacheService.getScriptCache(), key = 'budgetvoll:' + Utilities.formatDate(new Date(), TZ, 'yyyyMMdd');
+  if (c.get(key)) return;
+  c.put(key, '1', 21600);
+  log_('Budget aufgebraucht', '', 'KI-Budget USD ' + monatsBudget_(e) + ' für diesen Monat erreicht. Neue Recherchen starten erst wieder ab dem 1. oder mit höherem Budget.');
 }
 
 /* ------------------------------------------------------------------ */

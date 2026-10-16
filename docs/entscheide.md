@@ -78,3 +78,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Preisvorschläge: immer annehmen, wenn bis 24 h nach Auktionsende (Ricardo begrenzt Vorschläge auf max. 20 % unter Preis).
 - Verkaufsbericht bleibt nötig (Adressen) und dient als Gegenkontrolle.
 - Post: Application «Ricardo Tool Pretty Good» im Developer Portal; Barcode (Standard) und Address query Webservice (Medium) beantragt, Status pending. Tracking nur auf Anfrage (Mail an digitalintegration@swisspost.ch). Frankierlizenz Pakete Inland: 60162228. Debitor 32359747.
+- **KI-Budget statt Recherche-Guthaben (Analyse .16.5):** Jonas will keine Stückzahl mehr pflegen. Neu ein Monatsbudget von USD 150 (Summe Tab «Kosten» im Kalendermonat plus laufende Recherchen geschätzt). Fehlt die Einstellung noch, gilt 150. Ist es aufgebraucht, einmal pro Tag Log «Budget aufgebraucht».
