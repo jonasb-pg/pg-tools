@@ -63,3 +63,9 @@ Hier, im selben Repo wie Analyse Tool und Matchmaker (Schnittstelle Tab «Ricard
 Neue Spalten in «Listings» (am Ende): `Analyse-Nr`, `Foto-Ordner`, `Text geändert`. «Foto-Ordner» ist nicht mehr in `ALT_L`. Vor dem Test einmal «einrichten» ausführen (hängt die drei Spalten und die Einstellung an; die bereitgestellte Version liest nur die ersten 32 Spalten und läuft weiter).
 
 Tests: `tests/t_ricardo_analyse.js` (Server, 23 Fälle), `tests/t_ricardo_ui.py` (Oberfläche mit Stub).
+
+## Umsetzung 2026-10-16.1
+
+- **Post-Adressen pro Versandklasse:** `postAdressen()` liefert `{ anzahl, dateien: [{ klasse, anzahl, name, datei }] }`, eine Excel-Datei pro Versandklasse in der Reihenfolge des Tabs «Versand», «Ohne Versandklasse» zuletzt. Jede Datei einzeln im Postlogin hochladen und dort die gleiche Klasse wählen.
+- **Hauptbild beim Packen:** `hauptbilder_()` sucht im Foto-Ordner des Listings (Spalte «Foto-Ordner», nur Stücke aus der Analyse) die Datei «1 Hauptbild …» und hängt ein Vorschaubild als data-URL an den Verkauf. Zwischenspeicher 6 Stunden pro PG-ID. Kein Ordner, kein Zugriff oder kein Bild: kein Bild, Packen wie bisher.
+- Tests: `tests/t_ricardo_post.js`, `tests/t_ricardo_pack.py`.

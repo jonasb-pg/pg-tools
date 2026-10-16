@@ -571,7 +571,7 @@
     'ri.ohneTyp': ['Kein Typenschild am Gerät', 'No type plate on the device'], 'ri.ohneMangel': ['Mängel auf Fotos nicht sichtbar', 'Defects not visible on photos'], 'ri.keinMangel': ['entfällt, keine Mängel', 'not needed, no defects'],
     'ri.n2': ['2 · Titel und Artikelbeschrieb', '2 · Title and description'], 'ri.schreibt': ['Die KI schreibt einen Entwurf …', 'The AI is writing a draft …'], 'ri.neu': ['Neu schreiben lassen', 'Write again'],
     'ri.ftitel': ['Titel', 'Title'], 'ri.zeichen': ['{0} von 60 Zeichen', '{0} of 60 characters'], 'ri.fbeschrieb': ['Artikelbeschrieb', 'Description'],
-    'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Übernommen', '4 · Taken over'], 'ri.preis': ['Startpreis', 'Starting price'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
+    'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Startpreis und Zustand', '4 · Starting price and condition'], 'ri.preis': ['Startpreis CHF', 'Starting price CHF'], 'ri.vorschlagVp': ['Vorschlag aus dem VP: CHF {0}', 'Suggested from the selling price: CHF {0}'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
     'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
     'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
@@ -1367,7 +1367,9 @@
   var RIC = null, QRLIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
   function kanal(v) {
     if (v === 'regal' || v === 'matchmaker') { AN.s.kanal = v; sichern(); abschluss(); return; }
-    AN.s.kanal = 'ricardo'; sichern(); zeichneSchritt();
+    AN.s.kanal = 'ricardo';
+    if (!AN.s.ricPreis && Number(AN.d.produkt.vp) > 0) AN.s.ricPreis = String(Number(AN.d.produkt.vp));   // Vorschlag: VP, die Person kann ihn ändern
+    sichern(); zeichneSchritt();
     fotoHolen(); if (!AN.s.ricTitel && !AN.s.ricBeschrieb) ricText(true);
   }
   function fwAbbruch(v, k, el) { AN.s.fwAbbruch = !!el.checked; sichern(); }
@@ -1384,7 +1386,7 @@
     if (!s.ricTitel.trim() || s.ricTitel.trim().length > 60) f.push(t('ri.fTitel'));
     if (!s.ricBeschrieb.trim()) f.push(t('ri.fBeschrieb'));
     if (!s.ricVersand) f.push(t('ri.fVersand'));
-    if (!(Number(AN.d.produkt.vp) > 0) && !(Number(s.ricPreis) > 0)) f.push(t('ri.fPreis'));
+    if (!(Number(s.ricPreis) > 0)) f.push(t('ri.fPreis'));
     return f;
   }
   function ricardoTeil(r) {
@@ -1398,8 +1400,8 @@
       + '<div class="knoepfe">' + taste('ricText', 'ri.neu', '', LAUF.ricLaeuft ? ' disabled' : '') + '</div></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n3') + '</div><div class="ric-versand">' + d.ricardo.versand.map(function (v, i) {
           return '<button data-a="ricVersand" data-v="' + i + '" class="' + (s.ricVersand === v.name ? 'an' : '') + '" aria-pressed="' + (s.ricVersand === v.name) + '">' + esc(v.name) + ' · CHF ' + esc(v.preis) + '</button>'; }).join('') + '</div></div>'
-      + '<div class="ric-box"><div class="n">' + tx('ri.n4') + '</div><dl class="werte" style="margin:0"><dt>' + tx('ri.preis') + '</dt><dd>' + (vp ? 'CHF ' + vp.toFixed(2)
-          : '<input type="number" min="1" step="1" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n4') + '</div><dl class="werte" style="margin:0"><dt>' + tx('ri.preis') + '</dt><dd>' + '<input type="number" min="1" step="any" inputmode="decimal" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">'
+          + (vp ? ' <span class="still">' + tx('ri.vorschlagVp', vp.toFixed(2)) + '</span>' : '') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
       + '<div class="meldung warn">' + tx('ri.zettel', d.produkt.id) + '</div>'
       + '<p class="still" id="ric-fehlt">' + (fehlt.length ? tx('ri.fehlt', fehlt.join(', ')) : '') + '</p>'
       + '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink', fehlt.length ? ' disabled id="ric-ab"' : ' id="ric-ab"') + '</div></div>';

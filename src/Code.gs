@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-15.15';
+const VERSION = '2026-10-16.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1981,7 +1981,7 @@ function ricardoText(d) {
 /** Was beim Abschluss mit «Auf Ricardo» stimmen muss. Gibt die Zeile für den Tab «Ricardo» zurück. */
 function ricardoPruefen_(d, u, x, e, p) {
   const r = d.ricardo || {}, titel = String(r.titel || '').trim(), beschrieb = String(r.beschrieb || '').trim();
-  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(p['VP CHF']) || zahl_(r.preis);
+  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(r.preis) || zahl_(p['VP CHF']);                       // Startpreis aus der Analyse (Vorschlag: VP, von Hand änderbar)
   if (!titel || titel.length > 60) throw new Error('Der Titel für Ricardo fehlt oder ist länger als 60 Zeichen.');
   if (!beschrieb) throw new Error('Der Artikelbeschrieb für Ricardo fehlt.');
   if (!v) throw new Error('Bitte die Versandklasse wählen.');

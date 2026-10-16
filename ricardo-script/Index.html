@@ -78,6 +78,7 @@
   td { padding:12px 16px; border-bottom:1px solid var(--linie); vertical-align:top; font-weight:600; }
   tr:last-child td { border-bottom:0; }
   td .klein { display:block; }
+  .vbild { float:left; width:56px; height:56px; object-fit:cover; border:2px solid var(--ink); border-radius:4px; margin:0 10px 4px 0; background:#fff; }
   .mono { font:400 14px/1.4 var(--mono); color:var(--muted); }
   .zeile-neu td { background:var(--pink-hell); }
   .betrag { white-space:nowrap; font-size:18px; }
@@ -439,7 +440,7 @@
     'v.a1': ['Adressliste bei der Post hochladen, Etiketten drucken', 'Upload the address list at Swiss Post, print the labels'],
     'v.a2': ['Packen: gebrauchter Karton, Pretty-Good-Klebeband, Matchmaker-Karte und Care-Flyer', 'Pack: used box, Pretty Good tape, matchmaker card and care flyer'],
     'v.a3': ['Paket in den Rollcontainer «Ricardo Unpaid»', 'Parcel into the roll container «Ricardo Unpaid»'], 'v.a4': ['Zahlung auf dem Konto prüfen, dann Postwagen', 'Check the payment on the bank account, then postal cart'],
-    'v.post': ['Adressliste für die Post erstellen', 'Create address list for Swiss Post'], 'v.post.leer': ['Keine Verkäufe mit Status «Zu packen».', 'No sales with status «To pack».'], 'v.post.dann': [' ({0} Adressen), dann im Postlogin unter «Paketetiketten Inland» hochladen.', ' ({0} addresses), then upload in the Post login under «Paketetiketten Inland».'],
+    'v.post': ['Adressliste für die Post erstellen', 'Create address list for Swiss Post'], 'v.post.leer': ['Keine Verkäufe mit Status «Zu packen».', 'No sales with status «To pack».'], 'v.post.mehr': ['{0} Adressen in {1} Dateien, eine pro Versandklasse. Jede einzeln im Postlogin unter «Paketetiketten Inland» hochladen und dort die gleiche Klasse wählen:', '{0} addresses in {1} files, one per shipping class. Upload each one separately in the Post login under «Paketetiketten Inland» and choose the same class there:'], 'v.post.n': ['{0} Adressen', '{0} addresses'], 'v.post.dann': [' ({0} Adressen), dann im Postlogin unter «Paketetiketten Inland» hochladen.', ' ({0} addresses), then upload in the Post login under «Paketetiketten Inland».'],
     'v.leer': ['Keine offenen Verkäufe. Alles gepackt, bezahlt und versendet.', 'No open sales. Everything is packed, paid and shipped.'],
     'v.gepackt': ['Gepackt', 'Packed'], 'v.bezahlt': ['Bezahlt und versendet', 'Paid and shipped'],
     'v.nichtzu': ['nicht zugeordnet', 'not linked'], 'v.ort': ['Lagerort {0}, ', 'Location {0}, '], 'v.nr': ['Nr. {0}', 'No. {0}'],
@@ -786,7 +787,7 @@
         ? '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'gepackt\')">' + t('v.gepackt') + '</button>'
         : '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'bezahlt\')">' + t('v.bezahlt') + '</button>';
       z += '<tr class="' + (o.status === 'Zu packen' ? 'zeile-neu' : '') + '"><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td>' +
-        '<td>' + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span></td>' +
+        '<td>' + (o.bild ? '<img class="vbild" src="' + esc(o.bild) + '" alt="">' : '') + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span></td>' +
         '<td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + (o.kaeufer && o.kaeufer !== o.name ? ', ' + esc(o.kaeufer) : '') + '</span></td>' +
         '<td class="betrag">CHF ' + esc(o.total) + '</td><td><span class="etikett">' + esc(st(o.status)) + '</span></td><td>' + a + '</td></tr>';
     });
@@ -797,10 +798,16 @@
     var los = function () { ruf('setzeVerkauf', [o.nr, aktion], function (v) { VK = v; zeichneVerkaeufe(); }); };
     if (aktion === 'gepackt') los(); else frage(t('v.f.bezahlt', o.pgId || o.titel, o.total), los);
   }
+  /* Eine Datei pro Versandklasse: Jede Datei einzeln im Postlogin hochladen und dort die passende Klasse wählen. */
   function post() {
     ruf('postAdressen', [], function (p) {
       if (!p.anzahl) { $('v-post').textContent = t('v.post.leer'); return; }
-      ladeDatei(p, $('v-post'), t('v.post.dann', p.anzahl));
+      $('v-post').innerHTML = '<span class="klein">' + t('v.post.mehr', p.anzahl, p.dateien.length) + '</span>' + p.dateien.map(function (d) {
+        var bin = atob(d.datei), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        var u = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        return '<span class="klein"><a href="' + u + '" download="' + esc(d.name) + '" target="_self">' + esc(d.klasse) + '</a> · ' + t('v.post.n', d.anzahl) + '</span>';
+      }).join('');
     });
   }
   /* ---------- Retouren ---------- */

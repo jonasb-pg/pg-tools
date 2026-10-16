@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-15.1';
+const VERSION = '2026-10-16.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku';
 const TZ = 'Europe/Zurich';
 
@@ -1142,6 +1142,7 @@ function verkaeufe() {
     if (V_OFFEN.indexOf(v['Status']) === -1) return;
     offen.push(vZeile_(v));
   });
+  hauptbilder_(offen);
   const rang = { 'Zu packen': 0, 'Wartet auf Zahlung': 1 };
   // Holliste: zuerst nach Status, dann nach Lagerort
   offen.sort(function (a, b) { return (rang[a.status] - rang[b.status]) || String(a.lagerort).localeCompare(String(b.lagerort)) || a.nr.localeCompare(b.nr); });
@@ -1220,30 +1221,94 @@ function setzeVerkauf(nr, aktion) {
   } finally { lock.releaseLock(); }
 }
 
-/** Schreibt die Adressen aller Verkäufe «Zu packen» im Format der Post-Vorlage «Adressen hochladen». */
+/**
+ * Schreibt die Adressen aller Verkäufe «Zu packen» im Format der Post-Vorlage «Adressen hochladen», eine Datei pro Versandklasse:
+ * Die Post nimmt Gewicht und Produkt pro Upload, nicht pro Adresse. So gibt jeder Upload einen Druckdurchlauf mit gleichen Etiketten.
+ */
 function postAdressen() {
   const ss = SpreadsheetApp.getActive();
   const sv = ss.getSheetByName(TAB_S);
-  let p = ss.getSheetByName(TAB_P) || ss.insertSheet(TAB_P);
-  p.clear();
-  if (p.getMaxColumns() < POST_KOPF.length) p.insertColumnsAfter(p.getMaxColumns(), POST_KOPF.length - p.getMaxColumns());
-  const rows = [];
+  const gruppen = {}, reihe = [];
   if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (v['Status'] !== 'Zu packen') return;
-    rows.push([v['Firma'], '', '', v['Nachname'], v['Vorname'], v['Postfach'] ? 'Postfach ' + v['Postfach'] : '', v['Strasse'], v['Hausnummer'],
+    const k = String(v['Versandklasse'] || '').trim() || 'Ohne Versandklasse';
+    if (!gruppen[k]) { gruppen[k] = []; reihe.push(k); }
+    gruppen[k].push([v['Firma'], '', '', v['Nachname'], v['Vorname'], v['Postfach'] ? 'Postfach ' + v['Postfach'] : '', v['Strasse'], v['Hausnummer'],
       v['PLZ'], v['Ort'], v['PG-ID'], '', '', '', 'Ricardo ' + v['Verkauf-Nr'], 1, 0]);
   });
-  p.getRange(1, 1, Math.max(p.getMaxRows(), 1), POST_KOPF.length).setNumberFormat('@');
-  p.getRange(1, 1, 1, POST_KOPF.length).setValues([POST_KOPF]);
-  if (rows.length) p.getRange(2, 1, rows.length, POST_KOPF.length).setValues(rows);
-  SpreadsheetApp.flush();
-  log_('Post-Adressen', '', rows.length + ' Adressen');
-  if (!rows.length) return { anzahl: 0 };
-  const datei = alsExcel_(ss, p, TAB_P);
-  // Die Adressen werden nur für die Datei gebraucht und bleiben nicht im Sheet stehen
-  p.getRange(2, 1, rows.length, POST_KOPF.length).clearContent();
-  return { anzahl: rows.length, name: 'Post-Adressen-' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') + '.xlsx', datei: datei };
+  if (!reihe.length) { log_('Post-Adressen', '', '0 Adressen'); return { anzahl: 0, dateien: [] }; }
+  /* Reihenfolge wie im Tab «Versand» (leicht bis schwer, Sperrgut zuletzt), unbekannte Klassen am Schluss */
+  const klassen = versandKlassen_();
+  reihe.sort(function (a, b) { const x = klassen.indexOf(a), y = klassen.indexOf(b); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y) || a.localeCompare(b); });
+  let p = ss.getSheetByName(TAB_P) || ss.insertSheet(TAB_P);
+  if (p.getMaxColumns() < POST_KOPF.length) p.insertColumnsAfter(p.getMaxColumns(), POST_KOPF.length - p.getMaxColumns());
+  const tag = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'), dateien = [];
+  let anzahl = 0;
+  try {
+    reihe.forEach(function (k) {
+      const rows = gruppen[k];
+      p.clear();
+      p.getRange(1, 1, Math.max(p.getMaxRows(), 1), POST_KOPF.length).setNumberFormat('@');
+      p.getRange(1, 1, 1, POST_KOPF.length).setValues([POST_KOPF]);
+      p.getRange(2, 1, rows.length, POST_KOPF.length).setValues(rows);
+      SpreadsheetApp.flush();
+      dateien.push({ klasse: k, anzahl: rows.length, name: 'Post-Adressen ' + tag + ' ' + k.replace(/[\\/:*?"<>|]+/g, '-') + '.xlsx', datei: alsExcel_(ss, p, TAB_P) });
+      anzahl += rows.length;
+    });
+  } finally {
+    // Die Adressen werden nur für die Dateien gebraucht und bleiben nicht im Sheet stehen
+    p.clear();
+    p.getRange(1, 1, 1, POST_KOPF.length).setValues([POST_KOPF]);
+  }
+  log_('Post-Adressen', '', dateien.map(function (d) { return d.klasse + ': ' + d.anzahl; }).join(', '));
+  return { anzahl: anzahl, dateien: dateien };
+}
+
+/** Namen der Versandklassen in der Reihenfolge des Tabs «Versand». */
+function versandKlassen_() {
+  const v = SpreadsheetApp.getActive().getSheetByName(TAB_V);
+  if (!v || v.getLastRow() < 2) return VERSAND_DEFAULT.map(function (x) { return x[0]; });
+  return v.getRange(2, 1, v.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]).trim(); }).filter(String);
+}
+
+/**
+ * Hängt an jeden offenen Verkauf das Hauptbild aus der Analyse (kleines Vorschaubild als data-URL), damit man das Stück beim Packen erkennt.
+ * Nur Stücke aus der Analyse haben Fotos im Drive (Spalte «Foto-Ordner» im Listing). Fehlt etwas, bleibt das Bild leer: Packen geht wie bisher.
+ * Zwischenspeicher 6 Stunden pro PG-ID, damit die Liste schnell lädt.
+ */
+function hauptbilder_(offen) {
+  const ids = offen.map(function (o) { return o.pgId; }).filter(String);
+  if (!ids.length) return;
+  const cache = CacheService.getScriptCache(), da = cache.getAll(ids.map(function (id) { return 'hb:' + id; })), ordner = {};
+  const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L), cO = col_('Foto-Ordner');
+  if (sl && sl.getLastRow() > 1 && cO) {
+    const a = sl.getRange(2, 1, sl.getLastRow() - 1, 1).getValues(), o = sl.getRange(2, cO, sl.getLastRow() - 1, 1).getValues();
+    a.forEach(function (r, i) { const u = String(o[i][0] || '').trim(); if (u) ordner[String(r[0]).trim()] = u; });
+  }
+  const neu = {};
+  offen.forEach(function (x) {
+    if (!x.pgId) return;
+    const key = 'hb:' + x.pgId;
+    if (da[key] !== undefined) { x.bild = da[key]; return; }
+    let bild = '';
+    try {
+      const m = /\/folders\/([\w-]+)/.exec(ordner[x.pgId] || '');
+      if (m) {
+        const it = DriveApp.getFolderById(m[1]).getFiles();
+        while (it.hasNext()) {
+          const f = it.next();
+          if (f.isTrashed() || f.getName().indexOf('1 Hauptbild') !== 0) continue;
+          const t = f.getThumbnail();
+          if (t) bild = 'data:' + (t.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(t.getBytes());
+          break;
+        }
+      }
+    } catch (e) { bild = ''; }                                                  // kein Zugriff oder Ordner weg: ohne Bild weiter
+    if (bild.length > 90000) bild = '';                                           // zu gross für den Zwischenspeicher und die Liste
+    x.bild = bild; neu[key] = bild;
+  });
+  if (Object.keys(neu).length) try { cache.putAll(neu, 21600); } catch (e) { /* ohne Zwischenspeicher */ }
 }
 
 /** Gibt einen Tab als Excel-Datei (Base64) zurück, damit er auch ohne eigenen Zugriff aufs Sheet heruntergeladen werden kann. */
