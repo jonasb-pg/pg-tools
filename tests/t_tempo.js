@@ -21,7 +21,7 @@ const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Er
   CacheService: { getScriptCache: () => ({ get: k => cacheStore[k] ?? null, put: (k, v) => { cacheStore[k] = v; }, remove: k => { delete cacheStore[k]; } }) },
   Utilities: { formatDate: (d, tz, f) => f === 'H' ? String(c.STUNDE) : '0' }, LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty() {}, deleteProperty() {} }) }, Session: { getActiveUser: () => ({ getEmail: () => 't' }) }, STUNDE: 10 };
-vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../src/Code.gs', 'utf8'), c);
+vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8'), c);
 vm.runInContext("log_ = function () {}; zeit_ = function () { return 'z'; };", c);
 
 const r = vm.runInContext("rechercheVon_('0761')", c);

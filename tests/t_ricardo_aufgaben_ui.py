@@ -1,7 +1,8 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 """Ricardo Tool: Reiter «Zu erledigen» mit Stub (Preisvorschlag, Frage, Nachricht, Zahlung überfällig). Lauf: python3 tests/t_ricardo_aufgaben_ui.py [bild.png]"""
 import json, pathlib, sys
 from playwright.sync_api import sync_playwright
-html = (pathlib.Path(__file__).parent.parent / 'ricardo-script/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
+html = (pathlib.Path(__file__).parent.parent / 'apps/ricardo/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
 AU = {'anzahl': 4, 'verpasst': 1,
       'kontrolle': {'aktiv': True, 'letzte': '16.10. 21:42', 'warnung': False, 'unecht': 0},
       'angebote': [{'id': 'm1', 'art': 'Preisvorschlag', 'eingang': '16.10. 12:08', 'alter': 2, 'titel': 'Neu: Haartrockner Z', 'pgId': 'PG-2002', 'artikel': '1332215532',

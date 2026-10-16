@@ -1,7 +1,8 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 """Ricardo Tool Oberfläche mit Stub: Liste «Aus der Analyse», Analyse-Modus gesperrt, Text wiederherstellen. Lauf: python3 tests/t_ricardo_ui.py"""
 import json, pathlib, re
 from playwright.sync_api import sync_playwright
-html = (pathlib.Path(__file__).parent.parent / 'ricardo-script/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
+html = (pathlib.Path(__file__).parent.parent / 'apps/ricardo/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
 R = {'id': 'PG-100', 'status': 'Bereit', 'ean': '076', 'bezeichnung': 'Toaster X', 'neupreis': 80, 'startpreis': '40.00', 'lagerort': '', 'zustand': 'Gebraucht', 'maengel': '',
      'frei': False, 'gewicht': 2, 'sperrgut': False, 'klasse': 'PostPac B-Post bis 2 kg', 'versand': '9.00', 'titel': 'Toaster X 2 Schlitze', 'beschrieb': 'Zustand: Gebraucht.',
      'link': '', 'produktlink': '', 'fehlt': [], 'versandForm': 'Paket, bis 2kg, Economy', 'getestet': True, 'buendelIds': [], 'buendelInhalt': [], 'masse': [],

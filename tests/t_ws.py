@@ -1,7 +1,8 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 # Werkstatt-Seite lokal: Liste, Formular, Speichern, Testmittel
 import json
 from playwright.sync_api import sync_playwright
-html=open('src/Index.html',encoding='utf8').read()
+html=open('../apps/analyse/Index.html',encoding='utf8').read()
 W={"konten":[{"r":2,"dienst":"Google","login":"pg.test@gmail.com","passwort":"Abc-123","geraet":"Foto-Handy","notiz":"","aktiv":True,"von":"JB","am":""}],
    "mittel":[{"name":"Steckdose","vorhanden":""},{"name":"Testkonto Google","vorhanden":"Ja"}],"dienste":["Google","Apple-ID","Amazon","Hersteller-App","Anderes"]}
 stub="""<script>window.CALLS=[];window.ARGS={};window.google={script:{url:{getLocation:function(cb){}},run:(function(){var ok;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(){return o},api:function(l,n,a){CALLS.push(n);ARGS[n]=a;var f=ok;

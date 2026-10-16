@@ -4,14 +4,17 @@
 
 | # | Schritt | Prüfung |
 |---|---|---|
-| 1 | Änderung lokal in `src/Code.gs` / `src/Index.html`, `VERSION` in beiden Dateien erhöhen | |
+| 1 | Änderung lokal in `apps/<tool>/Code.gs` / `Index.html` (oder `apps/basis/Basis.gs`), `VERSION` erhöhen | |
+| 1b | `sh tools/tests.sh` | alle ok |
 | 2 | `node --check` auf Code.gs (als .js) und auf die `<script>`-Blöcke aus Index.html | Syntax OK |
 | 3 | Code.gs in `vm.runInNewContext` mit Stubs (Session, PropertiesService, Utilities, SpreadsheetApp, DriveApp, ScriptApp, HtmlService, LockService, UrlFetchApp) | «top-level OK» (fängt `ReferenceError … before initialization`) |
 | 4 | Oberfläche lokal mit Playwright, `google.script.run` gestubbt | keine `pageerror`, Screenshots ansehen |
 | 5 | Zeilen-Patch in den Monaco-Editor des Scripts (prüft Zeilenzahl vorher) | djb2-Hash und Länge im Editor = lokal |
 | 6 | Speichern (Strg+S / Symbol) | «In Google Drive gespeichert» |
 | 7 | Test-Adresse `/dev` neu laden | Version unten links |
-| 8 | Commit ins Repo mit Doku-Update | |
+| 8 | Bei Änderung an `Basis.gs`: Datei «Basis» in beiden Projekten ersetzen, Hash prüfen | Hash in beiden Editoren = Repo |
+| 9 | Nach Änderungen an Tabs oder Basis: «einrichten» ausführen | Tab «Übersicht» zeigt neue Version |
+| 10 | Commit ins Repo mit Doku-Update | |
 
 Wichtig: Konstanten, die in Top-Level-Objekten (`SPALTEN`, `NEUE_EINSTELLUNGEN`) vorkommen, müssen **vor** diesen deklariert sein (`const` hat eine Temporal Dead Zone). Fehler vom 15.10.2026: `RICARDO_VERSAND`.
 
@@ -41,6 +44,8 @@ Wichtig: Konstanten, die in Top-Level-Objekten (`SPALTEN`, `NEUE_EINSTELLUNGEN`)
 Jeder KI-Aufruf schreibt eine Zeile in den Tab «Kosten» (`kostenzeile_`). Richtwerte: Vorab-Recherche ≈ USD 0.28/Produkt, Handbuch USD 0.05–0.10, Matchmaker ≈ USD 0.01/Produkt (Sonnet, ~70 Aufträge).
 
 ## Tests (lokal, nicht im Repo-CI)
+
+Alle auf einmal: `sh tools/tests.sh`. `t_basis.js` prüft die gemeinsame Basis mit beiden Tools.
 
 | Skript | Prüft |
 |---|---|

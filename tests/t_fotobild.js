@@ -1,5 +1,5 @@
 // Vorschaubild vom Server: data-URL, gemerkt, leer ohne Vorschau, leer wenn zu gross
-const fs = require('fs'), src = fs.readFileSync(__dirname + '/../src/Code.gs', 'utf8');
+const fs = require('fs'), src = fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8');
 const f = src.slice(src.indexOf('function fotoBild_('), src.indexOf('/** Ein Foto vom Handy ablegen.'));
 const store = {}; let thumbs = 0;
 const CacheService = { getScriptCache: () => ({ get: k => store[k] || null, put: (k, v) => { store[k] = v; } }) };
@@ -12,6 +12,6 @@ ok(a === 'data:image/jpeg;base64,AQID', 'data-URL');
 ok(fotoBild_(datei('A', [1, 2, 3])) === a && thumbs === 1, 'aus Zwischenspeicher');
 ok(fotoBild_(datei('B', null)) === '', 'ohne Vorschau leer');
 ok(fotoBild_(datei('C', new Array(80000).fill(7))) === '' && !store['fb:C'], 'zu gross leer');
-const ui = fs.readFileSync(__dirname + '/../src/Index.html', 'utf8');
+const ui = fs.readFileSync(__dirname + '/../apps/analyse/Index.html', 'utf8');
 ok(!/<img src="https:\/\/drive\.google\.com\/thumbnail/.test(ui) && (ui.match(/fotoSrc\(x\)/g) || []).length === 3, 'UI nutzt fotoSrc');
 console.log('ok t_fotobild');

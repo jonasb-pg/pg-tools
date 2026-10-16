@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.6';
+const VERSION = '2026-10-16.7';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -2392,6 +2392,44 @@ function verbindungTest() {
  * Einmal nach dem Einfügen des Codes ausführen, und nach jeder neuen Version. Bringt das Sheet auf den Stand dieser Version (umbau_),
  * prüft, ob es zum Code passt, und setzt den Auslöser.
  */
+/** Tabs des Analyse Tools für die gemeinsame Übersicht (Basis.gs). Reihenfolge innerhalb der Art = Reihenfolge im Sheet. */
+const ANALYSE_KATALOG = [
+  { tab: 'Produkte', art: 'arbeit', inhalt: 'Warteschlange: ein Stück pro Zeile. Kommt aus dem Tab «Analyse» des Return Tools (nur gelesen) oder wird im Tool als Stück ohne Inventar angelegt (AN-0001).' },
+  { tab: 'Recherche', art: 'arbeit', inhalt: 'Eine Info pro Zeile (z.B. Lieferumfang, Top-Defekt 1) mit Quelle und Score. Gilt pro Produkt, nicht pro Stück, und wird wiederverwendet.' },
+  { tab: 'Analysen', art: 'arbeit', inhalt: 'Eine abgeschlossene Analyse pro Zeile: Dauer, Ergebnis, Grade, Befund, Verkaufsinfo. Das ist das Prüfprotokoll pro Gerät.' },
+  { tab: 'Prüfschritte', art: 'arbeit', inhalt: 'Ein Prüfschritt pro Zeile mit Ergebnis, Zeit und Kürzel.' },
+  { tab: 'Ersatzteile', art: 'arbeit', inhalt: 'Jede Ersatzteil-Suche: gesuchtes Teil, Teilenummer, Preis, Shop. Zeigt auch, welche Teile oft gebraucht werden.' },
+  { tab: 'Ricardo', art: 'arbeit', inhalt: 'Ein Stück pro Zeile, das in der Analyse auf Ricardo geht: Titel, Artikelbeschrieb, Zustand, Startpreis, Versand, Link zum Foto-Ordner. Das Ricardo Tool liest von hier.' },
+  { tab: 'Bestellliste', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Ersatzteile für Stücke im Regal «Reparatur». «Status» (Offen, Bestellt, Da) setzt die Person, die gebündelt bestellt.' },
+  { tab: 'Testkonten', art: 'arbeit', inhalt: 'Testkonten für Geräte mit App und Konto, mit Logindaten. Gepflegt in der Oberfläche unter «Infrastruktur». Für das Analyse-Team sichtbar.' },
+  { tab: 'Feedback', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Rückmeldungen der Analyseleute aus dem Tool. «Status» (Neu, Erledigt) pflegt Jonas.' },
+  { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion und jeder Fehler mit Zeit und Person. Erste Anlaufstelle, wenn etwas unklar ist.' },
+  { tab: 'Kosten', art: 'protokoll', inhalt: 'Jeder KI-Aufruf mit Modell, Tokens, Websuchen und Kosten in USD. Grundlage für das KI-Budget.' },
+  { tab: 'Testmittel-Log', art: 'protokoll', inhalt: 'Jede Nennung eines Testmittels: benötigt oder gefehlt.' },
+  { tab: 'Quellen-Log', art: 'protokoll', inhalt: 'Eine Zeile pro Recherche und Quelle: gefunden oder nicht, gelieferte Felder.' },
+  { tab: 'Batches', art: 'protokoll', inhalt: 'Recherche-Läufe bei Claude mit Status.' },
+  { tab: 'Auswertung', art: 'hilfe', wer: 'Niemand (Formeln)', kopf: 0, inhalt: 'Abdeckung pro Quelle, Trefferquote des Scores, Analysezeit pro Kategorie. Nur Formeln.' },
+  { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Schalter, Grenzwerte, Hausregeln, KI-Budget und die Anweisungen an die KI in normaler Sprache.' },
+  { tab: 'Stufen', art: 'einstellung', inhalt: 'Stufe pro Herkunft und Verkaufspreis: Minuten, Tiefe der Recherche und Umfang der Funktionsprüfung.' },
+  { tab: 'Sicherheitspunkte', art: 'einstellung', inhalt: 'Was vor dem Einstecken angeschaut wird. «Gilt für» bestimmt, bei welchen Produkten ein Punkt erscheint.' },
+  { tab: 'Testmittel', art: 'einstellung', wer: 'Tool und Mensch', inhalt: 'Liste der Testmittel. «Vorhanden» pflegt das Team in der Oberfläche unter «Infrastruktur» (oder hier). Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».' },
+  { tab: 'Score-Regeln', art: 'einstellung', kopf: 0, inhalt: 'Punkte für den Accuracy Score und ein Rechenbeispiel.' },
+  { tab: 'Listen', art: 'einstellung', kopf: 2, inhalt: 'Auswahlwerte. Die linke Liste ist frei anpassbar, die rechte verwendet das Tool fest.' }
+];
+const ANALYSE_REGELN = [
+  ['Regeln', [
+    'Kopfzeilen nie umbenennen und keine Spalten löschen. Das Tool findet die Spalten über ihre Namen.',
+    'Das Return Tool wird nur gelesen. Das Tool schreibt dort nie.',
+    'Der Claude-API-Schlüssel steht nicht in diesem Sheet, sondern in den Script-Eigenschaften (ANTHROPIC_API_KEY).',
+    'Prüfprotokolle mindestens vier Jahre aufbewahren (EN 50614): Zeilen in «Analysen» und «Prüfschritte» nicht löschen.',
+    'Die Hausregeln für die Prüfung stehen im Tab «Einstellungen». Die KI hält sich beim Erstellen der Prüfschritte daran.'
+  ]],
+  ['Weiterentwickeln', [
+    'Der Code steht im GitHub-Repo jonasb-pg/pg-analyse-tool (apps/analyse, apps/basis). Basis.gs ist in allen Tools gleich und wird nur im Repo geändert.',
+    'Nach jeder Änderung VERSION erhöhen, im Editor «einrichten» ausführen und neu bereitstellen.'
+  ]]
+];
+
 function einrichten() {
   const ss = ss_(), fehler = [];
   vergissAlle_();
@@ -2422,6 +2460,10 @@ function einrichten() {
     lies_('Produkte').z.forEach(function (p) { if (p['Recherche-Status'] === 'Bereit' && !hat[String(p['Recherche-Schlüssel'])]) offen[p._r] = 'Offen'; });
     setz_('Produkte', 'Recherche-Status', offen);
   });
+  /* Gemeinsamer Standard (Basis.gs): Übersicht, Reihenfolge, Farben, Schrift, Warnschutz, Zeitzone */
+  const fehlt = basisEinrichten_(ss, { name: 'Analyse Tool', version: VERSION, zweck: 'Datenbank des Analyse Tools. Das Tool schreibt in die weissen Tabs. Angepasst wird nur in den gelben Tabs.',
+    legende: [['Dunkelgraue Kopfzeile', 'Berechnete Spalte. Das Tool schreibt die Formel pro Zeile.']] }, ANALYSE_KATALOG, ANALYSE_REGELN);
+  if (fehlt.length) log_('Einrichten', '', 'Tabs noch nicht angelegt: ' + fehlt.join(', '));
   vergissAlle_();
   log_('Einrichten', '', 'Version ' + VERSION + ', Claude-Schlüssel ' + (key_() ? 'vorhanden' : 'fehlt'));
   return 'Eingerichtet. Version ' + VERSION;
@@ -2514,20 +2556,5 @@ function umbau_(ss) {
   const cl = ss.getSheetByName('Chat-Log');
   if (cl) ss.deleteSheet(cl);
 
-  /* Übersicht: die Beschreibung der umbenannten Tabs */
-  const ue = ss.getSheetByName('Übersicht');
-  if (ue) {
-    ue.getDataRange().getValues().map(function (z, i) { return String(z[0]) === 'Chat-Log' ? i + 1 : 0; }).filter(Number).reverse().forEach(function (r) { ue.deleteRow(r); });
-    const neu = { 'Prüfgerüst': ['Sicherheitspunkte', 'Was vor dem Einstecken angeschaut wird. «Gilt für» bestimmt, bei welchen Produkten ein Punkt erscheint.'],
-      'Zeitbudgets': ['Stufen', ''], 'Stufen': ['Stufen', 'Stufe pro Herkunft und Verkaufspreis: Minuten, Tiefe der Recherche und Umfang der Funktionsprüfung.'],
-      'Analysen': ['Analysen', 'Eine abgeschlossene Analyse pro Zeile: Dauer, Ergebnis, Grade, Befund, Verkaufsinfo. Das ist das Prüfprotokoll pro Gerät.'],
-      'Einstellungen': ['Einstellungen', 'Schalter, Grenzwerte, Hausregeln und die Anweisungen an die KI in normaler Sprache.'],
-      'Listen': ['Listen', 'Auswahlwerte. Die linke Liste ist frei anpassbar, die rechte verwendet das Tool fest.'],
-      'Testmittel': ['Testmittel', 'Liste der Testmittel. «Vorhanden» pflegt das Team in der Oberfläche unter «Infrastruktur» (oder hier). Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».'] };
-    ue.getDataRange().getValues().forEach(function (z, i) {
-      const n = neu[String(z[0])];
-      if (n && (String(z[0]) !== n[0] || String(z[1]) !== (n[1] || neu['Stufen'][1]))) ue.getRange(i + 1, 1, 1, 2).setValues([[n[0], n[1] || neu['Stufen'][1]]]);
-      if (String(z[1]).indexOf('Abschnittsnummern der EN 50614') === 0) ue.getRange(i + 1, 2).setValue('Die Hausregeln für die Prüfung stehen im Tab «Einstellungen». Die KI hält sich beim Erstellen der Prüfschritte daran.');
-    });
-  }
+  /* Die Übersicht schreibt seit 2026-10-16.7 die gemeinsame Basis (Basis.gs) bei jedem «einrichten» ganz neu: ANALYSE_KATALOG. */
 }

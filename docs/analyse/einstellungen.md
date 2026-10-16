@@ -1,9 +1,9 @@
 # Einstellungen (Tab «Einstellungen»)
 
-<!-- Automatisch erzeugt mit tools/gen.py aus data/einstellungen-snapshot.json (Version 2026-10-15.15). Nicht von Hand ändern. -->
+<!-- Automatisch erzeugt mit tools/gen.py aus data/einstellungen-snapshot.json (Version 2026-10-16.7). Nicht von Hand ändern. -->
 
 
-Sheet ANALYSE TOOL (1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM), Tab Einstellungen, Stand 15.10.2026 12:10. Werte, die Geheimnisse sind, stehen nicht hier (siehe docs/secrets.md).
+Sheet ANALYSE TOOL (1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM), Tab Einstellungen, Stand 15.10.2026 12:10. Werte, die Geheimnisse sind, stehen nicht hier (siehe docs/gemeinsam/secrets.md).
 
 Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE_EINSTELLUNGEN` (Code) an, ändert bestehende Werte aber nicht.
 
@@ -21,7 +21,7 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Recherche-Anweisung | siehe [Recherche-Anweisung](#recherche-anweisung) | So sucht die KI. In normaler Sprache änderbar. |
 | Funktions-Anweisung | siehe [Funktions-Anweisung](#funktions-anweisung) | So stellt die KI die Liste der Funktionen und ihre Prüfschritte zusammen. |
 | Ersatzteil-Anweisung | siehe [Ersatzteil-Anweisung](#ersatzteil-anweisung) | So sucht die KI auf der Seite «Ersatzteile». Gilt für jede Marke. |
-| KI-Budget USD pro Monat | 150 | Kostenbremse: So viele USD dürfen die KI-Aufrufe dieses Tools pro Kalendermonat kosten (Summe im Tab «Kosten», laufende Recherchen geschätzt). Ist das Budget aufgebraucht, startet das Tool bis zum Monatsende keine Vorab-Recherchen mehr. 0 = keine. Ersetzt seit 16.10.2026 das «Recherche-Guthaben» (einrichten benennt die Zeile um). |
+| Recherche-Guthaben | 0 | Kostenbremse: So viele Vorab-Recherchen darf das Tool noch starten. Jede gestartete Recherche zieht eins ab, bei 0 startet keine mehr. Zum Freigeben eine Zahl eintragen. |
 | Vergleichsmodell |  | Nur zum Testen: Steht hier ein Modell, läuft jede Vorab-Recherche zusätzlich damit. Das Ergebnis steht nur im Tab «Kosten», zum Vergleichen von Preis und Qualität. Kostet doppelt. |
 | Stundenansatz Reparatur CHF | 50 | Mit diesem Ansatz rechnet das Tool die Arbeitszeit einer Reparatur. Quelle: Entscheid von Jonas vom 10.10.2026. |
 | Hausregeln | siehe [Hausregeln](#hausregeln) | Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar. |
@@ -33,21 +33,21 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Handbuch-Sheet ID | 1GqaJ3mFsVuwJmXVPBo0k-t78Rn5qsEf9ZKMHHR-9IYc | Das Sheet «HANDBÜCHER» mit allen gelesenen Handbüchern, eine Zeile pro Modell. Es bleibt bestehen, auch wenn das Analyse Tool ersetzt wird. |
 | Handbuch-Guthaben | 0 | Kostenbremse: So viele Handbücher darf das Tool noch suchen und lesen (rund USD 0.05 bis 0.10 pro Handbuch). Jedes zieht eins ab, bei 0 macht es keines mehr. |
 | KI-Modell Handbuch | claude-haiku-5-5 | Mit diesem Modell liest das Tool die Handbücher. Haiku reicht dafür (Test vom 14.10.2026: gleiche Qualität wie Sonnet zu einem Zwanzigstel des Preises). |
-| Handbuch-Anweisung | = Konstante HANDBUCH_ANWEISUNG in src/Code.gs (Wortlaut identisch) | So liest die KI ein Handbuch. Die Abschnitte und die fünf Kopfzeilen nicht umbenennen, das Tool liest sie aus. |
+| Handbuch-Anweisung | = Konstante HANDBUCH_ANWEISUNG in apps/analyse/Code.gs (Wortlaut identisch) | So liest die KI ein Handbuch. Die Abschnitte und die fünf Kopfzeilen nicht umbenennen, das Tool liest sie aus. |
 | Handbuch-Ordner ID | 1JUaSaYQpkt3HZn2ByjR4LpFJcwsoFOMJ | Der Drive-Ordner «HANDBÜCHER PDF». Das Tool legt jedes Handbuch dort ab (Marke Modell.pdf) und liest es von dort. Hochgeladene Handbücher landen auch hier. |
-| Handbuch-Suche | = Konstante HANDBUCH_SUCHE in src/Code.gs (Wortlaut identisch) | So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus. |
-| Ersatzteil-Shops | = Konstante TEIL_SHOPS in src/Code.gs (Wortlaut identisch) | Hier sucht die KI Ersatzteile zuerst, eine Zeile pro Shop: Name \| Domain \| Link \| Info. |
+| Handbuch-Suche | = Konstante HANDBUCH_SUCHE in apps/analyse/Code.gs (Wortlaut identisch) | So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus. |
+| Ersatzteil-Shops | = Konstante TEIL_SHOPS in apps/analyse/Code.gs (Wortlaut identisch) | Hier sucht die KI Ersatzteile zuerst, eine Zeile pro Shop: Name \| Domain \| Link \| Info. |
 | Ricardo ab VP CHF | 50 | Ab diesem Verkaufspreis schlägt das Tool im Entscheid «Auf Ricardo» vor. Die Person entscheidet. |
 | Ricardo-Foto-Ordner ID | 1DimLxvk4jqFf3gpbre1kKm5oE84_7TD4 | Der Drive-Ordner «RICARDO FOTOS». Pro Produkt ein Ordner mit der PG-ID, darin die Fotos vom Handy, das Hauptbild zuerst. |
 | Web-App-Adresse für Fotos | https://script.google.com/a/macros/pretty-good.ch/s/AKfycbz-CuQ5QOygYatY8Sq7L8EK0FaulltyecT3u_wTjKEe/dev | TEST-WERT. Vor Go-live leeren (leer = Live-Adresse der Web-App). |
-| Ricardo-Versand | = Konstante RICARDO_VERSAND in src/Code.gs | Versandklassen wie bei Ricardo, eine pro Zeile: Name \| Preis CHF. Pretty Good versendet mit B-Post. |
+| Ricardo-Versand | = Konstante RICARDO_VERSAND in apps/analyse/Code.gs | Versandklassen wie bei Ricardo, eine pro Zeile: Name \| Preis CHF. Pretty Good versendet mit B-Post. |
 | KI-Modell Ricardo | claude-haiku-5-5 | Mit diesem Modell schreibt das Tool Titel und Artikelbeschrieb für Ricardo. |
-| Ricardo-Anweisung | = Konstante RICARDO_ANWEISUNG in src/Code.gs | So schreibt die KI Titel und Artikelbeschrieb. Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter. |
+| Ricardo-Anweisung | = Konstante RICARDO_ANWEISUNG in apps/analyse/Code.gs | So schreibt die KI Titel und Artikelbeschrieb. Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter. |
 | Ricardo-Versandsatz | Versand ausschliesslich per Post, keine Abholung. | Steht in jedem Artikelbeschrieb. |
 | Ricardo-Schlusssatz | Alle Produkte werden von Pretty Good sorgfältig geprüft und mit einer Garantie von 30 Tagen verkauft. | Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. |
 | Matchmaker-Sheet ID | 1xxlT767Eqc7Y0OREu4fVM-LYWyJ2tSbfz52z0SS8L1w | Aus diesem Sheet (Tab «Matchmaker») liest das Tool die offenen Suchaufträge. Beim Auftrag schreibt es in die Spalte «Aus Analyse». |
 | KI-Modell Matchmaker | claude-sonnet-5-5 | Mit diesem Modell prüft das Tool jedes Produkt gegen alle offenen Suchaufträge. |
-| Matchmaker-Anweisung | = Konstante MM_ANWEISUNG in src/Code.gs (Wortlaut identisch) | Nach diesen Regeln entscheidet die KI «passt» oder «ähnlich». «Passt» ist Pflicht. |
+| Matchmaker-Anweisung | = Konstante MM_ANWEISUNG in apps/analyse/Code.gs (Wortlaut identisch) | Nach diesen Regeln entscheidet die KI «passt» oder «ähnlich». «Passt» ist Pflicht. |
 
 ## Prompts im Wortlaut
 

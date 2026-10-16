@@ -1,11 +1,11 @@
-"""Erzeugt docs/datenmodell.md, docs/api.md und docs/einstellungen.md aus data/code-facts.json und data/einstellungen-snapshot.json.
+"""Erzeugt docs/analyse/datenmodell.md, docs/analyse/api.md und docs/analyse/einstellungen.md aus data/code-facts.json und data/einstellungen-snapshot.json.
 Aufruf: node tools/extract.js && python3 tools/gen.py"""
 import json, os
 B = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 f = json.load(open(f'{B}/data/code-facts.json', encoding='utf8'))
 e = json.load(open(f'{B}/data/einstellungen-snapshot.json', encoding='utf8'))
 def esc(s): return str(s).replace('|', '\\|').replace('\n', '<br>')
-KOPF = '<!-- Automatisch erzeugt mit tools/gen.py aus src/Code.gs (Version {v}). Nicht von Hand ändern. -->\n\n'.format(v=f['version'])
+KOPF = '<!-- Automatisch erzeugt mit tools/gen.py aus apps/analyse/Code.gs (Version {v}). Nicht von Hand ändern. -->\n\n'.format(v=f['version'])
 
 # Datenmodell
 ROLLE = {
@@ -35,7 +35,7 @@ L += ['', 'Zusätzlich angelegt bei Bedarf: «Kosten» (jeder KI-Aufruf), «Best
 for t, cols in f['spalten'].items():
     if not cols: continue
     L += [f'## {t}', '', '| # | Spalte |', '|---|---|'] + [f'| {i+1} | {esc(c)} |' for i, c in enumerate(cols)] + ['']
-open(f'{B}/docs/datenmodell.md', 'w', encoding='utf8').write('\n'.join(L))
+open(f'{B}/docs/analyse/datenmodell.md', 'w', encoding='utf8').write('\n'.join(L))
 
 # API
 def clean(d): return '' if not d or d.startswith('-') else d
@@ -44,10 +44,10 @@ L = ['# Server-Funktionen', '', KOPF, 'Einziger Einstieg aus der Oberfläche: `a
 L += [f"| `{a['name']}` | `{esc(a.get('params',''))}` | {a.get('zeile','')} | {esc(clean(a.get('doc','')))} |" for a in f['api']]
 L += ['', '## Intern (Endung `_` = nicht aufrufbar aus dem Browser)', '', '| Funktion | Parameter | Zeile | Zweck |', '|---|---|---|---|']
 L += [f"| `{a['name']}` | `{esc(a.get('params',''))}` | {a.get('zeile','')} | {esc(clean(a.get('doc','')))} |" for a in sorted(f['intern'], key=lambda x: x.get('zeile', 0))]
-open(f'{B}/docs/api.md', 'w', encoding='utf8').write('\n'.join(L) + '\n')
+open(f'{B}/docs/analyse/api.md', 'w', encoding='utf8').write('\n'.join(L) + '\n')
 
 # Einstellungen
-L = ['# Einstellungen (Tab «Einstellungen»)', '', KOPF.replace('aus src/Code.gs', 'aus data/einstellungen-snapshot.json'), e['_quelle'], '',
+L = ['# Einstellungen (Tab «Einstellungen»)', '', KOPF.replace('aus apps/analyse/Code.gs', 'aus data/einstellungen-snapshot.json'), e['_quelle'], '',
      'Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE_EINSTELLUNGEN` (Code) an, ändert bestehende Werte aber nicht.', '',
      '| Einstellung | Wert | Zweck |', '|---|---|---|']
 lang = []
@@ -56,5 +56,5 @@ for n, w, x in e['zeilen']:
     L.append(f'| {esc(n)} | {esc(w)} | {esc(x)} |')
 L += ['', '## Prompts im Wortlaut', '']
 for n, w in lang: L += [f'### {n}', '', '```text', w, '```', '']
-open(f'{B}/docs/einstellungen.md', 'w', encoding='utf8').write('\n'.join(L))
+open(f'{B}/docs/analyse/einstellungen.md', 'w', encoding='utf8').write('\n'.join(L))
 print('ok')

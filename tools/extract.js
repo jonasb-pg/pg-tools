@@ -1,6 +1,6 @@
-// Liest src/Code.gs und schreibt data/code-facts.json: Konstanten, Tabs und Spalten, API-Funktionen mit Kommentar.
+// Liest apps/analyse/Code.gs und schreibt data/code-facts.json: Konstanten, Tabs und Spalten, API-Funktionen mit Kommentar.
 const vm = require('vm'), fs = require('fs'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../src/Code.gs'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '../apps/analyse/Code.gs'), 'utf8');
 const P = new Proxy(function () {}, { get: (t, k) => k === Symbol.toPrimitive ? () => '' : P, apply: () => P, construct: () => P });
 const c = { console, Session: P, PropertiesService: P, Utilities: P, SpreadsheetApp: P, DriveApp: P, ScriptApp: P, HtmlService: P, LockService: P, UrlFetchApp: P, CacheService: P, ContentService: P };
 vm.createContext(c); vm.runInContext(src, c);

@@ -1,7 +1,8 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 """Ricardo Tool: Hauptbild beim Packen und ein Post-Export pro Versandklasse (Oberfläche mit Stub). Lauf: python3 tests/t_ricardo_pack.py"""
 import json, pathlib, base64
 from playwright.sync_api import sync_playwright
-html = (pathlib.Path(__file__).parent.parent / 'ricardo-script/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
+html = (pathlib.Path(__file__).parent.parent / 'apps/ricardo/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
 PIX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 O = lambda nr, pg, bild: {'nr': nr, 'pgId': pg, 'titel': 'Stück ' + nr, 'am': '16.10.2026', 'total': '49.00', 'preis': '40.00', 'status': 'Zu packen', 'name': 'A B', 'kaeufer': 'ab', 'ort': '3000 Bern', 'lagerort': 'Regal Unpaid', 'klasse': 'PostPac B-Post bis 2 kg', 'bild': bild}
 X = base64.b64encode(b'xlsx').decode()

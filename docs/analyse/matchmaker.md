@@ -10,7 +10,7 @@
 
 Suchprofil-Format (Text, von Hand änderbar): `Art:` / `Muss:` / `Wunsch:` / `Nicht:` / `Suchwörter:`.
 
-## Matchmaker-Script (`matchmaker-script/Code.gs`, Version 3)
+## Matchmaker-Script (`apps/matchmaker/Code.gs`, Version 3)
 
 Container-gebundenes Apps-Script-Projekt im Matchmaker Sheet (Erweiterungen → Apps Script), 1 Datei `Code.gs`, 820 Zeilen. Stand im Repo = Editor am 15.10.2026.
 

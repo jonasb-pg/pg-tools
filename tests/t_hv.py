@@ -1,6 +1,12 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 import base64, json, sys
 from playwright.sync_api import sync_playwright
-html=open('../src/Index.html',encoding='utf8').read()
+html=open('../apps/analyse/Index.html',encoding='utf8').read()
+if not os.path.exists('test.pdf'):   # Testdatei: 12 Seiten, «Reset» steht auf Seite 9. Wird beim ersten Lauf erzeugt.
+    from reportlab.pdfgen import canvas
+    c = canvas.Canvas('test.pdf')
+    for i in range(12): c.drawString(72, 720, 'Testseite %d' % (i + 1) + (' Reset auf Werkseinstellungen' if i == 8 else '')); c.showPage()
+    c.save()
 pdf=base64.b64encode(open('test.pdf','rb').read()).decode()
 stub="""<script>window.CALLS=[];window.google={script:{run:(function mk(){var ok,ko;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(f){ko=f;return o},api:function(l,n,a){CALLS.push(n);var okf=ok;ok=null;ko=null;if(n==='handbuchPdf')setTimeout(function(){okf({name:'t.pdf',daten:'%s',ab:4,datei:'https://drive.google.com/file/d/x/view'})},50);}};return o;})()}};</script>"""%pdf
 html=html.replace('<head>','<head>'+stub,1)

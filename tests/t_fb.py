@@ -1,5 +1,6 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 from playwright.sync_api import sync_playwright
-html=open('../src/Index.html',encoding='utf8').read()
+html=open('../apps/analyse/Index.html',encoding='utf8').read()
 stub="<script>window.CALLS=[];window.google={script:{run:(function(){var ok;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(){return o},api:function(l,n,a){CALLS.push([n,a]);if(n==='feedback'){var f=ok;setTimeout(function(){f(true)},20);}}};return o;})()}};</script>"
 html=html.replace('<head>','<head>'+stub,1)
 with sync_playwright() as p:

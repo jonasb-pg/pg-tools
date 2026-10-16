@@ -1,6 +1,6 @@
 /* Ricardo Tool: Post-Export pro Versandklasse und Hauptbild beim Packen. Lauf: node tests/t_ricardo_post.js */
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../ricardo-script/Code.gs'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '../apps/ricardo/Code.gs'), 'utf8');
 function blatt(name, rows) {
   let d = rows.map(r => r.slice());
   const sh = { d: () => d, getSheetId: () => 7, getName: () => name, getLastRow: () => d.length, getMaxColumns: () => 40, getMaxRows: () => d.length + 50, insertColumnsAfter() {},

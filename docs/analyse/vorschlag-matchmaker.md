@@ -1,6 +1,6 @@
 # Matchmaker vereinfachen: Befund und Vorschlag (15.10.2026)
 
-Grundlage: Matchmaker Sheet (Tab «Matchmaker», 72 Zeilen), Matchmaker-Script (`matchmaker-script/Code.gs`), Admin-App `app.pretty-good.ch/admin/matchmaking` (nur angesehen, nichts geändert), Recherche `claude/nacht-recherche/03-matchmaker.md`. Personendaten der Kundschaft sind hier bewusst nicht übernommen.
+Grundlage: Matchmaker Sheet (Tab «Matchmaker», 72 Zeilen), Matchmaker-Script (`apps/matchmaker/Code.gs`), Admin-App `app.pretty-good.ch/admin/matchmaking` (nur angesehen, nichts geändert), Recherche `claude/nacht-recherche/03-matchmaker.md`. Personendaten der Kundschaft sind hier bewusst nicht übernommen.
 
 ## Befund
 

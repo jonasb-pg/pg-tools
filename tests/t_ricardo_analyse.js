@@ -1,6 +1,6 @@
 /* Ricardo Tool: Quelle ANALYSE TOOL, Analyse-Modus, gemischte Bündel, RC neu listen. Lauf: node tests/t_ricardo_analyse.js */
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../ricardo-script/Code.gs'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '../apps/ricardo/Code.gs'), 'utf8');
 
 function blatt(name, rows) {
   const d = rows.map(r => r.slice());

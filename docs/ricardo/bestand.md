@@ -44,7 +44,7 @@ Quelle: Chat «Ricardo Tool» (08.–10.10.2026, https://claude.ai/chat/ea5f8271
 
 ## Wo überarbeiten
 
-Hier, im selben Repo wie Analyse Tool und Matchmaker (Schnittstelle Tab «Ricardo» liegt hier; der alte Chat ist lang und voller überholter Entscheide; sein Code lag nur in einer temporären Sandbox). Voraussetzung: `Code.gs` und `Index.html` des Ricardo Tools ins Repo (`ricardo-script/`), wie beim Matchmaker.
+Hier, im selben Repo wie Analyse Tool und Matchmaker (Schnittstelle Tab «Ricardo» liegt hier; der alte Chat ist lang und voller überholter Entscheide; sein Code lag nur in einer temporären Sandbox). Voraussetzung: `Code.gs` und `Index.html` des Ricardo Tools ins Repo (`apps/ricardo/`), wie beim Matchmaker.
 
 ## Umsetzung 2026-10-15.1 (Testversion, nicht bereitgestellt)
 

@@ -1,29 +1,35 @@
 # pg-analyse-tool
 
-Analyse Tool von Pretty Good: geführte Prüfung von Retouren am Analyseplatz, mit KI-Recherche, Handbuch, Ersatzteilen, Ricardo-Vorbereitung, Reparatur und Matchmaker. Google Apps Script + Google Sheets.
+Die internen Tools von Pretty Good als Google Apps Script mit Google Sheets als Datenbank. Beide Tools sind gleich aufgebaut und teilen `Basis.gs` (Sheet-Standard).
+
+| Tool | Zweck | Code | Doku |
+|---|---|---|---|
+| Analyse Tool | Geführte Prüfung von Retouren am Analyseplatz: KI-Recherche, Handbuch, Ersatzteile, Ricardo-Vorbereitung, Reparatur, Matchmaker | `apps/analyse/` | `docs/analyse/` |
+| Ricardo Tool | Verkauf über Ricardo: Listings, Mails, Verkäufe, Versand, Retouren | `apps/ricardo/` | `docs/ricardo/` |
+| Matchmaker | Script im Matchmaker Sheet (Suche, Profile, Urteile) | `apps/matchmaker/` | `docs/analyse/matchmaker.md` |
+| Basis | Gemeinsamer Sheet-Standard: Übersicht, Tab-Reihenfolge, Farben, Schrift, Schutz | `apps/basis/Basis.gs` | `docs/gemeinsam/sheet-standard.md` |
+
+## Aufbau
 
 | Pfad | Inhalt |
 |---|---|
-| `src/Code.gs` | Server (Apps Script), Stand = Editor |
-| `src/Index.html` | Oberfläche (HTML, CSS, JS) |
-| `ricardo-script/Code.gs`, `Index.html` | Ricardo Tool (Sheet RICARDO TOOL), Stand 2026-10-09.2 = Editor 15.10. |
-| `matchmaker-script/Code.gs` | Script im Matchmaker Sheet (Suche, Profile, Urteile), Stand = Editor |
-| `docs/architektur.md` | Komponenten, IDs, Datenflüsse, Trigger, Sperren |
-| `docs/datenmodell.md` | Tabs und Spalten (erzeugt) |
-| `docs/stati.md` | Stati, Übergänge, Regale, Gründe, Stufen, Grades |
-| `docs/einstellungen.md` | Einstellungen und Prompts im Wortlaut (erzeugt) |
-| `docs/api.md` | Server-Funktionen (erzeugt) und externe APIs |
-| `docs/secrets.md` | Wo Schlüssel liegen (nie Werte) |
-| `docs/matchmaker.md` | Matchmaker Sheet, Script, Integration |
-| `docs/betrieb.md` | Einspielen, Go-live, Kosten, Tests |
-| `docs/vorschlag-matchmaker.md` | Befund und Vorschlag Matchmaker vereinfachen |
-| `docs/ricardo-tool-bestand.md` | Ricardo Tool: Ist, Lücken, Anpassungen |
-| `docs/standardablauf.md` | Ablauf am Analyseplatz (gleich wie Projekt-Doc «analyse-tool-standardablauf») |
-| `docs/entscheide.md` | Entscheid-Log |
-| `data/` | Snapshot Einstellungen, extrahierte Code-Fakten |
-| `tools/` | `extract.js` + `gen.py`: erzeugte Doku neu bauen |
-| `tests/` | lokale Playwright-/Node-Tests |
+| `apps/<tool>/Code.gs`, `Index.html` | Server und Oberfläche, Stand = Editor |
+| `apps/basis/Basis.gs` | in jedem Apps-Script-Projekt als Datei «Basis» identisch; Quelle ist nur das Repo |
+| `docs/analyse/` | Architektur, Datenmodell, Stati, Einstellungen, API, Standardablauf, Matchmaker |
+| `docs/ricardo/` | Architektur, Bestand |
+| `docs/gemeinsam/` | Sheet-Standard, Betrieb (Einspielen, Go-live, Tests), Secrets (nur wo, nie Werte), Entscheide |
+| `data/` | Snapshot Einstellungen, extrahierte Code-Fakten (Analyse) |
+| `tools/` | `tests.sh` (alle Tests), `extract.js` + `gen.py` (erzeugte Doku Analyse) |
+| `tests/` | Node-Tests (Server mit Stubs) und Playwright-Tests (Oberfläche) |
 
-Doku neu erzeugen: `node tools/extract.js && python3 tools/gen.py`
+## Befehle
 
-Regel: Jede Code-Änderung = Commit mit `VERSION`, Doku-Update und Eintrag in `docs/entscheide.md`, wenn ein Entscheid dahintersteht. Keine Schlüssel, Passwörter oder Personendaten im Repo.
+- Alle Tests: `sh tools/tests.sh`
+- Doku Analyse neu erzeugen: `node tools/extract.js && python3 tools/gen.py`
+
+## Regeln
+
+- Jede Code-Änderung = Commit mit erhöhter `VERSION`, Doku-Update und Eintrag in `docs/gemeinsam/entscheide.md`, wenn ein Entscheid dahintersteht.
+- `Basis.gs` nur im Repo ändern und dann in beide Projekte kopieren.
+- Keine Schlüssel, Passwörter oder Personendaten im Repo. Tests verwenden erfundene Namen.
+- Live geht nichts ohne Go von Jonas (neue Bereitstellung im Editor).

@@ -1,6 +1,6 @@
 // Ricardo-Mails: Erkennen, Echtheit, Wirkung auf Verkäufe/Listings/Posteingang, Aufgaben. Aufbau der Mails wie echt (Okt 2026), Namen erfunden.
 const fs = require('fs'), vm = require('vm');
-const src = fs.readFileSync(__dirname + '/../ricardo-script/Code.gs', 'utf8');
+const src = fs.readFileSync(__dirname + '/../apps/ricardo/Code.gs', 'utf8');
 const ok = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
 
 const VERKAUF = `Hallo Jonas,

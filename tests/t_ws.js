@@ -1,7 +1,7 @@
 // Werkstatt: kontoSpeichern / kontenAbgleich_ / mittelSpeichern mit einem Sheet im Speicher
 const vm=require('vm'),fs=require('fs');const P=new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?()=>'':P,apply:()=>P,construct:()=>P});
 const c={console,Session:P,PropertiesService:P,Utilities:P,SpreadsheetApp:P,DriveApp:P,ScriptApp:P,HtmlService:P,LockService:P,UrlFetchApp:P,CacheService:P,ContentService:P};
-vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/../src/Code.gs','utf8'),c);
+vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/../apps/analyse/Code.gs','utf8'),c);
 vm.runInContext(`
 var DB={Testkonten:[], Testmittel:[{Testmittel:'Steckdose',Vorhanden:''},{Testmittel:'Testkonto Google',Vorhanden:'Nein'},{Testmittel:'Testkonto Apple-ID',Vorhanden:'Nein'}]};
 lies_=function(n){return {kopf:[],z:DB[n].map(function(r,i){return Object.assign({_r:i+2},r);})}};

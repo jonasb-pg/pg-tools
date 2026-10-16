@@ -39,7 +39,7 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 15.10.2026 | Matchmaker | KI-Abgleich pro Produkt gegen alle offenen Aufträge nach der Identität; Treffer «passt» = Pflicht, keine Wahl; MM vor Ricardo; Wiedereinstieg per Scan durch MM-Person; Vermerk «Aus Analyse» im Matchmaker Sheet | |
 | 15.10.2026 | Admin | Admin-Bereich für Analyse-Team (Testkonten inkl. Logindaten nach internen Regeln, Testmittel, weitere Aktionen) | |
 | 15.10.2026 | Doku | Technische Doku in privatem GitHub-Repo unter Jonas' eigenem Konto | |
-| 15.10.2026 | Doku | Repo bei jeder Änderung nachführen (Code, Doku, Entscheide); Matchmaker-Script liegt in `matchmaker-script/` | |
+| 15.10.2026 | Doku | Repo bei jeder Änderung nachführen (Code, Doku, Entscheide); Matchmaker-Script liegt in `apps/matchmaker/` | |
 | 15.10.2026 | Admin | Admin-Bereich vorerst nur Testkonten und Testmittel; Passwörter für das Analyse-Team sichtbar | |
 | 15.10.2026 | Repo | Ein Repo für alle Tools vorgeschlagen (Umbenennung in `pg-tools` offen, macht Jonas) | |
 | 15.10.2026 | Daten | Return Tool bleibt «nur lesen», kein Rückfluss im Moment; Matchmaker Sheet (erledigte Stücke im Abgleich) und Ricardo Tool später anschauen | |
@@ -89,3 +89,5 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Zahlung überfällig nach 3 Tagen mit Erinnerungstext, «Erinnerung gesendet» blendet aus.
 - Zum Aktivieren: neue Version bereitstellen, dann einmal «einrichten» (Gmail-Berechtigung, Auslöser, Tab Posteingang, neue Spalten).
 - **Analyse .16.6 (Feedback Simon):** Uhr startet, wenn der Überblick erscheint (nicht beim Scan). Beworbene Funktionen höchstens 5 (Einstellung «Höchstens beworbene Funktionen»), die Recherche sortiert die Funktionen nach Wichtigkeit, die ersten werden geprüft; bei Prüfumfang «Alle» keine Grenze. Neue Sortierung gilt für neue Recherchen. Admin zeigt KI-Kosten des Monats.
+| 16.10.2026 | Sheets | Analyse und Ricardo Tool gleich aufgebaut: gemeinsame Datei `Basis.gs` (keine Bibliothek), Übersicht als erster Tab, Reihenfolge Daten > Verlauf > Hilfstabs > Einstellungen, Reiterfarben weiss/grau/gelb, Arial, Kopfzeile #efefef, Zeitzone Zürich. Wirkt beim nächsten «einrichten». | Ricardo: Tab «Doku», Kopffarbe #e6efe9; Analyse: Übersicht von Hand gepflegt |
+| 16.10.2026 | Repo | Ein Repo für alle Tools: `apps/<tool>`, `docs/<tool>`, `docs/gemeinsam`, `tests`, `tools/tests.sh`. clasp/GitHub Actions später. | `src/`, `ricardo-script/`, `matchmaker-script/` |

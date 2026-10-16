@@ -1,6 +1,7 @@
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
 import json
 from playwright.sync_api import sync_playwright
-html=open('src/Index.html',encoding='utf8').read()
+html=open('../apps/analyse/Index.html',encoding='utf8').read()
 ang=[{"id":"PG-1","teil":"Akku 3.6V","nummer":"BAT-77","shop":"RS","preis":24.5,"link":"https://ch.rs-online.com/x","produkt":"Dyson"},{"id":"PG-9","teil":"falsch","preis":1}]
 stub="""<script>window.CALLS=[];window.PAUSE=null;window.google={script:{url:{getLocation:function(cb){}},run:(function(){var ok;var o={withSuccessHandler:function(f){ok=f;return o},withFailureHandler:function(){return o},api:function(l,n,a){CALLS.push(n);var f=ok;
 if(n==='startDaten')setTimeout(function(){f({version:'x',admin:false,zahlen:{offen:3},listen:{kategorie:[]},reparatur:[{id:'PG-5',bezeichnung:'Nespresso',was:'Pumpe tauschen',teil:'Pumpe',status:'Bestellt',kuerzel:'JB',zeit:'15.10.2026 11:00:00'}]})},5);

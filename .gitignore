@@ -1,4 +1,6 @@
+# Bildschirmfotos und Testdateien, die die Tests erzeugen
 *.png
 *.xlsx
+tests/test.pdf
 node_modules/
 __pycache__/

@@ -1,5 +1,5 @@
 // Monatsbudget: zählt nur diesen Monat, schätzt laufende Recherchen, 0 = keine
-const fs = require('fs'), src = fs.readFileSync(__dirname + '/../src/Code.gs', 'utf8');
+const fs = require('fs'), src = fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8');
 const ab = src.indexOf('/** Monatsbudget in USD'), bis = src.indexOf('/** Einmal pro Tag ins Log');
 const ok = (c, m) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
 const zahlSrc = src.slice(src.indexOf('function zahl_('), src.indexOf('\n}', src.indexOf('function zahl_(')) + 2);

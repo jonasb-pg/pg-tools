@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-16.3';
+const VERSION = '2026-10-16.4';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang';
 const TZ = 'Europe/Zurich';
 
@@ -114,7 +114,7 @@ function einrichten() {
   let e = ss.getSheetByName(TAB_E);
   if (!e) {
     e = ss.insertSheet(TAB_E);
-    e.getRange(1, 1, 1, 3).setValues([['Einstellung', 'Wert', 'Erklärung']]).setFontWeight('bold').setBackground('#e6efe9');
+    e.getRange(1, 1, 1, 3).setValues([['Einstellung', 'Wert', 'Erklärung']]).setFontWeight('bold').setBackground('#efefef');
     e.setColumnWidth(1, 220); e.setColumnWidth(2, 380); e.setColumnWidth(3, 480); e.setFrozenRows(1);
   }
   // Einstellungen aus früheren Versionen entfernen
@@ -130,7 +130,7 @@ function einrichten() {
   let v = ss.getSheetByName(TAB_V);
   if (!v) {
     v = ss.insertSheet(TAB_V);
-    v.getRange(1, 1, 1, 4).setValues([['Versandklasse (wie bei Ricardo)', 'bis kg', 'Preis CHF', 'Sperrgut']]).setFontWeight('bold').setBackground('#e6efe9');
+    v.getRange(1, 1, 1, 4).setValues([['Versandklasse (wie bei Ricardo)', 'bis kg', 'Preis CHF', 'Sperrgut']]).setFontWeight('bold').setBackground('#efefef');
     v.getRange(2, 1, VERSAND_DEFAULT.length, 4).setValues(VERSAND_DEFAULT);
     v.getRange(2, 2, VERSAND_DEFAULT.length, 2).setFontColor('#0000FF');
     v.getRange(7, 1).setValue('Quelle: Ricardo-Hilfe «Postversand», Tarife ab 01.01.2026. Blaue Werte bei Tarifänderung anpassen.');
@@ -154,13 +154,14 @@ function einrichten() {
   let lg = ss.getSheetByName(TAB_LOG);
   if (!lg) {
     lg = ss.insertSheet(TAB_LOG);
-    lg.getRange(1, 1, 1, 5).setValues([['Zeit', 'Person', 'Aktion', 'PG-ID', 'Detail']]).setFontWeight('bold').setBackground('#e6efe9');
+    lg.getRange(1, 1, 1, 5).setValues([['Zeit', 'Person', 'Aktion', 'PG-ID', 'Detail']]).setFontWeight('bold').setBackground('#efefef');
     lg.setFrozenRows(1);
   }
-  // Warnung bei Handänderungen: Diese Tabs führt das Tool
-  [sh, s, rt, lg, pe].forEach(function (t) { try { t.protect().setWarningOnly(true).setDescription('Wird vom Ricardo Tool geführt. Bitte nicht von Hand sortieren oder Spalten ändern.'); } catch (err) { /* nicht kritisch */ } });
-  doku_(ss);
   wochen_();
+  /* Gemeinsamer Standard (Basis.gs): Übersicht, Reihenfolge, Farben, Schrift, Warnschutz. Ersetzt den früheren Tab «Doku». */
+  const alt = ss.getSheetByName(TAB_D);
+  if (alt && ss.getSheets().length > 1) ss.deleteSheet(alt);
+  basisEinrichten_(ss, { name: 'Ricardo Tool', version: VERSION, zweck: 'Datenbank des Ricardo Tools. Das Tool schreibt in die weissen Tabs. Angepasst wird nur in den gelben Tabs.' }, RICARDO_KATALOG, ricardoRegeln_());
   // Lesezugriff aufs Return Tool prüfen
   SpreadsheetApp.openById(cfg_('Return Tool ID')).getName();
   SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getName();
@@ -181,7 +182,7 @@ function kopf_(sh, cols, fixSpalten, alt) {
     if (x && x !== cols[i]) throw new Error('Tab «' + sh.getName() + '»: Spalte ' + (i + 1) + ' heisst «' + x + '», erwartet wird «' + (cols[i] || 'keine Spalte') + '». Die Kopfzeile wurde von Hand geändert, bitte zurückstellen.');
   });
   if (sh.getMaxColumns() < cols.length) sh.insertColumnsAfter(sh.getMaxColumns(), cols.length - sh.getMaxColumns());
-  sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#e6efe9');
+  sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#efefef');
   sh.setFrozenRows(1);
   if (fixSpalten) sh.setFrozenColumns(fixSpalten);
 }
@@ -204,7 +205,7 @@ function textSpalten_(sh, cols, namen) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Doku: steht als Tab im Sheet, damit das Tool ohne Chat gepflegt werden kann */
+/* Doku: steht im Tab «Übersicht», damit das Tool ohne Chat gepflegt werden kann */
 /* ------------------------------------------------------------------ */
 
 const DOKU = [
@@ -237,18 +238,6 @@ const DOKU = [
     '3. Bereitstellen > Bereitstellungen verwalten > Stift > Version «Neue Version» > Bereitstellen. Die Adresse der Web-App bleibt gleich.',
     '4. Web-App neu laden. Unten links muss die neue Versionsnummer stehen (Konstante VERSION in Code.gs).',
     'Vor jeder Änderung am Code: Datei > Kopie erstellen (Sheet samt Skript), dann gibt es einen Stand zum Zurückgehen. Im Apps-Script-Editor lassen sich unter «Bereitstellungen verwalten» auch ältere Versionen wieder aktivieren.'
-  ]],
-  ['TABS', [
-    'Listings: ein Stück oder Bündel pro Zeile. Führt das Tool.',
-    'Verkäufe: ein Verkauf pro Zeile aus dem Ricardo-Verkaufsbericht. Führt das Tool.',
-    'Retouren: ein Garantiefall pro Zeile. Führt das Tool.',
-    'Posteingang: Fragen, Nachrichten, Preisvorschläge und Hinweise aus den Ricardo-Mails, eine Mail pro Zeile. Führt das Tool. In der Web-App unter «Zu erledigen».',
-    'Wochenübersicht: Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.',
-    'Einstellungen: von Hand oder im Admin-Teil änderbar (blaue Werte).',
-    'Versand: Versandklassen und Preise. Von Hand änderbar (blaue Werte).',
-    'Post-Adressen und Auszahlungen: Zwischenablage für die Excel-Dateien, wird nach jedem Export geleert.',
-    'Log: jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.',
-    'Doku: dieser Tab. Wird bei jedem «einrichten» aus dem Code neu geschrieben, Änderungen hier gehen verloren.'
   ]],
   ['STATUS LISTING', [
     'In Arbeit > Bereit (alles vollständig) > Gelistet (Ricardo-Link gespeichert) > Verkauft (Verkaufsbericht) > Versendet (Zahlung bestätigt).',
@@ -302,7 +291,7 @@ const DOKU = [
     'Der Besitzer des Skripts verlässt die Firma: Das Sheet einem anderen Konto übertragen, dieses Konto stellt die Web-App neu bereit und braucht Lesezugriff aufs Return Tool. Die Adresse der Web-App ändert sich dann.'
   ]],
   ['WEITERENTWICKELN', [
-    'Alles Nötige steht in Code.gs, Index.html und diesem Tab. Für Änderungen einer Entwicklerin oder einer KI diese drei Dinge geben, dazu ein Beispiel des Ricardo-Verkaufsberichts.',
+    'Alles Nötige steht im GitHub-Repo jonasb-pg/pg-analyse-tool (apps/ricardo, apps/basis) und im Tab «Übersicht». Basis.gs ist in allen Tools gleich und wird nur im Repo geändert. Für Änderungen einer Entwicklerin oder einer KI das Repo geben, dazu ein Beispiel des Ricardo-Verkaufsberichts.',
     'Neue Spalte: immer am Ende von L_COLS, V_COLS oder R_COLS anhängen, nie dazwischen. Entfernte Spalte zusätzlich in ALT_L, ALT_V oder ALT_R eintragen, damit «einrichten» sie im Sheet löscht.',
     'Neue Serverfunktion: in api() eintragen. Neue Fehlermeldung: in EN_REGELN übersetzen. Neuer Text der Oberfläche: in T mit beiden Sprachen.',
     'Nach jeder Änderung VERSION erhöhen und den Ablauf einmal ganz durchspielen: Listing anlegen, listen, Bericht einlesen, packen, bezahlt, Retoure.',
@@ -310,16 +299,25 @@ const DOKU = [
   ]]
 ];
 
-function doku_(ss) {
-  const d = ss.getSheetByName(TAB_D) || ss.insertSheet(TAB_D);
-  const rows = [['Ricardo Tool', 'Version ' + VERSION + '. Dieser Tab wird bei jedem «einrichten» neu geschrieben.']];
-  DOKU.forEach(function (a) { rows.push(['', '']); a[1].forEach(function (z, i) { rows.push([i ? '' : a[0], z]); }); });
-  rows.push(['', ''], ['EINSTELLUNGEN', 'Bedeutung der Werte im Tab «Einstellungen»:']);
-  DEFAULTS.forEach(function (e) { rows.push(['', e[0] + ': ' + e[2] + '.']); });
-  d.clear();
-  d.getRange(1, 1, rows.length, 2).setValues(rows).setWrap(true).setVerticalAlignment('top');
-  d.getRange(1, 1, rows.length, 1).setFontWeight('bold');
-  d.setColumnWidth(1, 220); d.setColumnWidth(2, 900);
+/** Tabs des Ricardo Tools für die gemeinsame Übersicht (Basis.gs). Reihenfolge innerhalb der Art = Reihenfolge im Sheet. */
+const RICARDO_KATALOG = [
+  { tab: 'Listings', art: 'arbeit', inhalt: 'Ein Stück oder Bündel pro Zeile: Text, Preis, Status, Link.' },
+  { tab: 'Verkäufe', art: 'arbeit', inhalt: 'Ein Verkauf pro Zeile aus Mails und Verkaufsbericht: Käufer, Adresse, Zahlung, Versand.' },
+  { tab: 'Posteingang', art: 'arbeit', inhalt: 'Fragen, Nachrichten und Preisvorschläge aus den Ricardo-Mails («Zu erledigen»).' },
+  { tab: 'Retouren', art: 'arbeit', inhalt: 'Ein Garantiefall pro Zeile mit Grund und Rückzahlung.' },
+  { tab: 'Wochenübersicht', art: 'arbeit', inhalt: 'Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.' },
+  { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.' },
+  { tab: 'Post-Adressen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export an die Post, wird nach jedem Export geleert.', kopf: 0 },
+  { tab: 'Auszahlungen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export der Rückzahlungen, wird nach jedem Export geleert.', kopf: 0 },
+  { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Von Hand oder im Admin-Teil änderbar (blaue Werte). Bedeutung siehe unten.' },
+  { tab: 'Versand', art: 'einstellung', inhalt: 'Versandklassen und Preise wie bei Ricardo. Blaue Werte bei Tarifänderung anpassen.' }
+];
+
+/** Regeln für die Übersicht: die Doku des Tools und die Bedeutung jeder Einstellung. */
+function ricardoRegeln_() {
+  const r = DOKU.map(function (a) { return [a[0].charAt(0) + a[0].slice(1).toLowerCase(), a[1]]; });
+  r.push(['Einstellungen', DEFAULTS.map(function (e) { return e[0] + ': ' + e[2] + '.'; })]);
+  return r;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1480,7 +1478,7 @@ function wochen_() {
       return wochen[k].map(function (x, i) { return i >= 3 && i <= 6 ? runde_(x) : x; });
     });
     w.clear();
-    w.getRange(1, 1, 1, kopf.length).setValues([kopf]).setFontWeight('bold').setBackground('#e6efe9');
+    w.getRange(1, 1, 1, kopf.length).setValues([kopf]).setFontWeight('bold').setBackground('#efefef');
     w.getRange(2, 1, 1, kopf.length).setValues([['Total', '', total[0], runde_(total[1]), runde_(total[2]), runde_(total[3]), runde_(total[4]), total[5], total[6], total[7]]]).setFontWeight('bold');
     if (zeilen.length) w.getRange(3, 1, zeilen.length, kopf.length).setValues(zeilen);
     w.setFrozenRows(2);
