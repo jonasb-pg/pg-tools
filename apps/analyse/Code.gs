@@ -1875,7 +1875,7 @@ function urteil_(d, u, e) {
   const befund = (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
     if (!versiegelt && g) verkauf.push(satz('Grade ' + g[0] + ': ' + g[1]));
-    if (!versiegelt) verkauf.push(geprueft_(u));
+    if (!versiegelt) verkauf.push(geprueft_(u, d));
     if (befund) verkauf.push(befund);
     if (firmware) verkauf.push(satz('Firmware: ' + firmware));
     if (garantie) verkauf.push(satz(garantie + ' Tage Garantie'));
@@ -1884,10 +1884,17 @@ function urteil_(d, u, e) {
     befundAuto: befundAuto, befund: befund, verkaufsinfo: verkauf.join(' '), hinweis: ja && fehlt.length > 0 };
 }
 
-/** Was geprüft wurde, als Satz für Verkaufsinfo und Ricardo. */
-function geprueft_(u) {
-  return u.funktion.ersatz ? 'Geprüft: Zustand aller Teile (Sichtprüfung).'
-    : ({ 'Kern': 'Geprüft: Kernfunktionen.', 'Alle': 'Geprüft: alle prüfbaren Funktionen.' }[u.produkt.umfang] || 'Geprüft: Kernfunktionen und beworbene Funktionen.');
+/**
+ * Was geprüft wurde, als Satz für Verkaufsinfo und Ricardo, in Worten der Käufer:innen: die Funktionen, die im Schritt «Funktion» OK waren.
+ * (Nicht «Kernfunktionen und beworbene Funktionen»: Das versteht niemand, Entscheid Jonas 17.10.2026.)
+ */
+function geprueft_(u, d) {
+  if (u.funktion.ersatz) return 'Alle Teile auf Vollständigkeit und Zustand geprüft.';
+  const fn = d && Array.isArray(d.fn) ? d.fn : [];
+  const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return String(x.n || x.t || '').trim(); }).filter(String);
+  if (!ok.length) return 'Funktion geprüft.';
+  const und = function (l) { return l.length > 1 ? l.slice(0, -1).join(', ') + ' und ' + l[l.length - 1] : l[0]; };
+  return 'Von uns getestet, funktioniert: ' + (ok.length > 8 ? ok.slice(0, 8).join(', ') + ' und weitere' : und(ok)) + '.';
 }
 
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
@@ -2174,7 +2181,7 @@ function ricardoText(d) {
   const teil1 = [String(k.einleitung || '').replace(/ß/g, 'ss').trim()].concat((k.punkte || []).slice(0, 8).map(function (y) { return '– ' + String(y).replace(/ß/g, 'ss').trim(); })).filter(String);
   /* Bei «Neu (gemäss Beschreibung)» steht immer, warum: der Hinweis aus dem Schritt «Zustand», sonst die geöffnete Verpackung. */
   const zustand = ['Zustand: ' + rz + '.' + (rz === 'Neu (gemäss Beschreibung)' && !maengel ? ' Verpackung geöffnet, unbenutzt.' : '')];
-  if (!x.versiegelt) zustand.push(geprueft_(u));
+  if (!x.versiegelt) zustand.push(geprueft_(u, d));
   if (x.befund) zustand.push(x.befund);
   if (x.firmware) zustand.push('Firmware: ' + x.firmware + '.');
   if (ovp) zustand.push('Neupreis: CHF ' + ovp.toFixed(2));
