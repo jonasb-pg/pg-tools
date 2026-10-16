@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.1';
+const VERSION = '2026-10-17.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1874,27 +1874,52 @@ function urteil_(d, u, e) {
   const maengel = ja && !versiegelt ? String(d.maengel || '').trim() : '';
   const befund = (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
-    if (!versiegelt && g) verkauf.push(satz('Grade ' + g[0] + ': ' + g[1]));
-    if (!versiegelt) verkauf.push(geprueft_(u, d));
-    if (befund) verkauf.push(befund);
-    if (firmware) verkauf.push(satz('Firmware: ' + firmware));
+    kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel }).forEach(function (y) { verkauf.push(y); });
     if (garantie) verkauf.push(satz(garantie + ' Tage Garantie'));
   }
-  return { reusable: ja, versiegelt: versiegelt, grade: grade, grund: grund, fehlt: fehlt, nichtGeprueft: nichtGeprueft, rep: rep, firmware: firmware, garantie: ja ? garantie : '',
+  return { reusable: ja, versiegelt: versiegelt, grade: grade, grund: grund, fehlt: fehlt, nichtGeprueft: nichtGeprueft, nichtGeprueftKurz: nichtGeprueftKurz, rep: rep, firmware: firmware, garantie: ja ? garantie : '',
     befundAuto: befundAuto, befund: befund, verkaufsinfo: verkauf.join(' '), hinweis: ja && fehlt.length > 0 };
 }
 
 /**
- * Was geprüft wurde, als Satz für Verkaufsinfo und Ricardo, in Worten der Käufer:innen: die Funktionen, die im Schritt «Funktion» OK waren.
- * (Nicht «Kernfunktionen und beworbene Funktionen»: Das versteht niemand, Entscheid Jonas 17.10.2026.)
+ * Texte für Käufer:innen (Verkaufsinfo und Ricardo), Entscheid Jonas 17.10.2026: verständlich, nichts, was Angst macht.
+ * Keine Listen aus der Recherche mit «Nicht geprüft: …» (die Namen sind Prüfschritte, keine Käufersprache), keine Firmware-Zeile.
+ * Das Protokoll und der Befund im Tab «Analysen» behalten alle Einzelheiten.
  */
+const kurzName_ = function (x) { return String(x || '').replace(/\s*\([^)]*\)/g, '').replace(/^[-•–]\s*/, '').replace(/[.:;,]+$/, '').trim(); };
+const undListe_ = function (l) { return l.length > 1 ? l.slice(0, -1).join(', ') + ' und ' + l[l.length - 1] : (l[0] || ''); };
+/** Zustand in einem Satz. Ungeöffnet heisst «originalverpackt»; ein geöffnetes, unbenutztes Stück (Grade A) ist «neu, ohne Gebrauchsspuren». */
+function zustandSatz_(x) {
+  if (x.versiegelt) return 'Neu und originalverpackt, ungeöffnet.';
+  if (x.grade === 'A') return 'Neu, ohne Gebrauchsspuren. Die Verpackung wurde geöffnet.';
+  if (x.grade === 'B') return 'Gebraucht, kaum Gebrauchsspuren.';
+  if (x.grade === 'C') return 'Gebraucht, mit sichtbaren Gebrauchsspuren.';
+  return '';
+}
+/** Was getestet wurde: die Funktionen, die im Schritt «Funktion» OK waren, ohne Klammern, höchstens sechs. */
 function geprueft_(u, d) {
-  if (u.funktion.ersatz) return 'Alle Teile auf Vollständigkeit und Zustand geprüft.';
+  if (u.funktion.ersatz) return 'Von uns geprüft: vollständig und in gutem Zustand.';
   const fn = d && Array.isArray(d.fn) ? d.fn : [];
-  const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return String(x.n || x.t || '').trim(); }).filter(String);
-  if (!ok.length) return 'Funktion geprüft.';
-  const und = function (l) { return l.length > 1 ? l.slice(0, -1).join(', ') + ' und ' + l[l.length - 1] : l[0]; };
-  return 'Von uns getestet, funktioniert: ' + (ok.length > 8 ? ok.slice(0, 8).join(', ') + ' und weitere' : und(ok)) + '.';
+  const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return kurzName_(x.n || x.t); }).filter(function (x) { return x && x.length <= 50; });
+  if (!ok.length) return 'Von uns getestet: funktioniert einwandfrei.';
+  return 'Von uns getestet, funktioniert einwandfrei: ' + (ok.length > 6 ? ok.slice(0, 6).join(', ') + ' und mehr' : undListe_(ok)) + '.';
+}
+/** Die Sätze für Käufer:innen, ohne Garantie, Neupreis und Versand (die setzt der Kanal selbst). */
+function kaeuferSaetze_(x, u, d) {
+  const satz = function (y) { y = String(y).trim(); return /[.!?]$/.test(y) ? y : y + '.'; };
+  const z = [zustandSatz_(x)].filter(String);
+  if (x.versiegelt) return z;
+  const maengel = String(d.maengel || '').trim();
+  if (maengel) z.push(satz(maengel));
+  z.push(geprueft_(u, d));
+  /* Nicht alles ausprobiert: ein weicher Satz ohne Liste (Entscheid Jonas: erwähnen, aber nicht abschreckend). */
+  if ((x.nichtGeprueftKurz || []).length) z.push('Einzelne Zusatzfunktionen haben wir nicht ausprobiert.');
+  if ((x.rep || []).length) z.push(satz('Von uns repariert: ' + x.rep.map(function (r) { return r.text || r.was; }).join('; ')));
+  const fehlt = (x.fehlt || []).map(kurzName_).filter(String), fehltN = fehlt.map(norm_);
+  const dabei = u.liefer && !u.liefer.unsicher ? (u.liefer.teile || []).filter(function (t) { return fehltN.indexOf(norm_(kurzName_(t))) < 0; }).map(kurzName_).filter(String) : [];
+  if (dabei.length) z.push('Dabei: ' + undListe_(dabei) + '.');
+  if (fehlt.length) z.push('Nicht dabei: ' + undListe_(fehlt) + '.');
+  return z;
 }
 
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
@@ -2179,11 +2204,7 @@ function ricardoText(d) {
   if (titel.length > 60) titel = titel.slice(0, 60).replace(/\s+\S*$/, '');
   const rz = ricardoZustand_(x), maengel = String(d.maengel || '').trim(), ovp = zahl_(p['Neupreis CHF']);
   const teil1 = [String(k.einleitung || '').replace(/ß/g, 'ss').trim()].concat((k.punkte || []).slice(0, 8).map(function (y) { return '– ' + String(y).replace(/ß/g, 'ss').trim(); })).filter(String);
-  /* Bei «Neu (gemäss Beschreibung)» steht immer, warum: der Hinweis aus dem Schritt «Zustand», sonst die geöffnete Verpackung. */
-  const zustand = ['Zustand: ' + rz + '.' + (rz === 'Neu (gemäss Beschreibung)' && !maengel ? ' Verpackung geöffnet, unbenutzt.' : '')];
-  if (!x.versiegelt) zustand.push(geprueft_(u, d));
-  if (x.befund) zustand.push(x.befund);
-  if (x.firmware) zustand.push('Firmware: ' + x.firmware + '.');
+  const zustand = ['Zustand: ' + kaeuferSaetze_(x, u, d).join('\n')];
   if (ovp) zustand.push('Neupreis: CHF ' + ovp.toFixed(2));
   const beschrieb = [teil1.join('\n'), zustand.join('\n'), [e['Ricardo-Versandsatz'], e['Ricardo-Schlusssatz']].filter(Boolean).join('\n')].filter(String).join('\n\n');
   return { titel: titel, beschrieb: beschrieb, zustand: rz };
