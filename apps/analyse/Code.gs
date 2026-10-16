@@ -2572,7 +2572,7 @@ const ANALYSE_KATALOG = [
   { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Schalter, Grenzwerte, Hausregeln, KI-Budget und die Anweisungen an die KI in normaler Sprache.' },
   { tab: 'Stufen', art: 'einstellung', inhalt: 'Stufe pro Herkunft und Verkaufspreis: Minuten, Tiefe der Recherche und Umfang der Funktionsprüfung.' },
   { tab: 'Sicherheitspunkte', art: 'einstellung', inhalt: 'Was vor dem Einstecken angeschaut wird. «Gilt für» bestimmt, bei welchen Produkten ein Punkt erscheint.' },
-  { tab: 'Testmittel', art: 'einstellung', wer: 'Tool und Mensch', inhalt: 'Liste der Testmittel. «Vorhanden» pflegt das Team in der Oberfläche unter «Infrastruktur» (oder hier). Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».' },
+  { tab: 'Testmittel', art: 'einstellung', wer: 'Tool und Mensch', inhalt: 'Inventar der Testmittel: was ihr habt. «Vorhanden» pflegt das Team unter «Infrastruktur» (oder hier). Was hier nicht mit «Ja» steht, fragt der Schritt «Funktion»; «Haben wir» trägt es hier ein. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».' },
   { tab: 'Score-Regeln', art: 'einstellung', kopf: 0, inhalt: 'Punkte für den Accuracy Score und ein Rechenbeispiel.' },
   { tab: 'Listen', art: 'einstellung', kopf: 2, inhalt: 'Auswahlwerte. Die linke Liste ist frei anpassbar, die rechte verwendet das Tool fest.' }
 ];
