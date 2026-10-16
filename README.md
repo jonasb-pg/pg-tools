@@ -7,6 +7,7 @@ Die internen Tools von Pretty Good als Google Apps Script mit Google Sheets als 
 | Analyse Tool | Geführte Prüfung von Retouren am Analyseplatz: KI-Recherche, Handbuch, Ersatzteile, Ricardo-Vorbereitung, Reparatur, Matchmaker | `apps/analyse/` | `docs/analyse/` |
 | Ricardo Tool | Verkauf über Ricardo: Listings, Mails, Verkäufe, Versand, Retouren | `apps/ricardo/` | `docs/ricardo/` |
 | Matchmaker | Script im Matchmaker Sheet (Suche, Profile, Urteile) | `apps/matchmaker/` | `docs/analyse/matchmaker.md` |
+| Ersatzteil Tool | Internes Ersatzteillager fürs Handy: Typenschild lesen, einlagern, suchen, Online-Suche wie im Analyse Tool | `apps/ersatzteil/` | `docs/ersatzteil/` |
 | Basis | Gemeinsamer Sheet-Standard: Übersicht, Tab-Reihenfolge, Farben, Schrift, Schutz | `apps/basis/Basis.gs` | `docs/gemeinsam/sheet-standard.md` |
 
 ## Aufbau

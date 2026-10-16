@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<base target="_blank">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;900&family=DM+Mono&display=swap" rel="stylesheet">
+<style>
+  /* Gestaltung wie Analyse Tool und Ricardo Tool (Pretty Good Cockpit): schwarze 2px-Linien, graue Fläche, Pink als Akzent. Fürs Handy gebaut. */
+  @font-face { font-family:sofiaPro; src:url(https://app.pretty-good.ch/_next/static/immutable/media/SofiaPro_SemiBold-s.p.33k5evrv8kzp6.woff2) format("woff2"); font-weight:400 600; font-display:swap; }
+  @font-face { font-family:sofiaPro; src:url(https://app.pretty-good.ch/_next/static/immutable/media/SofiaPro_Black-s.p.05h8x691qwne-.woff2) format("woff2"); font-weight:700 900; font-display:swap; }
+  :root { --ink:#0a0a0a; --muted:#696967; --grau:#d2d2ce; --weiss:#ffffff; --pink:#ffbaf5; --pink-hell:#fff5ff; --linie:rgba(10,10,10,.15); --gruen:#c9f2cf; --gelb:#fff1a8; --rot:#ffc9c4;
+    --sans:sofiaPro, "Sofia Pro", Outfit, ui-sans-serif, system-ui, sans-serif; --mono:"DM Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; min-height:100%; font:400 17px/1.5 var(--sans); color:var(--ink); background:var(--grau); padding-bottom:env(safe-area-inset-bottom); }
+  .top { background:var(--weiss); border-bottom:2px solid var(--ink); padding:12px 20px; padding-top:calc(12px + env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; z-index:5; }
+  .top .titel { min-width:0; }
+  .top h1 { margin:0; font:900 19px/1.2 var(--sans); text-transform:uppercase; overflow-wrap:anywhere; }
+  .top .sub { font:400 13px/1.4 var(--mono); color:var(--muted); }
+  .etikett { display:inline-block; padding:6px 8px; border-radius:4px; background:var(--grau); font:600 13px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; white-space:nowrap; }
+  .etikett.pink { background:var(--pink); } .etikett.gruen { background:var(--gruen); } .etikett.gelb { background:var(--gelb); } .etikett.weiss { background:var(--weiss); }
+  main { padding:16px 20px 48px; max-width:640px; margin:0 auto; }
+  .karte { background:var(--weiss); border:2px solid var(--ink); border-radius:4px; padding:20px; margin-bottom:12px; display:flex; flex-direction:column; gap:12px; }
+  .kopf { display:flex; align-items:center; gap:12px; }
+  .kopf .nr { flex:none; width:38px; height:38px; border-radius:50%; background:var(--pink); border:2px solid var(--ink); display:flex; align-items:center; justify-content:center; font-weight:900; }
+  h2 { margin:0; font:900 24px/1.15 var(--sans); text-transform:uppercase; }
+  .frage { font:600 20px/1.3 var(--sans); margin:0; }
+  p { margin:0; }
+  .still { color:var(--muted); font-size:14px; }
+  .mono { font-family:var(--mono); }
+  a { color:var(--ink); font-weight:600; text-underline-offset:3px; overflow-wrap:anywhere; }
+
+  button { font-family:var(--sans); color:var(--ink); cursor:pointer; }
+  .knopf { display:flex; align-items:center; justify-content:center; width:100%; min-height:56px; padding:10px 24px; border:2px solid var(--ink); border-radius:28px; background:var(--weiss);
+    font:600 16px/1.1 var(--sans); letter-spacing:.7px; text-transform:uppercase; text-decoration:none; }
+  .knopf:hover { background:var(--grau); }
+  .knopf.pink { background:var(--pink); } .knopf.pink:hover { background:#f0a3e5; }
+  .knopf.schwarz { background:var(--ink); color:var(--weiss); } .knopf.schwarz:hover { background:#333; }
+  .knopf:disabled { opacity:.4; cursor:not-allowed; }
+  .link { background:none; border:0; padding:6px 0; font:600 14px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; text-decoration:underline; text-underline-offset:3px; }
+  .link.rechts { margin-left:auto; color:var(--muted); }
+  .fuss { display:flex; gap:16px; align-items:center; padding-top:12px; border-top:1px solid var(--linie); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid var(--pink); outline-offset:2px; }
+
+  label { display:block; font-weight:600; margin:0 0 4px; }
+  label small { font-weight:400; color:var(--muted); }
+  input[type=text], input[type=search], input[type=number], select { width:100%; height:48px; font:600 17px/1.4 var(--sans); padding:8px 12px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); color:var(--ink); }
+  input[type=search] { font-size:20px; height:56px; }
+  .feld { display:flex; flex-direction:column; }
+  .reihe { display:flex; gap:12px; }
+  .reihe > * { flex:1; min-width:0; }
+  .pillen { display:flex; flex-wrap:wrap; gap:6px; }
+  .pillen button { padding:8px 12px; border:2px solid var(--ink); border-radius:999px; background:var(--weiss); font:600 13px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; }
+  .pillen button.an { background:var(--pink); }
+  .pillen a { padding:8px 12px; border:2px solid var(--ink); border-radius:999px; background:var(--weiss); font:600 13px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+  .pillen a.login { background:var(--ink); color:var(--weiss); }
+
+  .schiene { display:flex; gap:6px; margin:0 0 12px; padding:0; list-style:none; }
+  .schiene li { display:flex; align-items:center; gap:8px; padding:6px 10px 6px 6px; border:2px solid var(--ink); border-radius:999px; background:var(--weiss); font:600 13px/1 var(--sans); letter-spacing:.5px; text-transform:uppercase; }
+  .schiene .nr { width:22px; height:22px; border-radius:50%; background:var(--grau); display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .schiene li.fertig { background:var(--grau); color:var(--muted); } .schiene li.fertig .nr { background:var(--ink); color:var(--weiss); }
+  .schiene li.aktiv { background:var(--pink); } .schiene li.aktiv .nr { background:var(--ink); color:var(--weiss); }
+
+  .liste { margin:0; padding:0; list-style:none; border:2px solid var(--ink); border-radius:4px; overflow:hidden; }
+  .liste li { display:flex; gap:12px; align-items:center; padding:12px 14px; border-bottom:1px solid var(--linie); min-width:0; }
+  .liste li:last-child { border-bottom:0; }
+  .liste .txt { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .liste .txt b { display:block; font-weight:600; }
+  .liste .txt small { color:var(--muted); font-size:14px; }
+  .liste li.wahl { padding:0; }
+  .liste li.wahl button { display:flex; gap:12px; align-items:center; width:100%; min-height:52px; padding:12px 14px; border:0; background:none; text-align:left; font:600 17px/1.4 var(--sans); }
+  .liste li.wahl.an { background:var(--pink); }
+  .liste li.wahl .box { font:400 22px/1 var(--mono); flex:none; }
+  .liste li.wahl .voll { color:var(--muted); font-size:14px; font-weight:400; }
+  .meldung { padding:12px 14px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); }
+  .meldung.warn { background:var(--pink-hell); } .meldung.ok { background:var(--pink); } .meldung.stop { background:var(--ink); color:var(--weiss); }
+  .meldung h3 { margin:0 0 4px; font:900 14px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.5px; }
+  .zaehler { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .zaehler button { height:44px; min-width:48px; padding:0 10px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); font:400 16px/1 var(--mono); }
+  .zaehler button.an { background:var(--ink); color:var(--weiss); }
+  .zaehler input { width:72px; flex:none; height:44px; font:400 16px/1 var(--mono); }
+  .foto-vorschau { width:100%; max-height:180px; object-fit:contain; border:2px solid var(--ink); border-radius:4px; background:var(--grau); display:none; }
+  .lade { position:fixed; left:0; right:0; bottom:0; padding:10px 16px; background:var(--ink); color:var(--weiss); font:600 14px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; text-align:center; z-index:9; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="titel"><h1 id="titel">Ersatzteile</h1><div class="sub" id="sub"></div></div>
+  <span class="etikett pink" id="kopf-etikett" hidden></span>
+</header>
+<main id="main"></main>
+<div class="lade" id="lade" hidden>Einen Moment</div>
+<input type="file" id="kamera" accept="image/*" capture="environment" hidden>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function istUrl(u) { return /^https?:\/\//i.test(String(u || '')); }
+
+  var START = null, OFFEN = {};
+  /* Einziger Weg zum Server. Solange ein Aufruf mit demselben Namen läuft, geht kein zweiter hinaus (Doppelklick). */
+  function ruf(name, args, ok, fehler) {
+    if (OFFEN[name]) return false;
+    OFFEN[name] = true; $('lade').hidden = false;
+    var fertig = function (f, x) { delete OFFEN[name]; $('lade').hidden = !Object.keys(OFFEN).length; f(x); };
+    google.script.run.withSuccessHandler(function (x) { fertig(ok, x); })
+      .withFailureHandler(function (e) { fertig(fehler || function (m) { melde(m, 'stop'); }, String((e && e.message) || e).replace(/^Error:\s*/, '')); })
+      .api(name, args);
+    return true;
+  }
+  function box(text, art) { return '<div class="meldung ' + (art || '') + '">' + text + '</div>'; }
+  function melde(text, art) { var m = $('meldung'); if (m) { m.innerHTML = box(esc(text), art || 'warn'); m.scrollIntoView({ block: 'nearest' }); } else alert(text); }
+  function kopf(titel, sub, etikett) {
+    $('titel').textContent = titel; $('sub').textContent = sub || '';
+    var e = $('kopf-etikett'); e.hidden = !etikett; e.textContent = etikett || '';
+  }
+
+  /* ---------- Foto: Kamera öffnen, verkleinern, als Base64 an den Server ---------- */
+  var FOTO_ZIEL = null;      // Funktion, die das gelesene Typenschild bekommt
+  function foto(ziel) {
+    if (!START.schluessel) { melde('Der Claude-Schlüssel fehlt im Tool. Bitte von Hand eintragen.', 'stop'); return; }
+    if (START.budgetVoll) { melde('Das KI-Budget für diesen Monat ist aufgebraucht. Bitte von Hand eintragen.', 'stop'); return; }
+    FOTO_ZIEL = ziel; $('kamera').value = ''; $('kamera').click();
+  }
+  $('kamera').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f || !FOTO_ZIEL) return;
+    var ziel = FOTO_ZIEL; FOTO_ZIEL = null;
+    verkleinern(f, START.fotoBreite, function (dataUrl) {
+      var v = $('vorschau'); if (v) { v.src = dataUrl; v.style.display = 'block'; }
+      var b64 = dataUrl.split(',')[1];
+      if (!ruf('typenschild', [b64, 'image/jpeg'], function (r) { ziel(r); }, function (m) { melde(m, 'stop'); ziel(null); })) return;
+      melde('Typenschild wird gelesen.', 'warn');
+    });
+  });
+  /* Verkleinert aufs Handy: höchstens «Foto-Breite Pixel» breit, JPEG 85 %. Schneller über das Handynetz, ein Bruchteil der Kosten. */
+  function verkleinern(datei, breite, cb) {
+    var img = new Image(), url = URL.createObjectURL(datei);
+    img.onload = function () {
+      var k = Math.min(1, breite / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      cb(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); melde('Das Foto liess sich nicht lesen. Bitte nochmals aufnehmen.', 'stop'); };
+    img.src = url;
+  }
+
+  /* ---------- Seiten ---------- */
+  var Z = null;     // Zustand der laufenden Erfassung oder Suche
+  function seiteStart() {
+    Z = null;
+    kopf('Ersatzteile', START.imLager + ' Teile · ' + START.boxen.filter(function (b) { return b.status !== 'aufgelöst'; }).length + ' Boxen');
+    $('main').innerHTML =
+      '<div class="karte"><div class="kopf"><span class="nr">1</span><h2>Teil einlagern</h2></div>'
+      + '<button class="knopf pink" data-a="einFoto">Typenschild fotografieren</button>'
+      + '<button class="knopf" data-a="einHand">Von Hand eintragen</button></div>'
+      + '<div class="karte"><div class="kopf"><span class="nr">2</span><h2>Teil suchen</h2></div>'
+      + '<button class="knopf pink" data-a="suchFoto">Typenschild fotografieren</button>'
+      + '<button class="knopf" data-a="suchHand">Tippen</button></div>'
+      + '<div id="meldung"></div>'
+      + '<p class="still" style="margin-top:8px">Version ' + esc(START.version) + (START.ich ? ' · ' + esc(START.ich) : '') + (START.schluessel ? '' : ' · Claude-Schlüssel fehlt') + '</p>';
+  }
+
+  /* Einlagern, Schritt 2: Prüfen. Felder vorausgefüllt vom Typenschild oder leer. */
+  function seitePruefen(d) {
+    Z = Z || { marke: '', modell: '', produktart: '', teil: '', teilart: '', menge: 1, box: '', quelle: '' };
+    if (d) { Z.marke = d.marke || Z.marke; Z.modell = d.modell || Z.modell; Z.produktart = d.produktart || Z.produktart; }
+    kopf('Teil einlagern', d ? (d.marke || d.modell || d.produktart ? 'Typenschild gelesen' : 'Nichts lesbar: bitte tippen') : '');
+    var feld = function (id, label, wert, liste) {
+      return '<div class="feld"><label for="' + id + '">' + label + '</label><input type="text" id="' + id + '" value="' + esc(wert) + '" autocomplete="off" autocapitalize="words"' + (liste ? ' list="l-' + id + '"' : '') + '>'
+        + (liste ? '<datalist id="l-' + id + '">' + liste.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>' : '') + '</div>';
+    };
+    $('main').innerHTML = schiene(2)
+      + '<div class="karte">'
+      + '<img class="foto-vorschau" id="vorschau" alt="">'
+      + feld('f-marke', 'Marke', Z.marke) + feld('f-modell', 'Modell', Z.modell) + feld('f-produktart', 'Produktart', Z.produktart, START.produktarten)
+      + feld('f-teil', 'Teil', Z.teil, START.teilarten)
+      + '<div class="pillen" id="teilarten">' + START.teilarten.slice(0, 6).map(function (x) { return '<button data-a="teilart" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>'
+      + '<div class="feld"><label for="f-quelle">Woher</label><select id="f-quelle">' + [''].concat(START.quellen).map(function (x) { return '<option value="' + esc(x) + '"' + (x === Z.quelle ? ' selected' : '') + '>' + esc(x || 'Keine Angabe') + '</option>'; }).join('') + '</select></div>'
+      + '<div id="meldung"></div>'
+      + '<div class="reihe"><button class="knopf pink" data-a="zuBox">Weiter</button><button class="knopf" data-a="einFoto">Neues Foto</button></div>'
+      + '<div class="fuss"><button class="link" data-a="start">Zurück</button><button class="link rechts" data-a="start">Abbrechen</button></div>'
+      + '</div>';
+    if (!Z.teil) $('f-teil').focus();
+  }
+  function lesen() {
+    Z.marke = $('f-marke').value.trim(); Z.modell = $('f-modell').value.trim(); Z.produktart = $('f-produktart').value.trim(); Z.teil = $('f-teil').value.trim(); Z.quelle = $('f-quelle').value;
+    Z.teilart = START.teilarten.filter(function (x) { return x.toLowerCase() === Z.teil.toLowerCase(); })[0] || Z.teilart;
+  }
+  function schiene(aktiv) {
+    return '<ol class="schiene">' + [[1, 'Foto'], [2, 'Prüfen'], [3, 'Box']].map(function (s) {
+      return '<li class="' + (s[0] < aktiv ? 'fertig' : s[0] === aktiv ? 'aktiv' : '') + '"><span class="nr">' + s[0] + '</span>' + s[1] + '</li>'; }).join('') + '</ol>';
+  }
+
+  /* Einlagern, Schritt 3: Box. Vorschlag: offene Box mit gleicher Produktart, sonst die zuletzt verwendete. */
+  function seiteBox() {
+    var offen = START.boxen.filter(function (b) { return b.status !== 'aufgelöst'; });
+    var passt = offen.filter(function (b) { return b.status === 'offen' && b.produktart.toLowerCase() === Z.produktart.toLowerCase(); });
+    var letzte = '';
+    try { letzte = localStorage.getItem('et-box') || ''; } catch (e) { /* ohne Speicher */ }
+    if (!Z.box) Z.box = passt.length ? passt[0].box : (offen.filter(function (b) { return b.box === letzte && b.status === 'offen'; })[0] || {}).box || '';
+    var sortiert = passt.concat(offen.filter(function (b) { return passt.indexOf(b) < 0; }));
+    kopf(Z.teil || 'Teil', [Z.marke, Z.modell, Z.produktart].filter(String).join(' · '));
+    $('main').innerHTML = schiene(3)
+      + '<div class="karte"><p class="frage">In welche Box?</p>'
+      + '<ul class="liste">' + sortiert.map(function (b) {
+        return '<li class="wahl' + (b.box === Z.box ? ' an' : '') + '"><button data-a="box" data-v="' + esc(b.box) + '"' + (b.status === 'voll' ? ' disabled' : '') + '><span class="box">' + esc(b.box) + '</span><span class="txt">' + esc(b.produktart) + '</span>'
+          + (b.status === 'voll' ? '<span class="voll">voll</span>' : passt.indexOf(b) > -1 ? '<span class="etikett weiss">Passt</span>' : '') + '</button></li>'; }).join('')
+      + '<li class="wahl"><button data-a="boxNeu"><span class="box" style="color:var(--muted)">B..</span><span class="txt" style="color:var(--muted)">Neue Box anlegen' + (Z.produktart ? ' für ' + esc(Z.produktart) : '') + '</span></button></li></ul>'
+      + '<div class="zaehler"><label style="margin:0 6px 0 0">Menge</label>' + [1, 2, 3].map(function (n) { return '<button data-a="menge" data-v="' + n + '"' + (Z.menge === n ? ' class="an"' : '') + '>' + n + '</button>'; }).join('')
+      + '<input type="number" id="f-menge" min="1" max="999" inputmode="numeric" placeholder="mehr" value="' + (Z.menge > 3 ? Z.menge : '') + '"></div>'
+      + '<div id="meldung"></div>'
+      + '<button class="knopf pink" id="speichern" data-a="speichern"' + (Z.box ? '' : ' disabled') + '>' + (Z.box ? 'In ' + esc(Z.box) + ' speichern' : 'Box wählen') + '</button>'
+      + '<div class="fuss"><button class="link" data-a="zuPruefen">Zurück</button><button class="link rechts" data-a="start">Abbrechen</button></div></div>';
+  }
+  function seiteFertig(r) {
+    kopf('Gespeichert', r.imLager + ' Teile im Lager', r.id);
+    $('main').innerHTML = '<div class="karte"><p class="frage">' + esc(Z.teil) + ' liegt in Box ' + esc(r.box) + '.</p><p class="still">' + esc([Z.marke, Z.modell].filter(String).join(' ')) + ' · ' + esc(r.id) + '</p>'
+      + '<button class="knopf pink" data-a="einFoto">Nächstes Teil fotografieren</button><button class="knopf" data-a="einHand">Nächstes von Hand</button>'
+      + '<div class="fuss"><button class="link" data-a="start">Zur Startseite</button></div></div>';
+  }
+
+  /* Suche: Typenschild oder tippen, Treffer in Gruppen, dann Online-Suche. */
+  function seiteSuche(d) {
+    Z = Z && Z.suche ? Z : { suche: true, marke: '', modell: '', produktart: '', text: '', teil: '', treffer: null, online: null };
+    if (d) { Z.marke = d.marke || ''; Z.modell = d.modell || ''; Z.produktart = d.produktart || ''; Z.text = [Z.marke, Z.modell].filter(String).join(' '); }
+    kopf('Teil suchen', d ? (Z.text ? 'Gelesen: ' + Z.text : 'Nichts lesbar: bitte tippen') : '');
+    $('main').innerHTML = '<div class="karte">'
+      + '<button class="knopf pink" data-a="suchFoto">Typenschild fotografieren</button>'
+      + '<div class="feld"><label for="s-text">Oder tippen: Marke, Modell, Produktart</label><input type="search" id="s-text" value="' + esc(Z.text) + '" autocomplete="off" enterkeyhint="search"></div>'
+      + '<button class="knopf" data-a="suchen">Im Lager suchen</button>'
+      + '<img class="foto-vorschau" id="vorschau" alt="">'
+      + '<div id="meldung"></div><div id="treffer"></div>'
+      + '<div id="online-block" style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--linie)">'
+      + '<div class="feld"><label for="s-teil">Welches Teil? <small>(für die Online-Suche)</small></label><input type="text" id="s-teil" value="' + esc(Z.teil) + '" placeholder="z.B. Wassertank" autocomplete="off" list="l-teil"><datalist id="l-teil">' + START.teilarten.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist></div>'
+      + '<button class="knopf pink" id="online-knopf" data-a="online">Online suchen</button><div id="online"></div></div>'
+      + '<div class="fuss"><button class="link" data-a="start">Zurück</button><button class="link rechts" data-a="einHand">Einlagern</button></div></div>';
+    if (Z.treffer) zeichneTreffer(Z.treffer);
+    if (Z.online) zeichneOnline(Z.online);
+    if (d && Z.text) suchen();
+  }
+  function suchen() {
+    Z.text = $('s-text').value.trim();
+    var s = Z.marke || Z.modell ? { marke: Z.marke, modell: Z.modell, produktart: Z.produktart } : { text: Z.text };
+    if (Z.text !== [Z.marke, Z.modell].filter(String).join(' ')) { Z.marke = ''; Z.modell = ''; s = { text: Z.text }; }   // von Hand geändert: Freitext
+    if (!Z.text) { melde('Bitte etwas eingeben oder ein Typenschild fotografieren.', 'warn'); return; }
+    ruf('suchen', [s], function (r) { Z.treffer = r; $('meldung').innerHTML = ''; zeichneTreffer(r); });
+  }
+  function zeichneTreffer(r) {
+    var gruppen = [['passend', 'Passend'], ['serie', 'Gleiche Serie, prüfen'], ['marke', 'Gleiche Marke'], ['produktart', 'Gleiche Produktart'], ['text', 'Treffer']];
+    var n = 0, h = '';
+    gruppen.forEach(function (g) {
+      var l = r[g[0]] || []; if (!l.length) return; n += l.length;
+      h += '<p class="still" style="margin-top:8px"><b>' + g[1] + '</b> · ' + l.length + '</p><ul class="liste">' + l.map(function (t) {
+        return '<li><span class="txt"><b>' + esc(t.teil) + (t.menge > 1 ? ' × ' + t.menge : '') + '</b><small>' + esc([t.marke, t.modell, t.produktart].filter(String).join(' · ')) + ' · ' + esc(t.id) + '</small></span>'
+          + '<span class="etikett ' + (g[0] === 'passend' ? 'pink' : '') + '">' + esc(t.box) + '</span><button class="link" data-a="weg" data-v="' + esc(t.id) + '">Genommen</button></li>'; }).join('') + '</ul>';
+    });
+    $('treffer').innerHTML = n ? h : box('Nichts im Lager.', 'warn');
+    $('sub').textContent = n ? n + ' im Lager' : 'Nichts im Lager';
+  }
+  function weg(id) {
+    if (!confirm('Teil ' + id + ' als genommen markieren?')) return;
+    ruf('verbraucht', [id], function (r) { melde(r.rest > 0 ? 'Eine Einheit genommen, ' + r.rest + ' bleiben.' : id + ' ist raus.', 'ok'); START.imLager = Math.max(0, START.imLager - 1); if (Z && Z.suche) suchen(); });
+  }
+  function online() {
+    Z.teil = $('s-teil').value.trim(); Z.text = $('s-text').value.trim();
+    if (!Z.marke && !Z.modell) {                                   // getippt statt fotografiert: erstes Wort Marke, Rest Modell
+      var w = Z.text.split(/\s+/); Z.marke = w[0] || ''; Z.modell = w.slice(1).join(' ');
+    }
+    if (!Z.teil) { $('online').innerHTML = box('Bitte angeben, welches Teil gesucht wird.', 'warn'); $('s-teil').focus(); return; }
+    if (!ruf('onlineSuche', [{ marke: Z.marke, modell: Z.modell, produktart: Z.produktart, teil: Z.teil }], function (r) { $('online-knopf').disabled = false; Z.online = r; zeichneOnline(r); },
+      function (m) { $('online-knopf').disabled = false; $('online').innerHTML = box(esc(m), 'stop'); })) return;
+    $('online-knopf').disabled = true; $('online').innerHTML = box('Die KI sucht in den Shops. Das dauert bis zu einer Minute.', 'warn');
+  }
+  function zeichneOnline(r) {
+    var h = r.gefunden ? '' : box('Nichts gefunden.' + (r.hinweis ? ' ' + esc(r.hinweis) : ''), 'warn');
+    if (r.angebote.length) h += '<ul class="liste">' + r.angebote.map(function (a) {
+      return '<li><span class="txt"><b>' + esc(a.teil) + (a.nummer ? ' · <span class="mono">' + esc(a.nummer) + '</span>' : '') + '</b><small>' + esc([a.art, a.shop, a.preis ? 'CHF ' + a.preis.toFixed(2) : '', a.lieferbar === 'Ja' ? 'lieferbar' : a.lieferbar === 'Nein' ? 'nicht lieferbar' : ''].filter(String).join(' · ')) + '</small></span>'
+        + (istUrl(a.link) ? '<a class="etikett gruen" href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">Link</a>' : '') + '</li>'; }).join('') + '</ul>';
+    if (r.gefunden && r.hinweis) h += '<p class="still">' + esc(r.hinweis) + '</p>';
+    if (r.shops && r.shops.length) h += '<div class="pillen">' + r.shops.map(function (s) {
+      return '<a class="' + (s.login ? 'login' : '') + '" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer" title="' + esc(s.info || '') + '">' + esc(s.shop) + (s.login ? ' App' : '') + '</a>'; }).join('') + '</div>';
+    if (r.suchbegriff && r.suchbegriff.text) h += '<p class="still">Suchbegriff: <span class="mono">' + esc(r.suchbegriff.text) + '</span>' + (r.suchbegriff.art ? ' · ' + esc(r.suchbegriff.art) : '') + (istUrl(r.suchbegriff.quelle) ? ' · <a href="' + esc(r.suchbegriff.quelle) + '" target="_blank" rel="noopener noreferrer">Quelle</a>' : '') + '</p>';
+    $('online').innerHTML = h;
+  }
+
+  /* ---------- Aktionen ---------- */
+  var AKT = {
+    start: function () { seiteStart(); },
+    einFoto: function () { Z = null; seitePruefen(null); foto(function (d) { if (d) seitePruefen(d); else melde('Nichts gelesen. Bitte von Hand eintragen oder neues Foto.', 'warn'); }); },
+    einHand: function () { Z = null; seitePruefen(null); },
+    teilart: function (b) { $('f-teil').value = b.dataset.v; $('teilarten').querySelectorAll('button').forEach(function (x) { x.classList.toggle('an', x === b); }); },
+    zuBox: function () {
+      lesen();
+      if (!Z.teil) { melde('Bitte angeben, was für ein Teil es ist.', 'warn'); $('f-teil').focus(); return; }
+      if (!Z.marke && !Z.produktart) { melde('Bitte mindestens Marke oder Produktart angeben.', 'warn'); $('f-marke').focus(); return; }
+      seiteBox();
+    },
+    zuPruefen: function () { seitePruefen(null); },
+    box: function (b) { Z.box = b.dataset.v; seiteBox(); },
+    menge: function (b) { Z.menge = Number(b.dataset.v); seiteBox(); },
+    boxNeu: function () {
+      var pa = Z.produktart || prompt('Produktart der neuen Box?'); if (!pa) return;
+      ruf('boxNeu', [pa, ''], function (r) { START.boxen = r.boxen; Z.box = r.box; seiteBox(); melde('Box ' + r.box + ' angelegt. Nummer mit Marker auf die Box schreiben.', 'ok'); });
+    },
+    speichern: function () {
+      var m = Number($('f-menge').value); if (m >= 1) Z.menge = Math.round(m);
+      if (!Z.box) return;
+      if (!ruf('einlagern', [{ marke: Z.marke, modell: Z.modell, produktart: Z.produktart, teil: Z.teil, teilart: Z.teilart, menge: Z.menge, box: Z.box, quelle: Z.quelle }], function (r) {
+        try { localStorage.setItem('et-box', r.box); } catch (e) { /* ohne Speicher */ }
+        START.imLager = r.imLager; $('speichern').disabled = false; seiteFertig(r);
+      }, function (msg) { $('speichern').disabled = false; melde(msg, 'stop'); })) return;
+      $('speichern').disabled = true;
+    },
+    suchFoto: function () { Z = { suche: true, marke: '', modell: '', produktart: '', text: '', teil: '', treffer: null, online: null }; seiteSuche(null); foto(function (d) { if (d) seiteSuche(d); else melde('Nichts gelesen. Bitte tippen.', 'warn'); }); },
+    suchHand: function () { Z = null; seiteSuche(null); $('s-text').focus(); },
+    suchen: function () { suchen(); },
+    weg: function (b) { weg(b.dataset.v); },
+    online: function () { online(); }
+  };
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-a]');
+    if (!b || b.disabled || !AKT[b.dataset.a]) return;
+    AKT[b.dataset.a](b);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.id === 's-text') { e.preventDefault(); suchen(); }
+    if (e.key === 'Enter' && e.target.id === 's-teil') { e.preventDefault(); online(); }
+  });
+
+  $('main').innerHTML = '<div class="karte"><p class="still">Lädt.</p></div>';
+  ruf('startDaten', [], function (s) { START = s; seiteStart(); }, function (m) { $('main').innerHTML = '<div class="karte">' + box(esc(m), 'stop') + '</div>'; });
+})();
+</script>
+</body>
+</html>
