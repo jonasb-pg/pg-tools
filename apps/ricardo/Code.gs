@@ -4,8 +4,8 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-16.4';
-const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang';
+const VERSION = '2026-10-16.5';
+const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
 const L_COLS = ['PG-ID', 'Status', 'EAN', 'Bezeichnung', 'Kategorie', 'Neupreis CHF', 'Startpreis CHF', 'Lagerort',
@@ -22,6 +22,8 @@ const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW
 // Posteingang: was aus den Ricardo-Mails zu erledigen ist (Fragen, Nachrichten, Preisvorschläge, Hinweise). ID = Gmail-Nachricht
 const I_COLS = ['ID', 'Eingang', 'Art', 'Status', 'Artikel-Nr', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Von', 'Text', 'Betrag CHF', 'Preis CHF', 'Frist',
   'Empfehlung', 'Entwurf', 'Link', 'Erledigt am', 'Erledigt von'];
+// Feedback aus der Web-App (Knopf «Feedback»), Status pflegt der Admin
+const F_COLS = ['Zeit', 'Person', 'Bereich', 'Feedback', 'Status'];
 const MAIL_KONTO = 'MAIL_KONTO', MAIL_STAND = 'MAIL_STAND', MAIL_START = 'MAIL_START', MAIL_LETZTE = 'MAIL_LETZTE', MAIL_UNECHT = 'MAIL_UNECHT';
 const MAIL_RUECKBLICK_MS = 3600000;        // jede Abfrage schaut eine Stunde zurück: Mails kommen nicht immer in der richtigen Reihenfolge an
 const MAIL_WARNUNG_STUNDEN = 6;            // tagsüber so lange keine Ricardo-Mail: Warnung unter «Zu erledigen»
@@ -150,6 +152,10 @@ function einrichten() {
   if (!pe) pe = ss.insertSheet(TAB_I);
   kopf_(pe, I_COLS, 0, []);
   textSpalten_(pe, I_COLS, ['ID', 'Artikel-Nr', 'Verkauf-Nr', 'PG-ID']);
+
+  let fb = ss.getSheetByName(TAB_F);
+  if (!fb) fb = ss.insertSheet(TAB_F);
+  kopf_(fb, F_COLS, 0, []);
 
   let lg = ss.getSheetByName(TAB_LOG);
   if (!lg) {
@@ -305,6 +311,7 @@ const RICARDO_KATALOG = [
   { tab: 'Verkäufe', art: 'arbeit', inhalt: 'Ein Verkauf pro Zeile aus Mails und Verkaufsbericht: Käufer, Adresse, Zahlung, Versand.' },
   { tab: 'Posteingang', art: 'arbeit', inhalt: 'Fragen, Nachrichten und Preisvorschläge aus den Ricardo-Mails («Zu erledigen»).' },
   { tab: 'Retouren', art: 'arbeit', inhalt: 'Ein Garantiefall pro Zeile mit Grund und Rückzahlung.' },
+  { tab: 'Feedback', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Rückmeldungen aus der Web-App. «Status» (Neu, Erledigt) setzt der Admin im Tool.' },
   { tab: 'Wochenübersicht', art: 'arbeit', inhalt: 'Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.' },
   { tab: 'Post-Adressen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export an die Post, wird nach jedem Export geleert.', kopf: 0 },
@@ -1866,13 +1873,17 @@ function aufgaben() {
   fragen.sort(function (a, b) { return b.alter - a.alter; });
   angebote.sort(function (a, b) { return (a.restStunden === '' ? 999 : a.restStunden) - (b.restStunden === '' ? 999 : b.restStunden); });
   zahlung.sort(function (a, b) { return b.tage - a.tage; });
-  /* Kontrolle: kommen überhaupt Mails an? */
+  return { fragen: fragen, angebote: angebote, zahlung: zahlung, verpasst: verpasst, anzahl: fragen.length + angebote.length + zahlung.length, kontrolle: mailKontrolle_() };
+}
+
+/** Kommen überhaupt Mails an? Für «Zu erledigen» und Admin › Betrieb. */
+function mailKontrolle_() {
+  const pr = PropertiesService.getScriptProperties(), jetzt = Date.now();
   const konto = pr.getProperty(MAIL_KONTO), letzte = Number(pr.getProperty(MAIL_LETZTE)) || Number(pr.getProperty(MAIL_START)) || 0, un = String(pr.getProperty(MAIL_UNECHT) || '').split('|');
   const tagsueber = imFenster_(cfg_('Mails prüfen zwischen'));
-  return { fragen: fragen, angebote: angebote, zahlung: zahlung, verpasst: verpasst, anzahl: fragen.length + angebote.length + zahlung.length,
-    kontrolle: { aktiv: !!konto, letzte: letzte ? Utilities.formatDate(new Date(letzte), TZ, 'dd.MM. HH:mm') : '',
-      warnung: !!konto && tagsueber && letzte > 0 && jetzt - letzte > MAIL_WARNUNG_STUNDEN * 3600000,
-      unecht: un.length === 2 && jetzt - Number(un[0]) < 86400000 ? Number(un[1]) : 0 } };
+  return { aktiv: !!konto, letzte: letzte ? Utilities.formatDate(new Date(letzte), TZ, 'dd.MM. HH:mm') : '',
+    warnung: !!konto && tagsueber && letzte > 0 && jetzt - letzte > MAIL_WARNUNG_STUNDEN * 3600000,
+    unecht: un.length === 2 && jetzt - Number(un[0]) < 86400000 ? Number(un[1]) : 0 };
 }
 
 function aufgabeErledigt(id) {
@@ -1919,7 +1930,8 @@ function api(lang, name, args) {
     setzeVerkauf: setzeVerkauf, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt, retourenExport: retourenExport,
-    aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt }[name];
+    aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
+    adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
   try { r = f.apply(null, args || []); }
@@ -2023,6 +2035,128 @@ function pruefeAdmin_() {
 }
 
 /** Sucht in allen Listings und Verkäufen, egal in welchem Status. Ohne Suchbegriff: die neusten Einträge. */
+/* ------------------------------------------------------------------ */
+/* Admin: Betrieb, Kennzahlen, Feedback (gleicher Aufbau wie im Analyse Tool) */
+/* ------------------------------------------------------------------ */
+
+/** Zeilen eines Tabs als Objekte nach Spaltennamen, _r = Zeilennummer im Sheet. */
+function objekte_(tab, cols) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(tab);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, cols.length).getValues().map(function (row, i) {
+    const o = { _r: i + 2 }; cols.forEach(function (k, j) { o[k] = row[j]; }); return o;
+  });
+}
+
+function adminBetrieb() {
+  pruefeAdmin_();
+  const pr = PropertiesService.getScriptProperties();
+  return { ki: !!pr.getProperty('ANTHROPIC_API_KEY'), mail: mailKontrolle_(), url: SpreadsheetApp.getActive().getUrl(),
+    ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mailsAbholen'; }) };
+}
+
+/** Prüft jede Verbindung einzeln und zeigt die Antwort oder den Fehler im Wortlaut. */
+function verbindungTest() {
+  pruefeAdmin_();
+  const aus = [], mess = function (name, f) {
+    const t0 = Date.now(); let ok = true, detail;
+    try { detail = f(); } catch (err) { ok = false; detail = String(err.message || err); }
+    aus.push({ name: name, ok: ok, detail: String(detail).slice(0, 300), sek: Math.round((Date.now() - t0) / 100) / 10 });
+  };
+  mess('Return Tool', function () { return SpreadsheetApp.openById(cfg_('Return Tool ID')).getName() + ' gelesen'; });
+  mess('Analyse Tool', function () { return SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getName() + ' gelesen'; });
+  mess('Ricardo-Mails', function () {
+    const n = GmailApp.search('from:' + String(cfg_('Mail-Absender') || '').trim() + ' newer_than:7d', 0, 50).length;
+    return n + ' Mails der letzten 7 Tage gefunden';
+  });
+  mess('Claude', function () {
+    if (!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY')) throw new Error('Schlüssel fehlt (Script-Eigenschaft ANTHROPIC_API_KEY)');
+    return 'Schlüssel vorhanden';
+  });
+  log_('Verbindungstest', '', aus.map(function (a) { return a.name + ': ' + (a.ok ? 'ok' : 'FEHLER') + ' ' + a.detail; }).join(' | '));
+  return aus;
+}
+
+function kennzahlen(jetztMs) {
+  pruefeAdmin_();
+  return kennzahlenRechnen_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), objekte_(TAB_R, R_COLS), objekte_(TAB_I, I_COLS), jetztMs ? Number(jetztMs) : Date.now(),
+    Number(cfg_('Zahlungserinnerung nach Tagen')) || 3);
+}
+/** Montag 00:00 (Zürcher Zeit) der Woche von ms, als «yyyy-MM-dd». */
+function wocheR_(ms) {
+  const d = new Date(ms), wt = Number(Utilities.formatDate(d, TZ, 'u')) - 1;
+  return Utilities.formatDate(new Date(ms - wt * 86400000), TZ, 'yyyy-MM-dd');
+}
+function kennzahlenRechnen_(listings, verkaeufe, retouren, posteingang, jetzt, zahlTage) {
+  const ms = function (d) { return d instanceof Date ? d.getTime() : null; }, r1 = function (x) { return Math.round(x * 10) / 10; };
+  const dieseWoche = wocheR_(jetzt), vier = jetzt - 28 * 86400000;
+  const zeitraeume = { woche: function (t) { return t !== null && wocheR_(t) === dieseWoche; }, vierWochen: function (t) { return t !== null && t >= vier; }, gesamt: function (t) { return t !== null; } };
+  const rechne = function (drin) {
+    const v = verkaeufe.filter(function (x) { return x['Verkauf-Nr'] && drin(ms(x['Verkauft am'])); });
+    const gueltig = v.filter(function (x) { return x['Status'] !== 'Storniert'; });
+    const summe = function (feld) { return Math.round(gueltig.reduce(function (t, x) { return t + (Number(x[feld]) || 0); }, 0) * 100) / 100; };
+    const versand = gueltig.filter(function (x) { return x['Bezahlt und versendet am'] instanceof Date; }).map(function (x) { return (ms(x['Bezahlt und versendet am']) - ms(x['Verkauft am'])) / 86400000; });
+    /* Listings, deren Angebot im Zeitraum endete: verkauft oder unverkauft */
+    const verkauft = listings.filter(function (x) { return x['Verkauft am'] instanceof Date && drin(ms(x['Verkauft am'])); });
+    const unverkauft = listings.filter(function (x) { return x['Status'] === 'Unverkauft' && drin(ms(x['Gelistet am'])); });
+    const tage = verkauft.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) { return (ms(x['Verkauft am']) - ms(x['Gelistet am'])) / 86400000; });
+    const rt = retouren.filter(function (x) { return drin(ms(x['Eröffnet am'])); }).length;
+    const pv = posteingang.filter(function (x) { return x['Art'] === 'Preisvorschlag' && drin(ms(x['Eingang'])); });
+    const avg = function (l) { return l.length ? r1(l.reduce(function (t, x) { return t + x; }, 0) / l.length) : null; };
+    return { verkaeufe: gueltig.length, storniert: v.length - gueltig.length, umsatz: summe('Preis CHF'), auszahlung: summe('Auszahlung CHF'),
+      schnitt: gueltig.length ? Math.round(summe('Preis CHF') / gueltig.length * 100) / 100 : null,
+      verkaufsquote: verkauft.length + unverkauft.length ? Math.round(verkauft.length / (verkauft.length + unverkauft.length) * 100) : null,
+      unverkauft: unverkauft.length, tageBisVerkauf: avg(tage), tageBisVersand: avg(versand),
+      retouren: rt, retourenquote: gueltig.length ? Math.round(rt / gueltig.length * 100) : null,
+      preisvorschlaege: pv.length };
+  };
+  const aus = {};
+  Object.keys(zeitraeume).forEach(function (k) { aus[k] = rechne(zeitraeume[k]); });
+  /* Jetzt: laufende Angebote und überfällige Zahlungen */
+  aus.jetzt = {
+    gelistet: listings.filter(function (x) { return x['Status'] === 'Gelistet'; }).length,
+    zuPacken: verkaeufe.filter(function (x) { return x['Status'] === 'Zu packen'; }).length,
+    zahlungOffen: verkaeufe.filter(function (x) { return V_OFFEN.indexOf(x['Status']) > -1 && x['Verkauft am'] instanceof Date && jetzt - ms(x['Verkauft am']) >= zahlTage * 86400000; }).length,
+    zahlTage: zahlTage
+  };
+  const w = {};
+  verkaeufe.forEach(function (x) {
+    const t = ms(x['Verkauft am']);
+    if (t === null || jetzt - t > 12 * 7 * 86400000 || x['Status'] === 'Storniert' || !x['Verkauf-Nr']) return;
+    const k = wocheR_(t), z = w[k] || (w[k] = { name: k, verkaeufe: 0, umsatz: 0, auszahlung: 0 });
+    z.verkaeufe++; z.umsatz += Number(x['Preis CHF']) || 0; z.auszahlung += Number(x['Auszahlung CHF']) || 0;
+  });
+  aus.wochen = Object.keys(w).sort().reverse().map(function (k) { const z = w[k]; z.umsatz = Math.round(z.umsatz * 100) / 100; z.auszahlung = Math.round(z.auszahlung * 100) / 100; return z; });
+  const erste = verkaeufe.map(function (x) { return ms(x['Verkauft am']); }).filter(function (t) { return t !== null; });
+  aus.seit = erste.length ? Utilities.formatDate(new Date(Math.min.apply(null, erste)), TZ, 'dd.MM.yyyy') : '';
+  return aus;
+}
+
+function feedback(text, bereich) {
+  text = String(text || '').trim().slice(0, 2000);
+  if (!text) throw new Error('Bitte zuerst etwas hineinschreiben.');
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(TAB_F);
+  if (!sh) { sh = ss.insertSheet(TAB_F); kopf_(sh, F_COLS, 0, []); }
+  sh.appendRow([new Date(), nutzer_(), String(bereich || '').slice(0, 40), text.replace(/^[=+\-@]/, "'$&"), 'Neu']);
+  return true;
+}
+function feedbackListe() {
+  pruefeAdmin_();
+  return objekte_(TAB_F, F_COLS).map(function (r) {
+    return { r: r._r, zeit: r['Zeit'] instanceof Date ? Utilities.formatDate(r['Zeit'], TZ, 'dd.MM.yyyy HH:mm') : String(r['Zeit']), person: String(r['Person'] || ''),
+      bereich: String(r['Bereich'] || ''), text: String(r['Feedback'] || ''), status: String(r['Status'] || 'Neu') };
+  }).filter(function (x) { return x.text; }).reverse();
+}
+function feedbackStatus(r, text, status) {
+  pruefeAdmin_();
+  if (['Neu', 'Erledigt'].indexOf(status) < 0) throw new Error('Unbekannter Status.');
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_F), z = Number(r);
+  if (!sh || z < 2 || z > sh.getLastRow() || String(sh.getRange(z, 4).getValue()).slice(0, 40) !== String(text).slice(0, 40)) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
+  sh.getRange(z, F_COLS.indexOf('Status') + 1).setValue(status);
+  return feedbackListe();
+}
+
 function adminSuche(q) {
   pruefeAdmin_();
   const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);

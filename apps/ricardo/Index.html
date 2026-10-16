@@ -96,6 +96,20 @@
   .meldung.warn { background:var(--pink-hell); }
   .meldung.ok { background:var(--pink); }
   .meldung.stop { background:var(--ink); color:var(--weiss); }
+  /* Admin: Unterseiten, Kennzahlen-Kacheln (gleich wie im Analyse Tool) */
+  .adm-reiter { margin:0 0 16px; }
+  .kacheln { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin:0 0 16px; }
+  .kachel { background:var(--weiss); border:2px solid var(--ink); border-radius:4px; padding:14px 16px; }
+  .kachel .z { font:900 30px/1.1 var(--sans); margin:4px 0; }
+  .kachel .n { color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.6px; font-weight:600; }
+  .kachel .u { color:var(--muted); font-size:14px; }
+  td.zahl-r, th.zahl-r { text-align:right; white-space:nowrap; }
+  /* Feedback */
+  .fb-auf { width:100%; margin-bottom:12px; background:var(--pink); }
+  #fb { position:fixed; inset:0; z-index:45; background:rgba(10,10,10,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+  #fb[hidden] { display:none; }
+  #fb .karte { width:min(520px, 100%); margin:0; }
+  #fb textarea { width:100%; resize:vertical; }
   .meldung ul { margin:6px 0 0; padding-left:20px; }
   .etikett { display:inline-block; padding:6px 8px; border-radius:4px; background:var(--grau); font:600 13px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; white-space:nowrap; }
   .etikett.hell { background:var(--pink); }
@@ -158,6 +172,7 @@
       <button id="nav-admin" onclick="zeige('admin')" hidden><span data-t="nav.admin"></span></button>
     </div>
     <div class="fuss">
+      <button class="fb-auf" onclick="fbAuf()" data-t="fb.knopf"></button>
       <p class="info" id="zaehler"></p>
       <div class="sprache" role="group" aria-label="Sprache / Language">
         <button id="l-de" onclick="sprache('de')">DE</button>
@@ -342,21 +357,35 @@
 
       <!-- ===================== ADMIN ===================== -->
       <section id="s-admin" hidden>
-        <div class="karte">
-          <h2 data-t="ad.titel"></h2>
-          <p class="still" data-t="ad.text"></p>
-          <div class="reihe">
-            <div class="breit"><input type="text" id="ad-q" data-tp="ad.platz"></div>
-            <button class="haupt-knopf" onclick="adminSuchen()" data-t="suchen"></button>
+        <div class="wahl adm-reiter" id="adm-reiter"></div>
+        <div id="adm-betrieb">
+          <div class="karte">
+            <div class="kopf"><h2 data-t="adm.zustand"></h2><span><button id="adm-knopf" onclick="admTest()" data-t="adm.test"></button> <a id="adm-sheet" href="#" target="_blank" rel="noopener" data-t="adm.sheet"></a></span></div>
+            <div id="adm-status"></div>
+            <div id="adm-test"></div>
           </div>
-          <div id="ad-liste"></div>
         </div>
-        <div class="karte">
-          <div class="kopf"><h2 data-t="ad.einst"></h2><button class="haupt-knopf" onclick="einstSpeichern()" data-t="ad.einst.speichern"></button></div>
-          <p class="still" data-t="ad.einst.text"></p>
-          <div class="meldung" id="ad-ki"></div>
-          <div id="ad-einst"></div>
+        <div id="adm-kennzahlen" hidden></div>
+        <div id="adm-einstellungen" hidden>
+          <div class="karte">
+            <div class="kopf"><h2 data-t="ad.einst"></h2><button class="haupt-knopf" onclick="einstSpeichern()" data-t="ad.einst.speichern"></button></div>
+            <p class="still" data-t="ad.einst.text"></p>
+            <div class="meldung" id="ad-ki"></div>
+            <div id="ad-einst"></div>
+          </div>
         </div>
+        <div id="adm-storno" hidden>
+          <div class="karte">
+            <h2 data-t="ad.titel"></h2>
+            <p class="still" data-t="ad.text"></p>
+            <div class="reihe">
+              <div class="breit"><input type="text" id="ad-q" data-tp="ad.platz"></div>
+              <button class="haupt-knopf" onclick="adminSuchen()" data-t="suchen"></button>
+            </div>
+            <div id="ad-liste"></div>
+          </div>
+        </div>
+        <div id="adm-feedback" hidden><div class="karte"><h2 data-t="af.titel"></h2><div id="af-liste"></div></div></div>
       </section>
     </main>
   </div>
@@ -364,6 +393,11 @@
 
 <div id="hinweis" role="status" aria-live="polite" hidden onclick="this.hidden=true"></div>
 <div id="dialog" role="dialog" aria-modal="true" hidden><div class="box"><p id="dialog-text"></p><div class="reihe"><button id="dialog-nein" data-t="nein"></button><button id="dialog-ja" class="haupt-knopf" data-t="ja"></button></div></div></div>
+<div id="fb" hidden><div class="karte" role="dialog" aria-modal="true" aria-labelledby="fb-titel">
+  <h2 id="fb-titel" data-t="fb.titel"></h2>
+  <textarea id="fb-text" rows="5" maxlength="2000" data-tp="fb.platz"></textarea>
+  <div class="reihe" style="justify-content:flex-end;margin-top:12px"><button onclick="fbZu()" data-t="nein"></button><button class="haupt-knopf" onclick="fbSenden()" data-t="fb.senden"></button></div>
+</div></div>
 <div id="sperre" hidden></div>
 <div id="lade" hidden></div>
 
@@ -501,6 +535,25 @@
     'rt.export.leer': ['Keine offenen Rückzahlungen.', 'No refunds due.'],
     'rt.export.fertig': [' ({0} Rückzahlungen)', ' ({0} refunds)'], 'rt.speichern': ['{0} speichern', 'Save {0}'],
     'ad.titel': ['Storno: Einträge löschen', 'Cancel: delete entries'],
+    'fb.knopf': ['Feedback', 'Feedback'], 'fb.titel': ['Was fehlt oder stört?', 'What is missing or bothering you?'], 'fb.platz': ['z.B. Schritt unklar, Idee …', 'e.g. step unclear, idea …'],
+    'fb.senden': ['Senden', 'Send'], 'fb.danke': ['Danke! Feedback ist gespeichert.', 'Thanks! Feedback saved.'], 'fb.leer': ['Bitte zuerst etwas hineinschreiben.', 'Please write something first.'],
+    'adm.r.betrieb': ['Betrieb', 'Operations'], 'adm.r.kennzahlen': ['Kennzahlen', 'Key figures'], 'adm.r.einstellungen': ['Einstellungen', 'Settings'], 'adm.r.storno': ['Storno', 'Cancel'], 'adm.r.feedback': ['Feedback', 'Feedback'],
+    'adm.zustand': ['Zustand', 'Status'], 'adm.test': ['Verbindungen testen', 'Test connections'], 'adm.sheet': ['Sheet öffnen', 'Open sheet'], 'adm.testet': ['Die Verbindungen werden geprüft …', 'Testing the connections …'],
+    'adm.ok': ['ok', 'ok'], 'adm.fehler': ['Fehler', 'Error'],
+    'adm.mail.an': ['Ricardo-Mails werden gelesen. Letzte Mail: {0}.', 'Ricardo mails are being read. Last mail: {0}.'], 'adm.mail.aus': ['Ricardo-Mails werden nicht gelesen: im Apps Script «einrichten» ausführen.', 'Ricardo mails are not read: run «einrichten» in Apps Script.'],
+    'adm.mail.still': ['Seit über 6 Stunden keine Ricardo-Mail. Kommt die Weiterleitung an care@ noch an?', 'No Ricardo mail for over 6 hours. Is forwarding to care@ still working?'],
+    'adm.mail.unecht': ['{0} Mails in den letzten 24 Stunden abgewiesen, weil sie nicht nachweislich von Ricardo kamen (Tab «Log»).', '{0} mails rejected in the last 24 hours because they were not verifiably from Ricardo (tab «Log»).'],
+    'adm.ausloeser': ['Der Mail-Abruf läuft von selbst (alle 30 Minuten im Zeitfenster).', 'Mail fetching runs by itself (every 30 minutes within the window).'], 'adm.keinausloeser': ['Der Auslöser für den Mail-Abruf fehlt: im Apps Script «einrichten» ausführen.', 'The trigger for fetching mails is missing: run «einrichten» in Apps Script.'],
+    'adm.ki': ['Claude ist verbunden.', 'Claude is connected.'], 'adm.keinki': ['Der Claude-Schlüssel fehlt.', 'The Claude key is missing.'],
+    'kz.woche': ['Diese Woche', 'This week'], 'kz.vier': ['Letzte 4 Wochen', 'Last 4 weeks'], 'kz.gesamt': ['Alles seit {0}', 'All since {0}'],
+    'kz.verkaeufe': ['Verkäufe', 'Sales'], 'kz.verkaeufe.u': ['Ø CHF {0} · {1} storniert', 'avg CHF {0} · {1} cancelled'], 'kz.umsatz': ['Umsatz CHF', 'Revenue CHF'], 'kz.umsatz.u': ['Auszahlung CHF {0}', 'Payout CHF {0}'],
+    'kz.quote': ['Verkaufsquote', 'Sell-through'], 'kz.quote.u': ['{0} unverkauft · Ø {1} Tage bis zum Verkauf', '{0} unsold · avg {1} days to sale'],
+    'kz.versand': ['Ø Tage bis Versand', 'Avg days to shipping'], 'kz.versand.u': ['vom Verkauf bis «bezahlt und versendet»', 'from sale to «paid and shipped»'],
+    'kz.retouren': ['Retourenquote', 'Return rate'], 'kz.retouren.u': ['{0} Retouren', '{0} returns'], 'kz.pv': ['Preisvorschläge', 'Price offers'], 'kz.pv.u': ['aus den Ricardo-Mails', 'from the Ricardo mails'],
+    'kz.jetzt': ['Jetzt', 'Now'], 'kz.gelistet': ['Laufende Angebote', 'Running listings'], 'kz.zupacken': ['Zu packen', 'To pack'], 'kz.zahlung': ['Zahlung offen seit {0}+ Tagen', 'Payment open {0}+ days'],
+    'kz.wochen': ['Pro Woche', 'Per week'], 'kz.th.woche': ['Woche ab', 'Week from'], 'kz.th.verkaeufe': ['Verkäufe', 'Sales'], 'kz.th.umsatz': ['Umsatz CHF', 'Revenue CHF'], 'kz.th.auszahlung': ['Auszahlung CHF', 'Payout CHF'],
+    'kz.leer': ['Noch keine Verkäufe in diesem Zeitraum.', 'No sales in this period yet.'],
+    'af.titel': ['Feedback aus dem Team', 'Feedback from the team'], 'af.leer': ['Noch kein Feedback.', 'No feedback yet.'], 'af.neu': ['Neu', 'New'], 'af.erledigt': ['Erledigt', 'Done'],
     'ad.text': ['Sucht in allen Listings und Verkäufen, egal in welchem Status. Ohne Suchbegriff erscheinen die neusten Einträge.', 'Searches all listings and sales in any status. Without a search term the latest entries are shown.'],
     'ad.platz': ['PG-ID, Titel, Käufer oder Verkaufsnummer', 'PG-ID, title, buyer or sale number'],
     'ad.listings': ['Listings', 'Listings'], 'ad.verkaeufe': ['Verkäufe', 'Sales'], 'ad.leer': ['Nichts gefunden.', 'Nothing found.'], 'th.angelegt': ['Angelegt', 'Created'],
@@ -551,7 +604,7 @@
     $('dialog-ja').onclick = function () { $('dialog').hidden = true; ja(); };
     $('dialog-nein').onclick = function () { $('dialog').hidden = true; };
   }
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('dialog').hidden = true; });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { $('dialog').hidden = true; $('fb').hidden = true; } });
   function ruf(name, args, ok) {
     lade(true);
     google.script.run.withSuccessHandler(function (x) { lade(false); ok(x); })
@@ -976,7 +1029,69 @@
 
   /* ---------- Admin ---------- */
   var AD = null, EINST = [];
-  function ladeAdmin() { adminSuchen(); ruf('adminEinstellungen', [], zeichneEinst); }
+  /* ---------- Admin: Betrieb, Kennzahlen, Einstellungen, Storno, Feedback ---------- */
+  var ADM = 'betrieb', KZ = null, KZZ = 'vierWochen', AF = [];
+  function ladeAdmin() { admTab(ADM); }
+  function admTab(v) {
+    ADM = v;
+    var reiter = ['betrieb', 'kennzahlen', 'einstellungen', 'storno', 'feedback'];
+    $('adm-reiter').innerHTML = reiter.map(function (x) { return '<button class="' + (x === ADM ? 'an' : '') + '" onclick="admTab(\'' + x + '\')">' + esc(t('adm.r.' + x)) + '</button>'; }).join('');
+    reiter.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });
+    if (ADM === 'betrieb') ruf('adminBetrieb', [], zeichneBetrieb);
+    else if (ADM === 'kennzahlen') ruf('kennzahlen', [], function (k) { KZ = k; zeichneKennzahlen(); });
+    else if (ADM === 'einstellungen') ruf('adminEinstellungen', [], zeichneEinst);
+    else if (ADM === 'storno') adminSuchen();
+    else ruf('feedbackListe', [], zeichneFeedback);
+  }
+  function zeichneBetrieb(r) {
+    var z = function (ok, text, warn) { return '<div class="meldung ' + (ok ? (warn ? 'warn' : '') : 'stop') + '" style="margin:8px 0">' + esc(text) + '</div>'; }, m = r.mail;
+    $('adm-status').innerHTML = z(m.aktiv, m.aktiv ? t('adm.mail.an', m.letzte || '–') : t('adm.mail.aus')) + (m.warnung ? z(true, t('adm.mail.still'), true) : '') + (m.unecht ? z(true, t('adm.mail.unecht', m.unecht), true) : '')
+      + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
+    $('adm-sheet').href = r.url;
+  }
+  function admTest() {
+    $('adm-test').innerHTML = '<div class="meldung warn">' + esc(t('adm.testet')) + '</div>';
+    ruf('verbindungTest', [], function (l) {
+      $('adm-test').innerHTML = l.map(function (x) { return '<div class="meldung ' + (x.ok ? '' : 'stop') + '"><strong>' + esc(x.name) + ': ' + esc(t(x.ok ? 'adm.ok' : 'adm.fehler')) + '</strong> · ' + esc(x.sek) + ' s<br>' + esc(x.detail) + '</div>'; }).join('');
+    });
+  }
+  function kzZeit(v) { KZZ = v; zeichneKennzahlen(); }
+  function zahlTxt(x, nach) { return x === null || x === undefined ? '–' : String(x) + (nach || ''); }
+  function chf(x) { return x === null || x === undefined ? '–' : Number(x).toFixed(2); }
+  function zeichneKennzahlen() {
+    var k = KZ, p = k[KZZ], j = k.jetzt;
+    var kachel = function (name, zahl, unter) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div><div class="u">' + esc(unter || '') + '</div></div>'; };
+    var h = '<h3>' + esc(t('kz.jetzt')) + '</h3><div class="kacheln">' + kachel(t('kz.gelistet'), String(j.gelistet)) + kachel(t('kz.zupacken'), String(j.zuPacken)) + kachel(t('kz.zahlung', j.zahlTage), String(j.zahlungOffen)) + '</div>';
+    h += '<div class="wahl adm-reiter">' + [['woche', 'kz.woche'], ['vierWochen', 'kz.vier'], ['gesamt', 'kz.gesamt']].map(function (x) {
+      return '<button class="' + (x[0] === KZZ ? 'an' : '') + '" onclick="kzZeit(\'' + x[0] + '\')">' + esc(t(x[1], k.seit || '–')) + '</button>'; }).join('') + '</div>';
+    if (!p.verkaeufe && !p.unverkauft && !p.preisvorschlaege) h += '<div class="karte"><p class="still">' + esc(t('kz.leer')) + '</p></div>';
+    else h += '<div class="kacheln">'
+      + kachel(t('kz.verkaeufe'), String(p.verkaeufe), t('kz.verkaeufe.u', chf(p.schnitt), p.storniert))
+      + kachel(t('kz.umsatz'), chf(p.umsatz), t('kz.umsatz.u', chf(p.auszahlung)))
+      + kachel(t('kz.quote'), zahlTxt(p.verkaufsquote, '%'), t('kz.quote.u', p.unverkauft, zahlTxt(p.tageBisVerkauf)))
+      + kachel(t('kz.versand'), zahlTxt(p.tageBisVersand), t('kz.versand.u'))
+      + kachel(t('kz.retouren'), zahlTxt(p.retourenquote, '%'), t('kz.retouren.u', p.retouren))
+      + kachel(t('kz.pv'), String(p.preisvorschlaege), t('kz.pv.u')) + '</div>';
+    if (k.wochen.length) h += '<div class="karte"><h2>' + esc(t('kz.wochen')) + '</h2><div class="tabelle" style="margin-top:0"><table><tr><th>' + esc(t('kz.th.woche')) + '</th><th class="zahl-r">' + esc(t('kz.th.verkaeufe')) + '</th><th class="zahl-r">' + esc(t('kz.th.umsatz')) + '</th><th class="zahl-r">' + esc(t('kz.th.auszahlung')) + '</th></tr>'
+      + k.wochen.map(function (w) { return '<tr><td>' + esc(w.name.split('-').reverse().join('.')) + '</td><td class="zahl-r">' + w.verkaeufe + '</td><td class="zahl-r">' + chf(w.umsatz) + '</td><td class="zahl-r">' + chf(w.auszahlung) + '</td></tr>'; }).join('') + '</table></div></div>';
+    $('adm-kennzahlen').innerHTML = h;
+  }
+  function zeichneFeedback(liste) {
+    AF = liste || [];
+    $('af-liste').innerHTML = AF.length ? '<div class="tabelle"><table>' + AF.slice().sort(function (a, b) { return (a.status === 'Neu' ? 0 : 1) - (b.status === 'Neu' ? 0 : 1); }).map(function (x) {
+      var i = AF.indexOf(x);
+      return '<tr><td style="white-space:nowrap">' + esc(x.zeit) + '<br><span class="still">' + esc(x.person) + '</span></td><td>' + esc(x.text) + (x.bereich ? '<br><span class="still">' + esc(t('nav.' + x.bereich)) + '</span>' : '') + '</td><td><span class="wahl">'
+        + [['Neu', 'af.neu'], ['Erledigt', 'af.erledigt']].map(function (o) { return '<button class="' + (x.status === o[0] ? 'an' : '') + '" onclick="afSetz(' + i + ',\'' + o[0] + '\')">' + esc(t(o[1])) + '</button>'; }).join('') + '</span></td></tr>';
+    }).join('') + '</table></div>' : '<p class="still">' + esc(t('af.leer')) + '</p>';
+  }
+  function afSetz(i, st) { var x = AF[i]; if (!x || x.status === st) return; ruf('feedbackStatus', [x.r, x.text, st], zeichneFeedback); }
+  function fbAuf() { $('fb').hidden = false; $('fb-text').focus(); }
+  function fbZu() { $('fb').hidden = true; }
+  function fbSenden() {
+    var text = $('fb-text').value.trim();
+    if (!text) { melde(t('fb.leer'), 'warn'); return; }
+    ruf('feedback', [text, ANSICHT], function () { $('fb-text').value = ''; fbZu(); melde(t('fb.danke'), 'ok'); });
+  }
   function adminSuchen() { ruf('adminSuche', [$('ad-q').value], function (a) { AD = a; zeichneAdmin(); }); }
   function zeichneAdmin() {
     var h = '', z = '';
