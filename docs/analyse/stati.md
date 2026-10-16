@@ -102,11 +102,13 @@ Seit `2026-10-17.3` entspricht das Grade dem Ricardo-Zustand (Entscheid Jonas 17
 
 | Fall | Grade | Ricardo-Zustand | Satz im Käufertext |
 |---|---|---|---|
-| originalversiegelt | A | Neu und originalverpackt | Neu und originalverpackt, ungeöffnet. |
-| unbenutzt, vollständige Originalverpackung (auch geöffnet) | A | Neu und originalverpackt | Neu und originalverpackt. |
-| unbenutzt, ohne Originalverpackung oder mit beschriebener Abweichung | B | Neu (gemäss Beschreibung) | Neu, unbenutzt (gemäss Beschreibung). |
-| mit Gebrauchsspuren | C | Gebraucht | Gebraucht. |
+| originalversiegelt | A | Neu und originalverpackt | Das Produkt ist neu und originalverpackt, die Verpackung ist noch versiegelt. |
+| unbenutzt, vollständige Originalverpackung (auch geöffnet) | A | Neu und originalverpackt | Das Produkt ist neu und unbenutzt, in der Originalverpackung. |
+| unbenutzt, ohne Originalverpackung oder mit beschriebener Abweichung | B | Neu (gemäss Beschreibung) | Das Produkt ist neu und unbenutzt. |
+| mit Gebrauchsspuren | C | Gebraucht | Das Produkt ist gebraucht. |
 | defekt | – | (nicht verkauft) |
+
+Käufertext (Verkaufsinfo und Ricardo) seit `2026-10-17.4`: Fliesstext aus einer Vorlage in drei Absätzen. 1. Zustandssatz, dazu «Das ist uns aufgefallen: …» mit den Mängeln. 2. «Wir haben es bei uns getestet: … funktionieren einwandfrei.», dazu Reparaturen. 3. «Im Paket sind …» und was fehlt. Nicht ausprobierte Funktionen und Firmware stehen nur im Protokoll.
 
 ## Matchmaker-Urteil
 
