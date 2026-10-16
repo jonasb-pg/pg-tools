@@ -540,7 +540,8 @@
     'vo.weiter1': ['Weiter, {0} Teil fehlt', 'Continue, {0} part is missing'], 'vo.weitern': ['Weiter, {0} Teile fehlen', 'Continue, {0} parts are missing'],
     'vo.unbekannt': ['Der Lieferumfang ist nicht bekannt. Fehlt offensichtlich etwas?', 'The scope of delivery is unknown. Is something obviously missing?'], 'vo.platz': ['Was fehlt? Leer lassen, wenn nichts fehlt.', 'What is missing? Leave empty if nothing is missing.'],
     'sp.frage': ['Ist das Gerät noch mit einem Konto verbunden?', 'Is the device still linked to an account?'], 'sp.wie': ['So prüfst du es', 'How to check'], 'sp.frei': ['Keine Sperre', 'No lock'], 'sp.ja': ['Gesperrt', 'Locked'], 'sp.unklar': ['Nicht ausschliessbar', 'Cannot rule it out'],
-    'fu.brauchst': ['Du brauchst:', 'You need:'], 'fu.fehlt': ['fehlt', 'missing'],
+    'fu.brauchst': ['Du brauchst:', 'You need:'], 'fu.frage': ['Habt ihr das?', 'Do you have this?'], 'fu.haben': ['Haben wir', 'We have it'], 'fu.nichthaben': ['Fehlt', 'Missing'],
+    'fu.frage.hinweis': ['«Haben wir» trägt es ins Inventar ein (Tab «Testmittel»). Weisst du es nicht, lass es offen.', '"We have it" adds it to the inventory (tab «Testmittel»). If you don\'t know, leave it open.'], 'fu.fehlt': ['fehlt', 'missing'],
     'fu.wlan': ['WLAN {0} · Passwort {1}', 'Wi-Fi {0} · password {1}'], 'fu.wlanohne': ['WLAN {0}', 'Wi-Fi {0}'],
     'fu.Kern': ['Kernfunktionen', 'Key functions'], 'fu.Weitere': ['Weitere Funktionen', 'Further functions'], 'fu.ok': ['OK', 'OK'], 'fu.nok': ['Nicht OK', 'Not OK'], 'fu.np': ['Nicht prüfbar', 'Cannot test'],
     'fu.achte': ['Achte auf', 'Watch out for'], 'fu.schwach': ['Bekannte Schwachstelle:', 'Known weak point:'], 'fu.ki': ['(Hinweis der KI, ohne Beleg)', '(hint from the AI, not sourced)'], 'fu.handbuch': ['Handbuch öffnen', 'Open the manual'],
@@ -804,10 +805,10 @@
     if (AN) { melde(t('fuss.laeuft'), true); return; }
     ruf('starteAnalyse', [id], function (d) { beginne(d, t0); });
   }
-  /* Was die Person im Lauf einer Analyse antwortet. Daraus entsteht in daten() das, was der Server beurteilt. Testmittel, die im Sheet auf «Nein» stehen, sind von Anfang an als fehlend markiert. */
+  /* Was die Person im Lauf einer Analyse antwortet. Daraus entsteht in daten() das, was der Server beurteilt. Testmittel, die nicht als vorhanden im Inventar stehen, fragt der Schritt «Funktion». */
   function leer(d) {
     return { versiegelt: false, rueckrufFrei: false, unbenutzt: false, sicher: false, sicherNein: false, sicherWahl: {}, fehlt: {}, fehltText: '', sperreFrei: false, fn: {},
-      mittelFehlt: d.funktion.mittel.filter(function (m) { return m.vorhanden === 'Nein'; }).map(function (m) { return m.name; }),
+      mittelFehlt: [], mittelDa: [],              // nichts wird als fehlend angenommen: Unbekanntes fragt der Schritt «Funktion»
       reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '' };
   }
   /* d = Überblick vom Server, t0 = Zeitpunkt des Scans, fehler = Grund, warum die Recherche nicht geklappt hat. */
@@ -1125,9 +1126,15 @@
     funktion: function () {
       var s = AN.s, f = AN.d.funktion, komplett = f.liste.every(function (x, i) { return s.fn[i]; }), nok = f.liste.some(function (x, i) { return s.fn[i] === 'nok'; });
       var gruppen = f.liste.some(function (x) { return x.g !== f.liste[0].g; }), h = f.regel ? '<p class="frage">' + esc(f.regel) + '</p>' : '';
-      if (f.mittel.length) h += '<p class="reihe"><span class="still">' + tx('fu.brauchst') + '</span>' + f.mittel.map(function (m, n) {
-        var weg = s.mittelFehlt.indexOf(m.name) > -1;
+      /* Im Inventar mit «Ja»: als Chip, antippen = fehlt heute. Sonst eine Frage «Habt ihr …?»: Ja trägt es ins Inventar ein, Nein zählt als fehlend. */
+      var bekannt = f.mittel.filter(function (m) { return m.vorhanden === 'Ja'; }), offen = f.mittel.filter(function (m) { return m.vorhanden !== 'Ja'; });
+      if (bekannt.length) h += '<p class="reihe"><span class="still">' + tx('fu.brauchst') + '</span>' + bekannt.map(function (m) {
+        var n = f.mittel.indexOf(m), weg = s.mittelFehlt.indexOf(m.name) > -1;
         return '<button class="chip' + (weg ? ' rot' : '') + '" data-a="mittelFehlt" data-v="' + n + '" aria-pressed="' + weg + '">' + esc(m.name) + (weg ? ' · ' + tx('fu.fehlt') : '') + '</button>'; }).join('') + '</p>';
+      if (offen.length) h += '<div class="ric-box"><div class="n">' + tx('fu.frage') + '</div><ul class="liste">' + offen.map(function (m) {
+        var n = f.mittel.indexOf(m), da = (s.mittelDa || []).indexOf(m.name) > -1, weg = s.mittelFehlt.indexOf(m.name) > -1;
+        return '<li class="fn"><span class="txt">' + esc(m.name) + '</span><span class="jn"><button class="ok' + (da ? ' an' : '') + '" data-a="mittelHaben" data-v="' + n + '" data-k="ja" aria-pressed="' + da + '">' + tx('fu.haben') + '</button>'
+          + '<button class="nok' + (weg ? ' an' : '') + '" data-a="mittelHaben" data-v="' + n + '" data-k="nein" aria-pressed="' + weg + '">' + tx('fu.nichthaben') + '</button></span></li>'; }).join('') + '</ul><p class="still" style="margin:8px 0 0">' + tx('fu.frage.hinweis') + '</p></div>';
       h += wlan();
       if (f.defekte.length || f.hinweise.length || f.handbuch) h += '<div class="meldung warn"><h3>' + tx('fu.achte') + '</h3><ul>'
         + f.defekte.map(function (x) { return '<li>' + tx('fu.schwach') + ' ' + esc(x.text) + (istUrl(x.quelle) ? ' ' + link(x.quelle, t('ub.quelle')) : '') + '</li>'; }).join('')
@@ -1331,6 +1338,14 @@
   function mittelFehlt(n) {
     var name = AN.d.funktion.mittel[n].name, m = AN.s.mittelFehlt;
     AN.s.mittelFehlt = m.indexOf(name) > -1 ? m.filter(function (x) { return x !== name; }) : m.concat([name]);
+    stand();
+  }
+  /* Testmittel, das nicht im Inventar steht: Ja = habt ihr (kommt beim Abschliessen ins Inventar), Nein = fehlt für diese Analyse. Nochmals tippen hebt die Antwort auf. */
+  function mittelHaben(n, k) {
+    var name = AN.d.funktion.mittel[n].name, s = AN.s, da = s.mittelDa || [], weg = s.mittelFehlt;
+    var war = k === 'ja' ? da.indexOf(name) > -1 : weg.indexOf(name) > -1;
+    s.mittelDa = da.filter(function (x) { return x !== name; }); s.mittelFehlt = weg.filter(function (x) { return x !== name; });
+    if (!war) (k === 'ja' ? s.mittelDa : s.mittelFehlt).push(name);
     stand();
   }
   function fn(v, i) { AN.s.fn[i] = v; stand(); }
@@ -1581,7 +1596,7 @@
     var s = AN.s, d = AN.d;
     return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), versiegelt: s.versiegelt, rueckrufFrei: s.rueckrufFrei, unbenutzt: s.unbenutzt, sicher: s.sicher,
       sicherNok: Object.keys(s.sicherWahl).map(function (n) { return d.sicher[n]; }), fehlt: Object.keys(s.fehlt).map(function (n) { return d.liefer.teile[n]; }).concat(s.fehltText.trim() ? [s.fehltText.trim()] : []),
-      sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), mittelFehlt: s.mittelFehlt, reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
+      sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
       rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
       mm: s.kanal === 'matchmaker' && AN.mm && AN.mm.passt ? AN.mm.passt[0] : null, nachMm: !!AN.nachMm,
       stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null };
@@ -1840,7 +1855,7 @@
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
-    versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, fn: fn, fnWeiter: fnWeiter,
+    versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
     kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, admTab: admTab, kzZeit: kzZeit, afSetz: afSetz };
 

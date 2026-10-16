@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.7';
+const VERSION = '2026-10-16.8';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1953,7 +1953,7 @@ function abschliessen(d) {
     }));
     /* Testmittel zählen nur, wenn der Schritt «Funktion» erreicht wurde. */
     if (bis >= u.ablauf.indexOf('funktion') && u.ablauf.indexOf('funktion') > -1) {
-      testmittelBuchen_({ benoetigt: u.funktion.mittel.map(function (m) { return m.name; }), gefehlt: d.mittelFehlt || [] }, String(p['PG-ID']), kuerzel, t);
+      testmittelBuchen_({ benoetigt: u.funktion.mittel.map(function (m) { return m.name; }), gefehlt: d.mittelFehlt || [], da: d.mittelDa || [] }, String(p['PG-ID']), kuerzel, t);
     }
     rueckmeldung_(String(p['Recherche-Schlüssel']), d.rueckmeldung || {});
     const st = {};
@@ -1976,18 +1976,29 @@ function mmPruefen_(d) {
   return { gesucht: String(m.gesucht).trim().slice(0, 200), mehr: String(m.mehr || '').trim().slice(0, 300), limit: zahl_(m.limit), hinweis: String(m.hinweis || '').slice(0, 120), schluessel: String(m.schluessel).slice(0, 600) };
 }
 
-/** Testmittel: jede Nennung ins Log (benötigt oder gefehlt), neue Namen in die Liste. Gleiche Schreibweise wie in der Liste, damit die Zählung stimmt. */
+/**
+ * Testmittel: jede Nennung ins Log (benötigt oder gefehlt). Die Liste im Tab «Testmittel» ist das Inventar: Sie wächst nur, wenn jemand
+ * in der Analyse bestätigt, dass ihr ein Testmittel habt (tm.da). Was nur die Recherche nennt, steht im Log, nicht im Inventar.
+ * Gleiche Schreibweise wie im Inventar, damit die Zählung stimmt.
+ */
 function testmittelBuchen_(tm, id, kuerzel, t) {
-  const bekannt = {}, log = [], neu = [];
-  lies_('Testmittel').z.forEach(function (r) { bekannt[norm_(r['Testmittel'])] = String(r['Testmittel']); });
+  const bekannt = {}, zeile = {}, log = [], neu = [], ja = {};
+  lies_('Testmittel').z.forEach(function (r) { bekannt[norm_(r['Testmittel'])] = String(r['Testmittel']); zeile[norm_(r['Testmittel'])] = r; });
+  (tm.da || []).forEach(function (n) {
+    n = txt_(n);
+    if (!n) return;
+    const r = zeile[norm_(n)];
+    if (!r) { bekannt[norm_(n)] = n; neu.push({ 'Testmittel': n, 'Vorhanden': 'Ja' }); }
+    else if (String(r['Vorhanden']) !== 'Ja') ja[r._r] = 'Ja';
+  });
   [['benoetigt', 'Benötigt'], ['gefehlt', 'Gefehlt']].forEach(function (art) {
     (tm[art[0]] || []).forEach(function (n) {
       n = txt_(n);
       if (!n) return;
-      if (!bekannt[norm_(n)]) { bekannt[norm_(n)] = n; neu.push({ 'Testmittel': n }); }
-      log.push({ 'Zeit': t, 'PG-ID': id, 'Testmittel': bekannt[norm_(n)], 'Art': art[1], 'Kürzel': kuerzel });
+      log.push({ 'Zeit': t, 'PG-ID': id, 'Testmittel': bekannt[norm_(n)] || n, 'Art': art[1], 'Kürzel': kuerzel });
     });
   });
+  if (Object.keys(ja).length) setz_('Testmittel', 'Vorhanden', ja);
   schreib_('Testmittel', neu);
   schreib_('Testmittel-Log', log);
 }
