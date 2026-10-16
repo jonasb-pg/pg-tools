@@ -83,6 +83,14 @@
   .mono { font:400 14px/1.4 var(--mono); color:var(--muted); }
   .zeile-neu td { background:var(--pink-hell); }
   .betrag { white-space:nowrap; font-size:18px; }
+  .aufgabe { border:2px solid var(--ink); border-radius:4px; padding:12px 14px; margin:10px 0; background:var(--weiss); }
+  .aufgabe.alt { border-color:#e08a00; }
+  .aufgabe.sehr-alt { border-color:#c62828; border-width:3px; }
+  .aufgabe .kopf { display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; justify-content:space-between; margin:0 0 6px; }
+  .aufgabe .frage { white-space:pre-wrap; margin:6px 0; }
+  .aufgabe textarea { margin:6px 0; }
+  .aufgabe .knoepfe { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .etikett.orange { background:#ffd8a8; } .etikett.rot { background:#c62828; color:#fff; }
 
   .meldung { padding:12px 16px; border:2px solid var(--ink); border-radius:4px; margin:12px 0; background:var(--weiss); }
   .meldung.warn { background:var(--pink-hell); }
@@ -142,6 +150,7 @@
     <div class="nav">
       <div class="sektion gross" data-t="nav.sektion"></div>
       <button id="nav-listen" class="an" onclick="zeige('listen')"><span data-t="nav.listen"></span></button>
+      <button id="nav-aufgaben" onclick="zeige('aufgaben')"><span data-t="nav.aufgaben"></span><span class="zahl" id="z-aufgaben" hidden></span></button>
       <button id="nav-verkauf" onclick="zeige('verkauf')"><span data-t="nav.verkauf"></span><span class="zahl" id="z-verkauf" hidden></span></button>
       <button id="nav-ueber" onclick="zeige('ueber')"><span data-t="nav.ueber"></span><span class="zahl" id="z-ueber" hidden></span></button>
       <button id="nav-retour" onclick="zeige('retour')"><span data-t="nav.retour"></span><span class="zahl" id="z-retour" hidden></span></button>
@@ -271,6 +280,16 @@
               <p style="margin:18px 0 0"><button onclick="abbrechen()" data-t="s4.abbrechen"></button></p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ===================== ZU ERLEDIGEN ===================== -->
+      <section id="s-aufgaben" hidden>
+        <div class="karte">
+          <div class="kopf"><h2 data-t="a.titel"></h2><button onclick="ladeAufgaben(true)" data-t="aktualisieren"></button></div>
+          <p class="still" data-t="a.text"></p>
+          <div id="a-kontrolle"></div>
+          <div id="a-liste"></div>
         </div>
       </section>
 
@@ -442,6 +461,23 @@
     'v.a2': ['Packen: gebrauchter Karton, Pretty-Good-Klebeband, Matchmaker-Karte und Care-Flyer', 'Pack: used box, Pretty Good tape, matchmaker card and care flyer'],
     'v.a3': ['Paket in den Rollcontainer «Ricardo Unpaid»', 'Parcel into the roll container «Ricardo Unpaid»'], 'v.a4': ['Zahlung auf dem Konto prüfen, dann Postwagen', 'Check the payment on the bank account, then postal cart'],
     'v.post': ['Adressliste für die Post erstellen', 'Create address list for Swiss Post'], 'v.post.leer': ['Keine Verkäufe mit Status «Zu packen».', 'No sales with status «To pack».'], 'v.post.mehr': ['{0} Adressen in {1} Dateien, eine pro Versandklasse. Jede einzeln im Postlogin unter «Paketetiketten Inland» hochladen und dort die gleiche Klasse wählen:', '{0} addresses in {1} files, one per shipping class. Upload each one separately in the Post login under «Paketetiketten Inland» and choose the same class there:'], 'v.post.n': ['{0} Adressen', '{0} addresses'], 'v.post.dann': [' ({0} Adressen), dann im Postlogin unter «Paketetiketten Inland» hochladen.', ' ({0} addresses), then upload in the Post login under «Paketetiketten Inland».'],
+    'nav.aufgaben': ['Zu erledigen', 'To do'], 'a.titel': ['Zu erledigen auf Ricardo', 'To do on Ricardo'],
+    'a.text': ['Das Tool liest die Mails von Ricardo. Was hier steht, muss auf Ricardo erledigt werden. Danach «Erledigt» klicken. Ab 4 Stunden orange, ab 24 Stunden rot.', 'The tool reads the Ricardo emails. Everything listed here has to be done on Ricardo. Then click «Done». Orange after 4 hours, red after 24 hours.'],
+    'a.leer': ['Nichts zu erledigen.', 'Nothing to do.'], 'a.fragen': ['Fragen und Nachrichten', 'Questions and messages'], 'a.angebote': ['Preisvorschläge', 'Price offers'], 'a.zahlung': ['Zahlung überfällig', 'Payment overdue'],
+    'a.erledigt': ['Erledigt', 'Done'], 'a.kopieren': ['Antwort kopieren und Ricardo öffnen', 'Copy reply and open Ricardo'], 'a.oeffnen': ['Auf Ricardo öffnen', 'Open on Ricardo'],
+    'a.entwurf': ['Antwortentwurf (vor dem Senden prüfen)', 'Draft reply (check before sending)'], 'a.keinentwurf': ['Kein Entwurf. Antwort selbst schreiben.', 'No draft. Write the reply yourself.'],
+    'a.nachricht': ['Die Nachricht steht nur auf Ricardo. Dort lesen und antworten.', 'The message is only on Ricardo. Read and reply there.'],
+    'a.von': ['von {0}', 'from {0}'], 'a.vor': ['vor {0} h', '{0} h ago'], 'a.vorschlag': ['Vorschlag CHF {0} (Preis CHF {1})', 'Offer CHF {0} (price CHF {1})'], 'a.frist': ['läuft ab {0} (noch {1} h)', 'expires {0} ({1} h left)'],
+    'a.verpasst': ['Abgelaufen ohne Antwort (letzte 3 Tage), obwohl «Annehmen» empfohlen war: {0}', 'Expired without reply (last 3 days) although «Accept» was recommended: {0}'], 'a.kopierenText': ['Text kopieren und Ricardo öffnen', 'Copy text and open Ricardo'],
+    'a.tage': ['seit {0} Tagen nicht bezahlt', 'unpaid for {0} days'], 'a.meldet': ['Käufer meldet: bezahlt am {0}', 'Buyer says: paid on {0}'], 'a.erinnerung': ['Text für die Erinnerung', 'Reminder text'],
+    'a.erinnert': ['Erinnerung gesendet', 'Reminder sent'],
+    'a.inaktiv': ['Das Lesen der Ricardo-Mails ist noch nicht eingerichtet. Im Apps-Script-Editor einmal «einrichten» ausführen und die Gmail-Berechtigung zulassen.', 'Reading the Ricardo emails is not set up yet. Run «einrichten» once in the Apps Script editor and allow Gmail access.'],
+    'a.letzte': ['Letzte Ricardo-Mail: {0}', 'Last Ricardo email: {0}'],
+    'a.warnung': ['Seit {0} keine Ricardo-Mail mehr. Bitte prüfen: Benachrichtigungen bei Ricardo, Mitgliedschaft in care@, Gmail-Filter.', 'No Ricardo email since {0}. Please check: Ricardo notifications, membership in care@, Gmail filter.'],
+    'a.unecht': ['{0} Mails mit Ricardo-Betreff hatten keine Ricardo-Signatur und wurden nicht verarbeitet (siehe Log).', '{0} emails with a Ricardo subject had no Ricardo signature and were not processed (see Log).'],
+    'v.meldet': ['Käufer meldet bezahlt', 'Buyer says paid'], 'v.ohneadr': ['Adresse fehlt: Verkaufsbericht einlesen', 'Address missing: import sales report'],
+    'v.post.ohne': ['{0} Verkäufe ohne Adresse sind nicht dabei: zuerst den Verkaufsbericht einlesen.', '{0} sales without address are not included: import the sales report first.'],
+    'v.ergaenzt': [' Adressen ergänzt: {0}.', ' Addresses added: {0}.'], 'v.fehlten': [' {0} Verkäufe fehlten im Tool (Mail nicht angekommen?).', ' {0} sales were missing in the tool (email not received?).'],
     'v.leer': ['Keine offenen Verkäufe. Alles gepackt, bezahlt und versendet.', 'No open sales. Everything is packed, paid and shipped.'],
     'v.gepackt': ['Gepackt', 'Packed'], 'v.bezahlt': ['Bezahlt und versendet', 'Paid and shipped'],
     'v.nichtzu': ['nicht zugeordnet', 'not linked'], 'v.ort': ['Lagerort {0}, ', 'Location {0}, '], 'v.nr': ['Nr. {0}', 'No. {0}'],
@@ -545,15 +581,16 @@
     if (R) { var id = R.id; ruf('lade', [id], function (r) { kontrolle(); zustandKnoepfe(R.zustandWahl); klasseKnoepfe(klasseWahl); aktualisiere(r); }); }
     if (VK) zeichneVerkaeufe();
     if (UE) zeichneUebersicht();
+    if (AU) zeichneAufgaben();
     if (ANSICHT === 'admin') ladeAdmin();
     $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();
   }
 
   function zeige(was) {
     ANSICHT = was;
-    ['listen', 'verkauf', 'ueber', 'retour', 'admin'].forEach(function (x) { $('s-' + x).hidden = was !== x; $('nav-' + x).className = was === x ? 'an' : ''; });
+    ['listen', 'aufgaben', 'verkauf', 'ueber', 'retour', 'admin'].forEach(function (x) { $('s-' + x).hidden = was !== x; $('nav-' + x).className = was === x ? 'an' : ''; });
     $('top-sub').textContent = t('nav.' + was);
-    if (was === 'ueber') ladeUebersicht(); else if (was === 'verkauf') ladeVerkaeufe(); else if (was === 'retour') ladeRetouren(); else if (was === 'admin') ladeAdmin(); else $('q').focus();
+    if (was === 'aufgaben') ladeAufgaben(false); else if (was === 'ueber') ladeUebersicht(); else if (was === 'verkauf') ladeVerkaeufe(); else if (was === 'retour') ladeRetouren(); else if (was === 'admin') ladeAdmin(); else $('q').focus();
   }
   function zaehler(aktiv, schwelle) { S.aktiv = aktiv; S.schwelle = schwelle; $('zaehler').textContent = t(aktiv >= schwelle ? 'aktiv.voll' : 'aktiv', aktiv); }
   function marke(el, n) { el.textContent = n; el.hidden = !n; }
@@ -770,7 +807,8 @@
     leser.onload = function () {
       ruf('importVerkaeufe', [String(leser.result)], function (v) {
         var i = v.import;
-        $('v-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + '</div>';
+        $('v-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + (i.ergaenzt ? t('v.ergaenzt', i.ergaenzt) : '') + '</div>'
+          + (i.fehlten ? '<div class="meldung warn">' + t('v.fehlten', i.fehlten) + '</div>' : '');
         $('v-datei').value = ''; VK = v; zeichneVerkaeufe();
       });
     };
@@ -789,8 +827,9 @@
         : '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'bezahlt\')">' + t('v.bezahlt') + '</button>';
       z += '<tr class="' + (o.status === 'Zu packen' ? 'zeile-neu' : '') + '"><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td>' +
         '<td>' + (o.bild ? '<img class="vbild" src="' + esc(o.bild) + '" alt="">' : '') + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span></td>' +
-        '<td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + (o.kaeufer && o.kaeufer !== o.name ? ', ' + esc(o.kaeufer) : '') + '</span></td>' +
-        '<td class="betrag">CHF ' + esc(o.total) + '</td><td><span class="etikett">' + esc(st(o.status)) + '</span></td><td>' + a + '</td></tr>';
+        '<td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + (o.kaeufer && o.kaeufer !== o.name ? ', ' + esc(o.kaeufer) : '') + '</span>' +
+        (o.ohneAdresse ? '<span class="klein">' + t('v.ohneadr') + '</span>' : '') + '</td>' +
+        '<td class="betrag">CHF ' + esc(o.total) + '</td><td><span class="etikett">' + esc(st(o.status)) + '</span>' + (o.meldet ? '<br><span class="etikett hell" style="margin-top:4px">' + t('v.meldet') + '</span>' : '') + '</td><td>' + a + '</td></tr>';
     });
     $('v-liste').innerHTML = tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.zahlbetrag', 'th.status', ''], z);
   }
@@ -802,15 +841,80 @@
   /* Eine Datei pro Versandklasse: Jede Datei einzeln im Postlogin hochladen und dort die passende Klasse wählen. */
   function post() {
     ruf('postAdressen', [], function (p) {
-      if (!p.anzahl) { $('v-post').textContent = t('v.post.leer'); return; }
+      var ohne = p.ohne ? '<span class="klein">' + t('v.post.ohne', p.ohne) + '</span>' : '';
+      if (!p.anzahl) { $('v-post').innerHTML = esc(t('v.post.leer')) + ohne; return; }
       $('v-post').innerHTML = '<span class="klein">' + t('v.post.mehr', p.anzahl, p.dateien.length) + '</span>' + p.dateien.map(function (d) {
         var bin = atob(d.datei), bytes = new Uint8Array(bin.length);
         for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         var u = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
         return '<span class="klein"><a href="' + u + '" download="' + esc(d.name) + '" target="_self">' + esc(d.klasse) + '</a> · ' + t('v.post.n', d.anzahl) + '</span>';
-      }).join('');
+      }).join('') + ohne;
     });
   }
+  /* ---------- Zu erledigen ---------- */
+  var AU = null;
+  /* frisch = true liest auch neue Mails (höchstens alle 5 Minuten, sonst nur die Liste) */
+  function ladeAufgaben(frisch) { ruf(frisch ? 'mailsJetzt' : 'aufgaben', [], function (a) { AU = a; zeichneAufgaben(); }); }
+  function alterKlasse(h) { return h >= 24 ? 'sehr-alt' : (h >= 4 ? 'alt' : ''); }
+  function alterEtikett(h) { return '<span class="etikett ' + (h >= 24 ? 'rot' : (h >= 4 ? 'orange' : '')) + '">' + t('a.vor', h) + '</span>'; }
+  function zeichneAufgaben() {
+    marke($('z-aufgaben'), AU.anzahl);
+    var k = AU.kontrolle, h = '';
+    if (!k.aktiv) h += '<div class="meldung warn">' + t('a.inaktiv') + '</div>';
+    else {
+      h += '<p class="still">' + (k.letzte ? t('a.letzte', esc(k.letzte)) : '') + '</p>';
+      if (k.warnung) h += '<div class="meldung warn">' + t('a.warnung', esc(k.letzte)) + '</div>';
+      if (k.unecht) h += '<div class="meldung warn">' + t('a.unecht', k.unecht) + '</div>';
+    }
+    if (AU.verpasst) h += '<div class="meldung warn">' + t('a.verpasst', AU.verpasst) + '</div>';
+    $('a-kontrolle').innerHTML = h;
+    if (!AU.anzahl) { $('a-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('a.leer') + '</p>'; return; }
+    var z = '';
+    var stueck = function (o) { return '<strong>' + esc(o.titel) + '</strong> <span class="still">' + (o.pgId ? esc(o.pgId) + ' · ' : '') + (o.artikel ? 'Art. ' + esc(o.artikel) : '') + '</span>'; };
+    if (AU.angebote.length) {
+      z += '<h3>' + t('a.angebote') + '</h3>';
+      AU.angebote.forEach(function (o, i) {
+        var annehmen = String(o.empfehlung).indexOf('Annehmen') === 0, knapp = o.restStunden !== '' && o.restStunden < 12;
+        z += '<div class="aufgabe ' + (knapp ? 'sehr-alt' : '') + '"><div class="kopf"><div>' + stueck(o) + '</div>' + alterEtikett(o.alter) + '</div>'
+          + '<p>' + t('a.vorschlag', esc(o.betrag), esc(o.preis)) + (o.frist ? ' · <span class="' + (knapp ? 'etikett rot' : '') + '">' + t('a.frist', esc(o.frist), o.restStunden) + '</span>' : '') + '</p>'
+          + '<p><span class="etikett ' + (annehmen ? 'hell' : '') + '">' + esc(o.empfehlung) + '</span></p>'
+          + '<div class="knoepfe">' + (o.link ? '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(o.link) + '\')">' + t('a.oeffnen') + '</button>' : '')
+          + '<button onclick="erledigt(\'' + esc(o.id) + '\')">' + t('a.erledigt') + '</button></div></div>';
+      });
+    }
+    if (AU.fragen.length) {
+      z += '<h3>' + t('a.fragen') + '</h3>';
+      AU.fragen.forEach(function (o, i) {
+        var nachricht = o.art !== 'Frage';
+        z += '<div class="aufgabe ' + alterKlasse(o.alter) + '"><div class="kopf"><div><span class="etikett">' + esc(o.art) + '</span> ' + stueck(o) + (o.von ? ' <span class="still">' + t('a.von', esc(o.von)) + '</span>' : '') + '</div>' + alterEtikett(o.alter) + '</div>'
+          + (o.text ? '<div class="frage">' + esc(o.text) + '</div>' : (nachricht && o.art === 'Nachricht' ? '<p class="still">' + t('a.nachricht') + '</p>' : ''))
+          + (o.art === 'Frage' ? (o.entwurf ? '<label for="ae-' + i + '">' + t('a.entwurf') + '</label><textarea id="ae-' + i + '" rows="5">' + esc(o.entwurf) + '</textarea>' : '<p class="still">' + t('a.keinentwurf') + '</p>') : '')
+          + '<div class="knoepfe">' + (o.art === 'Frage' && o.entwurf ? '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'ae-' + i + '\',\'' + esc(o.link) + '\')">' + t('a.kopieren') + '</button>' : (o.link ? '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(o.link) + '\')">' + t('a.oeffnen') + '</button>' : ''))
+          + '<button onclick="erledigt(\'' + esc(o.id) + '\')">' + t('a.erledigt') + '</button></div></div>';
+      });
+    }
+    if (AU.zahlung.length) {
+      z += '<h3>' + t('a.zahlung') + '</h3>';
+      AU.zahlung.forEach(function (o, i) {
+        z += '<div class="aufgabe ' + (o.tage >= 5 ? 'sehr-alt' : 'alt') + '"><div class="kopf"><div>' + stueck({ titel: o.titel, pgId: o.pgId, artikel: '' }) + ' <span class="still">' + t('a.von', esc(o.kaeufer)) + ' · CHF ' + esc(o.total) + '</span></div><span class="etikett orange">' + t('a.tage', o.tage) + '</span></div>'
+          + (o.meldet ? '<p><span class="etikett hell">' + t('a.meldet', esc(o.meldet)) + '</span></p>' : '')
+          + '<label for="az-' + i + '">' + t('a.erinnerung') + '</label><textarea id="az-' + i + '" rows="6">' + esc(o.entwurf) + '</textarea>'
+          + '<div class="knoepfe"><button class="haupt-knopf" onclick="kopiereUndOeffne(\'az-' + i + '\',\'' + esc(o.link) + '\')">' + t('a.kopierenText') + '</button>'
+          + '<button onclick="erinnert(\'' + esc(o.nr) + '\')">' + t('a.erinnert') + '</button></div></div>';
+      });
+    }
+    $('a-liste').innerHTML = z;
+  }
+  function oeffneLink(u) { if (/^https:\/\/(www\.)?ricardo\.ch\//.test(u)) window.open(u, '_blank', 'noopener'); }
+  function kopiereUndOeffne(feld, u) {
+    var text = $(feld).value;
+    var fertig = function () { melde(t('kopiert'), 'ok'); oeffneLink(u); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, function () { $(feld).select(); document.execCommand('copy'); fertig(); });
+    else { $(feld).select(); document.execCommand('copy'); fertig(); }
+  }
+  function erledigt(id) { ruf('aufgabeErledigt', [id], function (a) { AU = a; zeichneAufgaben(); }); }
+  function erinnert(nr) { ruf('erinnerungErledigt', [nr], function (a) { AU = a; zeichneAufgaben(); }); }
+
   /* ---------- Retouren ---------- */
   function ladeRetouren() { ruf('retouren', [], function (r) { RT = r; zeichneRetouren(); }); }
   function retoureSuchen() {
@@ -943,6 +1047,7 @@
     ladeAnalyse();
     still('verkaeufe', [], function (v) { marke($('z-verkauf'), v.offen.length); });
     still('retouren', [], function (r) { marke($('z-retour'), r.offen.length); });
+    still('mailsJetzt', [], function (a) { AU = a; marke($('z-aufgaben'), a.anzahl); if (ANSICHT === 'aufgaben') zeichneAufgaben(); });
   }).withFailureHandler(function (e) {
     $('lade').hidden = true; melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); $('hinweis').onclick = null;
   }).api(L, 'startDaten', []);

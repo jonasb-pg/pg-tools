@@ -26,7 +26,7 @@ ctx = { console, Date, Math, JSON, Object, String, Number, Array, RegExp, Error,
   CacheService: { getScriptCache: () => ({ getAll: ks => { const o = {}; ks.forEach(k => { if (k in cache) o[k] = cache[k]; }); return o; }, putAll: o => Object.assign(cache, o) }) },
   DriveApp: { getFolderById: id => { drive++; if (!ordner[id]) throw new Error('nicht gefunden'); let i = 0; const f = ordner[id]; return { getFiles: () => ({ hasNext: () => i < f.length, next: () => f[i++] }) }; } },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-  Session: { getActiveUser: () => ({ getEmail: () => 't' }) }, PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) } };
+  Session: { getActiveUser: () => ({ getEmail: () => 't' }) }, PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty() {} }) } };
 vm.createContext(ctx); vm.runInContext(src, ctx);
 S = blatt('Verkäufe', [V_COLS(), verkauf('1', 'PG-1', 'Zu packen', 'Sperrgut B-Post bis 30 kg'), verkauf('2', 'PG-2', 'Zu packen', 'PostPac B-Post bis 2 kg'),
   verkauf('3', 'PG-3', 'Zu packen', 'PostPac B-Post bis 2 kg'), verkauf('4', '', 'Zu packen', ''), verkauf('5', 'PG-5', 'Bezahlt und versendet', 'PostPac B-Post bis 2 kg')]);
@@ -50,4 +50,22 @@ ok(bild('PG-2') === '' && bild('PG-3') === '', 'ohne Ordner oder nur gelöschtes
 ok(v.offen.find(o => o.nr === '4').bild === undefined, 'Stück ohne PG-ID: kein Bild, kein Fehler');
 const vorher = drive; vm.runInContext('verkaeufe()', ctx);
 ok(drive === vorher, 'zweites Laden aus dem Zwischenspeicher, ohne Drive');
+
+/* Verkauf aus der Ricardo-Mail: ohne Adresse nicht im Post-Export, der Verkaufsbericht trägt die Adresse nach */
+const ohneAdr = verkauf('6', 'PG-6', 'Zu packen', 'PostPac B-Post bis 2 kg');
+['Nachname', 'Vorname', 'Strasse', 'Hausnummer', 'PLZ', 'Ort'].forEach(k => { ohneAdr[V_COLS().indexOf(k)] = ''; });
+ohneAdr[V_COLS().indexOf('Quelle')] = 'Mail'; ohneAdr[V_COLS().indexOf('Artikel-Nr')] = '1331';
+S.d().push(ohneAdr);
+const r2 = vm.runInContext('postAdressen()', ctx);
+ok(r2.anzahl === 5 && r2.ohne === 1, 'Verkauf ohne Adresse übersprungen und gezählt ' + JSON.stringify([r2.anzahl, r2.ohne]));
+ok(vm.runInContext('verkaeufe()', ctx).offen.find(o => o.nr === '6').ohneAdresse === true, 'Packliste zeigt «Adresse fehlt»');
+const csv = 'Article ID;Order ID;ArticleTitle;ReferenceNumber;ArticleUrl;EndDate;ItemQuantity;Selling Price;ShippingCost;BuyerNick;BuyerCompanyName;BuyerFirstName;BuyerLastName;BuyerAddress;BuyerPostalBox;BuyerZipCode;BuyerCity;BuyerCountry;BuyerEmail;BuyerPhone;PaymentStatus;DeliveryDescription;ShippingStatus\n'
+  + '1331;6;Titel 6;PG-6;x;15.10.2026 21:35;1;58.95;9.00;nick6;;Anna;Muster;Teststrasse  12;;3000;Bern;CH;a@b.ch;0;Nicht bezahlt;Paket B-Post;Nicht versandt\n';
+const imp = vm.runInContext('importVerkaeufe(' + JSON.stringify(csv) + ')', ctx).import;
+const z6 = S.d().find(z => String(z[0]) === '6');
+ok(imp.neu === 0 && imp.bekannt === 1 && imp.ergaenzt === 1, 'Bericht: bekannter Verkauf, Adresse ergänzt');
+ok(z6[V_COLS().indexOf('Nachname')] === 'Muster' && z6[V_COLS().indexOf('Strasse')] === 'Teststrasse' && z6[V_COLS().indexOf('Hausnummer')] === '12' && z6[V_COLS().indexOf('PLZ')] === '3000' && z6[V_COLS().indexOf('Status')] === 'Zu packen', 'Adresse eingetragen, Status bleibt');
+ok(vm.runInContext('postAdressen()', ctx).anzahl === 6, 'danach im Post-Export');
+const imp2 = vm.runInContext('importVerkaeufe(' + JSON.stringify(csv) + ')', ctx).import;
+ok(imp2.ergaenzt === 0 && S.d().filter(z => String(z[0]) === '6').length === 1, 'zweimal einlesen ändert nichts');
 console.log(fehler ? 'Fehler: ' + fehler : 'alle Tests ok'); process.exit(fehler ? 1 : 0);

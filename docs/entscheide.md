@@ -79,3 +79,12 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Verkaufsbericht bleibt nötig (Adressen) und dient als Gegenkontrolle.
 - Post: Application «Ricardo Tool Pretty Good» im Developer Portal; Barcode (Standard) und Address query Webservice (Medium) beantragt, Status pending. Tracking nur auf Anfrage (Mail an digitalintegration@swisspost.ch). Frankierlizenz Pakete Inland: 60162228. Debitor 32359747.
 - **KI-Budget statt Recherche-Guthaben (Analyse .16.5):** Jonas will keine Stückzahl mehr pflegen. Neu ein Monatsbudget von USD 150 (Summe Tab «Kosten» im Kalendermonat plus laufende Recherchen geschätzt). Fehlt die Einstellung noch, gilt 150. Ist es aufgebraucht, einmal pro Tag Log «Budget aufgebraucht».
+
+### 16.10.2026, Nacht: Ricardo .16.3, Ricardo-Mails lesen (gespeichert, nicht bereitgestellt)
+- Neuer Tab «Posteingang» und Reiter «Zu erledigen». Trigger alle 30 Min. (07:00–19:00) plus beim Öffnen (höchstens alle 5 Min.).
+- Echtheit: nur die oberste Kopfzeile Authentication-Results von mx.google.com zählt (arc=pass mit dkdomain=ricardo.ch oder dkim=pass header.i=@…ricardo.ch). Sonst Log «Mail nicht echt» mit der Kopfzeile, nichts verarbeitet. Am echten Postfach noch zu prüfen.
+- Verkauf aus der Mail ohne Adresse: Post-Export überspringt ihn, der Verkaufsbericht ergänzt die Adresse (gleiche Verkaufs-Nr = Order ID) und meldet als Gegenkontrolle Verkäufe, die nur im Bericht stehen (ab MAIL_START).
+- Preisvorschlag: Empfehlung nach Regel, automatisch erledigt bei Verkauf zum Artikel, abgelaufene mit Empfehlung «Annehmen» werden gemeldet.
+- Fragen: Antwortentwurf mit Claude (Modell aus «Claude-Modell»), Anrede wie die Frage. Fragetext/Entwurf/Absender 60 Tage nach Eingang gelöscht (erledigt).
+- Zahlung überfällig nach 3 Tagen mit Erinnerungstext, «Erinnerung gesendet» blendet aus.
+- Zum Aktivieren: neue Version bereitstellen, dann einmal «einrichten» (Gmail-Berechtigung, Auslöser, Tab Posteingang, neue Spalten).
