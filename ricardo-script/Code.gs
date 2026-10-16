@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-16.1';
+const VERSION = '2026-10-16.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku';
 const TZ = 'Europe/Zurich';
 
@@ -298,7 +298,9 @@ function doGet(e) {
 }
 
 function startDaten() {
-  aufbau_();
+  /* Aufbau nur einmal pro Stunde und Version prüfen: Er ändert sich nur mit «einrichten» */
+  const cache = CacheService.getScriptCache();
+  if (!cache.get('aufbau:' + VERSION)) { aufbau_(); cache.put('aufbau:' + VERSION, '1', 3600); }
   return {
     version: VERSION, admin: istAdmin_(),
     zustaende: ZUSTAENDE, maengelPflicht: MAENGEL_PFLICHT,
@@ -314,10 +316,10 @@ function startDaten() {
 /* Suche im Return Tool (nur lesen)                                    */
 /* ------------------------------------------------------------------ */
 
-function suche(q) {
+function suche(q, frisch) {
   q = String(q || '').trim();
   if (q.length < 3) return { treffer: [], andere: [], hinweis: 'Bitte mindestens 3 Zeichen eingeben oder eine EAN scannen.' };
-  const src = SpreadsheetApp.openById(cfg_('Return Tool ID'));
+  const src = rtQuelle_();
   const passt = matcher_(q);
   const listings = listingsIndex_();
   let treffer = [];
@@ -328,7 +330,7 @@ function suche(q) {
     ana[r.id] = true; treffer.push(r);
   });
   liste_(cfg_('Such-Tabs')).forEach(function (tab) {
-    leseQuelle_(src, tab).filter(passt).forEach(function (r) {
+    quelleGemerkt_(src, tab, frisch).filter(passt).forEach(function (r) {
       if (ana[r.id]) return;                                   // dasselbe Stück ist analysiert: es zählt die Analyse
       const l = listings[r.id];
       r.status = l ? l.status : '';
@@ -339,14 +341,53 @@ function suche(q) {
   let andere = [];
   if (!treffer.length) {
     liste_(cfg_('Hinweis-Tabs')).forEach(function (tab) {
-      leseQuelle_(src, tab).filter(passt).forEach(function (r) {
+      quelleGemerkt_(src, tab, frisch).filter(passt).forEach(function (r) {
         const l = listings[r.id];
         r.status = l ? l.status : ''; r.teilVon = l && l.teilVon ? l.teilVon : '';
         andere.push(r);
       });
     });
   }
+  /* Nichts gefunden mit der gemerkten Kopie: vielleicht wurde das Stück eben erst im Return Tool erfasst. Dann einmal frisch lesen. */
+  if (!frisch && !treffer.length && !andere.length) return suche(q, true);
   return { treffer: treffer.slice(0, 40), andere: andere.slice(0, 20), mehr: treffer.length > 40 };
+}
+
+/** Das Return Tool, erst geöffnet, wenn es gebraucht wird (Öffnen kostet Zeit). */
+function rtQuelle_() {
+  let src = null;
+  return { tab: function (tab) { if (!src) src = SpreadsheetApp.openById(cfg_('Return Tool ID')); return src; } };
+}
+/**
+ * Ein Tab des Return Tools, gemerkt für 10 Minuten (gepackt im Zwischenspeicher, in Stücken zu 90 KB). Das Return Tool bei jeder Suche ganz zu lesen,
+ * dauert Sekunden. frisch = true liest neu und merkt es sich wieder. Passt die Kopie nicht in den Zwischenspeicher, wird jedes Mal gelesen.
+ */
+function quelleGemerkt_(src, tab, frisch) {
+  const c = CacheService.getScriptCache(), key = 'rt:' + tab;
+  if (!frisch) {
+    try {
+      const n = Number(c.get(key + ':n'));
+      if (n > 0) {
+        const keys = []; for (let i = 0; i < n; i++) keys.push(key + ':' + i);
+        const teile = c.getAll(keys);
+        if (keys.every(function (k) { return teile[k]; })) {
+          const json = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(keys.map(function (k) { return teile[k]; }).join('')), 'application/x-gzip')).getDataAsString();
+          return JSON.parse(json);
+        }
+      }
+    } catch (e) { /* Kopie unbrauchbar: neu lesen */ }
+  }
+  const rows = leseQuelle_(src.tab(tab), tab);
+  try {
+    const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(rows), 'application/json')).getBytes()), stuecke = {};
+    const n = Math.ceil(b64.length / 90000);
+    if (n <= 40) {
+      for (let i = 0; i < n; i++) stuecke[key + ':' + i] = b64.slice(i * 90000, (i + 1) * 90000);
+      stuecke[key + ':n'] = String(n);
+      c.putAll(stuecke, 600);
+    }
+  } catch (e) { /* ohne Zwischenspeicher */ }
+  return rows;
 }
 
 function matcher_(q) {
@@ -469,14 +510,17 @@ function istAnalyse_(rec) { return rec['Quelle Tab'] === 'Analyse' && !String(re
 /* ------------------------------------------------------------------ */
 
 function findeQuelle_(id, auchAndere) {
-  const src = SpreadsheetApp.openById(cfg_('Return Tool ID'));
-  let q = null;
-  liste_(cfg_('Such-Tabs')).concat(auchAndere ? liste_(cfg_('Hinweis-Tabs')) : []).forEach(function (tab) {
-    if (q) return;
-    const m = leseQuelle_(src, tab).filter(function (r) { return r.id === id; });
-    if (m.length) q = m[0];
-  });
-  return q;
+  const src = rtQuelle_(), tabs = liste_(cfg_('Such-Tabs')).concat(auchAndere ? liste_(cfg_('Hinweis-Tabs')) : []);
+  const such = function (frisch) {
+    let q = null;
+    tabs.forEach(function (tab) {
+      if (q) return;
+      const m = quelleGemerkt_(src, tab, frisch).filter(function (r) { return r.id === id; });
+      if (m.length) q = m[0];
+    });
+    return q;
+  };
+  return such(false) || such(true);                                     // nicht in der gemerkten Kopie: frisch nachsehen
 }
 
 function starteListing(id, auchAndere) {

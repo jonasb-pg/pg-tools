@@ -35,8 +35,13 @@ const ctx = {
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'test@pretty-good.ch' }) },
   PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
-  Utilities: { formatDate: d => d.toISOString().slice(0, 10) }
+  Utilities: { formatDate: d => d.toISOString().slice(0, 10),
+    newBlob: (x) => ({ x, getBytes: () => Buffer.isBuffer(x) ? x : Buffer.from(String(x)), getDataAsString: () => Buffer.from(x).toString() }),
+    gzip: b => ({ getBytes: () => require('zlib').gzipSync(b.getBytes()) }), ungzip: b => ({ getDataAsString: () => require('zlib').gunzipSync(Buffer.from(b.x)).toString() }),
+    base64Encode: b => Buffer.from(b).toString('base64'), base64Decode: s => Buffer.from(s, 'base64') },
+  CacheService: { getScriptCache: () => ({ get: k => CACHE[k] ?? null, getAll: ks => { const o = {}; ks.forEach(k => { if (k in CACHE) o[k] = CACHE[k]; }); return o; }, putAll: o => Object.assign(CACHE, o), put: (k, v) => { CACHE[k] = v; }, remove: k => { delete CACHE[k]; } }) }
 };
+const CACHE = {};
 vm.createContext(ctx); vm.runInContext(src, ctx);
 Lsh = blatt('Listings', [vm.runInContext('L_COLS', ctx)]);
 const c = n => vm.runInContext(n, ctx);
@@ -86,4 +91,12 @@ ok(c("lade('PG-200')").regal === 'Online-Regal' && c('startDaten').toString() &&
 // Leere Analyse (Tab fehlt) stört nicht
 ext.AT.getSheetByName = () => null;
 ok(c('analyseListe()').length === 0 && c("suche('Kabel')").treffer.length === 1, 'ohne Tab «Ricardo» weiter wie bisher');
+// Tempo: Return Tool gemerkt, neu erfasste Stücke trotzdem gefunden
+let opens = 0; const altOpen = ctx.SpreadsheetApp.openById; ctx.SpreadsheetApp.openById = id => { if (id === 'RT') opens++; return altOpen(id); };
+for (const k of Object.keys(CACHE)) delete CACHE[k];
+c("suche('Kabel')"); const o1 = opens; c("suche('Kabel')");
+ok(o1 === 1 && opens === 1 && CACHE['rt:Online:n'], 'zweite Suche aus der gemerkten Kopie, ohne Return Tool zu öffnen');
+RT.d.push(['PG-400', 'Lampe neu', '', 12, 20, 'C3', '']);
+ok(c("suche('Lampe neu')").treffer.length === 1, 'eben erfasstes Stück wird trotzdem gefunden (frisch nachgelesen)');
+const o3 = opens, t3 = c("suche('Lampe neu')"); ok(t3.treffer.length === 1 && opens === o3, 'danach wieder aus der Kopie, ohne Return Tool zu öffnen');
 console.log(fehler ? fehler + ' Fehler' : 'alle Tests ok'); process.exit(fehler ? 1 : 0);

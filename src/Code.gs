@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.2';
+const VERSION = '2026-10-16.3';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -154,6 +154,7 @@ const MM_ANWEISUNG = 'Du prüfst für Pretty Good, ob ein geprüftes Produkt zu 
   + '«ähnlich» heisst: gleiche Produktart, aber ein Wunsch oder ein weicher Punkt weicht ab. Zubehör, Ersatzteile und andere Produktarten passen nie. Das Limit (Preis) zählt nicht. Mehr als gewünscht ist keine Abweichung. '
   + 'Im Zweifel bei unklarer Produktart: kein Treffer. Im Zweifel zwischen passt und ähnlich: ähnlich.';
 const NEUE_EINSTELLUNGEN = [
+  ['Handbücher nicht zwischen', '07:00-18:30', 'In diesem Zeitfenster sucht und liest der Abgleich keine Handbücher (dauert pro Stück rund eine Minute und bremst das Tool). Er macht es am Abend und in der Nacht. Leer = immer.'],
   ['Recherche-Guthaben', 0, 'Kostenbremse: So viele Vorab-Recherchen darf das Tool noch starten. Jede gestartete Recherche zieht eins ab, bei 0 startet keine mehr. Zum Freigeben eine Zahl eintragen.'],
   ['Vergleichsmodell', '', 'Nur zum Testen: Steht hier ein Modell, läuft jede Vorab-Recherche zusätzlich damit. Das Ergebnis steht nur im Tab «Kosten», zum Vergleichen von Preis und Qualität. Kostet doppelt.'],
   ['Stundenansatz Reparatur CHF', 50, 'Mit diesem Ansatz rechnet das Tool die Arbeitszeit einer Reparatur. Quelle: Entscheid von Jonas vom 10.10.2026.'],
@@ -251,9 +252,15 @@ function api(lang, name, args) {
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
     ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
+  const t0 = Date.now();
   try { return f.apply(null, args || []); }
   catch (e) { throw new Error(en_(String(e.message || e))); }
+  finally {
+    const ms = Date.now() - t0;                                       // langsame Aufrufe festhalten: So sieht man, wo das Tool bremst
+    if (ms >= TEMPO_GRENZE_MS) log_('Tempo', '', name + ' ' + (ms / 1000).toFixed(1) + ' s');
+  }
 }
+const TEMPO_GRENZE_MS = 4000;
 
 /** Fehlermeldungen entstehen auf Deutsch. Für die englische Oberfläche übersetzt diese Tabelle; Unbekanntes bleibt deutsch. */
 const EN_REGELN = [
@@ -331,8 +338,19 @@ function spalte_(kopf, name, tab) {
 }
 function buchstabe_(c) { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + (c - 1) % 26) + s; return s; }
 
-/** Liest einen Tab: { kopf, z: [ {Spaltenname: Wert, _r: Zeilennummer} ] }. Leere Zeilen fallen weg. */
+/** Liest einen Tab: { kopf, z: [ {Spaltenname: Wert, _r: Zeilennummer} ] }. Leere Zeilen fallen weg. Tabs aus STABIL kommen aus dem Zwischenspeicher. */
 function lies_(n) {
+  if (STABIL.indexOf(n) > -1 && !IN_SPERRE) {                         // in einer Sperre immer frisch lesen: dort wird gerechnet und geschrieben (z.B. Guthaben)
+    if (!MEMO[n]) {
+      const c = CacheService.getScriptCache(), alt = c.get('tab:' + n);
+      if (alt) MEMO[n] = alt;
+      else { MEMO[n] = JSON.stringify(liesRoh_(n)); if (MEMO[n].length < 95000) try { c.put('tab:' + n, MEMO[n], 300); } catch (err) { /* ohne Zwischenspeicher */ } }
+    }
+    return JSON.parse(MEMO[n]);                                       // eine eigene Kopie: Wer die Zeilen ändert, ändert nicht den Speicher
+  }
+  return liesRoh_(n);
+}
+function liesRoh_(n) {
   const v = blatt_(n).getDataRange().getValues(), kopf = v[0].map(String), z = [];
   for (let i = 1; i < v.length; i++) {
     const o = { _r: i + 1 };
@@ -342,10 +360,54 @@ function lies_(n) {
   }
   return { kopf: kopf, z: z };
 }
+/**
+ * Tabs, die sich selten ändern. Sie werden höchstens alle 5 Minuten neu gelesen, und sofort, wenn das Tool selbst hineinschreibt (schreib_, setz_, loeschen_)
+ * oder jemand im Sheet von Hand etwas ändert (onEdit). Werte darin sind Text und Zahlen, keine Daten (ein Datum käme als Text zurück).
+ */
+const STABIL = ['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel'];
+let MEMO = {};
+function vergiss_(n) {
+  if (STABIL.indexOf(n) < 0) return;
+  delete MEMO[n];
+  try { CacheService.getScriptCache().remove('tab:' + n); } catch (err) { /* läuft nach 5 Minuten ab */ }
+}
+function vergissAlle_() { STABIL.forEach(vergiss_); }
+/** Einfacher Auslöser: Änderung von Hand im Sheet. Der Zwischenspeicher des Tabs gilt dann nicht mehr. */
+function onEdit(ev) {
+  try { vergiss_(ev.range.getSheet().getName()); } catch (err) { /* ohne Wirkung */ }
+}
+
+/**
+ * Nur die Zeilen einer Recherche (Schlüssel k), wie lies_('Recherche'), aber ohne die übrigen tausenden Zeilen zu lesen.
+ * Sucht den Schlüssel in Spalte «Schlüssel» und liest nur die Blöcke, in denen er steht.
+ */
+function rechercheVon_(k) {
+  k = String(k || '');
+  const s = blatt_('Recherche'), kopf = kopf_(s), last = s.getLastRow(), c = kopf.indexOf('Schlüssel') + 1, z = [];
+  if (!k || last < 2 || !c) return { kopf: kopf, z: z };
+  const zeilen = s.getRange(2, c, last - 1, 1).createTextFinder(k).matchEntireCell(true).matchCase(true).findAll()
+    .map(function (x) { return x.getRow(); }).sort(function (a, b) { return a - b; });
+  if (!zeilen.length && /^\d+$/.test(k)) {                              // Zahl statt Text in der Zelle (z.B. von Hand eingetragen): sicherheitshalber alles lesen
+    return { kopf: kopf, z: liesRoh_('Recherche').z.filter(function (r) { return String(r['Schlüssel']) === k; }) };
+  }
+  for (let i = 0; i < zeilen.length;) {
+    let j = i;
+    while (j + 1 < zeilen.length && zeilen[j + 1] === zeilen[j] + 1) j++;
+    const v = s.getRange(zeilen[i], 1, j - i + 1, kopf.length).getValues();
+    v.forEach(function (row, n) {
+      const o = { _r: zeilen[i] + n };
+      kopf.forEach(function (name, m) { o[name] = row[m]; });
+      if (String(o['Schlüssel']) === k) z.push(o);
+    });
+    i = j + 1;
+  }
+  return { kopf: kopf, z: z };
+}
 
 /** Hängt Zeilen an. objs = Objekte mit Spaltennamen; ein Wert, der mit «=» beginnt, wird zur Formel. Nur innerhalb von gesperrt_ aufrufen. */
 function schreib_(n, objs) {
   if (!objs.length) return;
+  vergiss_(n);
   const s = blatt_(n), kopf = kopf_(s);
   const rows = objs.map(function (o) { return kopf.map(function (k) { return o[k] === undefined || o[k] === null ? '' : o[k]; }); });
   s.getRange(s.getLastRow() + 1, 1, rows.length, kopf.length).setValues(rows);
@@ -355,6 +417,7 @@ function schreib_(n, objs) {
 function setz_(n, feld, werte) {
   const zeilen = Object.keys(werte);
   if (!zeilen.length) return;
+  vergiss_(n);
   const s = blatt_(n), c = buchstabe_(spalte_(kopf_(s), feld, n)), nachWert = {};
   zeilen.forEach(function (r) { const k = typeof werte[r] + ':' + werte[r]; (nachWert[k] = nachWert[k] || { wert: werte[r], zellen: [] }).zellen.push(c + r); });
   Object.keys(nachWert).forEach(function (k) { s.getRangeList(nachWert[k].zellen).setValue(nachWert[k].wert); });
@@ -545,19 +608,33 @@ function ohneInventar(name, link, vp, kategorie, ovp) {
 /** Läuft alle 10 Minuten (Auslöser aus einrichten) und über den Knopf «Aktualisieren». Jeder Schritt läuft für sich; scheitert einer, laufen die anderen trotzdem. */
 function abgleichen() {
   const r = allein_(function () {
-    const e = einst_(), aus = { neu: 0, entfaellt: 0, fertig: 0, fehler: 0, gestartet: 0, hinweise: [] };
-    const schritt = function (f) {
+    vergiss_('Einstellungen');                                          // Guthaben und Schalter frisch
+    const e = einst_(), aus = { neu: 0, entfaellt: 0, fertig: 0, fehler: 0, gestartet: 0, hinweise: [] }, t0 = Date.now(), dauer = [];
+    const schritt = function (f, name) {
+      const t = Date.now();
       try { const x = f(); Object.keys(x).forEach(function (k) { if (k === 'hinweis') aus.hinweise.push(x[k]); else aus[k] = x[k]; }); }
       catch (err) { aus.hinweise.push(String(err.message || err)); log_('Abgleich-Fehler', '', err.message); }
+      dauer.push((name || f.name || 'Schritt') + ' ' + Math.round((Date.now() - t) / 1000) + ' s');
     };
-    if (String(e['Automatischer Import']) === 'Ja') schritt(function () { return spiegeln_(e); });
-    schritt(abholen_);
-    schritt(function () { return starten_(e); });
-    schritt(function () { return handbuecher_(e); });
+    if (String(e['Automatischer Import']) === 'Ja') schritt(function () { return spiegeln_(e); }, 'spiegeln');
+    schritt(abholen_, 'abholen');
+    schritt(function () { return starten_(e); }, 'starten');
+    /* Handbücher suchen und lesen dauert pro Stück rund eine Minute und bremst das Tool. Tagsüber nicht, sondern am Abend und in der Nacht. */
+    const tag = tagsueber_(e);
+    if (!tag) schritt(function () { return handbuecher_(e); }, 'Handbücher');
+    if (tag && Date.now() - t0 >= 30000) log_('Tempo', '', 'Abgleich ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + dauer.join(', '));
     PropertiesService.getScriptProperties().setProperty('ABGLEICH_ZULETZT', zeit_());
     return aus;
   });
   return r || { beschaeftigt: true };
+}
+
+/** Zeitfenster aus der Einstellung «Handbücher nicht zwischen» (z.B. «07:00-18:30»): In diesem Fenster lässt der Abgleich die Handbücher aus. */
+function tagsueber_(e) {
+  const m = /(\d{1,2})[:.](\d{2})\s*-\s*(\d{1,2})[:.](\d{2})/.exec(e['Handbücher nicht zwischen'] === undefined ? '07:00-18:30' : String(e['Handbücher nicht zwischen']));
+  if (!m) return false;
+  const jetzt = Number(Utilities.formatDate(new Date(), TZ, 'H')) * 60 + Number(Utilities.formatDate(new Date(), TZ, 'm'));
+  return jetzt >= Number(m[1]) * 60 + Number(m[2]) && jetzt < Number(m[3]) * 60 + Number(m[4]);
 }
 
 /**
@@ -903,6 +980,7 @@ function params_(p, ice, e, kontext, modell) {
 
 /** Löscht Zeilen eines Tabs (Zeilennummern in beliebiger Reihenfolge). Zusammenhängende Zeilen gehen in einem Zug. Nur innerhalb von gesperrt_ aufrufen. */
 function loeschen_(n, zeilen) {
+  vergiss_(n);
   const s = blatt_(n), z = zeilen.slice().sort(function (a, b) { return b - a; });
   for (let i = 0; i < z.length;) {
     let j = i;
@@ -919,7 +997,7 @@ function loeschen_(n, zeilen) {
  */
 function rechercheSchreiben_(p, d) {
   const k = String(p['Recherche-Schlüssel']), bez = txt_(p['Bezeichnung']), t = zeit_(), zeilen = [];
-  loeschen_('Recherche', lies_('Recherche').z.filter(function (r) { return String(r['Schlüssel']) === k; }).map(function (r) { return r._r; }));
+  loeschen_('Recherche', rechercheVon_(k).z.map(function (r) { return r._r; }));
   const infozeile = function (feld, o) {
     const quelle = /^https?:\/\//i.test(String(o.quelle || '')) ? String(o.quelle) : '';
     let typ = QUELLENTYPEN.indexOf(o.quellentyp) > -1 ? o.quellentyp : 'KI-Einschätzung';
@@ -1013,6 +1091,18 @@ function handbuchSchluessel_(marke, modell) {
 }
 function handbuchDateiname_(x) { return (String(x.marke || '') + ' ' + String(x.modell || '')).replace(/[\\\/:*?"<>|#]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) + '.pdf'; }
 /** Alle Zeilen des Handbuch-Sheets: { Schlüssel: Zeile }. */
+/** Eine Zeile des Handbuch-Sheets (Schlüssel hk) oder null, ohne das ganze Sheet zu lesen. */
+function handbuchZeile_(e, hk) {
+  const s = handbuchBlatt_(e), kopf = kopf_(s), c = kopf.indexOf('Schlüssel') + 1, last = s.getLastRow();
+  if (!c || last < 2) return null;
+  const f = s.getRange(2, c, last - 1, 1).createTextFinder(String(hk)).matchEntireCell(true).matchCase(true).findAll();
+  for (let i = f.length - 1; i >= 0; i--) {
+    const row = s.getRange(f[i].getRow(), 1, 1, kopf.length).getValues()[0], o = {};
+    kopf.forEach(function (k, j) { o[k] = row[j]; });
+    if (String(o['Schlüssel']) === String(hk)) return o;
+  }
+  return null;
+}
 function handbuecherLesen_(e) {
   const v = handbuchBlatt_(e).getDataRange().getValues(), kopf = v[0].map(String), aus = {};
   for (let i = 1; i < v.length; i++) {
@@ -1023,9 +1113,9 @@ function handbuecherLesen_(e) {
   return aus;
 }
 /** Marke, Modell, Herstellernummer, Handbuch-Link und Stromversorgung aus der Recherche: { Recherche-Schlüssel: { marke, modell, nummer, link, strom } }. */
-function handbuchInfos_() {
+function handbuchInfos_(zeilen) {
   const info = {};
-  lies_('Recherche').z.forEach(function (r) {
+  (zeilen || lies_('Recherche').z).forEach(function (r) {
     const k = String(r['Schlüssel']), x = info[k] = info[k] || {};
     if (r['Feld'] === 'Marke und Modell') { const t = String(r['Inhalt']).split('|'); x.marke = String(t[0] || '').trim(); x.modell = String(t[1] || '').trim(); x.nummer = String(t[2] || '').trim(); }
     if (r['Feld'] === 'Handbuch') { const m = /https?:\/\/\S+/.exec(String(r['Inhalt'])) || /https?:\/\/\S+/.exec(String(r['Quelle (Link)'])); if (m) x.link = m[0].replace(/[),.;]+$/, ''); }
@@ -1325,7 +1415,7 @@ function handbuchPdf(id) {
 }
 /** Stand des Handbuchs für die Oberfläche, z.B. nach einem Neuladen während des Lesens. */
 function handbuchStand(id) {
-  const x = handbuchInfos_()[String(produkt_(id)['Recherche-Schlüssel'])] || {};
+  const k = String(produkt_(id)['Recherche-Schlüssel']), x = handbuchInfos_(rechercheVon_(k).z)[k] || {};
   return handbuchFuer_(einst_(), x.marke, x.modell);
 }
 /** Was die Oberfläche zum Handbuch eines Modells braucht, oder null. Ein Fehler beim Lesen des Handbuch-Sheets darf die Analyse nicht aufhalten. */
@@ -1333,7 +1423,7 @@ function handbuchFuer_(e, marke, modell) {
   try {
     const hk = handbuchSchluessel_(marke, modell);
     if (!hk || !String(e['Handbuch-Sheet ID'] || '').trim()) return null;
-    const z = handbuecherLesen_(e)[hk];
+    const z = handbuchZeile_(e, hk);
     if (!z) return null;
     const themen = {};
     HANDBUCH_THEMEN.forEach(function (t) { themen[t] = String(z[t] || ''); });
@@ -1386,8 +1476,7 @@ function ueberblick_(p, e) {
   const k = String(p['Recherche-Schlüssel']), gruen = Number(ss_().getRangeByName('Score_Gruen').getValue()), gelb = Number(ss_().getRangeByName('Score_Gelb').getValue());
   const hilf = {}, nach = {}, vorhanden = {}, st = stufe_(lies_('Stufen').z, p['Herkunft'], p['VP CHF']);
   let infos = [];
-  lies_('Recherche').z.forEach(function (r) {
-    if (String(r['Schlüssel']) !== k) return;
+  rechercheVon_(k).z.forEach(function (r) {
     const feld = String(r['Feld']);
     if (INFO_FELDER.indexOf(feld) < 0) { hilf[feld] = String(r['Inhalt']); return; }
     const score = typeof r['Score'] === 'number' ? r['Score'] : null;
@@ -1847,9 +1936,8 @@ function testmittelBuchen_(tm, id, kuerzel, t) {
 
 /** «Stimmt» und «Stimmt nicht» aus der Analyse zählen. Daraus rechnet der Tab «Auswertung» die Trefferquote des Scores. */
 function rueckmeldung_(k, rm) {
-  const rech = lies_('Recherche'), s = blatt_('Recherche');
+  const rech = rechercheVon_(k), s = blatt_('Recherche');
   rech.z.forEach(function (r) {
-    if (String(r['Schlüssel']) !== k) return;
     const art = rm[String(r['Feld'])], feld = art === 'ok' ? 'Von uns bestätigt (Anzahl)' : (art === 'falsch' ? 'Von uns korrigiert (Anzahl)' : '');
     if (feld) s.getRange(r._r, spalte_(rech.kopf, feld, 'Recherche')).setValue((Number(r[feld]) || 0) + 1);
   });
@@ -2050,7 +2138,7 @@ function ersatzteilSuche(id, name, teil, kuerzel) {
   const e = einst_(), p = id ? produkt_(id) : null, z = ['Produkt: ' + (p ? p['Bezeichnung'] : name)];
   if (p) {
     const k = String(p['Recherche-Schlüssel']);
-    const mm = lies_('Recherche').z.filter(function (r) { return String(r['Schlüssel']) === k && r['Feld'] === 'Marke und Modell'; })[0];
+    const mm = rechercheVon_(k).z.filter(function (r) { return r['Feld'] === 'Marke und Modell'; })[0];
     if (mm) z.push('Marke | Modell | Herstellernummer: ' + mm['Inhalt']);
     if (ean_(p['Barcode'])) z.push('EAN: ' + ean_(p['Barcode']));
     if (p['Link']) z.push('Link beim Händler: ' + p['Link']);
@@ -2230,6 +2318,7 @@ function verbindungTest() {
  */
 function einrichten() {
   const ss = ss_(), fehler = [];
+  vergissAlle_();
   gesperrt_(function () { umbau_(ss); });
   ['Kosten', 'Feedback', 'Ricardo', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
   Object.keys(SPALTEN).forEach(function (n) {
@@ -2257,6 +2346,7 @@ function einrichten() {
     lies_('Produkte').z.forEach(function (p) { if (p['Recherche-Status'] === 'Bereit' && !hat[String(p['Recherche-Schlüssel'])]) offen[p._r] = 'Offen'; });
     setz_('Produkte', 'Recherche-Status', offen);
   });
+  vergissAlle_();
   log_('Einrichten', '', 'Version ' + VERSION + ', Claude-Schlüssel ' + (key_() ? 'vorhanden' : 'fehlt'));
   return 'Eingerichtet. Version ' + VERSION;
 }
