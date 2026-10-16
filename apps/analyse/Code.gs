@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.8';
+const VERSION = '2026-10-17.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -264,10 +264,10 @@ function api(lang, name, args) {
   catch (e) { throw new Error(en_(String(e.message || e))); }
   finally {
     const ms = Date.now() - t0;                                       // langsame Aufrufe festhalten: So sieht man, wo das Tool bremst
-    if (ms >= TEMPO_GRENZE_MS) log_('Tempo', '', name + ' ' + (ms / 1000).toFixed(1) + ' s');
+    if (ms >= TEMPO_GRENZE_MS) log_('Tempo', '', name + ' ' + (ms / 1000).toFixed(1) + ' s' + (LESEN.length ? ' · gelesen: ' + LESEN.join(', ') : ''));
   }
 }
-const TEMPO_GRENZE_MS = 4000;
+const TEMPO_GRENZE_MS = 2000;
 
 /** Fehlermeldungen entstehen auf Deutsch. Für die englische Oberfläche übersetzt diese Tabelle; Unbekanntes bleibt deutsch. */
 const EN_REGELN = [
@@ -346,6 +346,8 @@ function spalte_(kopf, name, tab) {
 function buchstabe_(c) { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + (c - 1) % 26) + s; return s; }
 
 /** Liest einen Tab: { kopf, z: [ {Spaltenname: Wert, _r: Zeilennummer} ] }. Leere Zeilen fallen weg. Tabs aus STABIL kommen aus dem Zwischenspeicher. */
+/* Jeder Tab höchstens einmal pro Aufruf lesen (ausserhalb einer Sperre). Ein Lesezugriff kostet in der Web-App rund eine Sekunde. */
+let LAUF_MEMO = {}, LESEN = [];                                       // LESEN: welche Tabs ein Aufruf gelesen hat (für das Tempo-Log)
 function lies_(n) {
   if (STABIL.indexOf(n) > -1 && !IN_SPERRE) {                         // in einer Sperre immer frisch lesen: dort wird gerechnet und geschrieben (z.B. Guthaben)
     if (!MEMO[n]) {
@@ -358,7 +360,10 @@ function lies_(n) {
   return liesRoh_(n);
 }
 function liesRoh_(n) {
-  const v = blatt_(n).getDataRange().getValues(), kopf = v[0].map(String), z = [];
+  /* Die Werte eines Tabs pro Aufruf nur einmal holen (ausserhalb einer Sperre); die Objekte entstehen jedes Mal neu, Änderungen daran bleiben lokal. */
+  let v = !IN_SPERRE && LAUF_MEMO[n];
+  if (!v) { const t = Date.now(); v = blatt_(n).getDataRange().getValues(); LESEN.push(n + ' ' + (Date.now() - t) + ' ms'); if (!IN_SPERRE) LAUF_MEMO[n] = v; }
+  const kopf = v[0].map(String), z = [];
   for (let i = 1; i < v.length; i++) {
     const o = { _r: i + 1 };
     let voll = false;
@@ -374,6 +379,10 @@ function liesRoh_(n) {
 const STABIL = ['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel'];
 let MEMO = {};
 function vergiss_(n) {
+  delete LAUF_MEMO[n];
+  if (['Produkte', 'Bestellliste', 'Listen'].indexOf(n) > -1) startVergessen_();
+  if (n === 'Kosten') try { CacheService.getScriptCache().remove('kosten:' + Utilities.formatDate(new Date(), TZ, 'MM.yyyy')); } catch (err) { /* läuft ab */ }
+  if (n === 'Analysen') try { CacheService.getScriptCache().remove('kennzahlen'); } catch (err) { /* läuft ab */ }
   if (STABIL.indexOf(n) < 0) return;
   delete MEMO[n];
   try { CacheService.getScriptCache().remove('tab:' + n); } catch (err) { /* läuft nach 5 Minuten ab */ }
@@ -453,7 +462,7 @@ function gesperrt_(f) {
   const l = LockService.getScriptLock();
   l.waitLock(30000);
   IN_SPERRE = true;
-  try { return f(); } finally { IN_SPERRE = false; l.releaseLock(); }
+  try { return f(); } finally { IN_SPERRE = false; LAUF_MEMO = {}; l.releaseLock(); }
 }
 /** Führt f aus, wenn kein anderer Abgleich läuft; sonst null. Nach 6 Minuten (längste Laufzeit eines Scripts) gilt ein Abgleich als beendet. */
 function allein_(f) {
@@ -531,8 +540,21 @@ function recherchiert_() {
 /* Start, Suche, Warteschlange                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Startseite: Warteschlange, Kategorien und Regal «Reparatur». Kommt aus dem Zwischenspeicher (10 Minuten), damit das Tool sofort bereit ist.
+ * Jede Änderung an Produkte, Bestellliste oder Listen löscht ihn (vergiss_), der Abgleich füllt ihn wieder.
+ */
+const START_SCHLUESSEL = 'start:' + VERSION;
+function startPaket_() {
+  const c = CacheService.getScriptCache(), alt = c.get(START_SCHLUESSEL);
+  if (alt) return JSON.parse(alt);
+  const p = { zahlen: zahlen_(lies_('Produkte').z), listen: { kategorie: liste_('Kategorie') }, reparatur: reparaturListe_() };
+  try { c.put(START_SCHLUESSEL, JSON.stringify(p), 600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return p;
+}
+function startVergessen_() { try { CacheService.getScriptCache().remove(START_SCHLUESSEL); } catch (err) { /* läuft ab */ } }
 function startDaten() {
-  return { version: VERSION, admin: istAdmin_(), zahlen: zahlen_(lies_('Produkte').z), listen: { kategorie: liste_('Kategorie') }, reparatur: reparaturListe_() };
+  return Object.assign({ version: VERSION, admin: istAdmin_() }, startPaket_());
 }
 function zahlen_(p) {
   const z = { offen: 0, bereit: 0, laeuft: 0, fehler: 0 };
@@ -631,6 +653,7 @@ function abgleichen() {
     if (!tag) schritt(function () { return handbuecher_(e); }, 'Handbücher');
     if (tag && Date.now() - t0 >= 30000) log_('Tempo', '', 'Abgleich ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + dauer.join(', '));
     PropertiesService.getScriptProperties().setProperty('ABGLEICH_ZULETZT', zeit_());
+    try { startPaket_(); } catch (err) { /* nicht kritisch */ }          // Startseite für die nächsten 10 Minuten vorbereiten
     return aus;
   });
   return r || { beschaeftigt: true };
@@ -824,6 +847,13 @@ function monatsBudget_(e) {
  * Liest nur die Spalten Zeit, Art und USD.
  */
 function monatsKosten_() {
+  const c = CacheService.getScriptCache(), schl = 'kosten:' + Utilities.formatDate(new Date(), TZ, 'MM.yyyy'), alt = c.get(schl);
+  if (alt) return JSON.parse(alt);
+  const x = monatsKostenRechnen_();
+  try { c.put(schl, JSON.stringify(x), 600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return x;
+}
+function monatsKostenRechnen_() {
   const s = blatt_('Kosten'), k = kopf_(s), last = s.getLastRow(), monat = Utilities.formatDate(new Date(), TZ, 'MM.yyyy');
   const cZ = k.indexOf('Zeit'), cA = k.indexOf('Art'), cU = k.indexOf('USD');
   let usd = 0, rech = 0, n = 0;
@@ -2357,13 +2387,21 @@ function mittelSpeichern(m, kuerzel) {
 /* Testmittel und Admin                                                */
 /* ------------------------------------------------------------------ */
 
+/** Läuft der Abgleich von selbst? Die Abfrage der Auslöser ist langsam: eine Stunde zwischenspeichern. */
+function ausloeserDa_() {
+  const c = CacheService.getScriptCache(), alt = c.get('ausloeser');
+  if (alt) return alt === '1';
+  const da = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'abgleichen'; });
+  try { c.put('ausloeser', da ? '1' : '0', 3600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return da;
+}
 function adminDaten() {
   const e = einst_();
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
   let budget, verbraucht;
   try { budget = monatsBudget_(e); verbraucht = (Math.round(monatsKosten_().usd * 100) / 100).toFixed(2); } catch (err) { /* ohne Anzeige */ }
   return { budget: budget, verbraucht: verbraucht, ki: !!key_(), url: ss_().getUrl(), schlange: warteschlange(), importAn: String(e['Automatischer Import']) === 'Ja',
-    ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'abgleichen'; }),
+    ausloeser: ausloeserDa_(),
     batches: lies_('Batches').z.slice(-8).reverse().map(function (r) { return { id: String(r['Batch-ID']), erstellt: r['Erstellt am'] instanceof Date ? zeit_(r['Erstellt am']) : String(r['Erstellt am']), status: String(r['Status']), anzahl: r['Anzahl'] }; }) };
 }
 
@@ -2399,7 +2437,13 @@ function wocheVon_(ms) { const d = new Date(ms), wt = (d.getUTCDay() + 6) % 7; r
 function kennzahlen(jetztMs) {
   const e = einst_();
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
-  return kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, jetztMs ? Number(jetztMs) : zeitMs_(zeit_()), blatt_('Auswertung').getDataRange().getDisplayValues());
+  if (jetztMs) return kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, Number(jetztMs), blatt_('Auswertung').getDataRange().getDisplayValues());
+  const c = CacheService.getScriptCache(), alt = c.get('kennzahlen');
+  if (alt) return JSON.parse(alt);
+  const k = kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, zeitMs_(zeit_()), blatt_('Auswertung').getDataRange().getDisplayValues());
+  k.stand = zeit_().slice(11, 16);
+  try { c.put('kennzahlen', JSON.stringify(k), 600); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
+  return k;
 }
 function kennzahlenRechnen_(analysen, log, jetzt, auswertung) {
   const a = analysen.map(function (r) {
@@ -2607,6 +2651,7 @@ function einrichten() {
   /* Genau ein Auslöser: der Abgleich */
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('abgleichen').timeBased().everyMinutes(TAKT_MINUTEN).create();
+  try { CacheService.getScriptCache().removeAll(['ausloeser', START_SCHLUESSEL, 'kennzahlen']); } catch (err) { /* läuft ab */ }
 
   gesperrt_(function () {
     /* Wer einrichtet, wird Admin, solange noch niemand eingetragen ist */

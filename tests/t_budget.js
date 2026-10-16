@@ -9,8 +9,9 @@ function lauf(kostenZeilen, laufend, e) {
   const kopf_ = () => KOPF;
   const lies_ = () => ({ z: Array.from({ length: laufend }, () => ({ 'Recherche-Status': 'Läuft' })) });
   const Utilities = { formatDate: (d, tz, f) => f === 'MM.yyyy' ? (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1) + '.' + d.getFullYear() : '' };
-  const f = new Function('blatt_', 'kopf_', 'lies_', 'Utilities', 'TZ', 'BUDGET_VORGABE', 'BUDGET_SCHAETZUNG', zahlSrc + src.slice(ab, bis) + '; return { frei: rechercheFrei_, kosten: monatsKosten_ };');
-  return f(blatt_, kopf_, lies_, Utilities, 'Europe/Zurich', 150, 0.3);
+  const f = new Function('blatt_', 'kopf_', 'lies_', 'Utilities', 'CacheService', 'TZ', 'BUDGET_VORGABE', 'BUDGET_SCHAETZUNG', zahlSrc + src.slice(ab, bis) + '; return { frei: rechercheFrei_, kosten: monatsKosten_ };');
+  const CacheService = { getScriptCache: () => ({ get: () => null, put() {}, remove() {} }) };   // ohne Zwischenspeicher: rechnet jedes Mal
+  return f(blatt_, kopf_, lies_, Utilities, CacheService, 'Europe/Zurich', 150, 0.3);
 }
 const d = new Date(), mm = (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1), heute = '01.' + mm + '.' + d.getFullYear() + ' 10:00:00';
 const alt = '01.' + (mm === '01' ? '02' : '01') + '.2020 10:00:00';

@@ -491,7 +491,7 @@
     'ws.geraet': ['Gerät', 'Device'], 'ws.notiz': ['Notiz', 'Note'], 'ws.aktiv': ['Aktiv', 'Active'], 'ws.inaktiv': ['Inaktiv', 'Inactive'], 'ws.neu': ['Neues Testkonto', 'New test account'],
     'ws.bearb': ['Bearbeiten', 'Edit'], 'ws.speichern': ['Speichern', 'Save'], 'ws.abbr': ['Abbrechen', 'Cancel'], 'ws.leer': ['Noch keine Testkonten.', 'No test accounts yet.'],
     'ws.aktivfrage': ['Konto ist aktiv und nutzbar', 'Account is active and usable'], 'ws.geraetplatz': ['z.B. Foto-Handy', 'e.g. photo phone'], 'ws.mneu': ['Neues Testmittel', 'New test equipment'],
-    'ws.hinzu': ['Hinzufügen', 'Add'], 'ws.da': ['Vorhanden', 'Available'], 'ws.nichtda': ['Fehlt', 'Missing'], 'ws.gespeichert': ['Gespeichert.', 'Saved.'],
+    'ws.hinzu': ['Hinzufügen', 'Add'], 'ws.mname': ['Name des Testmittels', 'Name of the test equipment'], 'ws.da': ['Vorhanden', 'Available'], 'ws.nichtda': ['Fehlt', 'Missing'], 'ws.gespeichert': ['Gespeichert.', 'Saved.'],
     'ws.auto': ['wird über die Testkonten gesetzt', 'set by the test accounts'],
     'fuss.kuerzel': ['Kürzel', 'Initials'], 'fuss.ende': ['Beenden', 'End'], 'fuss.laeuft': ['Zuerst die laufende Analyse abschliessen oder abbrechen.', 'Finish or cancel the running analysis first.'],
     'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'],
@@ -742,7 +742,8 @@
       if (AN) $('t-name').value = AN.d.produkt.bezeichnung; else if ($('t-name').readOnly) $('t-name').value = '';
       $('t-name').readOnly = !!AN;
     }
-    if (SEITEN[a]) ruf(SEITEN[a][0], [], SEITEN[a][1]);
+    /* Zuletzt geladene Daten sofort zeigen, dann im Hintergrund auffrischen */
+    if (SEITEN[a]) { if (GELADEN[a]) SEITEN[a][1](GELADEN[a]); ruf(SEITEN[a][0], [], function (r) { GELADEN[a] = r; if (ANSICHT === a) SEITEN[a][1](r); }); }
     if (a === 'scan' && !AN) $('q').focus();
   }
   /* Startseite: eine Zeile zur Warteschlange. Die ganze Liste steht im Admin unter «Betrieb». */
@@ -1733,7 +1734,7 @@
 
   /* ---------- Infrastruktur: Testkonten und Testmittel (für das ganze Team) ---------- */
   /* WS = Daten vom Server; WSK = offenes Formular (neu: r leer). Passwörter sind für das Team sichtbar (interne Regel). */
-  var WS = null, WSK = null;
+  var WS = null, WSK = null, MTN = false;
   function zeichneWerkstatt(r) { WS = r; WSK = null; wsZeichnen(); }
   function wsZeichnen() {
     var k = WS.konten, auto = {}, f;
@@ -1758,7 +1759,10 @@
         + (auto[m.name] ? '<span class="etikett' + (m.vorhanden === 'Ja' ? ' gruen' : '') + '">' + tx(m.vorhanden === 'Ja' ? 'ws.da' : 'ws.nichtda') + '</span>'
           : [['Ja', 'ws.da', 'ok'], ['Nein', 'ws.nichtda', 'nok']].map(function (o) { return '<button class="' + o[2] + (m.vorhanden === o[0] ? ' an' : '') + '" data-a="mtSetz" data-k="' + i + '" data-v="' + o[0] + '" aria-pressed="' + (m.vorhanden === o[0]) + '">' + tx(o[1]) + '</button>'; }).join(''))
         + '</span></li>'; }).join('') + '</ul>'
-      + '<label for="mt-neu">' + tx('ws.mneu') + '</label><div class="reihe"><div class="breit"><input type="text" id="mt-neu" data-enter="mtNeu" autocomplete="off"></div>' + taste('mtNeu', 'ws.hinzu', '', ' style="flex:none;width:auto"') + '</div>';
+      + (MTN ? '<div class="ric-box" style="margin-top:14px"><div class="n">' + tx('ws.mneu') + '</div><label for="mt-neu">' + tx('ws.mname') + '</label><input type="text" id="mt-neu" data-enter="mtNeu" autocomplete="off">'
+        + '<div class="knoepfe">' + taste('mtNeu', 'ws.speichern', 'pink') + taste('mtAbbr', 'ws.abbr') + '</div></div>'
+        : '<div class="knoepfe">' + taste('mtAuf', 'ws.mneu', 'pink') + '</div>');
+    if (MTN) $('mt-neu').focus();
   }
   function wsLesen() { if (!WSK) return; WSK.login = $('ws-login').value.trim(); WSK.passwort = $('ws-pw').value; WSK.geraet = $('ws-geraet').value.trim(); WSK.notiz = $('ws-notiz').value.trim(); WSK.aktiv = $('ws-aktiv').checked; }
   function wsNeu() { WSK = { r: '', login_alt: '', dienst: '', login: '', passwort: '', geraet: '', notiz: '', aktiv: true }; wsZeichnen(); }
@@ -1772,7 +1776,9 @@
   }
   function wsKopier(i, k, el) { kopiereText(WS.konten[Number(i)].passwort, el); }
   function mtSetz(v, i) { ruf('mittelSpeichern', [{ name: WS.mittel[Number(i)].name, vorhanden: v }, K], function (r) { WS = r; wsZeichnen(); }); }
-  function mtNeu() { var n = $('mt-neu').value.trim(); if (!n) { $('mt-neu').focus(); return; } ruf('mittelSpeichern', [{ name: n, vorhanden: 'Ja' }, K], function (r) { WS = r; wsZeichnen(); melde(t('ws.gespeichert')); }); }
+  function mtAuf() { MTN = true; wsZeichnen(); }
+  function mtAbbr() { MTN = false; wsZeichnen(); }
+  function mtNeu() { var n = $('mt-neu').value.trim(); if (!n) { $('mt-neu').focus(); return; } ruf('mittelSpeichern', [{ name: n, vorhanden: 'Ja' }, K], function (r) { WS = r; MTN = false; wsZeichnen(); melde(t('ws.gespeichert')); }); }
 
   /* ---------- Admin: Betrieb, Kennzahlen, Feedback ---------- */
   var ADM = 'betrieb', KZ = null, KZZ = 'vierWochen', AF = [];
@@ -1851,13 +1857,20 @@
 
   /* ---------- Seiten und Aktionen ---------- */
   /* Seite: [Aufruf beim Öffnen, Funktion für die Antwort]. */
+  var GELADEN = {};                                 // zuletzt geladene Daten pro Seite
+  /* Nach dem Start die anderen Seiten still vorladen, damit der Wechsel sofort geht */
+  function vorladen() {
+    ['teile', 'werkstatt'].concat(S && S.admin ? ['admin'] : []).forEach(function (a, n) {
+      setTimeout(function () { try { google.script.run.withSuccessHandler(function (r) { GELADEN[a] = r; }).withFailureHandler(function () {}).api(L, SEITEN[a][0], []); } catch (e) { /* ohne Vorladen */ } }, 300 * n);
+    });
+  }
   var SEITEN = { scan: null, teile: ['bestellliste', zeichneBestell], werkstatt: ['werkstatt', zeichneWerkstatt], admin: ['adminDaten', zeichneAdmin] };
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
-    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, admTab: admTab, kzZeit: kzZeit, afSetz: afSetz };
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, kzZeit: kzZeit, afSetz: afSetz };
 
   /* ---------- Start ---------- */
   (function () {
@@ -1908,13 +1921,22 @@
     window.addEventListener('pagehide', sichern);                              // beim Neuladen oder Schliessen: die Zeit bis jetzt zählt noch
     /* Foto-Seite fürs Handy: Die Adresse aus dem QR-Code trägt ?foto=PG-ID. Dann gibt es weder Kürzel noch Analyse. */
     try { google.script.url.getLocation(function (loc) { var f = loc && loc.parameter && loc.parameter.foto; if (f) fotoModus(String(f)); }); } catch (e) { /* ausserhalb von Apps Script */ }
-    ruf('startDaten', [], function (s) {
+    /* Startdaten des letzten Besuchs sofort anzeigen (gleiche Version), dann frisch vom Server */
+    var einmal = false;
+    var start = function (s, frisch) {
       S = s;
       if (FS) return;
+      if (frisch) { try { merke('at-start', JSON.stringify({ v: VERSION, s: s })); } catch (e) { /* ohne Speicher */ } }
       $('version').textContent = 'Version ' + s.version; $('nav-admin').hidden = !s.admin; $('nav-sektion2').hidden = !s.admin; zahlen(s.zahlen); ohneKat(); REP = s.reparatur || []; zeichneRep();
+      if (einmal) return;
+      einmal = true;
       if (lauf && lauf.v === VERSION) { AN = lauf; AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; zeichneAnalyse(); } else merke('at-lauf', null);      // ein Abgleich, der beim Neuladen lief, startet neu
       if (!K) { $('start').hidden = false; $('kuerzel').focus(); } else if (!AN) $('q').focus();
-    });
+    };
+    var alt = null;
+    try { alt = JSON.parse(lies('at-start') || 'null'); } catch (e) { alt = null; }
+    if (alt && alt.v === VERSION && alt.s) start(alt.s, false);
+    ruf('startDaten', [], function (s) { start(s, true); vorladen(); });
   })();
 </script>
 </body>

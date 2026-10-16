@@ -24,7 +24,7 @@ with sync_playwright() as p:
     pg.click('button[data-a=wsSpeichern]'); pg.wait_for_timeout(100)
     print('konto', json.dumps(pg.evaluate('ARGS.kontoSpeichern')))
     pg.click('button[data-a=mtSetz][data-k="0"][data-v=Nein]'); pg.wait_for_timeout(50)
-    pg.fill('#mt-neu','Lötkolben'); pg.press('#mt-neu','Enter'); pg.wait_for_timeout(50)
+    pg.click('button[data-a=mtAuf]'); pg.fill('#mt-neu','Lötkolben'); pg.press('#mt-neu','Enter'); pg.wait_for_timeout(50)
     print('mittel', json.dumps(pg.evaluate('ARGS.mittelSpeichern')), pg.evaluate('CALLS'))
     b.close()
 print('ERR',err)
