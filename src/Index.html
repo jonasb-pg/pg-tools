@@ -595,7 +595,7 @@
     'adm.titel': ['Admin', 'Admin'], 'adm.test': ['Verbindungen testen', 'Test connections'], 'adm.testet': ['Die Verbindungen werden geprüft, das dauert bis zu einer Minute.', 'The connections are being tested, this takes up to a minute.'],
     'adm.sheet': ['Sheet öffnen', 'Open sheet'], 'adm.batches': ['Letzte Recherche-Läufe', 'Latest research runs'], 'adm.ki': ['Claude ist verbunden.', 'Claude is connected.'], 'adm.keinki': ['Der Claude-Schlüssel fehlt.', 'The Claude key is missing.'],
     'adm.an': ['Der Import aus dem Return Tool ist an.', 'The import from the Return Tool is on.'], 'adm.aus': ['Der Import aus dem Return Tool ist aus.', 'The import from the Return Tool is off.'],
-    'adm.auto': ['Der Abgleich läuft von selbst.', 'The sync runs by itself.'], 'adm.keinauto': ['Der Auslöser fehlt: im Apps Script «einrichten» ausführen.', 'The trigger is missing: run "einrichten" in Apps Script.'],
+    'adm.auto': ['Der Abgleich läuft von selbst.', 'The sync runs by itself.'], 'adm.budget': ['KI-Kosten diesen Monat: USD {0} von {1} (Einstellung «KI-Budget USD pro Monat» im Sheet).', 'AI costs this month: USD {0} of {1} (setting «KI-Budget USD pro Monat» in the sheet).'], 'adm.keinauto': ['Der Auslöser fehlt: im Apps Script «einrichten» ausführen.', 'The trigger is missing: run "einrichten" in Apps Script.'],
     'adm.leer': ['Noch keine Läufe.', 'No runs yet.'], 'adm.ok': ['ok', 'ok'], 'adm.fehler': ['Fehler', 'Error'],
     'adm.th.zeit': ['Erstellt', 'Created'], 'adm.th.anzahl': ['Produkte', 'Products'], 'adm.th.status': ['Status', 'Status'], 'adm.th.id': ['Auftrag bei Claude', 'Batch at Claude']
   };
@@ -772,7 +772,8 @@
   /* d = Überblick vom Server, t0 = Zeitpunkt des Scans, fehler = Grund, warum die Recherche nicht geklappt hat. */
   function beginne(d, t0, fehler) {
     var jetzt = Date.now();
-    AN = { v: VERSION, d: d, start: t0, aktiv: jetzt - t0, seit: jetzt, i: 0, s: leer(d), gate: null, rm: {}, hb: null };
+    /* Die Uhr startet, wenn der Überblick da ist: Scan, Erfassen und Recherche sind Wartezeit aufs Tool, nicht Arbeit (Feedback Simon 16.10.2026). t0 bleibt nur für Meldungen. */
+    AN = { v: VERSION, d: d, start: jetzt, aktiv: 0, seit: jetzt, i: 0, s: leer(d), gate: null, rm: {}, hb: null };
     if (d.handbuch && d.handbuch.status === 'Hochgeladen') { d.handbuch.status = 'liest'; AN.hb = 'liest'; }   // wird gerade gelesen (anderes Gerät oder Abgleich)
     LAUF = { suchFehler: fehler || '' };
     if (ANSICHT !== 'scan') zeige('scan');
@@ -1693,7 +1694,8 @@
   /* ---------- Admin ---------- */
   function zeichneAdmin(r) {
     var bloecke = [], akt = null;
-    $('adm-status').textContent = [t(r.ki ? 'adm.ki' : 'adm.keinki'), t(r.importAn ? 'adm.an' : 'adm.aus'), t(r.ausloeser ? 'adm.auto' : 'adm.keinauto')].join(' ');
+    $('adm-status').textContent = [t(r.ki ? 'adm.ki' : 'adm.keinki'), t(r.importAn ? 'adm.an' : 'adm.aus'), t(r.ausloeser ? 'adm.auto' : 'adm.keinauto'),
+      r.budget !== undefined ? t('adm.budget', r.verbraucht, r.budget) : ''].join(' ');
     $('adm-sheet').href = r.url;
     /* Tab «Auswertung», wie er im Sheet steht: Blöcke sind durch Leerzeilen getrennt, die erste Zeile jedes Blocks ist der Titel, die zweite die Kopfzeile. */
     r.auswertung.slice(2).forEach(function (z) {

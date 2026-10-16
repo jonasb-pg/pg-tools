@@ -88,3 +88,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Fragen: Antwortentwurf mit Claude (Modell aus «Claude-Modell»), Anrede wie die Frage. Fragetext/Entwurf/Absender 60 Tage nach Eingang gelöscht (erledigt).
 - Zahlung überfällig nach 3 Tagen mit Erinnerungstext, «Erinnerung gesendet» blendet aus.
 - Zum Aktivieren: neue Version bereitstellen, dann einmal «einrichten» (Gmail-Berechtigung, Auslöser, Tab Posteingang, neue Spalten).
+- **Analyse .16.6 (Feedback Simon):** Uhr startet, wenn der Überblick erscheint (nicht beim Scan). Beworbene Funktionen höchstens 5 (Einstellung «Höchstens beworbene Funktionen»), die Recherche sortiert die Funktionen nach Wichtigkeit, die ersten werden geprüft; bei Prüfumfang «Alle» keine Grenze. Neue Sortierung gilt für neue Recherchen. Admin zeigt KI-Kosten des Monats.

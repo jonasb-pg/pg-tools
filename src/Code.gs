@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.5';
+const VERSION = '2026-10-16.6';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -30,6 +30,7 @@ const PREISE = { 'claude-sonnet-5-5': [2, 10], 'claude-haiku-5-5': [0.1, 0.5] };
 const PREIS_WEBSUCHE = 0.01;
 /* Kostenbremse für die Vorab-Recherchen: höchstens so viele USD pro Kalendermonat (Entscheid Jonas 16.10.2026). Gezählt wird alles im Tab «Kosten». */
 const BUDGET_VORGABE = 150;
+const MAX_BEWORBEN = 5;                 // Vorgabe für «Höchstens beworbene Funktionen»
 const BUDGET_SCHAETZUNG = 0.3;          // USD pro Recherche, solange es diesen Monat noch keine abgerechnete gibt
 const BUDGET_ERKL = 'Kostenbremse: So viele USD dürfen die KI-Aufrufe dieses Tools pro Kalendermonat kosten (Summe im Tab «Kosten», laufende Recherchen geschätzt). Ist das Budget aufgebraucht, startet das Tool bis zum Monatsende keine Vorab-Recherchen mehr. 0 = keine.';
 const KOSTEN_KOPF = ['Zeit', 'Art', 'ID', 'Bezeichnung', 'Modell', 'Tokens Eingabe', 'Tokens Ausgabe', 'Websuchen', 'Suchfehler', 'Abschluss', 'Belegte Infos', 'USD', 'Batch-ID', 'Antwort', 'Stufe'];
@@ -160,6 +161,7 @@ const MM_ANWEISUNG = 'Du prüfst für Pretty Good, ob ein geprüftes Produkt zu 
 const NEUE_EINSTELLUNGEN = [
   ['Handbücher nicht zwischen', '07:00-18:30', 'In diesem Zeitfenster sucht und liest der Abgleich keine Handbücher (dauert pro Stück rund eine Minute und bremst das Tool). Er macht es am Abend und in der Nacht. Leer = immer.'],
   ['KI-Budget USD pro Monat', BUDGET_VORGABE, BUDGET_ERKL],
+  ['Höchstens beworbene Funktionen', MAX_BEWORBEN, 'So viele beworbene Funktionen prüft die Analyse höchstens (die wichtigsten zuerst). Die übrigen stehen als «nicht geprüft» in Befund und Verkaufsinfo. Gilt nicht für Stufen mit Prüfumfang «Alle».'],
   ['Vergleichsmodell', '', 'Nur zum Testen: Steht hier ein Modell, läuft jede Vorab-Recherche zusätzlich damit. Das Ergebnis steht nur im Tab «Kosten», zum Vergleichen von Preis und Qualität. Kostet doppelt.'],
   ['Stundenansatz Reparatur CHF', 50, 'Mit diesem Ansatz rechnet das Tool die Arbeitszeit einer Reparatur. Quelle: Entscheid von Jonas vom 10.10.2026.'],
   ['Hausregeln', HAUSREGELN, 'Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar.'],
@@ -958,6 +960,7 @@ function format_(kurz) {
     ' "sichtpruefung": [],          // höchstens drei kurze Punkte, die man bei genau diesem Produkt vor dem Einstecken oder Benutzen ohne Werkzeug anschaut, z.B. "Glaskanne ohne Sprung", "Messer sitzt fest", "Bremse greift". Nicht Netzkabel, Stecker, Gehäuse und Akku, die prüft das Tool schon',
     ' "funktionen": [ { "name": "", "pruefung": "", "art": "Kern", "pruefbar": "Ja", "grund": "" } ]',
     '}',
+    'funktionen: nach Wichtigkeit für Käuferinnen und Käufer sortiert, die wichtigste zuerst: zuerst Kern, dann Beworben, dann Weitere, innerhalb jeder Art die wichtigste zuerst. Das Tool prüft bei günstigen Produkten nur die ersten.',
     'In "infos" steht je genau ein Eintrag für diese Felder: ' + (kurz ? INFO_IMMER : INFO_FELDER).join(', ') + '.',
     'Lieferumfang: ein Teil pro Zeile, ohne Aufzählungszeichen.'
   ];
@@ -1511,6 +1514,27 @@ function rechercheJetzt(id, modell) {
  * Alles, was die Oberfläche für ein Produkt braucht. «ablauf» ist die Reihenfolge der Schritte für genau dieses Produkt:
  * Produktart und Stufe bestimmen, welche Schritte es gibt und welche Funktionen geprüft werden. Ohne Recherche ist der Ablauf leer.
  */
+/**
+ * Welche Funktionen geprüft werden: was zum Prüfumfang der Stufe gehört und prüfbar ist. Beworbene höchstens «Höchstens beworbene Funktionen»
+ * (Feedback Simon 16.10.2026: günstige Elektronik wirbt mit sehr vielen). Die Recherche liefert sie nach Wichtigkeit sortiert, geprüft werden die ersten.
+ * Bei Prüfumfang «Alle» gilt keine Grenze. Alles andere steht als «nicht geprüft» in Protokoll, Befund und Verkaufsinfo.
+ */
+function funktionsAuswahl_(fn, umfang, e) {
+  const drin = PRUEFUMFANG[umfang] || PRUEFUMFANG['Kern und beworben'], kern = [], weitere = [], ungeprueft = [], ungeprueftKurz = [];
+  const roh = e && e['Höchstens beworbene Funktionen'] !== undefined && String(e['Höchstens beworbene Funktionen']).trim() !== '' ? e['Höchstens beworbene Funktionen'] : MAX_BEWORBEN;
+  const maxBeworben = umfang === 'Alle' ? 999 : Math.max(0, Math.floor(Number(roh) || 0));
+  let beworben = 0;
+  (fn || []).forEach(function (x) {
+    if (x.ok && x.a === 'Beworben' && drin.indexOf('Beworben') > -1 && ++beworben > maxBeworben) {
+      ungeprueft.push(x.n + ' (Stufe: nur die wichtigsten ' + maxBeworben + ')'); ungeprueftKurz.push(x.n); return;
+    }
+    if (x.ok && drin.indexOf(x.a) > -1) { (x.a === 'Kern' ? kern : weitere).push({ t: x.p || x.n, n: x.n || x.p, g: x.a === 'Kern' ? 'Kern' : 'Weitere' }); return; }
+    ungeprueft.push(x.n + (!x.ok && x.g ? ' (' + x.g + ')' : ''));          // fürs Protokoll: alles, mit dem Grund
+    if (x.ok || x.a !== 'Weitere') ungeprueftKurz.push(x.n);                // für Befund und Verkaufsinfo: was die Stufe auslässt und was an Kern und Beworbenem nicht prüfbar ist
+  });
+  return { kern: kern, weitere: weitere, ungeprueft: ungeprueft, ungeprueftKurz: ungeprueftKurz };
+}
+
 function ueberblick_(p, e) {
   const k = String(p['Recherche-Schlüssel']), gruen = Number(ss_().getRangeByName('Score_Gruen').getValue()), gelb = Number(ss_().getRangeByName('Score_Gelb').getValue());
   const hilf = {}, nach = {}, vorhanden = {}, st = stufe_(lies_('Stufen').z, p['Herkunft'], p['VP CHF']);
@@ -1540,12 +1564,7 @@ function ueberblick_(p, e) {
   /* Funktionen: geprüft wird, was zur Stufe gehört und nach den Hausregeln prüfbar ist. Alles andere steht am Schluss als «nicht geprüft» im Befund. */
   let fn = [];
   try { fn = JSON.parse(hilf['Funktionen'] || '[]'); } catch (err) { fn = []; }
-  const drin = PRUEFUMFANG[st.umfang] || PRUEFUMFANG['Kern und beworben'], kern = [], weitere = [], ungeprueft = [], ungeprueftKurz = [];
-  fn.forEach(function (x) {
-    if (x.ok && drin.indexOf(x.a) > -1) { (x.a === 'Kern' ? kern : weitere).push({ t: x.p || x.n, n: x.n || x.p, g: x.a === 'Kern' ? 'Kern' : 'Weitere' }); return; }
-    ungeprueft.push(x.n + (!x.ok && x.g ? ' (' + x.g + ')' : ''));          // fürs Protokoll: alles, mit dem Grund
-    if (x.ok || x.a !== 'Weitere') ungeprueftKurz.push(x.n);                // für Befund und Verkaufsinfo: was die Stufe auslässt und was an Kern und Beworbenem nicht prüfbar ist
-  });
+  const aw = funktionsAuswahl_(fn, st.umfang, e), kern = aw.kern, weitere = aw.weitere, ungeprueft = aw.ungeprueft, ungeprueftKurz = aw.ungeprueftKurz;
   const liste = kern.concat(weitere), ersatz = da && !liste.length;
   /* Nichts Prüfbares in der Stufe (z.B. ein Produkt ohne Technik): Dann wird wenigstens geprüft, ob alle Teile unbeschädigt sind. */
   if (ersatz) liste.push({ t: 'Alle Teile sind unbeschädigt und benutzbar', n: 'Zustand der Teile', g: 'Kern' });
@@ -2330,7 +2349,9 @@ function mittelSpeichern(m, kuerzel) {
 function adminDaten() {
   const e = einst_();
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
-  return { ki: !!key_(), url: ss_().getUrl(), auswertung: blatt_('Auswertung').getDataRange().getDisplayValues(), importAn: String(e['Automatischer Import']) === 'Ja',
+  let budget, verbraucht;
+  try { budget = monatsBudget_(e); verbraucht = (Math.round(monatsKosten_().usd * 100) / 100).toFixed(2); } catch (err) { /* ohne Anzeige */ }
+  return { budget: budget, verbraucht: verbraucht, ki: !!key_(), url: ss_().getUrl(), auswertung: blatt_('Auswertung').getDataRange().getDisplayValues(), importAn: String(e['Automatischer Import']) === 'Ja',
     ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'abgleichen'; }),
     batches: lies_('Batches').z.slice(-8).reverse().map(function (r) { return { id: String(r['Batch-ID']), erstellt: r['Erstellt am'] instanceof Date ? zeit_(r['Erstellt am']) : String(r['Erstellt am']), status: String(r['Status']), anzahl: r['Anzahl'] }; }) };
 }
