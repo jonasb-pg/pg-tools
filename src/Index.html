@@ -1410,11 +1410,13 @@
       + '<p class="still" id="ric-fehlt">' + (fehlt.length ? tx('ri.fehlt', fehlt.join(', ')) : '') + '</p>'
       + '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink', fehlt.length ? ' disabled id="ric-ab"' : ' id="ric-ab"') + '</div></div>';
   }
+  /* Vorschau vom Server (sieht jede Person mit Zugang zum Tool). Nur wenn Drive noch keine hat: direkt aus Drive, das klappt nur mit Zugriff auf den Ordner. */
+  function fotoSrc(x) { return x.bild || ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160'); }
   function fotoSlots() {
     var st = RIC && AN && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = AN && !!AN.s.maengel.trim();
     var art = function (a, titel, soll, extra) {
       var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length;
-      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><img src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160" alt="' + esc(x.name) + '"><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
+      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt="' + esc(x.name) + '"><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
         + '</div><strong>' + tx(titel) + '</strong>' + (extra || '') + (soll === null ? '' : '<span class="etikett ' + (n >= soll ? 'gruen' : '') + '" style="align-self:flex-start">' + (n >= soll ? tx('fs.da', n) : tx('fs.fehlt')) + '</span>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fotoOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
@@ -1493,7 +1495,7 @@
       var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length, offen = soll !== null && n < soll;
       return '<div class="fs-zeile' + (offen ? ' offen' : '') + '"><div class="fs-titel"><div><strong>' + tx(titel) + '</strong><span class="still">' + tx(hilfe) + '</span></div>'
         + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx('fs.fehlt') : tx('fs.da', n)) + '</span>') + '</div>'
-        + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
+        + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
         + (extra || '') + (FS.laedt === a ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt') + '</p>' : '<button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fsOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };

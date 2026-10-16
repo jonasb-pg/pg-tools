@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.3';
+const VERSION = '2026-10-16.4';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1975,11 +1975,27 @@ function fotoStand(id) {
     const it = f.getFiles();
     while (it.hasNext()) {
       const x = it.next(), n = x.getName(), a = Object.keys(FOTO_ARTEN).filter(function (k) { return n.indexOf(FOTO_ARTEN[k]) === 0; })[0];
-      if (a && !x.isTrashed()) { zahl[a]++; liste.push({ id: x.getId(), art: a, name: n }); }
+      if (a && !x.isTrashed()) { zahl[a]++; liste.push({ id: x.getId(), art: a, name: n, bild: fotoBild_(x) }); }
     }
   }
   liste.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
   return { id: String(p['PG-ID']), bezeichnung: String(p['Bezeichnung']), zahl: zahl, liste: liste, ordner: f ? f.getUrl() : '', ohneTypenschild: ohne.typenschild === true, ohneMangel: ohne.mangel === true };
+}
+/**
+ * Kleines Vorschaubild eines Fotos als data-URL, vom Server geliefert. Der Browser lädt so nichts direkt aus Drive:
+ * Wer den Foto-Ordner in Drive nicht sieht (z.B. Simon), sieht die Vorschau trotzdem. 6 Stunden gemerkt. Leer, wenn Drive noch keine Vorschau hat.
+ */
+function fotoBild_(x) {
+  const c = CacheService.getScriptCache(), key = 'fb:' + x.getId();
+  try { const alt = c.get(key); if (alt) return alt; } catch (err) { /* ohne Zwischenspeicher */ }
+  let url = '';
+  try {
+    const b = x.getThumbnail();
+    if (b && b.getBytes().length) url = 'data:' + (b.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(b.getBytes());
+  } catch (err) { url = ''; }
+  if (url.length > 90000) url = '';                                    // zu gross für den Zwischenspeicher und die Antwort
+  if (url) try { c.put(key, url, 21600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return url;
 }
 /** Ein Foto vom Handy ablegen. Das Hauptbild gibt es nur einmal: Ein neues ersetzt das alte. */
 function fotoHochladen(id, art, daten) {

@@ -63,3 +63,8 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 16.10.2026 | Ricardo | Verkaufsbericht gibt es erst am Folgetag: bleibt so (Bericht am nächsten Morgen einlesen, dann packen). Kein Erfassen von Hand, kein Mail-Import | Verkauf von Hand erfassen, Verkaufsmails lesen |
 | 16.10.2026 | Tempo | Analyse 2026-10-16.3: Abgleich liest tagsüber (Einstellung «Handbücher nicht zwischen», Vorgabe 07:00-18:30) keine Handbücher; Recherche und Handbuch-Sheet werden gezielt pro Schlüssel gelesen (TextFinder) statt ganz; Einstellungen, Stufen, Sicherheitspunkte, Testmittel im Zwischenspeicher (5 Min, sofort neu bei Schreiben oder Änderung von Hand); Aufrufe ab 4 s und Abgleiche ab 30 s (tagsüber) stehen als «Tempo» im Log | Datenbank statt Sheets (später, mit HuggyStudio) |
 | 16.10.2026 | Tempo | Ricardo 2026-10-16.2: Tabs des Return Tools 10 Min gemerkt (gepackt im Zwischenspeicher), ohne Treffer wird frisch nachgelesen; Aufbau-Prüfung beim Start nur einmal pro Stunde | |
+
+### 16.10.2026, Abend
+- **Fotos für Simon (Analyse .16.4):** Die Vorschaubilder kommen neu vom Server (fotoBild_, Thumbnail als data-URL, 6 h gemerkt). Vorher lud der Browser sie direkt aus Drive, was nur mit Zugriff auf den Ordner «RICARDO FOTOS» ging. Hat Drive für ein frisch hochgeladenes Foto noch keine Vorschau, bleibt der alte Weg als Ersatz.
+- **Ricardo-Knöpfe:** Feste Höhe 40px entfernt (min-height, Zeilenumbruch erlaubt). In Tabellen bricht der Knopftext nicht um, die Tabelle scrollt. Grund: «Bezahlt und versendet» lief über den Knopf hinaus.
+- **Recherchen mit Status «Fehler»:** 98 Produkte auf «Offen» zurückgesetzt, der Abgleich startet sie neu, solange das Recherche-Guthaben reicht. Guthaben erhöhen macht Jonas selbst.

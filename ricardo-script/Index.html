@@ -63,8 +63,9 @@
   label small, .klein { font-weight:400; font-size:14px; color:var(--muted); }
   label.haken { display:flex; gap:10px; align-items:flex-start; font-weight:600; }
 
-  button { font:600 14px/1 var(--sans); letter-spacing:.7px; text-transform:uppercase; cursor:pointer; height:40px; padding:0 18px; border:2px solid var(--ink); border-radius:24px; background:var(--weiss); color:var(--ink); }
+  button { font:600 14px/1.2 var(--sans); letter-spacing:.7px; text-transform:uppercase; cursor:pointer; min-height:40px; padding:8px 18px; max-width:100%; white-space:normal; text-align:center; border:2px solid var(--ink); border-radius:24px; background:var(--weiss); color:var(--ink); }
   button:hover { background:var(--grau); }
+  .tabelle td button { white-space:nowrap; letter-spacing:.3px; padding:8px 14px; }
   button.haupt-knopf { background:var(--pink); }
   button.haupt-knopf:hover { background:#f0a3e5; }
   button:disabled { opacity:.45; cursor:not-allowed; }
