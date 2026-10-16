@@ -51,3 +51,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 | 15.10.2026 | Ricardo | Regalnamen (Offline, Online, Unpaid) sind Einstellungen im Ricardo Tool und im Admin-Teil umbenennbar | fest im Code |
 | 15.10.2026 | Kosten | Guthaben freigegeben: Recherche 100, Handbuch 100 (nicht unbegrenzt; nach Kontrolle von Qualität und Kosten neu freigeben) | 0 |
 | 15.10.2026 | Ricardo | Ricardo Tool 2026-10-15.1 im Editor gespeichert (nicht bereitgestellt), «einrichten» ausgeführt: Spalten Analyse-Nr, Foto-Ordner, Text geändert und Einstellungen Analyse Tool ID, Regal Offline/Online/Unpaid angelegt | |
+| 16.10.2026 | Live | Analyse Tool 2026-10-15.15 live bereitgestellt (von Jonas); «Web-App-Adresse für Fotos» geleert (QR führt auf Live); Guthaben Recherche 350, Handbuch 350 für den Rückstand; Fehler-Stücke werden erst beim Scannen recherchiert | Version 7 |
