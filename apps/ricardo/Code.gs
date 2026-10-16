@@ -48,7 +48,7 @@ const OFFEN = ['In Arbeit', 'Bereit'];
 const REGAL_STATUS = { 'In Arbeit': 'Regal Offline', 'Bereit': 'Regal Offline', 'Gelistet': 'Regal Online', 'Verkauft': 'Regal Unpaid',
   'Zu packen': 'Regal Unpaid', 'Wartet auf Zahlung': 'Regal Unpaid' };
 const REGAL_VORGABE = { 'Regal Offline': 'Ricardo Offline', 'Regal Online': 'Ricardo Online', 'Regal Unpaid': 'Ricardo Unpaid' };
-const SCHLUSSSATZ = 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Alle Artikel werden von Pretty Good sorgfältig geprüft, nicht geprüfte Funktionen werden im Beschrieb aufgelistet. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.';
+const SCHLUSSSATZ = 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.';
 const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM', ANALYSE_TAB = 'Ricardo';
 // Status, in denen ein Stück wieder frei ist und neu gelistet werden kann
 const FREI = ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'];

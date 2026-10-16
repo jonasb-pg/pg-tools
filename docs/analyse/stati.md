@@ -108,7 +108,17 @@ Seit `2026-10-17.3` entspricht das Grade dem Ricardo-Zustand (Entscheid Jonas 17
 | mit Gebrauchsspuren | C | Gebraucht | Das Produkt ist gebraucht. |
 | defekt | – | (nicht verkauft) |
 
-Käufertext (Verkaufsinfo und Ricardo) seit `2026-10-17.4`: Fliesstext aus einer Vorlage in drei Absätzen. 1. Zustandssatz, dazu «Das ist uns aufgefallen: …» mit den Mängeln. 2. «Wir haben es bei uns getestet: … funktionieren einwandfrei.», dazu Reparaturen. 3. «Im Paket sind …» und was fehlt. Nicht ausprobierte Funktionen und Firmware stehen nur im Protokoll.
+Käufertext (Verkaufsinfo und Ricardo) seit `2026-10-17.6`, Vorlage Jonas 17.10.2026. Ricardo-Beschrieb, Absätze durch eine Leerzeile getrennt:
+
+1. Einleitung (KI)
+2. Stichpunkte (KI, ohne Lieferumfang)
+3. Zustandssatz (mit «Das ist uns aufgefallen: …»), darunter «Wir haben es bei uns getestet:» und auf der nächsten Zeile «… funktionieren einwandfrei.» Produkte ohne Strom: «Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.»
+4. «Im Paket sind …», was fehlt, «Nicht im Lieferumfang …»
+5. Neupreis
+6. Versandsatz
+7. Schlusssatz «Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.»
+
+Die Verkaufsinfo enthält 3 und 4 als Fliesstext plus Garantie. Nicht ausprobierte Funktionen und Firmware stehen nur im Protokoll.
 
 ## Matchmaker-Urteil
 

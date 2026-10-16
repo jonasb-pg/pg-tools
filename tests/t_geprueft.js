@@ -14,12 +14,12 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(t)), ['Das Produkt ist neu und 
   'Wir haben es bei uns getestet: Saugen, Akku laden und App-Verbindung funktionieren einwandfrei.',
   'Im Paket sind Staubsauger und Ladestation. Bodendüse fehlt.']);
 assert.ok(!/Nicht geprüft|nicht ausprobiert|Toner|Firmware/.test(t.join(' ')));
-assert.strictEqual(c.kaeuferSaetze_({ versiegelt: true, grade: 'A' }, u, { maengel: 'x' }).join(' '), 'Das Produkt ist neu und originalverpackt, die Verpackung ist noch versiegelt.');
-t = c.kaeuferSaetze_({ grade: 'A', fehlt: [], rep: [{ text: 'Netzkabel ersetzt' }] }, u, { fn: ['ok'] }).join(' ');
+assert.strictEqual(c.kaeuferSaetze_({ versiegelt: true, grade: 'A' }, u, { maengel: 'x' }).filter(String).join(' '), 'Das Produkt ist neu und originalverpackt, die Verpackung ist noch versiegelt.');
+t = c.kaeuferSaetze_({ grade: 'A', fehlt: [], rep: [{ text: 'Netzkabel ersetzt' }] }, u, { fn: ['ok'] }).filter(String).join(' ');
 assert.strictEqual(t, 'Das Produkt ist neu und unbenutzt, in der Originalverpackung. Wir haben es bei uns getestet: Saugen funktioniert einwandfrei. Ausserdem haben wir es repariert: Netzkabel ersetzt. '
   + 'Im Paket sind Staubsauger, Ladestation und Bodendüse.');
 /* unsicherer Lieferumfang: nur was fehlt */
-t = c.kaeuferSaetze_({ grade: 'C', fehlt: ['Akku', 'Netzteil'], rep: [] }, { funktion: u.funktion, liefer: { teile: ['X'], unsicher: true } }, { fn: [] }).join(' ');
+t = c.kaeuferSaetze_({ grade: 'C', fehlt: ['Akku', 'Netzteil'], rep: [] }, { funktion: u.funktion, liefer: { teile: ['X'], unsicher: true } }, { fn: [] }).filter(String).join(' ');
 assert.strictEqual(t, 'Das Produkt ist gebraucht. Wir haben es bei uns getestet, es funktioniert einwandfrei. Akku und Netzteil fehlen.');
 /* Grades = Ricardo-Zustände (Entscheid Jonas 17.10.2026) */
 assert.strictEqual(c.ricardoZustand_({ reusable: true, grade: 'A' }), 'Neu und originalverpackt');
@@ -37,4 +37,16 @@ t = c.kaeuferSaetze_({ grade: 'B', fehlt: [], rep: [] }, { funktion: u.funktion,
 assert.strictEqual(t[2], 'Im Paket sind Gefrierschüssel und Ladegerät.');
 t = c.kaeuferSaetze_({ grade: 'B', fehlt: [], rep: [] }, { funktion: { liste: [{ n: 'Unbeschädigt und benutzbar' }] }, liefer: { teile: ['Akku-Handkreissäge', 'Kein Akku', 'Kein Ladegerät', 'Kein Ladenetzteil im Lieferumfang', 'Eichenstücke 10 cm, bis 25 %'], unsicher: false } }, { fn: ['ok'] });
 assert.deepStrictEqual(JSON.parse(JSON.stringify(t.slice(1))), ['Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.', 'Im Paket ist Akku-Handkreissäge. Nicht im Lieferumfang sind Akku, Ladegerät und Ladenetzteil.']);
+/* Ohne Strom: Satz zur Vollständigkeit statt Liste von Handgriffen */
+assert.strictEqual(c.geprueft_({ funktion: u.funktion, strom: [] }, { fn: ['ok', 'ok'] }), 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.');
+assert.ok(/Saugen/.test(c.geprueft_({ funktion: u.funktion, strom: ['Akku'] }, { fn: ['ok'] })));
+/* Struktur des Ricardo-Beschriebs (Vorlage Jonas 17.10.2026) */
+const e = { 'Ricardo-Versandsatz': 'Versand ausschliesslich per Post, keine Abholung.', 'Ricardo-Schlusssatz': 'Schluss.' };
+let b = c.ricardoBeschrieb_('Einleitung.', ['Punkt eins', 'Punkt zwei'], ['Das Produkt ist neu und unbenutzt.', 'Wir haben es bei uns getestet: A und B funktionieren einwandfrei.', 'Im Paket ist X. Y fehlt.'], 0, e);
+assert.strictEqual(b, 'Einleitung.\n\n– Punkt eins\n– Punkt zwei\n\nDas Produkt ist neu und unbenutzt.\nWir haben es bei uns getestet:\nA und B funktionieren einwandfrei.\n\nIm Paket ist X. Y fehlt.\n\nVersand ausschliesslich per Post, keine Abholung.\n\nSchluss.');
+b = c.ricardoBeschrieb_('', [], ['Das Produkt ist neu und originalverpackt, die Verpackung ist noch versiegelt.', '', ''], 303, e);
+assert.strictEqual(b, 'Das Produkt ist neu und originalverpackt, die Verpackung ist noch versiegelt.\n\nNeupreis: CHF 303.00\n\nVersand ausschliesslich per Post, keine Abholung.\n\nSchluss.');
+const SCHL = vm.runInContext('NEUE_EINSTELLUNGEN', c).filter(function (n) { return n[0] === 'Ricardo-Schlusssatz'; })[0][1];
+assert.ok(!/nicht geprüfte/.test(SCHL) && /Garantie von 30 Tagen/.test(SCHL));
+assert.ok(/Lieferumfang/.test(vm.runInContext('RICARDO_ANWEISUNG', c)));
 console.log('t_geprueft ok');

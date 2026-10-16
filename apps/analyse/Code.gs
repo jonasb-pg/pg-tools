@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.5';
+const VERSION = '2026-10-17.6';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -144,7 +144,7 @@ const RICARDO_VERSAND = ['0-2kg / PostPac B-Post | 9', '2-10kg / PostPac B-Post 
 const RICARDO_ANWEISUNG = 'Du schreibst ein Inserat für Ricardo für ein Produkt, das Pretty Good geprüft hat. '
   + 'Titel: höchstens 60 Zeichen, Marke, Modell und das Wichtigste (z.B. Farbe, Speicher, Grösse), ohne Werbewörter und ohne Zustand. '
   + 'Einleitung: zwei bis drei Sätze zu Produkt und Nutzen. Danach bis zu acht kurze Stichpunkte zu den wichtigsten Merkmalen. Ton: freundlich, sachlich, per Du. '
-  + 'Nur, was in den Angaben steht. Nichts erfinden, keine Domains, keine Kontaktangaben, nichts zu Zustand, Preis, Versand oder Garantie: Das fügt das Tool selbst an. Schweizer Rechtschreibung: ss statt ß.';
+  + 'Nur, was in den Angaben steht. Nichts erfinden, keine Domains, keine Kontaktangaben, nichts zu Zustand, Lieferumfang, Preis, Versand oder Garantie: Das fügt das Tool selbst an. Schweizer Rechtschreibung: ss statt ß.';
 const FOTO_ARTEN = { hauptbild: '1 Hauptbild', weitere: '2 Weitere', typenschild: '3 Typenschild', mangel: '4 Mangel' };
 const FOTO_MAX_MB = 8;
 const TEIL_SHOPS = [
@@ -181,9 +181,9 @@ const NEUE_EINSTELLUNGEN = [
   ['Web-App-Adresse für Fotos', '', 'Diese Adresse steckt im QR-Code für die Fotos. Leer = die Live-Adresse der Web-App. Zum Testen die Test-Adresse (endet auf /dev) eintragen.'],
   ['Ricardo-Versand', RICARDO_VERSAND, 'Versandklassen wie bei Ricardo, eine pro Zeile: Name | Preis CHF. Pretty Good versendet mit B-Post.'],
   ['KI-Modell Ricardo', 'claude-haiku-5-5', 'Mit diesem Modell schreibt das Tool Titel und Artikelbeschrieb für Ricardo.'],
-  ['Ricardo-Anweisung', RICARDO_ANWEISUNG, 'So schreibt die KI Titel und Artikelbeschrieb. Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter.'],
+  ['Ricardo-Anweisung', RICARDO_ANWEISUNG, 'So schreibt die KI Titel, Einleitung und Stichpunkte. Zustand, Lieferumfang, Neupreis, Versand und Garantie setzt das Tool selbst darunter.'],
   ['Ricardo-Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Artikelbeschrieb.'],
-  ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Alle Artikel werden von Pretty Good sorgfältig geprüft, nicht geprüfte Funktionen werden im Beschrieb aufgelistet. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool.'],
+  ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool. Stand 17.10.2026.'],
   ['Handbuch-Suche', HANDBUCH_SUCHE, 'So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus.'],
   ['Matchmaker-Sheet ID', MM_SHEET, 'Aus diesem Sheet (Tab «Matchmaker») liest das Tool die offenen Suchaufträge. Beim Auftrag schreibt es in die Spalte «Aus Analyse», wenn ein Stück ins Regal «Matchmaker» kommt.'],
   ['KI-Modell Matchmaker', 'claude-sonnet-5-5', 'Mit diesem Modell prüft das Tool jedes Produkt gegen alle offenen Suchaufträge.'],
@@ -198,7 +198,10 @@ const EINST_UMBAU = [
   /* seit 2026-10-17.3: Grades = Ricardo-Zustände (A neu und originalverpackt, B neu gemäss Beschreibung, C gebraucht) */
   ['Grade A', 'Grade A', 'Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand». Der Titel entspricht dem Ricardo-Zustand (Entscheid Jonas 17.10.2026).', 'Neu und originalverpackt: Unbenutzt, in der vollständigen Originalverpackung (versiegelt oder geöffnet).'],
   ['Grade B', 'Grade B', 'Wie Grade A. Neu seit 17.10.2026.', 'Neu (gemäss Beschreibung): Unbenutzt, keine Gebrauchsspuren, aber ohne Originalverpackung oder mit einer Abweichung, die im Befund steht.'],
-  ['Grade C', 'Grade C', 'Wie Grade A. Neu seit 17.10.2026.', 'Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben.']
+  ['Grade C', 'Grade C', 'Wie Grade A. Neu seit 17.10.2026.', 'Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben.'],
+  /* seit 2026-10-17.6: Schlusssatz ohne «nicht geprüfte Funktionen werden aufgelistet», KI schreibt keinen Lieferumfang */
+  ['Ricardo-Schlusssatz', 'Ricardo-Schlusssatz', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool. Stand 17.10.2026.', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.'],
+  ['Ricardo-Anweisung', 'Ricardo-Anweisung', 'So schreibt die KI Titel, Einleitung und Stichpunkte. Zustand, Lieferumfang, Neupreis, Versand und Garantie setzt das Tool selbst darunter.', RICARDO_ANWEISUNG]
 ];
 const EINST_WEG = ['Elektrische Messung', 'Prüfgerät (Typ, Seriennummer)', 'Prüfgerät kalibriert bis', 'Schutzleiterwiderstand max. Ohm', 'Isolation min. MOhm, Schutzklasse I',
   'Isolation min. MOhm, Schutzklasse II', 'Schutzleiterstrom max. mA', 'Berührungsstrom max. mA', 'Mängel-Anweisung',
@@ -1639,6 +1642,7 @@ function ueberblick_(p, e) {
   return {
     produkt: { id: String(p['PG-ID']), bezeichnung: String(p['Bezeichnung']), link: String(p['Link'] || ''), anzahl: Number(p['Anzahl']) || 1, vp: p['VP CHF'], ovp: p['Neupreis CHF'], stufe: st.name, budget: st.minuten, umfang: st.umfang },
     recherche: da,
+    strom: strom,
     ablauf: ablauf,
     infos: infos,
     handbuch: hb,
@@ -1878,7 +1882,7 @@ function urteil_(d, u, e) {
   const maengel = ja && !versiegelt ? String(d.maengel || '').trim() : '';
   const befund = (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
-    kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel }).forEach(function (y) { verkauf.push(y); });
+    kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel }).filter(String).forEach(function (y) { verkauf.push(y); });
     if (garantie) verkauf.push(satz(garantie + ' Tage Garantie'));
   }
   return { reusable: ja, versiegelt: versiegelt, grade: grade, grund: grund, fehlt: fehlt, nichtGeprueft: nichtGeprueft, nichtGeprueftKurz: nichtGeprueftKurz, rep: rep, firmware: firmware, garantie: ja ? garantie : '',
@@ -1902,7 +1906,8 @@ function zustandSatz_(x) {
 }
 /** Was getestet wurde, als ganzer Satz: die Funktionen, die im Schritt «Funktion» OK waren, ohne Klammern, höchstens sechs. */
 function geprueft_(u, d) {
-  if (u.funktion.ersatz) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
+  /* Produkte ohne Strom (Taschen, Zubehör, Toner): Eine Liste von Handgriffen liest sich komisch. Entscheid Jonas 17.10.2026. */
+  if (u.funktion.ersatz || (Array.isArray(u.strom) && !u.strom.length)) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
   const fn = d && Array.isArray(d.fn) ? d.fn : [];
   const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return kurzName_(x.n || x.t); }).filter(function (x) { return x && x.length <= 50; });
   /* Bei Produkten ohne Technik heisst die einzige «Funktion» oft «Unbeschädigt und benutzbar»: dann der Satz zur Vollständigkeit */
@@ -1922,7 +1927,7 @@ function kaeuferSaetze_(x, u, d) {
   const abs = [];
   const maengel = x.versiegelt ? '' : String(d.maengel || '').trim();
   abs.push([zustandSatz_(x), maengel ? 'Das ist uns aufgefallen: ' + satz(maengel) : ''].filter(String).join(' '));
-  if (x.versiegelt) return abs.filter(String);
+  if (x.versiegelt) return [abs[0], '', ''];
   const rep = (x.rep || []).map(function (r) { return String(r.text || r.was || '').trim(); }).filter(String);
   abs.push([geprueft_(u, d), rep.length ? 'Ausserdem haben wir es repariert: ' + satz(rep.join('; ')) : ''].filter(String).join(' '));
   const fehlt = (x.fehlt || []).map(kurzName_).filter(String), fehltN = fehlt.map(norm_);
@@ -1938,7 +1943,7 @@ function kaeuferSaetze_(x, u, d) {
   if (fehlt.length) paket.push(gross(undListe_(fehlt)) + (fehlt.length > 1 ? ' fehlen.' : ' fehlt.'));
   if (ohne.length) paket.push('Nicht im Lieferumfang ' + (ohne.length > 1 ? 'sind ' : 'ist ') + undListe_(ohne) + '.');
   abs.push(paket.join(' '));
-  return abs.filter(String);
+  return abs;                                                              // immer drei Absätze (Zustand, Test, Paket), leere bleiben leer
 }
 
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
@@ -2207,7 +2212,7 @@ function ricardoText(d) {
   if (u.handbuch && u.handbuch.typ && !/nicht im handbuch/i.test(u.handbuch.typ)) z.push('Typ laut Handbuch: ' + u.handbuch.typ);
   if (info('Prüfrelevante Specs')) z.push('Specs: ' + info('Prüfrelevante Specs'));
   z.push('Funktionen: ' + u.funktion.liste.filter(function (f) { return f.g !== 'Weitere'; }).map(function (f) { return f.n; }).join(', '));
-  if (info('Lieferumfang')) z.push('Lieferumfang: ' + info('Lieferumfang').replace(/\n/g, ', '));
+  /* Den Lieferumfang setzt das Tool selbst unten in den Beschrieb (mit dem, was fehlt). Die KI bekommt ihn nicht, sonst steht er doppelt und widersprüchlich da. */
   let k;
   try {
     k = json_(text_(claude_({ model: String(e['KI-Modell Ricardo'] || 'claude-haiku-5-5'), max_tokens: 1500,
@@ -2222,11 +2227,20 @@ function ricardoText(d) {
   let titel = String(k.titel || p['Bezeichnung']).replace(/ß/g, 'ss').trim();
   if (titel.length > 60) titel = titel.slice(0, 60).replace(/\s+\S*$/, '');
   const rz = ricardoZustand_(x), maengel = String(d.maengel || '').trim(), ovp = zahl_(p['Neupreis CHF']);
-  const teil1 = [String(k.einleitung || '').replace(/ß/g, 'ss').trim()].concat((k.punkte || []).slice(0, 8).map(function (y) { return '– ' + String(y).replace(/ß/g, 'ss').trim(); })).filter(String);
-  const zustand = [kaeuferSaetze_(x, u, d).join('\n\n')];
-  if (ovp) zustand.push('Neupreis: CHF ' + ovp.toFixed(2));
-  const beschrieb = [teil1.join('\n'), zustand.join('\n'), [e['Ricardo-Versandsatz'], e['Ricardo-Schlusssatz']].filter(Boolean).join('\n')].filter(String).join('\n\n');
+  const ohneLiefer = function (y) { return !/lieferumfang|^im paket|^enthalten|^mitgeliefert/i.test(y); };     // falls die KI ihn trotzdem nennt
+  const einleitung = String(k.einleitung || '').replace(/ß/g, 'ss').trim();
+  const punkte = (k.punkte || []).map(function (y) { return String(y).replace(/ß/g, 'ss').replace(/^[-–•]\s*/, '').trim(); }).filter(function (y) { return y && ohneLiefer(y); }).slice(0, 8);
+  const beschrieb = ricardoBeschrieb_(einleitung, punkte, kaeuferSaetze_(x, u, d), ovp, e);
   return { titel: titel, beschrieb: beschrieb, zustand: rz };
+}
+/**
+ * Der Artikelbeschrieb in der festen Struktur (Vorlage Jonas 17.10.2026), Absätze durch eine Leerzeile getrennt:
+ * Einleitung | Stichpunkte | Zustand und darunter «Wir haben es bei uns getestet:» mit der Liste auf der nächsten Zeile | Paketinhalt | Neupreis | Versandsatz | Schlusssatz.
+ */
+function ricardoBeschrieb_(einleitung, punkte, abs, ovp, e) {
+  const test = String(abs[1] || '').replace(/^Wir haben es bei uns getestet: /, 'Wir haben es bei uns getestet:\n');
+  return [einleitung, punkte.map(function (y) { return '– ' + y; }).join('\n'), [abs[0], test].filter(Boolean).join('\n'), abs[2] || '',
+    ovp ? 'Neupreis: CHF ' + Number(ovp).toFixed(2) : '', e['Ricardo-Versandsatz'] || '', e['Ricardo-Schlusssatz'] || ''].map(function (y) { return String(y).trim(); }).filter(String).join('\n\n');
 }
 /** Was beim Abschluss mit «Auf Ricardo» stimmen muss. Gibt die Zeile für den Tab «Ricardo» zurück. */
 function ricardoPruefen_(d, u, x, e, p) {
