@@ -257,7 +257,7 @@ function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
   const f = { startDaten: startDaten, suche: suche, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
   try { return f.apply(null, args || []); }
@@ -2351,9 +2351,158 @@ function adminDaten() {
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
   let budget, verbraucht;
   try { budget = monatsBudget_(e); verbraucht = (Math.round(monatsKosten_().usd * 100) / 100).toFixed(2); } catch (err) { /* ohne Anzeige */ }
-  return { budget: budget, verbraucht: verbraucht, ki: !!key_(), url: ss_().getUrl(), auswertung: blatt_('Auswertung').getDataRange().getDisplayValues(), importAn: String(e['Automatischer Import']) === 'Ja',
+  return { budget: budget, verbraucht: verbraucht, ki: !!key_(), url: ss_().getUrl(), schlange: warteschlange(), importAn: String(e['Automatischer Import']) === 'Ja',
     ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'abgleichen'; }),
     batches: lies_('Batches').z.slice(-8).reverse().map(function (r) { return { id: String(r['Batch-ID']), erstellt: r['Erstellt am'] instanceof Date ? zeit_(r['Erstellt am']) : String(r['Erstellt am']), status: String(r['Status']), anzahl: r['Anzahl'] }; }) };
+}
+
+/* ------------------------------------------------------------------ */
+/* Kennzahlen (Admin)                                                  */
+/* ------------------------------------------------------------------ */
+
+/** Anmeldung mit Kürzel: beginnt die Schicht. Die Oberfläche meldet sich einmal pro Tag und Kürzel an. */
+function anmelden(kuerzel) {
+  const k = String(kuerzel || '').trim().toUpperCase();
+  if (!/^[A-ZÄÖÜ]{2,4}$/.test(k)) throw new Error('Kürzel mit 2 bis 4 Buchstaben.');
+  log_('Anmelden', '', k);
+  return true;
+}
+
+/** «dd.MM.yyyy HH:mm:ss» oder Datum → Millisekunden (Zürcher Zeit wie im Sheet). Leer oder unlesbar → null. */
+function zeitMs_(x) {
+  if (x instanceof Date) return x.getTime();
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(x || ''));
+  if (!m) return null;
+  return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +(m[6] || 0));   // als Wandzeit gerechnet: nur Abstände und Tage zählen
+}
+function tagVon_(ms) { return new Date(ms).toISOString().slice(0, 10); }
+/** Montag der Kalenderwoche als «yyyy-mm-dd» */
+function wocheVon_(ms) { const d = new Date(ms), wt = (d.getUTCDay() + 6) % 7; return tagVon_(ms - wt * 864e5); }
+
+/**
+ * Kennzahlen aus «Analysen» und «Log».
+ * Schicht = Kürzel und Tag: von der ersten Anmeldung bis zum Ende der letzten Analyse. Ohne Anmeldung zählt der Start der ersten Analyse.
+ * Pro Stunde netto = 60 / Ø Analysedauer, brutto = Analysen / Schichtstunden.
+ * jetztMs nur für Tests.
+ */
+function kennzahlen(jetztMs) {
+  const e = einst_();
+  if (!istAdmin_(e)) throw new Error('Nur für Admins.');
+  return kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, jetztMs ? Number(jetztMs) : zeitMs_(zeit_()), blatt_('Auswertung').getDataRange().getDisplayValues());
+}
+function kennzahlenRechnen_(analysen, log, jetzt, auswertung) {
+  const a = analysen.map(function (r) {
+    const start = zeitMs_(r['Start']), ende = zeitMs_(r['Ende']);
+    if (!ende) return null;
+    const dauer = Number(String(r['Dauer Min']).replace(',', '.')), budget = Number(String(r['Zeitbudget Min']).replace(',', '.'));
+    const regal = String(r['Regal'] || ''), reusable = String(r['Reusable']) === 'Ja';
+    return { k: String(r['Kürzel'] || '?'), start: start || ende, ende: ende, tag: tagVon_(ende), dauer: isFinite(dauer) ? dauer : 0, budget: isFinite(budget) && budget > 0 ? budget : 0,
+      stufe: String(r['Stufe'] || ''), kat: String(r['Kategorie'] || ''), rep: !!String(r['Reparatur (Beschrieb)'] || '').trim(),
+      ergebnis: regal === 'Matchmaker' ? 'matchmaker' : (regal === 'Ricardo Offline' ? 'ricardo' : (reusable ? 'reuse' : 'nicht')) };
+  }).filter(Boolean);
+  /* Erste Anmeldung pro Kürzel und Tag */
+  const login = {};
+  log.forEach(function (r) {
+    if (String(r['Aktion']) !== 'Anmelden') return;
+    const ms = zeitMs_(r['Zeit']), k = String(r['Detail'] || '').trim().toUpperCase();
+    if (!ms || !k) return;
+    const key = k + '|' + tagVon_(ms);
+    if (!login[key] || ms < login[key]) login[key] = ms;
+  });
+  const r1 = function (x) { return Math.round(x * 10) / 10; };
+  const rechne = function (liste) {
+    const n = liste.length, mitBudget = liste.filter(function (x) { return x.budget; });
+    const schichten = {};
+    liste.forEach(function (x) {
+      const key = x.k + '|' + x.tag, s = schichten[key] || (schichten[key] = { von: Infinity, bis: 0, n: 0 });
+      s.von = Math.min(s.von, x.start); s.bis = Math.max(s.bis, x.ende); s.n++;
+    });
+    let stunden = 0;
+    Object.keys(schichten).forEach(function (key) {
+      const s = schichten[key], an = login[key];
+      if (an && an < s.von) s.von = an;
+      stunden += Math.max(s.bis - s.von, 0) / 36e5;
+    });
+    const anzSchichten = Object.keys(schichten).length, dauer = n ? liste.reduce(function (t, x) { return t + x.dauer; }, 0) / n : 0;
+    const erg = { reuse: 0, ricardo: 0, matchmaker: 0, nicht: 0 };
+    liste.forEach(function (x) { erg[x.ergebnis]++; });
+    return {
+      analysen: n, schichten: anzSchichten, schichtStunden: r1(stunden),
+      imBudget: mitBudget.length ? Math.round(mitBudget.filter(function (x) { return x.dauer <= x.budget; }).length / mitBudget.length * 100) : null,
+      abweichung: mitBudget.length ? r1(mitBudget.reduce(function (t, x) { return t + x.dauer - x.budget; }, 0) / mitBudget.length) : null,
+      dauer: n ? r1(dauer) : null, budget: mitBudget.length ? r1(mitBudget.reduce(function (t, x) { return t + x.budget; }, 0) / mitBudget.length) : null,
+      proSchicht: anzSchichten ? r1(n / anzSchichten) : null,
+      proStundeNetto: dauer ? r1(60 / dauer) : null,
+      proStundeBrutto: stunden >= 0.25 ? r1(n / stunden) : null,
+      schichtDauer: anzSchichten ? r1(stunden / anzSchichten) : null,
+      ergebnis: erg, reparatur: liste.filter(function (x) { return x.rep; }).length
+    };
+  };
+  const gruppe = function (liste, feld) {
+    const g = {};
+    liste.forEach(function (x) { (g[x[feld]] = g[x[feld]] || []).push(x); });
+    return Object.keys(g).sort().map(function (name) { return Object.assign({ name: name }, rechne(g[name])); });
+  };
+  const dieseWoche = wocheVon_(jetzt), vier = jetzt - 28 * 864e5;
+  const inWoche = a.filter(function (x) { return wocheVon_(x.ende) === dieseWoche; }), inVier = a.filter(function (x) { return x.ende >= vier; });
+  const wochen = gruppe(a.filter(function (x) { return x.ende >= jetzt - 12 * 7 * 864e5; }).map(function (x) { return Object.assign({}, x, { woche: wocheVon_(x.ende) }); }), 'woche').reverse();
+  /* Trefferquote des Scores: Block aus dem Tab «Auswertung» (Formeln über die Prüfung der Infos) */
+  const treffer = [];
+  let im = false;
+  (auswertung || []).forEach(function (z) {
+    if (String(z[0]) === 'Trefferquote des Scores') { im = true; return; }
+    if (!im) return;
+    if (!z.join('').trim()) { if (treffer.length) im = false; return; }
+    if (String(z[0]) !== 'Stufe') treffer.push({ stufe: String(z[0]), infos: z[1], bestaetigt: z[2], korrigiert: z[3], quote: z[4] });
+  });
+  return {
+    woche: rechne(inWoche), vierWochen: rechne(inVier), gesamt: rechne(a),
+    personen: gruppe(inVier, 'k'), stufen: gruppe(inVier, 'stufe'), kategorien: gruppe(inVier, 'kat'), wochen: wochen, treffer: treffer,
+    seit: a.length ? tagVon_(Math.min.apply(null, a.map(function (x) { return x.ende; }))).split('-').reverse().join('.') : ''
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bestellliste und Feedback in der Oberfläche                         */
+/* ------------------------------------------------------------------ */
+
+function bestellliste() {
+  blatt_('Bestellliste');
+  return lies_('Bestellliste').z.map(function (r) {
+    return { r: r._r, zeit: r['Zeit'] instanceof Date ? zeit_(r['Zeit']) : String(r['Zeit']), id: String(r['PG-ID'] || ''), produkt: String(r['Produkt'] || ''), was: String(r['Was'] || ''),
+      teil: String(r['Teil'] || ''), nummer: String(r['Teilenummer'] || ''), shop: String(r['Shop'] || ''), preis: Number(r['Preis CHF']) || null, link: String(r['Link'] || ''),
+      kuerzel: String(r['Kürzel'] || ''), status: BESTELL_STATUS.indexOf(String(r['Status'])) > -1 ? String(r['Status']) : 'Offen' };
+  }).filter(function (x) { return x.teil || x.was; }).reverse();
+}
+/** Status einer Zeile der Bestellliste. id = PG-ID zur Kontrolle, falls Zeilen verschoben wurden. */
+function bestellStatus(r, id, status, kuerzel) {
+  if (BESTELL_STATUS.indexOf(status) < 0) throw new Error('Unbekannter Status.');
+  gesperrt_(function () {
+    const z = lies_('Bestellliste').z.filter(function (x) { return x._r === Number(r) && String(x['PG-ID']) === String(id); })[0];
+    if (!z) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
+    const w = {}; w[z._r] = status; setz_('Bestellliste', 'Status', w);
+  });
+  log_('Bestellliste', id, status + ' (' + String(kuerzel || '').toUpperCase().slice(0, 4) + ')');
+  return bestellliste();
+}
+
+function feedbackListe() {
+  if (!istAdmin_()) throw new Error('Nur für Admins.');
+  blatt_('Feedback');
+  return lies_('Feedback').z.map(function (r) {
+    return { r: r._r, zeit: r['Zeit'] instanceof Date ? zeit_(r['Zeit']) : String(r['Zeit']), kuerzel: String(r['Kürzel'] || ''), id: String(r['PG-ID'] || ''), schritt: String(r['Schritt'] || ''),
+      text: String(r['Feedback'] || ''), status: String(r['Status'] || 'Neu') };
+  }).filter(function (x) { return x.text; }).reverse();
+}
+function feedbackStatus(r, text, status) {
+  if (!istAdmin_()) throw new Error('Nur für Admins.');
+  if (['Neu', 'Erledigt'].indexOf(status) < 0) throw new Error('Unbekannter Status.');
+  gesperrt_(function () {
+    const z = lies_('Feedback').z.filter(function (x) { return x._r === Number(r) && String(x['Feedback']).slice(0, 40) === String(text).slice(0, 40); })[0];
+    if (!z) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
+    const w = {}; w[z._r] = status; setz_('Feedback', 'Status', w);
+  });
+  return feedbackListe();
 }
 
 /** Prüft jede Verbindung einzeln und zeigt die Antwort oder den Fehler im Wortlaut. Die Websuche läuft mit genau der Einstellung der Recherche. */

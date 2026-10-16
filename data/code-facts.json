@@ -540,7 +540,43 @@
    "name": "verbindungTest",
    "params": "",
    "doc": "Prüft jede Verbindung einzeln und zeigt die Antwort oder den Fehler im Wortlaut. Die Websuche läuft mit genau der Einstellung der Recherche.",
-   "zeile": 2360
+   "zeile": 2509
+  },
+  {
+   "name": "anmelden",
+   "params": "kuerzel",
+   "doc": "Anmeldung mit Kürzel: beginnt die Schicht. Die Oberfläche meldet sich einmal pro Tag und Kürzel an.",
+   "zeile": 2364
+  },
+  {
+   "name": "kennzahlen",
+   "params": "jetztMs",
+   "doc": "Kennzahlen aus «Analysen» und «Log». Schicht = Kürzel und Tag: von der ersten Anmeldung bis zum Ende der letzten Analyse. Ohne Anmeldung zählt der Start der ersten Analyse. Pro Stunde netto = 60 / Ø Analysedauer, brutto = Analysen / Schichtstunden. jetztMs nur für Tests.",
+   "zeile": 2383
+  },
+  {
+   "name": "bestellliste",
+   "params": "",
+   "doc": "------------------------------------------------------------------",
+   "zeile": 2468
+  },
+  {
+   "name": "bestellStatus",
+   "params": "r, id, status, kuerzel",
+   "doc": "Status einer Zeile der Bestellliste. id = PG-ID zur Kontrolle, falls Zeilen verschoben wurden.",
+   "zeile": 2478
+  },
+  {
+   "name": "feedbackListe",
+   "params": "",
+   "doc": "",
+   "zeile": 2488
+  },
+  {
+   "name": "feedbackStatus",
+   "params": "r, text, status",
+   "doc": "",
+   "zeile": 2497
   }
  ],
  "intern": [
@@ -1175,10 +1211,34 @@
    "zeile": 2314
   },
   {
+   "name": "zeitMs_",
+   "params": "x",
+   "doc": "«dd.MM.yyyy HH:mm:ss» oder Datum → Millisekunden (Zürcher Zeit wie im Sheet). Leer oder unlesbar → null.",
+   "zeile": 2372
+  },
+  {
+   "name": "tagVon_",
+   "params": "ms",
+   "doc": "",
+   "zeile": 2378
+  },
+  {
+   "name": "wocheVon_",
+   "params": "ms",
+   "doc": "Montag der Kalenderwoche als «yyyy-mm-dd»",
+   "zeile": 2380
+  },
+  {
+   "name": "kennzahlenRechnen_",
+   "params": "analysen, log, jetzt, auswertung",
+   "doc": "",
+   "zeile": 2393
+  },
+  {
    "name": "umbau_",
    "params": "ss",
    "doc": "Einmal nach dem Einfügen des Codes ausführen, und nach jeder neuen Version. Bringt das Sheet auf den Stand dieser Version (umbau_), prüft, ob es zum Code passt, und setzt den Auslöser. /\n/** Tabs des Analyse Tools für die gemeinsame Übersicht (Basis.gs). Reihenfolge innerhalb der Art = Reihenfolge im Sheet. */\nconst ANALYSE_KATALOG = [\n  { tab: 'Produkte', art: 'arbeit', inhalt: 'Warteschlange: ein Stück pro Zeile. Kommt aus dem Tab «Analyse» des Return Tools (nur gelesen) oder wird im Tool als Stück ohne Inventar angelegt (AN-0001).' },\n  { tab: 'Recherche', art: 'arbeit', inhalt: 'Eine Info pro Zeile (z.B. Lieferumfang, Top-Defekt 1) mit Quelle und Score. Gilt pro Produkt, nicht pro Stück, und wird wiederverwendet.' },\n  { tab: 'Analysen', art: 'arbeit', inhalt: 'Eine abgeschlossene Analyse pro Zeile: Dauer, Ergebnis, Grade, Befund, Verkaufsinfo. Das ist das Prüfprotokoll pro Gerät.' },\n  { tab: 'Prüfschritte', art: 'arbeit', inhalt: 'Ein Prüfschritt pro Zeile mit Ergebnis, Zeit und Kürzel.' },\n  { tab: 'Ersatzteile', art: 'arbeit', inhalt: 'Jede Ersatzteil-Suche: gesuchtes Teil, Teilenummer, Preis, Shop. Zeigt auch, welche Teile oft gebraucht werden.' },\n  { tab: 'Ricardo', art: 'arbeit', inhalt: 'Ein Stück pro Zeile, das in der Analyse auf Ricardo geht: Titel, Artikelbeschrieb, Zustand, Startpreis, Versand, Link zum Foto-Ordner. Das Ricardo Tool liest von hier.' },\n  { tab: 'Bestellliste', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Ersatzteile für Stücke im Regal «Reparatur». «Status» (Offen, Bestellt, Da) setzt die Person, die gebündelt bestellt.' },\n  { tab: 'Testkonten', art: 'arbeit', inhalt: 'Testkonten für Geräte mit App und Konto, mit Logindaten. Gepflegt in der Oberfläche unter «Infrastruktur». Für das Analyse-Team sichtbar.' },\n  { tab: 'Feedback', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Rückmeldungen der Analyseleute aus dem Tool. «Status» (Neu, Erledigt) pflegt Jonas.' },\n  { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion und jeder Fehler mit Zeit und Person. Erste Anlaufstelle, wenn etwas unklar ist.' },\n  { tab: 'Kosten', art: 'protokoll', inhalt: 'Jeder KI-Aufruf mit Modell, Tokens, Websuchen und Kosten in USD. Grundlage für das KI-Budget.' },\n  { tab: 'Testmittel-Log', art: 'protokoll', inhalt: 'Jede Nennung eines Testmittels: benötigt oder gefehlt.' },\n  { tab: 'Quellen-Log', art: 'protokoll', inhalt: 'Eine Zeile pro Recherche und Quelle: gefunden oder nicht, gelieferte Felder.' },\n  { tab: 'Batches', art: 'protokoll', inhalt: 'Recherche-Läufe bei Claude mit Status.' },\n  { tab: 'Auswertung', art: 'hilfe', wer: 'Niemand (Formeln)', kopf: 0, inhalt: 'Abdeckung pro Quelle, Trefferquote des Scores, Analysezeit pro Kategorie. Nur Formeln.' },\n  { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Schalter, Grenzwerte, Hausregeln, KI-Budget und die Anweisungen an die KI in normaler Sprache.' },\n  { tab: 'Stufen', art: 'einstellung', inhalt: 'Stufe pro Herkunft und Verkaufspreis: Minuten, Tiefe der Recherche und Umfang der Funktionsprüfung.' },\n  { tab: 'Sicherheitspunkte', art: 'einstellung', inhalt: 'Was vor dem Einstecken angeschaut wird. «Gilt für» bestimmt, bei welchen Produkten ein Punkt erscheint.' },\n  { tab: 'Testmittel', art: 'einstellung', wer: 'Tool und Mensch', inhalt: 'Liste der Testmittel. «Vorhanden» pflegt das Team in der Oberfläche unter «Infrastruktur» (oder hier). Was auf «Nein» steht, ist im Schritt «Funktion» schon als fehlend markiert. «Testkonto Google/Apple-ID/Amazon» setzt das Tool aus dem Tab «Testkonten».' },\n  { tab: 'Score-Regeln', art: 'einstellung', kopf: 0, inhalt: 'Punkte für den Accuracy Score und ein Rechenbeispiel.' },\n  { tab: 'Listen', art: 'einstellung', kopf: 2, inhalt: 'Auswahlwerte. Die linke Liste ist frei anpassbar, die rechte verwendet das Tool fest.' }\n];\nconst ANALYSE_REGELN = [\n  ['Regeln', [\n    'Kopfzeilen nie umbenennen und keine Spalten löschen. Das Tool findet die Spalten über ihre Namen.',\n    'Das Return Tool wird nur gelesen. Das Tool schreibt dort nie.',\n    'Der Claude-API-Schlüssel steht nicht in diesem Sheet, sondern in den Script-Eigenschaften (ANTHROPIC_API_KEY).',\n    'Prüfprotokolle mindestens vier Jahre aufbewahren (EN 50614): Zeilen in «Analysen» und «Prüfschritte» nicht löschen.',\n    'Die Hausregeln für die Prüfung stehen im Tab «Einstellungen». Die KI hält sich beim Erstellen der Prüfschritte daran.'\n  ]],\n  ['Weiterentwickeln', [\n    'Der Code steht im GitHub-Repo jonasb-pg/pg-analyse-tool (apps/analyse, apps/basis). Basis.gs ist in allen Tools gleich und wird nur im Repo geändert.',\n    'Nach jeder Änderung VERSION erhöhen, im Editor «einrichten» ausführen und neu bereitstellen.'\n  ]]\n];\n\nfunction einrichten() {\n  const ss = ss_(), fehler = [];\n  vergissAlle_();\n  gesperrt_(function () { umbau_(ss); });\n  ['Kosten', 'Feedback', 'Ricardo', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen\n  Object.keys(SPALTEN).forEach(function (n) {\n    const s = ss.getSheetByName(n);\n    if (!s) { fehler.push('Tab «' + n + '» fehlt'); return; }\n    const kopf = kopf_(s), fehlt = SPALTEN[n].filter(function (c) { return kopf.indexOf(c) < 0; });\n    if (fehlt.length) fehler.push('Im Tab «' + n + '» fehlen die Spalten: ' + fehlt.join(', '));\n  });\n  NAMEN.forEach(function (n) { if (!ss.getRangeByName(n)) fehler.push('Der benannte Bereich «' + n + '» fehlt (Tab «Score-Regeln»)'); });\n  if (fehler.length) throw new Error('Das Sheet passt nicht zu dieser Version: ' + fehler.join('; '));\n\n  /* Genau ein Auslöser: der Abgleich */\n  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });\n  ScriptApp.newTrigger('abgleichen').timeBased().everyMinutes(TAKT_MINUTEN).create();\n\n  gesperrt_(function () {\n    /* Wer einrichtet, wird Admin, solange noch niemand eingetragen ist */\n    const admin = {}, offen = {}, hat = recherchiert_();\n    lies_('Einstellungen').z.forEach(function (r) {\n      if (String(r['Einstellung']).trim() === 'Admins' && (!String(r['Wert']) || String(r['Wert']).charAt(0) === '[') && ich_()) admin[r._r] = ich_();\n    });\n    setz_('Einstellungen', 'Wert', admin);\n    blatt_('Kosten').getRange(1, 1, 1, KOSTEN_KOPF.length).setValues([KOSTEN_KOPF]);\n    /* «Bereit» heisst: Es gibt eine Recherche in der heutigen Fassung. Stücke mit einer älteren warten wieder auf ihre Recherche. */\n    lies_('Produkte').z.forEach(function (p) { if (p['Recherche-Status'] === 'Bereit' && !hat[String(p['Recherche-Schlüssel'])]) offen[p._r] = 'Offen'; });\n    setz_('Produkte', 'Recherche-Status', offen);\n  });\n  /* Gemeinsamer Standard (Basis.gs): Übersicht, Reihenfolge, Farben, Schrift, Warnschutz, Zeitzone */\n  const fehlt = basisEinrichten_(ss, { name: 'Analyse Tool', version: VERSION, zweck: 'Datenbank des Analyse Tools. Das Tool schreibt in die weissen Tabs. Angepasst wird nur in den gelben Tabs.',\n    legende: [['Dunkelgraue Kopfzeile', 'Berechnete Spalte. Das Tool schreibt die Formel pro Zeile.']] }, ANALYSE_KATALOG, ANALYSE_REGELN);\n  if (fehlt.length) log_('Einrichten', '', 'Tabs noch nicht angelegt: ' + fehlt.join(', '));\n  vergissAlle_();\n  log_('Einrichten', '', 'Version ' + VERSION + ', Claude-Schlüssel ' + (key_() ? 'vorhanden' : 'fehlt'));\n  return 'Eingerichtet. Version ' + VERSION;\n}\n\n/** Bringt ein Sheet aus einer früheren Version auf den heutigen Stand. Jeder Teil prüft selbst, ob er noch nötig ist: Mehrfaches Ausführen ändert nichts. Nur innerhalb von gesperrt_ aufrufen.",
-   "zeile": 2392
+   "zeile": 2541
   }
  ]
 }
