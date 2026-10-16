@@ -434,6 +434,15 @@
             <div id="adm-test"></div>
           </div>
           <div class="karte">
+            <h2 style="margin:0 0 6px" data-t="adm.sp.titel"></h2>
+            <p class="still" data-t="adm.sp.info"></p>
+            <div class="reihe">
+              <label>Grade A/B (%) <input type="number" id="sp-ab" min="1" max="100" step="any" inputmode="decimal" style="max-width:110px"></label>
+              <label>Grade C (%) <input type="number" id="sp-c" min="1" max="100" step="any" inputmode="decimal" style="max-width:110px"></label>
+              <button class="knopf pink" data-a="startpreisSpeichern" data-t="adm.sp.speichern"></button>
+            </div>
+          </div>
+          <div class="karte">
             <div class="reihe">
               <div class="breit"><h2 style="margin:0" data-t="liste.titel"></h2><span class="still" id="liste-zahlen"></span></div>
               <button data-a="aktualisieren" data-t="liste.neu"></button>
@@ -590,7 +599,7 @@
     'ri.ohneTyp': ['Kein Typenschild am Gerät', 'No type plate on the device'], 'ri.ohneMangel': ['Mängel auf Fotos nicht sichtbar', 'Defects not visible on photos'], 'ri.keinMangel': ['entfällt, keine Mängel', 'not needed, no defects'],
     'ri.n2': ['2 · Titel und Artikelbeschrieb', '2 · Title and description'], 'ri.schreibt': ['Die KI schreibt einen Entwurf …', 'The AI is writing a draft …'], 'ri.neu': ['Neu schreiben lassen', 'Write again'],
     'ri.ftitel': ['Titel', 'Title'], 'ri.zeichen': ['{0} von 60 Zeichen', '{0} of 60 characters'], 'ri.fbeschrieb': ['Artikelbeschrieb', 'Description'],
-    'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Startpreis und Zustand', '4 · Starting price and condition'], 'ri.preis': ['Startpreis CHF', 'Starting price CHF'], 'ri.vorschlagVp': ['Vorschlag aus dem VP: CHF {0}', 'Suggested from the selling price: CHF {0}'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
+    'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Startpreis und Zustand', '4 · Starting price and condition'], 'ri.preis': ['Startpreis CHF', 'Starting price CHF'], 'ri.vorschlag': ['Vorschlag: CHF {0} ({1})', 'Suggestion: CHF {0} ({1})'], 'ri.vonOvp': ['{0} % vom Neupreis CHF {1}', '{0} % of the new price CHF {1}'], 'ri.vonVp': ['VP, kein Neupreis', 'selling price, no new price'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
     'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
     'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
@@ -615,6 +624,8 @@
     'bs.leer': ['Keine Teile auf der Liste.', 'No parts on the list.'], 'bs.offen': ['Zu bestellen', 'To order'], 'bs.bestellt': ['Bestellt, noch nicht da', 'Ordered, not here yet'], 'bs.da': ['Da (letzte 20)', 'Arrived (last 20)'],
     'bs.ohneshop': ['Ohne Shop', 'No shop'], 'bs.total': ['Total CHF {0}', 'Total CHF {0}'],
     'adm.zustand': ['Zustand', 'Status'], 'adm.r.betrieb': ['Betrieb', 'Operations'], 'adm.r.kennzahlen': ['Kennzahlen', 'Key figures'], 'adm.r.feedback': ['Feedback', 'Feedback'],
+    'adm.sp.titel': ['Ricardo-Startpreis (Vorschlag)', 'Ricardo starting price (suggestion)'], 'adm.sp.info': ['Prozent vom Neupreis, nach Grade. Ohne Neupreis gilt der VP. In der Analyse lässt sich der Vorschlag überschreiben.', 'Percent of the new price, by grade. Without a new price the selling price applies. The suggestion can be overwritten in the analysis.'],
+    'adm.sp.speichern': ['Speichern', 'Save'], 'adm.sp.ok': ['Gespeichert. Gilt ab der nächsten Analyse.', 'Saved. Applies from the next analysis.'],
     'adm.zuletzt': ['Letzter Abgleich mit dem Return Tool: {0}', 'Last sync with the Return Tool: {0}'],
     'kz.woche': ['Diese Woche', 'This week'], 'kz.vier': ['Letzte 4 Wochen', 'Last 4 weeks'], 'kz.gesamt': ['Alles seit {0}', 'All since {0}'],
     'kz.budget': ['Im Zeitbudget', 'Within time budget'], 'kz.budget.u': ['Ø {0} Min. {1} Budget · Ø Dauer {2} von {3} Min.', 'avg {0} min {1} budget · avg duration {2} of {3} min'],
@@ -1433,9 +1444,16 @@
   function kanal(v) {
     if (v === 'regal' || v === 'matchmaker') { AN.s.kanal = v; sichern(); abschluss(); return; }
     AN.s.kanal = 'ricardo';
-    if (!AN.s.ricPreis && Number(AN.d.produkt.vp) > 0) AN.s.ricPreis = String(Number(AN.d.produkt.vp));   // Vorschlag: VP, die Person kann ihn ändern
+    /* Vorschlag nach Grade (Prozent vom Neupreis, im Admin änderbar). Hat die Person den Preis selbst geändert, bleibt ihrer. */
+    if (!AN.s.ricPreis || AN.s.ricPreis === AN.s.ricVorschlag) { var vs = ricVorschlag(); AN.s.ricPreis = vs.preis ? String(vs.preis) : ''; AN.s.ricVorschlag = AN.s.ricPreis; }
     sichern(); zeichneSchritt();
     fotoHolen(); if (!AN.s.ricTitel && !AN.s.ricBeschrieb) ricText(true);
+  }
+  function zahlVon(x) { return parseFloat(String(x == null ? '' : x).replace(/['’\s]/g, '').replace(',', '.')) || 0; }
+  function ricVorschlag() {
+    var d = AN.d, g = AN.s.versiegelt ? 'A' : AN.s.grade, ovp = zahlVon(d.produkt.ovp), pz = (d.ricardo.prozent || {})[g];
+    if (ovp > 0 && pz) return { preis: Math.max(1, Math.round(ovp * pz / 100)), text: t('ri.vonOvp', pz, ovp.toFixed(2)) };
+    var vp = zahlVon(d.produkt.vp); return { preis: vp, text: vp ? t('ri.vonVp') : '' };
   }
   function fwAbbruch(v, k, el) { AN.s.fwAbbruch = !!el.checked; sichern(); }
   function kanalZurueck() { AN.s.kanal = ''; sichern(); zeichneSchritt(); }
@@ -1455,7 +1473,7 @@
     return f;
   }
   function ricardoTeil(r) {
-    var s = AN.s, d = AN.d, vp = Number(d.produkt.vp) || 0, fehlt = ricFehlt();
+    var s = AN.s, d = AN.d, vs = ricVorschlag(), fehlt = ricFehlt();
     return '<div class="ric"><div class="leiste"><h3 class="gruppe" style="margin:0">' + tx('ri.titel') + '</h3><button class="link rechts" data-a="kanalZurueck">' + tx('ri.zurueck') + '</button></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n1') + '</div><div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(d.ricardo.fotoUrl) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
       + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>'
@@ -1466,7 +1484,7 @@
       + '<div class="ric-box"><div class="n">' + tx('ri.n3') + '</div><div class="ric-versand">' + d.ricardo.versand.map(function (v, i) {
           return '<button data-a="ricVersand" data-v="' + i + '" class="' + (s.ricVersand === v.name ? 'an' : '') + '" aria-pressed="' + (s.ricVersand === v.name) + '">' + esc(v.name) + ' · CHF ' + esc(v.preis) + '</button>'; }).join('') + '</div></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n4') + '</div><dl class="werte" style="margin:0"><dt>' + tx('ri.preis') + '</dt><dd>' + '<input type="number" min="1" step="any" inputmode="decimal" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">'
-          + (vp ? ' <span class="still">' + tx('ri.vorschlagVp', vp.toFixed(2)) + '</span>' : '') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
+          + (vs.preis ? ' <span class="still">' + tx('ri.vorschlag', Number(vs.preis).toFixed(2), vs.text) + '</span>' : '') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
       + '<div class="meldung warn">' + tx('ri.zettel', d.produkt.id) + '</div>'
       + '<p class="still" id="ric-fehlt">' + (fehlt.length ? tx('ri.fehlt', fehlt.join(', ')) : '') + '</p>'
       + '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink', fehlt.length ? ' disabled id="ric-ab"' : ' id="ric-ab"') + '</div></div>';
@@ -1801,12 +1819,16 @@
       h += '<div class="meldung' + (pz >= 90 ? ' warn' : '') + '" style="margin:8px 0">' + esc(t('adm.budget', r.verbraucht, r.budget)) + '<div class="balken"><i style="width:' + pz + '%"></i></div></div>';
     }
     $('adm-status').innerHTML = h;
+    if (r.startpreis) { $('sp-ab').value = r.startpreis.A; $('sp-c').value = r.startpreis.C; }
     $('adm-sheet').href = r.url;
     if (r.schlange) zeichneListe(r.schlange);
     $('adm-batches').innerHTML = r.batches.length ? '<div class="tabelle" style="margin-top:0"><table><thead><tr><th>' + tx('adm.th.zeit') + '</th><th>' + tx('adm.th.anzahl') + '</th><th>' + tx('adm.th.status') + '</th><th>' + tx('adm.th.id') + '</th></tr></thead><tbody>'
       + r.batches.map(function (b) { return '<tr><td class="mono">' + esc(b.erstellt) + '</td><td>' + esc(b.anzahl) + '</td><td><span class="etikett' + (b.status === 'Läuft' ? ' hell' : '') + '">' + esc(w(b.status)) + '</span></td><td class="mono">' + esc(b.id) + '</td></tr>'; }).join('')
       + '</tbody></table></div>' : '<p class="still">' + tx('adm.leer') + '</p>';
     admTab();
+  }
+  function startpreisSpeichern() {
+    ruf('startpreisSpeichern', [$('sp-ab').value, $('sp-c').value], function (r) { $('sp-ab').value = r.A; $('sp-c').value = r.C; if (GELADEN.admin) GELADEN.admin.startpreis = r; melde(t('adm.sp.ok')); });
   }
   function kzZeit(v) { KZZ = v; zeichneKennzahlen(); }
   function zahlTxt(x, nach) { return x === null || x === undefined ? '–' : (nach === '±' ? (x > 0 ? '+' : '') + x : String(x) + (nach || '')); }
@@ -1873,7 +1895,7 @@
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
-    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, kzZeit: kzZeit, afSetz: afSetz };
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, kzZeit: kzZeit, afSetz: afSetz };
 
   /* ---------- Start ---------- */
   (function () {

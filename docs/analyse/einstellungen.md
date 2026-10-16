@@ -27,6 +27,8 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Hausregeln | siehe [Hausregeln](#hausregeln) | Was beim Prüfen gilt. Die KI hält sich beim Erstellen der Prüfschritte daran. In normaler Sprache änderbar. |
 | Test-WLAN Name | TEST WLAN | Das Tool zeigt Name und Passwort bei Geräten an, die zum Prüfen ein WLAN brauchen. |
 | Test-WLAN Passwort | [im Sheet, nicht im Repo] | Bitte selbst eintragen. |
+| Startpreis A/B % vom Neupreis | 50 | Vorschlag für den Ricardo-Startpreis bei Grade A und B. Ohne Neupreis gilt der VP. In der Analyse überschreibbar, im Admin (Betrieb) änderbar. |
+| Startpreis C % vom Neupreis | 35 | Wie oben, für Grade C. |
 | Grade A | Neu und originalverpackt: Unbenutzt, in der vollständigen Originalverpackung (versiegelt oder geöffnet). | Titel und Beschreibung, getrennt durch einen Doppelpunkt. Erscheint im Schritt «Zustand». Der Titel entspricht dem Ricardo-Zustand (Entscheid Jonas 17.10.2026). |
 | Grade B | Neu (gemäss Beschreibung): Unbenutzt, keine Gebrauchsspuren, aber ohne Originalverpackung oder mit einer Abweichung, die im Befund steht. | Wie Grade A. Neu seit 17.10.2026. |
 | Grade C | Gebraucht: Mit Gebrauchsspuren. Sichtbare Spuren im Befund beschreiben. | Wie Grade A. Neu seit 17.10.2026. |

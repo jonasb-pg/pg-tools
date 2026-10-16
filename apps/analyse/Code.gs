@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.6';
+const VERSION = '2026-10-17.7';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -182,6 +182,8 @@ const NEUE_EINSTELLUNGEN = [
   ['Ricardo-Versand', RICARDO_VERSAND, 'Versandklassen wie bei Ricardo, eine pro Zeile: Name | Preis CHF. Pretty Good versendet mit B-Post.'],
   ['KI-Modell Ricardo', 'claude-haiku-5-5', 'Mit diesem Modell schreibt das Tool Titel und Artikelbeschrieb für Ricardo.'],
   ['Ricardo-Anweisung', RICARDO_ANWEISUNG, 'So schreibt die KI Titel, Einleitung und Stichpunkte. Zustand, Lieferumfang, Neupreis, Versand und Garantie setzt das Tool selbst darunter.'],
+  ['Startpreis A/B % vom Neupreis', 50, 'Vorschlag für den Ricardo-Startpreis bei Grade A und B: so viel Prozent vom Neupreis. Ohne Neupreis gilt der VP. Die Person kann den Vorschlag in der Analyse ändern. Im Admin änderbar. Entscheid Jonas 17.10.2026.'],
+  ['Startpreis C % vom Neupreis', 35, 'Wie oben, für Grade C (gebraucht).'],
   ['Ricardo-Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Artikelbeschrieb.'],
   ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool. Stand 17.10.2026.'],
   ['Handbuch-Suche', HANDBUCH_SUCHE, 'So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus.'],
@@ -264,7 +266,7 @@ function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
   const f = { startDaten: startDaten, suche: suche, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
   try { return f.apply(null, args || []); }
@@ -1663,7 +1665,7 @@ function ueberblick_(p, e) {
       return [g, (i > -1 ? t.slice(0, i) : t).trim(), i > -1 ? t.slice(i + 1).trim() : ''];
     }) },
     reparatur: { stundenansatz: Number(e['Stundenansatz Reparatur CHF']) || 0, grenze: Number(e['Reparatur lohnt bis Prozent vom VP']) || 0, hinweis: text('Reparierbarkeit') },
-    ricardo: { vorschlag: zahl_(p['VP CHF']) >= (Number(e['Ricardo ab VP CHF']) || 0) && zahl_(p['VP CHF']) > 0, versand: ricardoVersand_(e),
+    ricardo: { vorschlag: zahl_(p['VP CHF']) >= (Number(e['Ricardo ab VP CHF']) || 0) && zahl_(p['VP CHF']) > 0, versand: ricardoVersand_(e), prozent: startpreisProzent_(e),
       fotoUrl: (String(e['Web-App-Adresse für Fotos'] || '').trim() || ScriptApp.getService().getUrl()) + '?foto=' + encodeURIComponent(String(p['PG-ID'])) }
   };
 }
@@ -2233,6 +2235,36 @@ function ricardoText(d) {
   const beschrieb = ricardoBeschrieb_(einleitung, punkte, kaeuferSaetze_(x, u, d), ovp, e);
   return { titel: titel, beschrieb: beschrieb, zustand: rz };
 }
+/** Startpreis-Vorschlag in Prozent vom Neupreis pro Grade (Einstellungen, im Admin änderbar). Entscheid Jonas 17.10.2026: A und B 50 %, C 35 %. */
+function startpreisProzent_(e) {
+  const z = function (k, std) { const n = Number(String(e[k] === undefined || e[k] === '' ? std : e[k]).replace(',', '.')); return n > 0 && n <= 100 ? n : std; };
+  const ab = z('Startpreis A/B % vom Neupreis', 50);
+  return { A: ab, B: ab, C: z('Startpreis C % vom Neupreis', 35) };
+}
+/** Vorschlag für den Startpreis: Prozent vom Neupreis nach Grade, auf ganze Franken. Ohne Neupreis der VP. */
+function startpreis_(p, grade, e) {
+  const ovp = zahl_(p['Neupreis CHF']), pz = startpreisProzent_(e)[grade];
+  return ovp > 0 && pz ? Math.max(1, Math.round(ovp * pz / 100)) : zahl_(p['VP CHF']);
+}
+/** Admin: die zwei Prozentwerte für den Startpreis-Vorschlag speichern. */
+function startpreisSpeichern(ab, c) {
+  const e = einst_();
+  if (!istAdmin_(e)) throw new Error('Nur für Admins.');
+  const n = function (x) { const v = Number(String(x).replace(',', '.')); if (!(v > 0 && v <= 100)) throw new Error('Bitte eine Zahl zwischen 1 und 100 eingeben.'); return Math.round(v * 10) / 10; };
+  const werte = [['Startpreis A/B % vom Neupreis', n(ab)], ['Startpreis C % vom Neupreis', n(c)]];
+  gesperrt_(function () {
+    const s = blatt_('Einstellungen'), v = s.getDataRange().getValues(), k = v[0].map(String), cN = k.indexOf('Einstellung'), cW = k.indexOf('Wert');
+    werte.forEach(function (w) {
+      let i = -1;
+      for (let j = 1; j < v.length; j++) if (String(v[j][cN]).trim() === w[0]) { i = j; break; }
+      if (i > -1) s.getRange(i + 1, cW + 1).setValue(w[1]);
+      else { const neu = NEUE_EINSTELLUNGEN.filter(function (x) { return x[0] === w[0]; })[0]; schreib_('Einstellungen', [{ 'Einstellung': w[0], 'Wert': w[1], 'Erklärung': neu ? neu[2] : '' }]); }
+    });
+  });
+  vergiss_('Einstellungen');
+  log_('Startpreis', '', 'A/B ' + werte[0][1] + ' %, C ' + werte[1][1] + ' %');
+  return startpreisProzent_(einst_());
+}
 /**
  * Der Artikelbeschrieb in der festen Struktur (Vorlage Jonas 17.10.2026), Absätze durch eine Leerzeile getrennt:
  * Einleitung | Stichpunkte | Zustand und darunter «Wir haben es bei uns getestet:» mit der Liste auf der nächsten Zeile | Paketinhalt | Neupreis | Versandsatz | Schlusssatz.
@@ -2245,7 +2277,7 @@ function ricardoBeschrieb_(einleitung, punkte, abs, ovp, e) {
 /** Was beim Abschluss mit «Auf Ricardo» stimmen muss. Gibt die Zeile für den Tab «Ricardo» zurück. */
 function ricardoPruefen_(d, u, x, e, p) {
   const r = d.ricardo || {}, titel = String(r.titel || '').trim(), beschrieb = String(r.beschrieb || '').trim();
-  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(r.preis) || zahl_(p['VP CHF']);                       // Startpreis aus der Analyse (Vorschlag: VP, von Hand änderbar)
+  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(r.preis) || startpreis_(p, x.grade, e);                 // Startpreis aus der Analyse (Vorschlag nach Grade, von Hand änderbar)
   if (!titel || titel.length > 60) throw new Error('Der Titel für Ricardo fehlt oder ist länger als 60 Zeichen.');
   if (!beschrieb) throw new Error('Der Artikelbeschrieb für Ricardo fehlt.');
   if (!v) throw new Error('Bitte die Versandklasse wählen.');
@@ -2461,7 +2493,7 @@ function adminDaten() {
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
   let budget, verbraucht;
   try { budget = monatsBudget_(e); verbraucht = (Math.round(monatsKosten_().usd * 100) / 100).toFixed(2); } catch (err) { /* ohne Anzeige */ }
-  return { budget: budget, verbraucht: verbraucht, ki: !!key_(), url: ss_().getUrl(), schlange: warteschlange(), importAn: String(e['Automatischer Import']) === 'Ja',
+  return { budget: budget, verbraucht: verbraucht, startpreis: startpreisProzent_(e), ki: !!key_(), url: ss_().getUrl(), schlange: warteschlange(), importAn: String(e['Automatischer Import']) === 'Ja',
     ausloeser: ausloeserDa_(),
     batches: lies_('Batches').z.slice(-8).reverse().map(function (r) { return { id: String(r['Batch-ID']), erstellt: r['Erstellt am'] instanceof Date ? zeit_(r['Erstellt am']) : String(r['Erstellt am']), status: String(r['Status']), anzahl: r['Anzahl'] }; }) };
 }

@@ -29,6 +29,10 @@ with sync_playwright() as p:
     pg.fill('input[data-e=ricPreis]',''); pg.wait_for_timeout(100)
     assert 'Startpreis' in pg.inner_text('#ric-fehlt'), 'leerer Startpreis nicht gemeldet'
     print('preis ok')
+    pg.evaluate("AN.d.produkt.ovp=300; AN.d.ricardo.prozent={A:50,B:50,C:35}; AN.s.grade='C'")
+    assert pg.evaluate('ricVorschlag().preis')==105, 'Vorschlag C 35 % vom Neupreis'
+    pg.evaluate("AN.s.grade='B'"); assert pg.evaluate('ricVorschlag().preis')==150, 'Vorschlag B 50 % vom Neupreis'
+    print('vorschlag nach grade ok')
     # photo mode
     pg2=b.new_page(viewport={'width':390,'height':844}); pg2.route('http://app.test/', lambda r: r.fulfill(body=html, content_type='text/html; charset=utf-8'))
     pg2.on('pageerror',lambda e:err.append('fs '+str(e)))

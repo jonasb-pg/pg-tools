@@ -49,4 +49,10 @@ assert.strictEqual(b, 'Das Produkt ist neu und originalverpackt, die Verpackung 
 const SCHL = vm.runInContext('NEUE_EINSTELLUNGEN', c).filter(function (n) { return n[0] === 'Ricardo-Schlusssatz'; })[0][1];
 assert.ok(!/nicht geprüfte/.test(SCHL) && /Garantie von 30 Tagen/.test(SCHL));
 assert.ok(/Lieferumfang/.test(vm.runInContext('RICARDO_ANWEISUNG', c)));
+/* Startpreis-Vorschlag nach Grade (Entscheid Jonas 17.10.2026), im Admin änderbar */
+assert.strictEqual(c.startpreis_({ 'Neupreis CHF': 303, 'VP CHF': 150 }, 'A', {}), 152);
+assert.strictEqual(c.startpreis_({ 'Neupreis CHF': 303, 'VP CHF': 150 }, 'C', {}), 106);
+assert.strictEqual(c.startpreis_({ 'Neupreis CHF': '', 'VP CHF': 70 }, 'B', {}), 70);
+assert.strictEqual(c.startpreis_({ 'Neupreis CHF': 200 }, 'C', { 'Startpreis C % vom Neupreis': 40 }), 80);
+assert.strictEqual(c.startpreisProzent_({ 'Startpreis A/B % vom Neupreis': 'x' }).A, 50);
 console.log('t_geprueft ok');
