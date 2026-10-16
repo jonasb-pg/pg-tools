@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-16.1';
+const VERSION = '2026-10-16.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -518,7 +518,7 @@ function aktualisieren(mitFehlern) {
 }
 
 /** Stück, das nicht im Return Tool steht: Name oder Link genügt. Bekommt eine eigene Nummer (AN-0001). */
-function ohneInventar(name, link, vp, kategorie) {
+function ohneInventar(name, link, vp, kategorie, ovp) {
   name = String(name || '').trim(); link = String(link || '').trim();
   if (!name && link) {                                                      // Name aus dem letzten Teil des Links
     name = link.split('?')[0].replace(/\/+$/, '').split('/').pop() || '';
@@ -531,7 +531,7 @@ function ohneInventar(name, link, vp, kategorie) {
     lies_('Produkte').z.forEach(function (r) { const m = /^AN-(\d+)$/.exec(String(r['PG-ID'])); if (m) max = Math.max(max, Number(m[1])); });
     const neu = 'AN-' + ('000' + (max + 1)).slice(-4);
     schreib_('Produkte', [{ 'PG-ID': neu, 'Herkunft': 'Ohne Inventar', 'Bezeichnung': txt_(name), 'Anzahl': 1, 'Link': txt_(link), 'Kategorie': txt_(kategorie),
-      'VP CHF': zahl_(vp), 'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_('', name), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' }]);
+      'Neupreis CHF': zahl_(ovp), 'VP CHF': zahl_(vp), 'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_('', name), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' }]);
     return neu;
   });
   log_('Ohne Inventar angelegt', id, name);

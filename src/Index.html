@@ -351,6 +351,7 @@
             <label for="o-link" data-t="ohne.link2"></label><input type="text" id="o-link" placeholder="https://www.galaxus.ch/..." autocomplete="off">
             <div class="reihe">
               <div class="breit"><label for="o-vp" data-t="ohne.vp"></label><input type="number" id="o-vp" min="0" step="1"></div>
+              <div class="breit"><label for="o-ovp"><span data-t="ohne.ovp"></span> <small data-t="frei"></small></label><input type="number" id="o-ovp" min="0" step="any"></div>
               <div class="breit"><label data-t="ohne.kat"></label><div class="wahl" id="o-kat"></div></div>
             </div>
             <div id="ohne-meldung"></div>
@@ -486,7 +487,7 @@
     'th.rech': ['Recherche', 'Research'], 'th.budget': ['Budget', 'Budget'], 'min': ['Min', 'min'],
     'ohne.link': ['Stück ohne Inventar analysieren', 'Analyse an item without inventory'], 'ohne.titel': ['Stück ohne Inventar', 'Item without inventory'],
     'ohne.name': ['Produktname', 'Product name'], 'ohne.name.platz': ['Marke, Modell, Produkt', 'Brand, model, product'], 'ohne.link2': ['Link zum Produkt', 'Link to the product'],
-    'ohne.vp': ['Verkaufspreis CHF', 'Selling price CHF'], 'ohne.kat': ['Kategorie', 'Category'], 'ohne.knopf': ['Anlegen und analysieren', 'Create and analyse'],
+    'ohne.vp': ['Verkaufspreis CHF', 'Selling price CHF'], 'ohne.ovp': ['Neupreis (OVP) CHF', 'New price (RRP) CHF'], 'ohne.kat': ['Kategorie', 'Category'], 'ohne.knopf': ['Anlegen und analysieren', 'Create and analyse'],
     'a.abbruch': ['Analyse abbrechen', 'Cancel analysis'], 'a.abbruch2': ['Wirklich abbrechen?', 'Really cancel?'], 'a.abgebrochen': ['Analyse abgebrochen. Nichts wurde gespeichert.', 'Analysis cancelled. Nothing was saved.'],
     'a.teil': ['Ersatzteil suchen', 'Find a spare part'], 'a.anzahl': ['Anzahl {0}', 'Quantity {0}'], 'a.ovp': ['OVP CHF {0}', 'RRP CHF {0}'], 'a.seite': ['Produktseite', 'Product page'],
     's.handbuch': ['Handbuch', 'Manual'], 'hb.oeffnen': ['Handbuch', 'Manual'], 'hv.suche': ['Im Handbuch suchen, z.B. Reset, Fehler, E3', 'Search the manual, e.g. reset, error, E3'], 'hv.zu': ['Schliessen', 'Close'], 'hv.drive': ['Im Drive öffnen', 'Open in Drive'],
@@ -545,7 +546,7 @@
     'zu.frage': ['Schreib auf, was Käuferinnen und Käufer wissen müssen: jeden Mangel und alles, was du nicht prüfen konntest.', 'Write down what buyers need to know: every defect and everything you could not test.'],
     'zu.platz': ['z.B. Kratzer auf dem Deckel, linke Taste klemmt leicht, Bluetooth nicht geprüft', 'e.g. scratch on the lid, left button sticks slightly, Bluetooth not tested'], 'zu.schon': ['Steht schon im Befund', 'Already in the finding'],
     'zu.grade': ['Grade', 'Grade'],
-    'en.ja': ['Reusable', 'Reusable'], 'en.nein': ['Nicht reusable', 'Not reusable'], 'en.stufe': ['Stufe', 'Level'], 'en.dauer': ['Dauer', 'Duration'], 'en.dauerwert': ['{0} Min von {1} Min Budget', '{0} min of {1} min budget'],
+    'en.ja': ['Reusable', 'Reusable'], 'en.nein': ['Nicht reusable', 'Not reusable'], 'en.stufe': ['Stufe', 'Level'], 'en.preise': ['Preise', 'Prices'], 'en.preiswert': ['OVP {0} · VP {1}', 'RRP {0} · price {1}'], 'en.dauer': ['Dauer', 'Duration'], 'en.dauerwert': ['{0} Min von {1} Min Budget', '{0} min of {1} min budget'],
     'en.rep': ['Reparatur', 'Repair'], 'en.repwert': ['{0} ({1} Min, Kosten CHF {2})', '{0} ({1} min, cost CHF {2})'], 'en.befund': ['Befund', 'Finding'],
     'en.htitel': ['Analysehinweis', 'Analysis note'], 'en.hinweis': ['Es fehlt etwas. Fülle einen Analysehinweis aus und klebe ihn aufs Produkt.', 'Something is missing. Fill in an analysis note and stick it on the product.'],
     'en.knopf': ['Analyse abschliessen', 'Finish analysis'], 'en.offen': ['Noch offen', 'Still open'],
@@ -634,6 +635,8 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   /* Text aus T, fertig für innerHTML. */
   function tx() { return esc(t.apply(null, arguments)); }
+  /* Betrag für die Anzeige: CHF 49.90, leer als «–» */
+  function chf(v) { var n = Number(v); return v === '' || v == null || !(n > 0) ? '–' : 'CHF ' + n.toFixed(2); }
   function istUrl(s) { return /^https?:\/\/\S+$/i.test(s); }
   function link(url, text) { return istUrl(url) ? '<a href="' + esc(url) + '" rel="noopener noreferrer">' + esc(text) + '</a>' : esc(text); }
   function box(text, klasse) { return '<div class="meldung ' + klasse + '">' + esc(text) + '</div>'; }
@@ -745,9 +748,9 @@
   /* Legt das Stück an und recherchiert sofort. Klappt die Recherche nicht, beginnt die Analyse trotzdem; der Grund steht dann im ersten Schritt. */
   function ohneAnlegen() {
     var t0 = Date.now();
-    rufLang('ohneInventar', [$('o-name').value, $('o-link').value, $('o-vp').value, OKAT], 'o-knopf', 'ohne-meldung', t('re.laeuft'), function (r) {
+    rufLang('ohneInventar', [$('o-name').value, $('o-link').value, $('o-vp').value, OKAT, $('o-ovp').value], 'o-knopf', 'ohne-meldung', t('re.laeuft'), function (r) {
       var frei = function (m) { $('o-knopf').disabled = false; $('ohne-meldung').innerHTML = m ? box(m, 'stop') : ''; };
-      var los = function (d, fehler) { frei(''); $('o-name').value = ''; $('o-link').value = ''; $('o-vp').value = ''; $('ohne').hidden = true; beginne(d, t0, fehler); };
+      var los = function (d, fehler) { frei(''); $('o-name').value = ''; $('o-link').value = ''; $('o-vp').value = ''; $('o-ovp').value = ''; $('ohne').hidden = true; beginne(d, t0, fehler); };
       var ohne = function (m) { ruf('starteAnalyse', [r.id], function (d) { los(d, m); }, frei); };
       $('o-knopf').disabled = true; $('ohne-meldung').innerHTML = box(t('re.laeuft'), 'warn');
       if (!ruf('rechercheJetzt', [r.id], los, ohne)) ohne('');
@@ -1125,6 +1128,7 @@
       g = AN.d.zustand.grade.filter(function (x) { return x[0] === r.grade; })[0];
       h += '<div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.reusable ? '' : '<small>' + esc(w(r.grund)) + '</small>') + '</div><dl class="werte">'
         + (g ? '<dt>' + tx('zu.grade') + '</dt><dd>' + esc(g[0]) + ' · ' + esc(w(g[1])) + '</dd>' : '')
+        + '<dt>' + tx('en.preise') + '</dt><dd>' + tx('en.preiswert', chf(p.ovp), chf(p.vp)) + '</dd>'
         + '<dt>' + tx('en.stufe') + '</dt><dd>' + esc(p.stufe) + '</dd><dt>' + tx('en.dauer') + '</dt><dd>' + tx('en.dauerwert', (Math.round(aktivMs() / 6000) / 10).toFixed(1), p.budget || '–') + '</dd>'
         + (r.rep.length ? '<dt>' + tx('en.rep') + '</dt><dd>' + r.rep.map(function (x) { return tx('en.repwert', x.text || x.was, x.min, x.kosten.toFixed(2)); }).join('<br>') + '</dd>' : '') + '</dl>'
         + (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund) + '</div>' : '')

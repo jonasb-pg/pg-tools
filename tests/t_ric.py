@@ -16,6 +16,7 @@ with sync_playwright() as p:
       funktion:{liste:[],mittel:[]},liefer:{teile:[]},sicher:[],reset:[],ricardo:{vorschlag:true,versand:[{name:'0-2kg / PostPac B-Post',preis:9},{name:'2-10kg / PostPac B-Post',preis:12},{name:'10-30kg / PostPac B-Post',preis:21},{name:'0-30 kg / Sperrgut B-Post',preis:31}],fotoUrl:'https://x/dev?foto=PG-14742'}};
     beginne(d, Date.now()); AN.i=1; LAUF.urteil={reusable:true,grade:'A',rep:[],befund:'',ricardoZustand:'Neu (gemäss Beschreibung)'}; LAUF.urteilBild=(function(){var x=daten();delete x.aktivSek;delete x.rueckmeldung;delete x.kanal;delete x.ricardo;delete x.mm;delete x.nachMm;delete x.stand;return JSON.stringify(x)})(); zeichneSchritt();""")
     pg.screenshot(path='ric1.png', full_page=True)
+    assert 'OVP – · VP CHF 108.00' in pg.inner_text('#schritt'), 'Preise im Entscheid fehlen'; print('preise im entscheid ok')
     pg.click('button[data-a=kanal][data-v=ricardo]'); pg.wait_for_timeout(1500)
     pg.click('button[data-a=ricVersand][data-v="0"]'); pg.wait_for_timeout(1300)
     print('fehlt:', pg.inner_text('#ric-fehlt'), '| disabled', pg.evaluate("document.getElementById('ric-ab').disabled"))
