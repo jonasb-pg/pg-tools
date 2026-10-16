@@ -34,3 +34,4 @@ Die internen Tools von Pretty Good als Google Apps Script mit Google Sheets als 
 - `Basis.gs` nur im Repo ändern und dann in beide Projekte kopieren.
 - Keine Schlüssel, Passwörter oder Personendaten im Repo. Tests verwenden erfundene Namen.
 - Live geht nichts ohne Go von Jonas (neue Bereitstellung im Editor).
+- Ändert sich ein Ablauf für die Mitarbeitenden, das passende Prozess-Dokument nachtragen (Liste in `docs/gemeinsam/prozesse.md`).
