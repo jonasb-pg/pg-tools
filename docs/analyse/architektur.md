@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-17.8`. Live: Bereitstellungsversion 7 vom 17.10.2026, 02:21. Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-17.9`. Live: Bereitstellungsversion 8 vom 17.10.2026, 11:49. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 
@@ -8,7 +8,7 @@ Stand: Version `2026-10-17.8`. Live: Bereitstellungsversion 7 vom 17.10.2026, 02
 |---|---|---|---|
 | Analyse Tool (Code) | Apps Script, an Sheet gebunden | Script `1UahLr-Ek_4QzRuGzyk4YhuZf1WrslrvJDlls-Eee5iFHiuQZORuiYLqN` (neu seit 16.10.2026) | Server (`Code.gs`) und Oberfläche (`Index.html`) |
 | Web-App Test | Apps Script `/dev` | `https://script.google.com/a/macros/pretty-good.ch/s/AKfycbz-CuQ5QOygYatY8Sq7L8EK0FaulltyecT3u_wTjKEe/dev` | immer der gespeicherte Stand (HEAD), nur für Bearbeiter:innen des Scripts |
-| Web-App Live | Apps Script Bereitstellung | Bereitstellungsversion 7 | Analyseplatz; neue Version nur nach Bestätigung von Jonas (Claude stellt bereit) |
+| Web-App Live | Apps Script Bereitstellung | Bereitstellungsversion 8 | Analyseplatz; neue Version nur nach Bestätigung von Jonas (Claude stellt bereit) |
 | ANALYSE TOOL | Google Sheet | `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM` | Datenbank des Tools (siehe `datenmodell.md`) |
 | Return Tool | Google Sheet | `1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E` | **nur lesen**. Tab «Analyse» = Quelle der Warteschlange |
 | HANDBÜCHER | Google Sheet | `1GqaJ3mFsVuwJmXVPBo0k-t78Rn5qsEf9ZKMHHR-9IYc` | gelesene Handbücher, 1 Zeile pro Modell; bleibt bei Ersatz des Tools |
