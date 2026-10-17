@@ -18,8 +18,10 @@ const log = [
   { 'Aktion': 'Anmelden', 'Zeit': '13.10.2026 08:00:00', 'Detail': 'YY' }        // anderer Tag ohne Analyse
 ];
 const jetzt = Date.UTC(2026, 9, 16, 12, 0, 0);
-const k = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(analysen, log, jetzt, [['Trefferquote des Scores'], ['Stufe', 'Infos', 'Bestätigt', 'Korrigiert', 'Trefferquote'], ['Grün', '10', '3', '1', '75%'], ['']])));
-const w = k.woche;
+const R = function (von, bis, an, lg) { return JSON.parse(JSON.stringify(c.kennzahlenRechnen_(an || analysen, lg || log, jetzt, von, bis))); };
+/* Woche 12.–18.10.2026 */
+const k = R('2026-10-12', '2026-10-18'), w = k.zeitraum;
+assert.strictEqual(k.einheit, 'tag');
 assert.strictEqual(w.analysen, 4);
 assert.strictEqual(w.schichten, 2);
 /* XX: 08:00 (Anmeldung) bis 10:00 = 2 h; YY: 13:00 bis 13:30 = 0.5 h */
@@ -27,20 +29,21 @@ assert.strictEqual(w.schichtStunden, 2.5);
 assert.strictEqual(w.proSchicht, 2);
 assert.strictEqual(w.proStundeBrutto, 1.6);
 assert.strictEqual(w.dauer, 12.1);                       // (10+20+12+6.5)/4
-assert.strictEqual(w.proStundeNetto, 4.9);               // 60/12.125
 assert.strictEqual(w.imBudget, 67);                      // 2 von 3 mit Budget
-assert.strictEqual(w.abweichung, -1);                    // (-5+5-3)/3
 assert.deepStrictEqual(w.ergebnis, { reuse: 1, ricardo: 1, matchmaker: 1, nicht: 1 });
-assert.strictEqual(w.reparatur, 1);
-assert.strictEqual(k.vierWochen.analysen, 4);
-assert.strictEqual(k.gesamt.analysen, 5);
-assert.deepStrictEqual(k.personen.map(function (p) { return [p.name, p.analysen, p.proSchicht]; }), [['XX', 3, 3], ['YY', 1, 1]]);
-assert.strictEqual(k.wochen[0].name, '2026-10-12');      // neueste Woche zuerst
-assert.strictEqual(k.treffer.length, 1); assert.strictEqual(k.treffer[0].quote, '75%');
-assert.strictEqual(k.seit, '01.09.2026');
+assert.deepStrictEqual(k.verlauf.map(function (x) { return [x.name, x.analysen]; }), [['2026-10-14', 3], ['2026-10-15', 1]]);
+assert.deepStrictEqual(k.personen.map(function (p) { return [p.name, p.analysen]; }), [['XX', 3], ['YY', 1]]);
+/* Ganzer Zeitraum: von leer = ab erster Analyse, Verlauf pro Woche */
+const g = R('', '');
+assert.strictEqual(g.zeitraum.analysen, 5); assert.strictEqual(g.von, '2026-09-01'); assert.strictEqual(g.bis, '2026-10-16');
+assert.strictEqual(g.einheit, 'woche'); assert.deepStrictEqual(g.verlauf.map(function (x) { return x.name; }), ['2026-08-31', '2026-10-12']);
+assert.strictEqual(g.seit, '01.09.2026');
+/* Monat September: nur die alte Analyse */
+assert.strictEqual(R('2026-09-01', '2026-09-30').zeitraum.analysen, 1);
+/* Langer Zeitraum: pro Monat */
+const j = R('2026-01-01', '2026-12-31'); assert.strictEqual(j.einheit, 'monat'); assert.deepStrictEqual(j.verlauf.map(function (x) { return x.name; }), ['2026-09', '2026-10']);
 /* Ohne Anmeldung: Schicht beginnt mit der ersten Analyse */
-const ohne = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(analysen.slice(0, 3), [], jetzt, [])));
-assert.strictEqual(ohne.woche.schichtStunden, 1.8);     // 08:10 bis 10:00
-const leer = JSON.parse(JSON.stringify(c.kennzahlenRechnen_([], [], jetzt, [])));
-assert.strictEqual(leer.woche.analysen, 0); assert.strictEqual(leer.woche.imBudget, null);
+assert.strictEqual(R('2026-10-12', '2026-10-18', analysen.slice(0, 3), []).zeitraum.schichtStunden, 1.8);     // 08:10 bis 10:00
+const leer = R('2026-10-12', '2026-10-18', [], []);
+assert.strictEqual(leer.zeitraum.analysen, 0); assert.strictEqual(leer.zeitraum.imBudget, null);
 console.log('t_kennzahlen ok');

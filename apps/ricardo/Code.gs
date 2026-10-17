@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-17.1';
+const VERSION = '2026-10-17.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2051,7 +2051,8 @@ function adminBetrieb() {
   pruefeAdmin_();
   const pr = PropertiesService.getScriptProperties();
   return { ki: !!pr.getProperty('ANTHROPIC_API_KEY'), mail: mailKontrolle_(), url: SpreadsheetApp.getActive().getUrl(),
-    ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mailsAbholen'; }) };
+    ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mailsAbholen'; }),
+    jetzt: jetztR_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), Date.now(), Number(cfg_('Zahlungserinnerung nach Tagen')) || 3) };
 }
 
 /** Prüft jede Verbindung einzeln und zeigt die Antwort oder den Fehler im Wortlaut. */
@@ -2076,59 +2077,78 @@ function verbindungTest() {
   return aus;
 }
 
-function kennzahlen(jetztMs) {
+/**
+ * Kennzahlen für einen Zeitraum (Entscheid Jonas 17.10.2026): Woche (KW), Monat, ganzer Zeitraum oder von–bis, wie im Analyse Tool.
+ * von/bis als «yyyy-mm-dd», leer = offen. Umsatz und Auszahlung immer ohne Porto (Preis CHF ohne Versand; Auszahlung = Preis − Provision).
+ */
+function kennzahlen(von, bis, jetztMs) {
   pruefeAdmin_();
-  return kennzahlenRechnen_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), objekte_(TAB_R, R_COLS), objekte_(TAB_I, I_COLS), jetztMs ? Number(jetztMs) : Date.now(),
-    Number(cfg_('Zahlungserinnerung nach Tagen')) || 3);
+  return kennzahlenRechnen_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), objekte_(TAB_R, R_COLS), jetztMs ? Number(jetztMs) : Date.now(), tagR_(von), tagR_(bis));
 }
+function tagR_(x) { const m = String(x || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[0] : ''; }
 /** Montag 00:00 (Zürcher Zeit) der Woche von ms, als «yyyy-MM-dd». */
 function wocheR_(ms) {
   const d = new Date(ms), wt = Number(Utilities.formatDate(d, TZ, 'u')) - 1;
   return Utilities.formatDate(new Date(ms - wt * 86400000), TZ, 'yyyy-MM-dd');
 }
-function kennzahlenRechnen_(listings, verkaeufe, retouren, posteingang, jetzt, zahlTage) {
-  const ms = function (d) { return d instanceof Date ? d.getTime() : null; }, r1 = function (x) { return Math.round(x * 10) / 10; };
-  const dieseWoche = wocheR_(jetzt), vier = jetzt - 28 * 86400000;
-  const zeitraeume = { woche: function (t) { return t !== null && wocheR_(t) === dieseWoche; }, vierWochen: function (t) { return t !== null && t >= vier; }, gesamt: function (t) { return t !== null; } };
-  const rechne = function (drin) {
-    const v = verkaeufe.filter(function (x) { return x['Verkauf-Nr'] && drin(ms(x['Verkauft am'])); });
-    const gueltig = v.filter(function (x) { return x['Status'] !== 'Storniert'; });
-    const summe = function (feld) { return Math.round(gueltig.reduce(function (t, x) { return t + (Number(x[feld]) || 0); }, 0) * 100) / 100; };
-    const versand = gueltig.filter(function (x) { return x['Bezahlt und versendet am'] instanceof Date; }).map(function (x) { return (ms(x['Bezahlt und versendet am']) - ms(x['Verkauft am'])) / 86400000; });
-    /* Listings, deren Angebot im Zeitraum endete: verkauft oder unverkauft */
-    const verkauft = listings.filter(function (x) { return x['Verkauft am'] instanceof Date && drin(ms(x['Verkauft am'])); });
-    const unverkauft = listings.filter(function (x) { return x['Status'] === 'Unverkauft' && drin(ms(x['Gelistet am'])); });
-    const tage = verkauft.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) { return (ms(x['Verkauft am']) - ms(x['Gelistet am'])) / 86400000; });
-    const rt = retouren.filter(function (x) { return drin(ms(x['Eröffnet am'])); }).length;
-    const pv = posteingang.filter(function (x) { return x['Art'] === 'Preisvorschlag' && drin(ms(x['Eingang'])); });
-    const avg = function (l) { return l.length ? r1(l.reduce(function (t, x) { return t + x; }, 0) / l.length) : null; };
-    return { verkaeufe: gueltig.length, storniert: v.length - gueltig.length, umsatz: summe('Preis CHF'), auszahlung: summe('Auszahlung CHF'),
-      schnitt: gueltig.length ? Math.round(summe('Preis CHF') / gueltig.length * 100) / 100 : null,
-      verkaufsquote: verkauft.length + unverkauft.length ? Math.round(verkauft.length / (verkauft.length + unverkauft.length) * 100) : null,
-      unverkauft: unverkauft.length, tageBisVerkauf: avg(tage), tageBisVersand: avg(versand),
-      retouren: rt, retourenquote: gueltig.length ? Math.round(rt / gueltig.length * 100) : null,
-      preisvorschlaege: pv.length };
-  };
-  const aus = {};
-  Object.keys(zeitraeume).forEach(function (k) { aus[k] = rechne(zeitraeume[k]); });
-  /* Jetzt: laufende Angebote und überfällige Zahlungen */
-  aus.jetzt = {
+/** Grade wie im Analyse Tool: A = Neu und originalverpackt, B = Neu (gemäss Beschreibung), C = Gebraucht, D = Defekt. */
+function gradeR_(zustand) { const i = ZUSTAENDE.indexOf(String(zustand || '')); return i < 0 ? '?' : 'ABCD'.charAt(i); }
+/** Für den Reiter Betrieb: was jetzt ansteht. */
+function jetztR_(listings, verkaeufe, jetzt, zahlTage) {
+  return {
     gelistet: listings.filter(function (x) { return x['Status'] === 'Gelistet'; }).length,
     zuPacken: verkaeufe.filter(function (x) { return x['Status'] === 'Zu packen'; }).length,
-    zahlungOffen: verkaeufe.filter(function (x) { return V_OFFEN.indexOf(x['Status']) > -1 && x['Verkauft am'] instanceof Date && jetzt - ms(x['Verkauft am']) >= zahlTage * 86400000; }).length,
+    zahlungOffen: verkaeufe.filter(function (x) { return V_OFFEN.indexOf(x['Status']) > -1 && x['Verkauft am'] instanceof Date && jetzt - x['Verkauft am'].getTime() >= zahlTage * 86400000; }).length,
     zahlTage: zahlTage
   };
-  const w = {};
-  verkaeufe.forEach(function (x) {
-    const t = ms(x['Verkauft am']);
-    if (t === null || jetzt - t > 12 * 7 * 86400000 || x['Status'] === 'Storniert' || !x['Verkauf-Nr']) return;
-    const k = wocheR_(t), z = w[k] || (w[k] = { name: k, verkaeufe: 0, umsatz: 0, auszahlung: 0 });
-    z.verkaeufe++; z.umsatz += Number(x['Preis CHF']) || 0; z.auszahlung += Number(x['Auszahlung CHF']) || 0;
+}
+function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis) {
+  const tag = function (d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : ''; };
+  const r2 = function (x) { return Math.round(x * 100) / 100; }, pz = function (a, b) { return b ? Math.round(a / b * 100) : null; };
+  const nachId = {};
+  listings.forEach(function (x) { if (x['PG-ID']) nachId[String(x['PG-ID'])] = x; });
+  /* Verkäufe nach Verkaufsdatum, Angebote nach Datum des Listings */
+  const vk = verkaeufe.filter(function (x) { return x['Verkauf-Nr'] && x['Verkauft am'] instanceof Date; }).map(function (x) {
+    const l = nachId[String(x['PG-ID'] || '')] || {}, neu = Number(l['Neupreis CHF']) || 0;
+    return { tag: tag(x['Verkauft am']), ms: x['Verkauft am'].getTime(), grade: gradeR_(l['Zustand']), storno: x['Status'] === 'Storniert', preis: Number(x['Preis CHF']) || 0, aus: Number(x['Auszahlung CHF']) || 0, neu: neu };
   });
-  aus.wochen = Object.keys(w).sort().reverse().map(function (k) { const z = w[k]; z.umsatz = Math.round(z.umsatz * 100) / 100; z.auszahlung = Math.round(z.auszahlung * 100) / 100; return z; });
-  const erste = verkaeufe.map(function (x) { return ms(x['Verkauft am']); }).filter(function (t) { return t !== null; });
-  aus.seit = erste.length ? Utilities.formatDate(new Date(Math.min.apply(null, erste)), TZ, 'dd.MM.yyyy') : '';
-  return aus;
+  const an = listings.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) {
+    const st = String(x['Status'] || '');
+    return { tag: tag(x['Gelistet am']), ms: x['Gelistet am'].getTime(), grade: gradeR_(x['Zustand']),
+      ergebnis: st === 'Unverkauft' ? 'nicht' : (st === 'Gelistet' ? 'laeuft' : (['Verkauft', 'Versendet'].indexOf(st) > -1 || x['Verkauft am'] instanceof Date ? 'verkauft' : 'laeuft')) };
+  });
+  const rt = retouren.filter(function (x) { return x['Eröffnet am'] instanceof Date; }).map(function (x) { return { tag: tag(x['Eröffnet am']), ms: x['Eröffnet am'].getTime() }; });
+  const alle = vk.concat(an).map(function (x) { return x.tag; }).filter(String).sort();
+  const seit = alle[0] || tag(new Date(jetzt)), v = von || seit, b = bis || tag(new Date(jetzt));
+  const drin = function (x) { return x.tag >= v && x.tag <= b; };
+  const rechne = function (V, A, R) {
+    const g = V.filter(function (x) { return !x.storno; }), mitNeu = g.filter(function (x) { return x.neu > 0; });
+    const n = { verkauft: 0, nicht: 0, laeuft: 0 };
+    A.forEach(function (x) { n[x.ergebnis]++; });
+    return { verkaeufe: g.length, storniert: V.length - g.length,
+      umsatz: r2(g.reduce(function (t, x) { return t + x.preis; }, 0)), auszahlung: r2(g.reduce(function (t, x) { return t + x.aus; }, 0)),
+      schnitt: g.length ? r2(g.reduce(function (t, x) { return t + x.preis; }, 0) / g.length) : null,
+      vomNeupreis: mitNeu.length ? Math.round(mitNeu.reduce(function (t, x) { return t + x.preis / x.neu; }, 0) / mitNeu.length * 100) : null,
+      angeboten: A.length, verkauft: n.verkauft, nichtVerkauft: n.nicht, laufend: n.laeuft, verkaufsquote: pz(n.verkauft, n.verkauft + n.nicht),
+      retouren: R.length, retourenquote: pz(R.length, g.length) };
+  };
+  const V = vk.filter(drin), A = an.filter(drin), R = rt.filter(drin);
+  const grades = ['A', 'B', 'C', 'D', '?'].map(function (gr) {
+    const l = A.filter(function (x) { return x.grade === gr; }), verk = l.filter(function (x) { return x.ergebnis === 'verkauft'; }), nicht = l.filter(function (x) { return x.ergebnis === 'nicht'; }).length;
+    const mitNeu = V.filter(function (x) { return x.grade === gr && !x.storno && x.neu > 0; });
+    return { grade: gr, angeboten: l.length, anteil: pz(l.length, A.length), verkauft: verk.length, nichtVerkauft: nicht, verkaufsquote: pz(verk.length, verk.length + nicht),
+      vomNeupreis: mitNeu.length ? Math.round(mitNeu.reduce(function (t, x) { return t + x.preis / x.neu; }, 0) / mitNeu.length * 100) : null };
+  }).filter(function (x) { return x.angeboten; });
+  const tage = (Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8)) - Date.UTC(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8))) / 864e5 + 1;
+  const einheit = tage <= 7 ? 'tag' : (tage <= 92 ? 'woche' : 'monat');
+  const periode = function (x) { return einheit === 'tag' ? x.tag : (einheit === 'woche' ? wocheR_(x.ms) : x.tag.slice(0, 7)); };
+  const keys = {};
+  V.concat(A, R).forEach(function (x) { keys[periode(x)] = 1; });
+  const verlauf = Object.keys(keys).sort().map(function (k) {
+    const f = function (l) { return l.filter(function (x) { return periode(x) === k; }); };
+    return Object.assign({ name: k }, rechne(f(V), f(A), f(R)));
+  });
+  return { von: v, bis: b, einheit: einheit, zeitraum: rechne(V, A, R), grades: grades, verlauf: verlauf, seit: seit.split('-').reverse().join('.') };
 }
 
 function feedback(text, bereich) {

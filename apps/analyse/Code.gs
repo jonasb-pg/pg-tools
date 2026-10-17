@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.8';
+const VERSION = '2026-10-17.9';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -460,7 +460,7 @@ function vergiss_(n) {
   delete LAUF_MEMO[n];
   if (['Produkte', 'Bestellliste', 'Listen'].indexOf(n) > -1) startVergessen_();
   if (n === 'Kosten') try { CacheService.getScriptCache().remove('kosten:' + Utilities.formatDate(new Date(), TZ, 'MM.yyyy')); } catch (err) { /* läuft ab */ }
-  if (n === 'Analysen') try { CacheService.getScriptCache().remove('kennzahlen'); } catch (err) { /* läuft ab */ }
+  if (n === 'Analysen' || n === 'Log') try { CacheService.getScriptCache().put('kz-gen', String(Date.now()), 21600); } catch (err) { /* läuft ab */ }
   if (['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel', 'Listen', 'Score-Regeln'].indexOf(n) > -1) uebNeu_();   // betrifft jeden Überblick
   if (STABIL.indexOf(n) < 0) return;
   delete MEMO[n];
@@ -2632,18 +2632,26 @@ function wocheVon_(ms) { const d = new Date(ms), wt = (d.getUTCDay() + 6) % 7; r
  * Pro Stunde netto = 60 / Ø Analysedauer, brutto = Analysen / Schichtstunden.
  * jetztMs nur für Tests.
  */
-function kennzahlen(jetztMs) {
+function kennzahlen(von, bis, jetztMs) {
   const e = einst_();
   if (!istAdmin_(e)) throw new Error('Nur für Admins.');
-  if (jetztMs) return kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, Number(jetztMs), blatt_('Auswertung').getDataRange().getDisplayValues());
-  const c = CacheService.getScriptCache(), alt = c.get('kennzahlen');
+  von = tagText_(von); bis = tagText_(bis);
+  if (jetztMs) return kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, Number(jetztMs), von, bis);
+  const c = CacheService.getScriptCache(), key = 'kz:' + (c.get('kz-gen') || '0') + ':' + von + ':' + bis, alt = c.get(key);
   if (alt) return JSON.parse(alt);
-  const k = kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, zeitMs_(zeit_()), blatt_('Auswertung').getDataRange().getDisplayValues());
+  const k = kennzahlenRechnen_(lies_('Analysen').z, lies_('Log').z, zeitMs_(zeit_()), von, bis);
   k.stand = zeit_().slice(11, 16);
-  try { c.put('kennzahlen', JSON.stringify(k), 600); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
+  try { c.put(key, JSON.stringify(k), 600); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
   return k;
 }
-function kennzahlenRechnen_(analysen, log, jetzt, auswertung) {
+/** «yyyy-mm-dd» oder leer (= offen). */
+function tagText_(x) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(x || '').trim()); return m ? m[0] : ''; }
+/** Gruppierung für den Verlauf: bis 7 Tage pro Tag, bis 3 Monate pro Kalenderwoche, sonst pro Monat. */
+function einheitFuer_(von, bis) {
+  const tage = (Date.parse(bis + 'T00:00:00Z') - Date.parse(von + 'T00:00:00Z')) / 864e5 + 1;
+  return tage <= 7 ? 'tag' : (tage <= 92 ? 'woche' : 'monat');
+}
+function kennzahlenRechnen_(analysen, log, jetzt, von, bis) {
   const a = analysen.map(function (r) {
     const start = zeitMs_(r['Start']), ende = zeitMs_(r['Ende']);
     if (!ende) return null;
@@ -2696,22 +2704,15 @@ function kennzahlenRechnen_(analysen, log, jetzt, auswertung) {
     liste.forEach(function (x) { (g[x[feld]] = g[x[feld]] || []).push(x); });
     return Object.keys(g).sort().map(function (name) { return Object.assign({ name: name }, rechne(g[name])); });
   };
-  const dieseWoche = wocheVon_(jetzt), vier = jetzt - 28 * 864e5;
-  const inWoche = a.filter(function (x) { return wocheVon_(x.ende) === dieseWoche; }), inVier = a.filter(function (x) { return x.ende >= vier; });
-  const wochen = gruppe(a.filter(function (x) { return x.ende >= jetzt - 12 * 7 * 864e5; }).map(function (x) { return Object.assign({}, x, { woche: wocheVon_(x.ende) }); }), 'woche').reverse();
-  /* Trefferquote des Scores: Block aus dem Tab «Auswertung» (Formeln über die Prüfung der Infos) */
-  const treffer = [];
-  let im = false;
-  (auswertung || []).forEach(function (z) {
-    if (String(z[0]) === 'Trefferquote des Scores') { im = true; return; }
-    if (!im) return;
-    if (!z.join('').trim()) { if (treffer.length) im = false; return; }
-    if (String(z[0]) !== 'Stufe') treffer.push({ stufe: String(z[0]), infos: z[1], bestaetigt: z[2], korrigiert: z[3], quote: z[4] });
-  });
+  /* Zeitraum (von/bis als «yyyy-mm-dd», leer = offen). Entscheid Jonas 17.10.2026: Woche, Monat, alles oder eigener Zeitraum; vier Kacheln, Verlauf, Personen. */
+  const seit = a.length ? tagVon_(Math.min.apply(null, a.map(function (x) { return x.ende; }))) : tagVon_(jetzt);
+  const v = von || seit, b = bis || tagVon_(jetzt);
+  const drin = a.filter(function (x) { return x.tag >= v && x.tag <= b; });
+  const einheit = einheitFuer_(v, b);
+  const verlauf = gruppe(drin.map(function (x) { return Object.assign({}, x, { periode: einheit === 'tag' ? x.tag : (einheit === 'woche' ? wocheVon_(x.ende) : x.tag.slice(0, 7)) }); }), 'periode');
   return {
-    woche: rechne(inWoche), vierWochen: rechne(inVier), gesamt: rechne(a),
-    personen: gruppe(inVier, 'k'), stufen: gruppe(inVier, 'stufe'), kategorien: gruppe(inVier, 'kat'), wochen: wochen, treffer: treffer,
-    seit: a.length ? tagVon_(Math.min.apply(null, a.map(function (x) { return x.ende; }))).split('-').reverse().join('.') : ''
+    von: v, bis: b, einheit: einheit, zeitraum: rechne(drin), verlauf: verlauf, personen: gruppe(drin, 'k'),
+    seit: seit.split('-').reverse().join('.')
   };
 }
 
@@ -2849,7 +2850,7 @@ function einrichten() {
   /* Genau ein Auslöser: der Abgleich */
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('abgleichen').timeBased().everyMinutes(TAKT_MINUTEN).create();
-  try { CacheService.getScriptCache().removeAll(['ausloeser', START_SCHLUESSEL, 'kennzahlen']); } catch (err) { /* läuft ab */ }
+  try { CacheService.getScriptCache().removeAll(['ausloeser', START_SCHLUESSEL, 'kennzahlen', 'kz-gen']); } catch (err) { /* läuft ab */ }
 
   gesperrt_(function () {
     /* Wer einrichtet, wird Admin, solange noch niemand eingetragen ist */

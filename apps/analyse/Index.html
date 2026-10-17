@@ -81,6 +81,12 @@
   .wahl { display:flex; flex-wrap:wrap; gap:6px; }
   .wahl button { border-radius:4px; }
   .wahl button.an { background:var(--ink); color:var(--weiss); }
+  .zr-zeile { display:flex; align-items:center; gap:10px; margin:8px 0 14px; flex-wrap:wrap; }
+  .zr-zeile button { min-width:36px; }
+  .kz-zeile { display:grid; grid-template-columns:7.5em 1fr 3em; gap:6px; align-items:center; font-size:13px; margin-top:4px; }
+  .kz-zeile b { text-align:right; }
+  tr.summe td { font-weight:600; border-top:2px solid var(--ink); }
+  details.karte summary { cursor:pointer; }
 
   .tabelle { border:2px solid var(--ink); border-radius:4px; overflow:auto; background:var(--weiss); margin-top:12px; }
   table { width:100%; border-collapse:collapse; }
@@ -627,20 +633,18 @@
     'adm.sp.titel': ['Ricardo-Startpreis (Vorschlag)', 'Ricardo starting price (suggestion)'], 'adm.sp.info': ['Prozent vom Neupreis, nach Grade. Ohne Neupreis gilt der VP. In der Analyse lässt sich der Vorschlag überschreiben.', 'Percent of the new price, by grade. Without a new price the selling price applies. The suggestion can be overwritten in the analysis.'],
     'adm.sp.speichern': ['Speichern', 'Save'], 'adm.sp.ok': ['Gespeichert. Gilt ab der nächsten Analyse.', 'Saved. Applies from the next analysis.'],
     'adm.zuletzt': ['Letzter Abgleich mit dem Return Tool: {0}', 'Last sync with the Return Tool: {0}'],
-    'kz.woche': ['Diese Woche', 'This week'], 'kz.vier': ['Letzte 4 Wochen', 'Last 4 weeks'], 'kz.gesamt': ['Alles seit {0}', 'All since {0}'],
-    'kz.budget': ['Im Zeitbudget', 'Within time budget'], 'kz.budget.u': ['Ø {0} Min. {1} Budget · Ø Dauer {2} von {3} Min.', 'avg {0} min {1} budget · avg duration {2} of {3} min'],
-    'kz.ueber': ['über', 'over'], 'kz.unter': ['unter', 'under'],
-    'kz.schicht': ['Produkte pro Schicht', 'Items per shift'], 'kz.schicht.u': ['{0} Schichten · Ø {1} h', '{0} shifts · avg {1} h'],
-    'kz.stunde': ['Produkte pro Stunde', 'Items per hour'], 'kz.stunde.u': ['brutto (Schicht) · netto {0} (nur Analysezeit)', 'gross (shift) · net {0} (analysis time only)'],
-    'kz.anzahl': ['Analysen', 'Analyses'], 'kz.anzahl.u': ['davon {0} mit Reparatur', 'of which {0} with repair'],
-    'kz.ergebnis': ['Ergebnis', 'Outcome'], 'kz.e.reuse': ['Reuse (Regal Analysiert)', 'Reuse (shelf Analysed)'], 'kz.e.ricardo': ['Ricardo', 'Ricardo'], 'kz.e.matchmaker': ['Matchmaker', 'Matchmaker'], 'kz.e.nicht': ['Nicht reusable', 'Not reusable'],
-    'kz.personen': ['Pro Person (letzte 4 Wochen)', 'Per person (last 4 weeks)'], 'kz.stufen': ['Pro Stufe (letzte 4 Wochen)', 'Per level (last 4 weeks)'], 'kz.kategorien': ['Pro Kategorie (letzte 4 Wochen)', 'Per category (last 4 weeks)'],
-    'kz.wochen': ['Pro Woche', 'Per week'], 'kz.treffer': ['Trefferquote der KI-Recherche', 'Hit rate of the AI research'],
-    'kz.th.name': ['', ''], 'kz.th.n': ['Analysen', 'Analyses'], 'kz.th.schichten': ['Schichten', 'Shifts'], 'kz.th.proschicht': ['Pro Schicht', 'Per shift'], 'kz.th.prostunde': ['Pro Std. brutto', 'Per h gross'],
-    'kz.th.netto': ['Pro Std. netto', 'Per h net'], 'kz.th.dauer': ['Ø Dauer Min', 'Avg min'], 'kz.th.budget': ['Ø Budget Min', 'Avg budget'], 'kz.th.imbudget': ['Im Budget', 'In budget'], 'kz.th.abw': ['Ø Abweichung Min', 'Avg deviation'],
-    'kz.th.woche': ['Woche ab', 'Week from'], 'kz.th.stufe': ['Stufe', 'Level'], 'kz.th.infos': ['Infos', 'Infos'], 'kz.th.best': ['Bestätigt', 'Confirmed'], 'kz.th.korr': ['Korrigiert', 'Corrected'], 'kz.th.quote': ['Quote', 'Rate'],
-    'kz.leer': ['Noch keine Analysen in diesem Zeitraum.', 'No analyses in this period yet.'],
-    'kz.def': ['Schicht = Kürzel und Tag, von der ersten Anmeldung bis zum Ende der letzten Analyse. Pro Stunde brutto = Analysen / Schichtstunden, netto = 60 / Ø Analysedauer.', 'Shift = initials and day, from the first login to the end of the last analysis. Per hour gross = analyses / shift hours, net = 60 / avg analysis time.'],
+    'zr.woche': ['Woche', 'Week'], 'zr.monat': ['Monat', 'Month'], 'zr.alles': ['Ganzer Zeitraum', 'All time'], 'zr.eigen': ['Von – bis', 'From – to'], 'zr.zeigen': ['Anzeigen', 'Show'],
+    'zr.kw': ['KW {0} · {1}–{2}', 'Week {0} · {1}–{2}'], 'zr.seit': ['seit {0}', 'since {0}'], 'zr.zurueck': ['Früher', 'Earlier'], 'zr.vor': ['Später', 'Later'],
+    'zr.monate': ['Januar,Februar,März,April,Mai,Juni,Juli,August,September,Oktober,November,Dezember', 'January,February,March,April,May,June,July,August,September,October,November,December'],
+    'kz.stunde': ['Produkte pro Stunde', 'Items per hour'], 'kz.stunde.u': ['{0} Analysen in {1} Schichtstunden', '{0} analyses in {1} shift hours'],
+    'kz.budget': ['Im Zeitbudget', 'Within time budget'], 'kz.budget.u': ['Ø {0} Min. pro Analyse, Budget Ø {1} Min.', 'avg {0} min per analysis, budget avg {1} min'],
+    'kz.reuse': ['Reusable', 'Reusable'], 'kz.reuse.u': ['{0} von {1} Produkten', '{0} of {1} items'],
+    'kz.ergebnis': ['Wohin es geht', 'Where it goes'], 'kz.e.reuse': ['Regal (Reuse)', 'Shelf (reuse)'], 'kz.e.ricardo': ['Ricardo', 'Ricardo'], 'kz.e.matchmaker': ['Matchmaker', 'Matchmaker'], 'kz.e.nicht': ['Nicht reusable', 'Not reusable'],
+    'kz.verlauf': ['Verlauf', 'Trend'], 'kz.personen': ['Pro Person', 'Per person'],
+    'kz.th.tag': ['Tag', 'Day'], 'kz.th.woche': ['Woche', 'Week'], 'kz.th.monat': ['Monat', 'Month'], 'kz.th.name': ['Kürzel', 'Initials'],
+    'kz.th.n': ['Analysen', 'Analyses'], 'kz.th.prostunde': ['Pro Std.', 'Per h'], 'kz.th.imbudget': ['Im Budget', 'In budget'], 'kz.th.reuse': ['Reusable', 'Reusable'], 'kz.th.dauer': ['Ø Min.', 'Avg min'],
+    'kz.leer': ['Keine Analysen in diesem Zeitraum.', 'No analyses in this period.'],
+    'kz.def': ['Pro Stunde = Analysen / Schichtstunden. Schicht = Kürzel und Tag, von der ersten Anmeldung bis zum Ende der letzten Analyse. Reusable = alles ausser «Nicht reusable».', 'Per hour = analyses / shift hours. Shift = initials and day, from the first login to the end of the last analysis. Reusable = everything except «Not reusable».'],
     'af.titel': ['Feedback aus dem Team', 'Feedback from the team'], 'af.leer': ['Noch kein Feedback.', 'No feedback yet.'], 'af.neu': ['Neu', 'New'], 'af.erledigt': ['Erledigt', 'Done'],
     'adm.titel': ['Admin', 'Admin'], 'adm.test': ['Verbindungen testen', 'Test connections'], 'adm.testet': ['Die Verbindungen werden geprüft, das dauert bis zu einer Minute.', 'The connections are being tested, this takes up to a minute.'],
     'adm.sheet': ['Sheet öffnen', 'Open sheet'], 'adm.batches': ['Letzte Recherche-Läufe', 'Latest research runs'], 'adm.ki': ['Claude ist verbunden.', 'Claude is connected.'], 'adm.keinki': ['Der Claude-Schlüssel fehlt.', 'The Claude key is missing.'],
@@ -1802,12 +1806,12 @@
   function mtNeu() { var n = $('mt-neu').value.trim(); if (!n) { $('mt-neu').focus(); return; } ruf('mittelSpeichern', [{ name: n, vorhanden: 'Ja' }, K], function (r) { WS = r; MTN = false; wsZeichnen(); melde(t('ws.gespeichert')); }); }
 
   /* ---------- Admin: Betrieb, Kennzahlen, Feedback ---------- */
-  var ADM = 'betrieb', KZ = null, KZZ = 'vierWochen', AF = [];
+  var ADM = 'betrieb', KZ = null, AF = [];
   function admTab(v) {
     ADM = v || ADM;
     $('adm-reiter').innerHTML = ['betrieb', 'kennzahlen', 'feedback'].map(function (x) { return '<button class="' + (x === ADM ? 'an' : '') + '" data-a="admTab" data-v="' + x + '">' + tx('adm.r.' + x) + '</button>'; }).join('');
     ['betrieb', 'kennzahlen', 'feedback'].forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });
-    if (ADM === 'kennzahlen') ruf('kennzahlen', [], function (k) { KZ = k; zeichneKennzahlen(); });
+    if (ADM === 'kennzahlen') kzLaden();
     if (ADM === 'feedback') ruf('feedbackListe', [], zeichneFeedback);
   }
   function zeichneAdmin(r) {
@@ -1830,37 +1834,65 @@
   function startpreisSpeichern() {
     ruf('startpreisSpeichern', [$('sp-ab').value, $('sp-c').value], function (r) { $('sp-ab').value = r.A; $('sp-c').value = r.C; if (GELADEN.admin) GELADEN.admin.startpreis = r; melde(t('adm.sp.ok')); });
   }
-  function kzZeit(v) { KZZ = v; zeichneKennzahlen(); }
+  /* Zeitraum für Kennzahlen (Entscheid Jonas 17.10.2026): Woche (KW), Monat, ganzer Zeitraum oder von–bis. Gleich im Ricardo Tool. */
+  var ZR = { art: 'woche', anker: new Date(), von: '', bis: '' };
+  function tagIso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function tagCh(iso, jahr) { var x = String(iso).split('-'); return x[2] + '.' + x[1] + '.' + (jahr ? x[0] : ''); }
+  function kwVon(d) { var x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), wt = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - wt); var j = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - j) / 864e5 + 1) / 7); }
+  function zrBereich() {
+    var d = ZR.anker;
+    if (ZR.art === 'woche') { var mo = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)), so = new Date(mo.getFullYear(), mo.getMonth(), mo.getDate() + 6);
+      return { von: tagIso(mo), bis: tagIso(so), label: t('zr.kw', kwVon(mo), tagCh(tagIso(mo)), tagCh(tagIso(so), true)) }; }
+    if (ZR.art === 'monat') { var a = new Date(d.getFullYear(), d.getMonth(), 1), e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      return { von: tagIso(a), bis: tagIso(e), label: t('zr.monate').split(',')[d.getMonth()] + ' ' + d.getFullYear() }; }
+    if (ZR.art === 'eigen') return { von: ZR.von, bis: ZR.bis, label: '' };
+    return { von: '', bis: '', label: '' };
+  }
+  function zrLeiste(seit) {
+    var b = zrBereich(), h = '<div class="wahl adm-reiter">' + ['woche', 'monat', 'alles', 'eigen'].map(function (x) {
+      return '<button class="' + (x === ZR.art ? 'an' : '') + '" data-a="zrArt" data-v="' + x + '">' + tx('zr.' + x) + '</button>'; }).join('') + '</div>';
+    h += '<div class="zr-zeile">';
+    if (ZR.art === 'woche' || ZR.art === 'monat') h += '<button data-a="zrSchritt" data-v="-1" title="' + tx('zr.zurueck') + '">‹</button><strong>' + esc(b.label) + '</strong><button data-a="zrSchritt" data-v="1" title="' + tx('zr.vor') + '">›</button>';
+    else if (ZR.art === 'eigen') h += '<input type="date" id="zr-von" value="' + esc(ZR.von) + '"> – <input type="date" id="zr-bis" value="' + esc(ZR.bis) + '"><button data-a="zrEigen">' + tx('zr.zeigen') + '</button>';
+    else h += '<strong>' + tx('zr.seit', seit || '–') + '</strong>';
+    return h + '</div>';
+  }
+  function zrArt(v) {
+    ZR.art = v; ZR.anker = new Date();
+    if (v === 'eigen' && !ZR.von) { var d = new Date(); ZR.bis = tagIso(d); d.setDate(d.getDate() - 27); ZR.von = tagIso(d); }
+    zrNeu();
+  }
+  function zrSchritt(v) { var d = ZR.anker, n = Number(v); ZR.anker = ZR.art === 'woche' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7 * n) : new Date(d.getFullYear(), d.getMonth() + n, 1); zrNeu(); }
+  function zrEigen() { var a = $('zr-von').value, b = $('zr-bis').value; if (a && b && a > b) { var x = a; a = b; b = x; } ZR.von = a; ZR.bis = b; zrNeu(); }
+  function zrNeu() { kzLaden(); }
+  function kzLaden() { var b = zrBereich(); ruf('kennzahlen', [b.von, b.bis], function (k) { KZ = k; zeichneKennzahlen(); }); }
   function zahlTxt(x, nach) { return x === null || x === undefined ? '–' : (nach === '±' ? (x > 0 ? '+' : '') + x : String(x) + (nach || '')); }
+  function periodeName(x, einheit) {
+    if (einheit === 'tag') return tagCh(x);
+    if (einheit === 'woche') { var p = x.split('-'); return 'KW ' + kwVon(new Date(+p[0], +p[1] - 1, +p[2])) + ' · ' + tagCh(x); }
+    var m = x.split('-'); return t('zr.monate').split(',')[+m[1] - 1].slice(0, 3) + ' ' + m[0];
+  }
   function zeichneKennzahlen() {
-    var k = KZ, p = k[KZZ], h = '<div class="wahl adm-reiter">' + [['woche', 'kz.woche'], ['vierWochen', 'kz.vier'], ['gesamt', 'kz.gesamt']].map(function (x) {
-      return '<button class="' + (x[0] === KZZ ? 'an' : '') + '" data-a="kzZeit" data-v="' + x[0] + '">' + esc(t(x[1], k.seit || '–')) + '</button>'; }).join('') + '</div>';
-    var kachel = function (name, zahl, unter) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div><div class="u">' + esc(unter || '') + '</div></div>'; };
-    if (!p.analysen) h += '<div class="karte"><p class="still">' + tx('kz.leer') + '</p></div>';
-    else {
-      h += '<div class="kacheln">'
-        + kachel(t('kz.budget'), zahlTxt(p.imBudget, '%'), p.abweichung === null ? '' : t('kz.budget.u', Math.abs(p.abweichung), t(p.abweichung > 0 ? 'kz.ueber' : 'kz.unter'), p.dauer, p.budget))
-        + kachel(t('kz.schicht'), zahlTxt(p.proSchicht), t('kz.schicht.u', p.schichten, zahlTxt(p.schichtDauer)))
-        + kachel(t('kz.stunde'), zahlTxt(p.proStundeBrutto), t('kz.stunde.u', zahlTxt(p.proStundeNetto)))
-        + kachel(t('kz.anzahl'), String(p.analysen), t('kz.anzahl.u', p.reparatur)) + '</div>';
-      var e = p.ergebnis;
-      h += '<div class="karte"><h2>' + tx('kz.ergebnis') + '</h2>' + ['reuse', 'ricardo', 'matchmaker', 'nicht'].map(function (x) {
-        var pz = Math.round(e[x] / p.analysen * 100);
-        return '<div class="feld"><div class="name">' + tx('kz.e.' + x) + '</div><div class="wert"><div class="balken"><i style="width:' + pz + '%"></i></div></div><div class="seite"><strong>' + e[x] + '</strong> <span class="still">' + pz + '%</span></div></div>';
-      }).join('') + '</div>';
-    }
-    var tab = function (titel, liste, erste, spalten) {
-      if (!liste.length) return '';
-      return '<div class="karte"><h2>' + tx(titel) + '</h2><div class="tabelle" style="margin-top:0"><table><thead><tr><th>' + tx(erste) + '</th>' + spalten.map(function (c) { return '<th class="zahl-r">' + tx(c[1]) + '</th>'; }).join('') + '</tr></thead><tbody>'
-        + liste.map(function (x) { return '<tr><td>' + esc(x.name) + '</td>' + spalten.map(function (c) { return '<td class="zahl-r">' + esc(zahlTxt(x[c[0]], c[2])) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div></div>';
+    var k = KZ, p = k.zeitraum, h = zrLeiste(k.seit);
+    var kachel = function (name, zahl, unter, extra) { return '<div class="kachel"><div class="n">' + esc(name) + '</div>' + (zahl === null ? '' : '<div class="z">' + esc(zahl) + '</div>') + (unter ? '<div class="u">' + esc(unter) + '</div>' : '') + (extra || '') + '</div>'; };
+    var reuseQ = function (x) { return x.analysen ? Math.round((x.analysen - x.ergebnis.nicht) / x.analysen * 100) : null; };
+    if (!p.analysen) { $('adm-kennzahlen').innerHTML = h + '<div class="karte"><p class="still">' + tx('kz.leer') + '</p></div>'; return; }
+    var e = p.ergebnis, balken = ['ricardo', 'matchmaker', 'reuse', 'nicht'].map(function (x) {
+      var pz = Math.round(e[x] / p.analysen * 100);
+      return '<div class="kz-zeile"><span>' + tx('kz.e.' + x) + '</span><div class="balken"><i style="width:' + pz + '%"></i></div><b>' + pz + '%</b></div>'; }).join('');
+    h += '<div class="kacheln">'
+      + kachel(t('kz.stunde'), zahlTxt(p.proStundeBrutto), t('kz.stunde.u', p.analysen, zahlTxt(p.schichtStunden)))
+      + kachel(t('kz.budget'), zahlTxt(p.imBudget, '%'), p.dauer === null ? '' : t('kz.budget.u', zahlTxt(p.dauer), zahlTxt(p.budget)))
+      + kachel(t('kz.reuse'), zahlTxt(reuseQ(p), '%'), t('kz.reuse.u', p.analysen - e.nicht, p.analysen))
+      + kachel(t('kz.ergebnis'), null, '', balken) + '</div>';
+    var spalten = [['analysen', 'kz.th.n'], ['proStundeBrutto', 'kz.th.prostunde'], ['dauer', 'kz.th.dauer'], ['imBudget', 'kz.th.imbudget', '%'], ['reuse', 'kz.th.reuse', '%']];
+    var tabelle = function (liste, erste) {
+      return '<div class="tabelle" style="margin-top:0"><table><thead><tr><th>' + tx(erste) + '</th>' + spalten.map(function (c) { return '<th class="zahl-r">' + tx(c[1]) + '</th>'; }).join('') + '</tr></thead><tbody>'
+        + liste.map(function (x) { x.reuse = reuseQ(x); return '<tr><td>' + esc(x.name) + '</td>' + spalten.map(function (c) { return '<td class="zahl-r">' + esc(zahlTxt(x[c[0]], c[2])) + '</td>'; }).join('') + '</tr>'; }).join('')
+        + '<tr class="summe"><td>Total</td>' + spalten.map(function (c) { var x = Object.assign({ reuse: reuseQ(p) }, p); return '<td class="zahl-r">' + esc(zahlTxt(x[c[0]], c[2])) + '</td>'; }).join('') + '</tr></tbody></table></div>';
     };
-    var tempo = [['analysen', 'kz.th.n'], ['schichten', 'kz.th.schichten'], ['proSchicht', 'kz.th.proschicht'], ['proStundeBrutto', 'kz.th.prostunde'], ['proStundeNetto', 'kz.th.netto'], ['dauer', 'kz.th.dauer'], ['imBudget', 'kz.th.imbudget', '%']];
-    var budget = [['analysen', 'kz.th.n'], ['dauer', 'kz.th.dauer'], ['budget', 'kz.th.budget'], ['imBudget', 'kz.th.imbudget', '%'], ['abweichung', 'kz.th.abw', '±']];
-    h += tab('kz.personen', k.personen, 'kz.th.name', tempo);
-    h += tab('kz.wochen', k.wochen.map(function (x) { return Object.assign({}, x, { name: x.name.split('-').reverse().join('.') }); }), 'kz.th.woche', tempo);
-    h += tab('kz.stufen', k.stufen, 'kz.th.stufe', budget) + tab('kz.kategorien', k.kategorien, 'th.kat', budget);
-    if (k.treffer.length) h += '<div class="karte"><h2>' + tx('kz.treffer') + '</h2><div class="tabelle" style="margin-top:0"><table><thead><tr><th>' + tx('kz.th.stufe') + '</th><th class="zahl-r">' + tx('kz.th.infos') + '</th><th class="zahl-r">' + tx('kz.th.best') + '</th><th class="zahl-r">' + tx('kz.th.korr') + '</th><th class="zahl-r">' + tx('kz.th.quote') + '</th></tr></thead><tbody>'
-      + k.treffer.map(function (x) { return '<tr><td>' + esc(w(x.stufe)) + '</td><td class="zahl-r">' + esc(x.infos) + '</td><td class="zahl-r">' + esc(x.bestaetigt) + '</td><td class="zahl-r">' + esc(x.korrigiert) + '</td><td class="zahl-r">' + esc(x.quote) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+    if (k.verlauf.length > 1) h += '<div class="karte"><h2>' + tx('kz.verlauf') + '</h2>' + tabelle(k.verlauf.map(function (x) { return Object.assign({}, x, { name: periodeName(x.name, k.einheit) }); }), 'kz.th.' + k.einheit) + '</div>';
+    if (k.personen.length) h += '<details class="karte"><summary><h2 style="display:inline">' + tx('kz.personen') + '</h2></summary>' + tabelle(k.personen, 'kz.th.name') + '</details>';
     h += '<p class="still">' + tx('kz.def') + '</p>';
     $('adm-kennzahlen').innerHTML = h;
   }
@@ -1895,7 +1927,7 @@
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
-    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, kzZeit: kzZeit, afSetz: afSetz };
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz };
 
   /* ---------- Start ---------- */
   (function () {

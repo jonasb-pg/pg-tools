@@ -72,6 +72,11 @@
   .wahl { display:flex; flex-wrap:wrap; gap:8px; }
   .wahl button { border-radius:4px; }
   .wahl button.an { background:var(--ink); color:var(--weiss); }
+  .zr-zeile { display:flex; align-items:center; gap:10px; margin:8px 0 14px; flex-wrap:wrap; }
+  .zr-zeile button { min-width:36px; }
+  tr.summe td { font-weight:600; border-top:2px solid var(--ink); }
+  .kz-tab th, .kz-tab td { padding:10px 10px; font-size:13px; letter-spacing:.3px; }
+  .kz-tab td { font-size:15px; }
 
   .tabelle { border:2px solid var(--ink); border-radius:4px; overflow:auto; background:var(--weiss); margin-top:12px; }
   table { width:100%; border-collapse:collapse; }
@@ -546,14 +551,20 @@
     'adm.mail.unecht': ['{0} Mails in den letzten 24 Stunden abgewiesen, weil sie nicht nachweislich von Ricardo kamen (Tab «Log»).', '{0} mails rejected in the last 24 hours because they were not verifiably from Ricardo (tab «Log»).'],
     'adm.ausloeser': ['Der Mail-Abruf läuft von selbst (alle 30 Minuten im Zeitfenster).', 'Mail fetching runs by itself (every 30 minutes within the window).'], 'adm.keinausloeser': ['Der Auslöser für den Mail-Abruf fehlt: im Apps Script «einrichten» ausführen.', 'The trigger for fetching mails is missing: run «einrichten» in Apps Script.'],
     'adm.ki': ['Claude ist verbunden.', 'Claude is connected.'], 'adm.keinki': ['Der Claude-Schlüssel fehlt.', 'The Claude key is missing.'],
-    'kz.woche': ['Diese Woche', 'This week'], 'kz.vier': ['Letzte 4 Wochen', 'Last 4 weeks'], 'kz.gesamt': ['Alles seit {0}', 'All since {0}'],
-    'kz.verkaeufe': ['Verkäufe', 'Sales'], 'kz.verkaeufe.u': ['Ø CHF {0} · {1} storniert', 'avg CHF {0} · {1} cancelled'], 'kz.umsatz': ['Umsatz CHF', 'Revenue CHF'], 'kz.umsatz.u': ['Auszahlung CHF {0}', 'Payout CHF {0}'],
-    'kz.quote': ['Verkaufsquote', 'Sell-through'], 'kz.quote.u': ['{0} unverkauft · Ø {1} Tage bis zum Verkauf', '{0} unsold · avg {1} days to sale'],
-    'kz.versand': ['Ø Tage bis Versand', 'Avg days to shipping'], 'kz.versand.u': ['vom Verkauf bis «bezahlt und versendet»', 'from sale to «paid and shipped»'],
-    'kz.retouren': ['Retourenquote', 'Return rate'], 'kz.retouren.u': ['{0} Retouren', '{0} returns'], 'kz.pv': ['Preisvorschläge', 'Price offers'], 'kz.pv.u': ['aus den Ricardo-Mails', 'from the Ricardo mails'],
+    'zr.woche': ['Woche', 'Week'], 'zr.monat': ['Monat', 'Month'], 'zr.alles': ['Ganzer Zeitraum', 'All time'], 'zr.eigen': ['Von – bis', 'From – to'], 'zr.zeigen': ['Anzeigen', 'Show'],
+    'zr.kw': ['KW {0} · {1}–{2}', 'Week {0} · {1}–{2}'], 'zr.seit': ['seit {0}', 'since {0}'], 'zr.zurueck': ['Früher', 'Earlier'], 'zr.vor': ['Später', 'Later'],
+    'zr.monate': ['Januar,Februar,März,April,Mai,Juni,Juli,August,September,Oktober,November,Dezember', 'January,February,March,April,May,June,July,August,September,October,November,December'],
+    'kz.umsatz': ['Umsatz CHF', 'Revenue CHF'], 'kz.umsatz.u': ['ohne Porto · {0} Verkäufe, Ø CHF {1}', 'without postage · {0} sales, avg CHF {1}'],
+    'kz.auszahlung': ['Auszahlung CHF', 'Payout CHF'], 'kz.auszahlung.u': ['ohne Porto, nach Ricardo-Provision', 'without postage, after Ricardo fee'],
+    'kz.quote': ['Verkaufsquote', 'Sell-through'], 'kz.quote.u': ['{0} angeboten: {1} verkauft, {2} nicht verkauft, {3} laufen noch', '{0} listed: {1} sold, {2} unsold, {3} still running'],
+    'kz.neupreis': ['Preis vom Neupreis', 'Price vs. new price'], 'kz.neupreis.u': ['Ø · Retouren {0} ({1})', 'avg · returns {0} ({1})'],
+    'kz.grades': ['Nach Grade (angeboten im Zeitraum)', 'By grade (listed in the period)'], 'kz.verlauf': ['Verlauf (Beträge in CHF ohne Porto)', 'Trend (amounts in CHF without postage)'],
+    'kz.g.A': ['A · Neu und originalverpackt', 'A · New, original packaging'], 'kz.g.B': ['B · Neu (gemäss Beschreibung)', 'B · New, as described'], 'kz.g.C': ['C · Gebraucht', 'C · Used'], 'kz.g.D': ['Defekt', 'Defective'], 'kz.g.?': ['Ohne Zustand', 'No condition'],
+    'kz.th.grade': ['Grade', 'Grade'], 'kz.th.anteil': ['Anteil', 'Share'], 'kz.th.angeboten': ['Angeboten', 'Listed'], 'kz.th.verkauft': ['Verkauft', 'Sold'], 'kz.th.nicht': ['Nicht verk.', 'Unsold'], 'kz.th.quote': ['Quote', 'Rate'], 'kz.th.neupreis': ['vom Neupreis', 'of new price'],
+    'kz.th.tag': ['Tag', 'Day'], 'kz.th.woche': ['Woche', 'Week'], 'kz.th.monat': ['Monat', 'Month'], 'kz.th.verkaeufe': ['Verkäufe', 'Sales'], 'kz.th.umsatz': ['Umsatz', 'Revenue'], 'kz.th.auszahlung': ['Auszahlung', 'Payout'],
     'kz.jetzt': ['Jetzt', 'Now'], 'kz.gelistet': ['Laufende Angebote', 'Running listings'], 'kz.zupacken': ['Zu packen', 'To pack'], 'kz.zahlung': ['Zahlung offen seit {0}+ Tagen', 'Payment open {0}+ days'],
-    'kz.wochen': ['Pro Woche', 'Per week'], 'kz.th.woche': ['Woche ab', 'Week from'], 'kz.th.verkaeufe': ['Verkäufe', 'Sales'], 'kz.th.umsatz': ['Umsatz CHF', 'Revenue CHF'], 'kz.th.auszahlung': ['Auszahlung CHF', 'Payout CHF'],
-    'kz.leer': ['Noch keine Verkäufe in diesem Zeitraum.', 'No sales in this period yet.'],
+    'kz.leer': ['Keine Verkäufe und keine Angebote in diesem Zeitraum.', 'No sales and no listings in this period.'],
+    'kz.def': ['Alle Beträge ohne Porto. Umsatz = Verkaufspreise ohne Stornos, Auszahlung = Umsatz minus Ricardo-Provision. Verkaufsquote = verkauft / (verkauft + nicht verkauft) der Angebote, die im Zeitraum online gingen.', 'All amounts without postage. Revenue = sale prices excluding cancellations, payout = revenue minus Ricardo fee. Sell-through = sold / (sold + unsold) of listings that went online in the period.'],
     'af.titel': ['Feedback aus dem Team', 'Feedback from the team'], 'af.leer': ['Noch kein Feedback.', 'No feedback yet.'], 'af.neu': ['Neu', 'New'], 'af.erledigt': ['Erledigt', 'Done'],
     'ad.text': ['Sucht in allen Listings und Verkäufen, egal in welchem Status. Ohne Suchbegriff erscheinen die neusten Einträge.', 'Searches all listings and sales in any status. Without a search term the latest entries are shown.'],
     'ad.platz': ['PG-ID, Titel, Käufer oder Verkaufsnummer', 'PG-ID, title, buyer or sale number'],
@@ -1028,15 +1039,15 @@
   /* ---------- Admin ---------- */
   var AD = null, EINST = [];
   /* ---------- Admin: Betrieb, Kennzahlen, Einstellungen, Storno, Feedback ---------- */
-  var ADM = 'betrieb', KZ = null, KZZ = 'vierWochen', AF = [];
+  var ADM = 'betrieb', KZ = null, AF = [];
   function ladeAdmin() { admTab(ADM); }
   function admTab(v) {
     ADM = v;
-    var reiter = ['betrieb', 'kennzahlen', 'einstellungen', 'storno', 'feedback'];
+    var reiter = ['betrieb', 'kennzahlen', 'storno', 'feedback', 'einstellungen'];   // Einstellungen am Schluss (Jonas 17.10.2026)
     $('adm-reiter').innerHTML = reiter.map(function (x) { return '<button class="' + (x === ADM ? 'an' : '') + '" onclick="admTab(\'' + x + '\')">' + esc(t('adm.r.' + x)) + '</button>'; }).join('');
     reiter.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });
     if (ADM === 'betrieb') ruf('adminBetrieb', [], zeichneBetrieb);
-    else if (ADM === 'kennzahlen') ruf('kennzahlen', [], function (k) { KZ = k; zeichneKennzahlen(); });
+    else if (ADM === 'kennzahlen') kzLaden();
     else if (ADM === 'einstellungen') ruf('adminEinstellungen', [], zeichneEinst);
     else if (ADM === 'storno') adminSuchen();
     else ruf('feedbackListe', [], zeichneFeedback);
@@ -1045,6 +1056,8 @@
     var z = function (ok, text, warn) { return '<div class="meldung ' + (ok ? (warn ? 'warn' : '') : 'stop') + '" style="margin:8px 0">' + esc(text) + '</div>'; }, m = r.mail;
     $('adm-status').innerHTML = z(m.aktiv, m.aktiv ? t('adm.mail.an', m.letzte || '–') : t('adm.mail.aus')) + (m.warnung ? z(true, t('adm.mail.still'), true) : '') + (m.unecht ? z(true, t('adm.mail.unecht', m.unecht), true) : '')
       + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
+    var j = r.jetzt, kachel = function (name, zahl) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div></div>'; };
+    if (j) $('adm-status').innerHTML = '<div class="kacheln">' + kachel(t('kz.gelistet'), String(j.gelistet)) + kachel(t('kz.zupacken'), String(j.zuPacken)) + kachel(t('kz.zahlung', j.zahlTage), String(j.zahlungOffen)) + '</div>' + $('adm-status').innerHTML;
     $('adm-sheet').href = r.url;
   }
   function admTest() {
@@ -1053,25 +1066,62 @@
       $('adm-test').innerHTML = l.map(function (x) { return '<div class="meldung ' + (x.ok ? '' : 'stop') + '"><strong>' + esc(x.name) + ': ' + esc(t(x.ok ? 'adm.ok' : 'adm.fehler')) + '</strong> · ' + esc(x.sek) + ' s<br>' + esc(x.detail) + '</div>'; }).join('');
     });
   }
-  function kzZeit(v) { KZZ = v; zeichneKennzahlen(); }
+  /* Zeitraum für Kennzahlen (Entscheid Jonas 17.10.2026): Woche (KW), Monat, ganzer Zeitraum oder von–bis. Gleich im Analyse Tool. */
+  var ZR = { art: 'monat', anker: new Date(), von: '', bis: '' };
+  function tagIso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function tagCh(iso, jahr) { var x = String(iso).split('-'); return x[2] + '.' + x[1] + '.' + (jahr ? x[0] : ''); }
+  function kwVon(d) { var x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), wt = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - wt); var j = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - j) / 864e5 + 1) / 7); }
+  function zrBereich() {
+    var d = ZR.anker;
+    if (ZR.art === 'woche') { var mo = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)), so = new Date(mo.getFullYear(), mo.getMonth(), mo.getDate() + 6);
+      return { von: tagIso(mo), bis: tagIso(so), label: t('zr.kw', kwVon(mo), tagCh(tagIso(mo)), tagCh(tagIso(so), true)) }; }
+    if (ZR.art === 'monat') { var a = new Date(d.getFullYear(), d.getMonth(), 1), e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      return { von: tagIso(a), bis: tagIso(e), label: t('zr.monate').split(',')[d.getMonth()] + ' ' + d.getFullYear() }; }
+    if (ZR.art === 'eigen') return { von: ZR.von, bis: ZR.bis, label: '' };
+    return { von: '', bis: '', label: '' };
+  }
+  function zrLeiste(seit) {
+    var b = zrBereich(), h = '<div class="wahl adm-reiter">' + ['woche', 'monat', 'alles', 'eigen'].map(function (x) {
+      return '<button class="' + (x === ZR.art ? 'an' : '') + '" onclick="zrArt(\'' + x + '\')">' + esc(t('zr.' + x)) + '</button>'; }).join('') + '</div><div class="zr-zeile">';
+    if (ZR.art === 'woche' || ZR.art === 'monat') h += '<button onclick="zrSchritt(-1)" title="' + esc(t('zr.zurueck')) + '">‹</button><strong>' + esc(b.label) + '</strong><button onclick="zrSchritt(1)" title="' + esc(t('zr.vor')) + '">›</button>';
+    else if (ZR.art === 'eigen') h += '<input type="date" id="zr-von" value="' + esc(ZR.von) + '"> – <input type="date" id="zr-bis" value="' + esc(ZR.bis) + '"><button onclick="zrEigen()">' + esc(t('zr.zeigen')) + '</button>';
+    else h += '<strong>' + esc(t('zr.seit', seit || '–')) + '</strong>';
+    return h + '</div>';
+  }
+  function zrArt(v) {
+    ZR.art = v; ZR.anker = new Date();
+    if (v === 'eigen' && !ZR.von) { var d = new Date(); ZR.bis = tagIso(d); d.setDate(d.getDate() - 27); ZR.von = tagIso(d); }
+    kzLaden();
+  }
+  function zrSchritt(n) { var d = ZR.anker; ZR.anker = ZR.art === 'woche' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7 * n) : new Date(d.getFullYear(), d.getMonth() + n, 1); kzLaden(); }
+  function zrEigen() { var a = $('zr-von').value, b = $('zr-bis').value; if (a && b && a > b) { var x = a; a = b; b = x; } ZR.von = a; ZR.bis = b; kzLaden(); }
+  function kzLaden() { var b = zrBereich(); ruf('kennzahlen', [b.von, b.bis], function (k) { KZ = k; zeichneKennzahlen(); }); }
+  function periodeName(x, einheit) {
+    if (einheit === 'tag') return tagCh(x);
+    if (einheit === 'woche') { var p = x.split('-'); return 'KW ' + kwVon(new Date(+p[0], +p[1] - 1, +p[2])) + ' · ' + tagCh(x); }
+    var m = x.split('-'); return t('zr.monate').split(',')[+m[1] - 1].slice(0, 3) + ' ' + m[0];
+  }
   function zahlTxt(x, nach) { return x === null || x === undefined ? '–' : String(x) + (nach || ''); }
-  function chf(x) { return x === null || x === undefined ? '–' : Number(x).toFixed(2); }
+  function chf(x) { return x === null || x === undefined ? '–' : Number(x).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'"); }
   function zeichneKennzahlen() {
-    var k = KZ, p = k[KZZ], j = k.jetzt;
+    var k = KZ, p = k.zeitraum, h = zrLeiste(k.seit);
     var kachel = function (name, zahl, unter) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div><div class="u">' + esc(unter || '') + '</div></div>'; };
-    var h = '<h3>' + esc(t('kz.jetzt')) + '</h3><div class="kacheln">' + kachel(t('kz.gelistet'), String(j.gelistet)) + kachel(t('kz.zupacken'), String(j.zuPacken)) + kachel(t('kz.zahlung', j.zahlTage), String(j.zahlungOffen)) + '</div>';
-    h += '<div class="wahl adm-reiter">' + [['woche', 'kz.woche'], ['vierWochen', 'kz.vier'], ['gesamt', 'kz.gesamt']].map(function (x) {
-      return '<button class="' + (x[0] === KZZ ? 'an' : '') + '" onclick="kzZeit(\'' + x[0] + '\')">' + esc(t(x[1], k.seit || '–')) + '</button>'; }).join('') + '</div>';
-    if (!p.verkaeufe && !p.unverkauft && !p.preisvorschlaege) h += '<div class="karte"><p class="still">' + esc(t('kz.leer')) + '</p></div>';
-    else h += '<div class="kacheln">'
-      + kachel(t('kz.verkaeufe'), String(p.verkaeufe), t('kz.verkaeufe.u', chf(p.schnitt), p.storniert))
-      + kachel(t('kz.umsatz'), chf(p.umsatz), t('kz.umsatz.u', chf(p.auszahlung)))
-      + kachel(t('kz.quote'), zahlTxt(p.verkaufsquote, '%'), t('kz.quote.u', p.unverkauft, zahlTxt(p.tageBisVerkauf)))
-      + kachel(t('kz.versand'), zahlTxt(p.tageBisVersand), t('kz.versand.u'))
-      + kachel(t('kz.retouren'), zahlTxt(p.retourenquote, '%'), t('kz.retouren.u', p.retouren))
-      + kachel(t('kz.pv'), String(p.preisvorschlaege), t('kz.pv.u')) + '</div>';
-    if (k.wochen.length) h += '<div class="karte"><h2>' + esc(t('kz.wochen')) + '</h2><div class="tabelle" style="margin-top:0"><table><tr><th>' + esc(t('kz.th.woche')) + '</th><th class="zahl-r">' + esc(t('kz.th.verkaeufe')) + '</th><th class="zahl-r">' + esc(t('kz.th.umsatz')) + '</th><th class="zahl-r">' + esc(t('kz.th.auszahlung')) + '</th></tr>'
-      + k.wochen.map(function (w) { return '<tr><td>' + esc(w.name.split('-').reverse().join('.')) + '</td><td class="zahl-r">' + w.verkaeufe + '</td><td class="zahl-r">' + chf(w.umsatz) + '</td><td class="zahl-r">' + chf(w.auszahlung) + '</td></tr>'; }).join('') + '</table></div></div>';
+    var tabelle = function (kopf, zeilen, summe) {
+      return '<div class="tabelle kz-tab" style="margin-top:0"><table><tr>' + kopf.map(function (x, i) { return '<th' + (i ? ' class="zahl-r"' : '') + '>' + esc(t(x)) + '</th>'; }).join('') + '</tr>'
+        + zeilen.concat(summe ? [summe] : []).map(function (z, j) { return '<tr' + (summe && j === zeilen.length ? ' class="summe"' : '') + '>' + z.map(function (x, i) { return '<td' + (i ? ' class="zahl-r"' : ' style="white-space:nowrap"') + '>' + esc(x) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
+    };
+    if (!p.verkaeufe && !p.angeboten) { $('adm-kennzahlen').innerHTML = h + '<div class="karte"><p class="still">' + esc(t('kz.leer')) + '</p></div>'; return; }
+    h += '<div class="kacheln">'
+      + kachel(t('kz.umsatz'), chf(p.umsatz), t('kz.umsatz.u', p.verkaeufe, chf(p.schnitt)))
+      + kachel(t('kz.auszahlung'), chf(p.auszahlung), t('kz.auszahlung.u'))
+      + kachel(t('kz.quote'), zahlTxt(p.verkaufsquote, '%'), t('kz.quote.u', p.angeboten, p.verkauft, p.nichtVerkauft, p.laufend))
+      + kachel(t('kz.neupreis'), zahlTxt(p.vomNeupreis, '%'), t('kz.neupreis.u', p.retouren, zahlTxt(p.retourenquote, '%'))) + '</div>';
+    if (k.grades.length) h += '<div class="karte"><h2>' + esc(t('kz.grades')) + '</h2>' + tabelle(['kz.th.grade', 'kz.th.angeboten', 'kz.th.anteil', 'kz.th.verkauft', 'kz.th.nicht', 'kz.th.quote', 'kz.th.neupreis'],
+      k.grades.map(function (g) { return [t('kz.g.' + g.grade), g.angeboten, zahlTxt(g.anteil, '%'), g.verkauft, g.nichtVerkauft, zahlTxt(g.verkaufsquote, '%'), zahlTxt(g.vomNeupreis, '%')]; })) + '</div>';
+    var zeile = function (name, x) { return [name, x.verkaeufe, chf(x.umsatz), chf(x.auszahlung), x.angeboten, x.verkauft, x.nichtVerkauft, zahlTxt(x.verkaufsquote, '%')]; };
+    if (k.verlauf.length) h += '<div class="karte"><h2>' + esc(t('kz.verlauf')) + '</h2>' + tabelle(['kz.th.' + k.einheit, 'kz.th.verkaeufe', 'kz.th.umsatz', 'kz.th.auszahlung', 'kz.th.angeboten', 'kz.th.verkauft', 'kz.th.nicht', 'kz.th.quote'],
+      k.verlauf.map(function (x) { return zeile(periodeName(x.name, k.einheit), x); }), k.verlauf.length > 1 ? zeile('Total', p) : null) + '</div>';
+    h += '<p class="still">' + esc(t('kz.def')) + '</p>';
     $('adm-kennzahlen').innerHTML = h;
   }
   function zeichneFeedback(liste) {
