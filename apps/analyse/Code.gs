@@ -525,7 +525,7 @@ function einst_() {
 }
 /** Tab «Listen»: Zeile 2 sind die Listennamen, darunter die Werte. */
 function liste_(name) {
-  const v = blatt_('Listen').getDataRange().getValues(), j = v[1].indexOf(name), aus = [];
+  const v = (!IN_SPERRE && LAUF_MEMO['Listen']) || rasterWerte_(blatt_('Listen')), j = (v[1] || []).indexOf(name), aus = [];
   for (let i = 2; j > -1 && i < v.length; i++) if (v[i][j] !== '') aus.push(String(v[i][j]));
   return aus;
 }
@@ -2986,6 +2986,21 @@ function tempoTest() {
   t('Sheets-Dienst: nochmals', function () { const r = Sheets.Spreadsheets.Values.batchGet(ss.getId(), { ranges: tabs.map(function (n) { return "'" + n + "'"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); return r.valueRanges.length; });
   t('Sheets-Dienst: 1 Tab', function () { const r = Sheets.Spreadsheets.Values.get(ss.getId(), "'Testkonten'"); return (r.values || []).length; });
   t('Zwischenspeicher lesen', function () { CacheService.getScriptCache().get('tab:Einstellungen'); });
+  console.log(aus.join('\n'));
+  return aus;
+}
+
+/** Tempo-Messung der echten Aufrufe der Oberfläche (nur lesen). Im Editor ausführen. Jeder Aufruf zweimal: zuerst kalt, dann mit Zwischenspeicher. */
+function tempoEcht() {
+  const aus = [], mal = function (name, args) {
+    LAUF_MEMO = {}; MEMO = {}; LESEN = [];                              // wie ein neuer Aufruf aus der Web-App
+    const t = Date.now();
+    try { api('de', name, args || []); aus.push(name + ': ' + (Date.now() - t) + ' ms · ' + LESEN.join(', ')); }
+    catch (err) { aus.push(name + ': Fehler ' + err.message); }
+  };
+  const p = lies_('Produkte').z.filter(function (r) { return inSchlange_(r) && r['Recherche-Status'] === 'Bereit'; })[0];
+  ['startDaten', 'werkstatt', 'adminDaten'].forEach(function (n) { mal(n); mal(n); });
+  if (p) { mal('starteAnalyse', [String(p['PG-ID'])]); mal('starteAnalyse', [String(p['PG-ID'])]); }
   console.log(aus.join('\n'));
   return aus;
 }
