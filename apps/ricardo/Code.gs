@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-17.2';
+const VERSION = '2026-10-17.3';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2083,7 +2083,8 @@ function verbindungTest() {
  */
 function kennzahlen(von, bis, jetztMs) {
   pruefeAdmin_();
-  return kennzahlenRechnen_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), objekte_(TAB_R, R_COLS), jetztMs ? Number(jetztMs) : Date.now(), tagR_(von), tagR_(bis));
+  return kennzahlenRechnen_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), objekte_(TAB_R, R_COLS), jetztMs ? Number(jetztMs) : Date.now(), tagR_(von), tagR_(bis),
+    Number(cfg_('Laufzeit Tage')) || 6, Number(PropertiesService.getScriptProperties().getProperty('LETZTER_IMPORT')) || 0);
 }
 function tagR_(x) { const m = String(x || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[0] : ''; }
 /** Montag 00:00 (Zürcher Zeit) der Woche von ms, als «yyyy-MM-dd». */
@@ -2102,7 +2103,12 @@ function jetztR_(listings, verkaeufe, jetzt, zahlTage) {
     zahlTage: zahlTage
   };
 }
-function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis) {
+/**
+ * Ein Angebot mit Status «Gelistet», dessen Laufzeit vorbei ist und das im danach eingelesenen Verkaufsbericht nicht vorkam, zählt als nicht verkauft,
+ * auch wenn die Ricardo-Mail «nicht verkauft» fehlt (Fehler 17.10.2026: 9 abgelaufene Angebote standen als «laufen noch»).
+ * Ist die Laufzeit vorbei, der Bericht aber noch nicht eingelesen, ist das Ergebnis offen («bericht»).
+ */
+function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, laufzeitTage, letzterImport) {
   const tag = function (d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : ''; };
   const r2 = function (x) { return Math.round(x * 100) / 100; }, pz = function (a, b) { return b ? Math.round(a / b * 100) : null; };
   const nachId = {};
@@ -2112,10 +2118,14 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis) {
     const l = nachId[String(x['PG-ID'] || '')] || {}, neu = Number(l['Neupreis CHF']) || 0;
     return { tag: tag(x['Verkauft am']), ms: x['Verkauft am'].getTime(), grade: gradeR_(l['Zustand']), storno: x['Status'] === 'Storniert', preis: Number(x['Preis CHF']) || 0, aus: Number(x['Auszahlung CHF']) || 0, neu: neu };
   });
+  const gelistet = function (d) {
+    const ende = d.getTime() + (laufzeitTage || 6) * 86400000;
+    return ende > jetzt ? 'laeuft' : ((letzterImport || 0) >= ende ? 'nicht' : 'bericht');
+  };
   const an = listings.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) {
     const st = String(x['Status'] || '');
     return { tag: tag(x['Gelistet am']), ms: x['Gelistet am'].getTime(), grade: gradeR_(x['Zustand']),
-      ergebnis: st === 'Unverkauft' ? 'nicht' : (st === 'Gelistet' ? 'laeuft' : (['Verkauft', 'Versendet'].indexOf(st) > -1 || x['Verkauft am'] instanceof Date ? 'verkauft' : 'laeuft')) };
+      ergebnis: st === 'Unverkauft' ? 'nicht' : (st === 'Gelistet' ? gelistet(x['Gelistet am']) : (['Verkauft', 'Versendet'].indexOf(st) > -1 || x['Verkauft am'] instanceof Date ? 'verkauft' : 'laeuft')) };
   });
   const rt = retouren.filter(function (x) { return x['Eröffnet am'] instanceof Date; }).map(function (x) { return { tag: tag(x['Eröffnet am']), ms: x['Eröffnet am'].getTime() }; });
   const alle = vk.concat(an).map(function (x) { return x.tag; }).filter(String).sort();
@@ -2123,13 +2133,13 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis) {
   const drin = function (x) { return x.tag >= v && x.tag <= b; };
   const rechne = function (V, A, R) {
     const g = V.filter(function (x) { return !x.storno; }), mitNeu = g.filter(function (x) { return x.neu > 0; });
-    const n = { verkauft: 0, nicht: 0, laeuft: 0 };
+    const n = { verkauft: 0, nicht: 0, laeuft: 0, bericht: 0 };
     A.forEach(function (x) { n[x.ergebnis]++; });
     return { verkaeufe: g.length, storniert: V.length - g.length,
       umsatz: r2(g.reduce(function (t, x) { return t + x.preis; }, 0)), auszahlung: r2(g.reduce(function (t, x) { return t + x.aus; }, 0)),
       schnitt: g.length ? r2(g.reduce(function (t, x) { return t + x.preis; }, 0) / g.length) : null,
       vomNeupreis: mitNeu.length ? Math.round(mitNeu.reduce(function (t, x) { return t + x.preis / x.neu; }, 0) / mitNeu.length * 100) : null,
-      angeboten: A.length, verkauft: n.verkauft, nichtVerkauft: n.nicht, laufend: n.laeuft, verkaufsquote: pz(n.verkauft, n.verkauft + n.nicht),
+      angeboten: A.length, verkauft: n.verkauft, nichtVerkauft: n.nicht, laufend: n.laeuft, berichtFehlt: n.bericht, verkaufsquote: pz(n.verkauft, n.verkauft + n.nicht),
       retouren: R.length, retourenquote: pz(R.length, g.length) };
   };
   const V = vk.filter(drin), A = an.filter(drin), R = rt.filter(drin);

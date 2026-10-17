@@ -563,6 +563,7 @@
     'kz.th.grade': ['Grade', 'Grade'], 'kz.th.anteil': ['Anteil', 'Share'], 'kz.th.angeboten': ['Angeboten', 'Listed'], 'kz.th.verkauft': ['Verkauft', 'Sold'], 'kz.th.nicht': ['Nicht verk.', 'Unsold'], 'kz.th.quote': ['Quote', 'Rate'], 'kz.th.neupreis': ['vom Neupreis', 'of new price'],
     'kz.th.tag': ['Tag', 'Day'], 'kz.th.woche': ['Woche', 'Week'], 'kz.th.monat': ['Monat', 'Month'], 'kz.th.verkaeufe': ['Verkäufe', 'Sales'], 'kz.th.umsatz': ['Umsatz', 'Revenue'], 'kz.th.auszahlung': ['Auszahlung', 'Payout'],
     'kz.jetzt': ['Jetzt', 'Now'], 'kz.gelistet': ['Laufende Angebote', 'Running listings'], 'kz.zupacken': ['Zu packen', 'To pack'], 'kz.zahlung': ['Zahlung offen seit {0}+ Tagen', 'Payment open {0}+ days'],
+    'kz.bericht': ['{0} Angebote sind abgelaufen, der Verkaufsbericht danach ist aber noch nicht eingelesen. Erst danach zählen sie als verkauft oder nicht verkauft.', '{0} listings have ended, but the sales report after that has not been imported yet. Only then do they count as sold or unsold.'],
     'kz.leer': ['Keine Verkäufe und keine Angebote in diesem Zeitraum.', 'No sales and no listings in this period.'],
     'kz.def': ['Alle Beträge ohne Porto. Umsatz = Verkaufspreise ohne Stornos, Auszahlung = Umsatz minus Ricardo-Provision. Verkaufsquote = verkauft / (verkauft + nicht verkauft) der Angebote, die im Zeitraum online gingen.', 'All amounts without postage. Revenue = sale prices excluding cancellations, payout = revenue minus Ricardo fee. Sell-through = sold / (sold + unsold) of listings that went online in the period.'],
     'af.titel': ['Feedback aus dem Team', 'Feedback from the team'], 'af.leer': ['Noch kein Feedback.', 'No feedback yet.'], 'af.neu': ['Neu', 'New'], 'af.erledigt': ['Erledigt', 'Done'],
@@ -1114,8 +1115,9 @@
     h += '<div class="kacheln">'
       + kachel(t('kz.umsatz'), chf(p.umsatz), t('kz.umsatz.u', p.verkaeufe, chf(p.schnitt)))
       + kachel(t('kz.auszahlung'), chf(p.auszahlung), t('kz.auszahlung.u'))
-      + kachel(t('kz.quote'), zahlTxt(p.verkaufsquote, '%'), t('kz.quote.u', p.angeboten, p.verkauft, p.nichtVerkauft, p.laufend))
+      + kachel(t('kz.quote'), zahlTxt(p.verkaufsquote, '%'), t('kz.quote.u', p.angeboten, p.verkauft, p.nichtVerkauft, p.laufend + (p.berichtFehlt || 0)))
       + kachel(t('kz.neupreis'), zahlTxt(p.vomNeupreis, '%'), t('kz.neupreis.u', p.retouren, zahlTxt(p.retourenquote, '%'))) + '</div>';
+    if (p.berichtFehlt) h += '<div class="meldung warn" style="margin:0 0 16px">' + esc(t('kz.bericht', p.berichtFehlt)) + '</div>';
     if (k.grades.length) h += '<div class="karte"><h2>' + esc(t('kz.grades')) + '</h2>' + tabelle(['kz.th.grade', 'kz.th.angeboten', 'kz.th.anteil', 'kz.th.verkauft', 'kz.th.nicht', 'kz.th.quote', 'kz.th.neupreis'],
       k.grades.map(function (g) { return [t('kz.g.' + g.grade), g.angeboten, zahlTxt(g.anteil, '%'), g.verkauft, g.nichtVerkauft, zahlTxt(g.verkaufsquote, '%'), zahlTxt(g.vomNeupreis, '%')]; })) + '</div>';
     var zeile = function (name, x) { return [name, x.verkaeufe, chf(x.umsatz), chf(x.auszahlung), x.angeboten, x.verkauft, x.nichtVerkauft, zahlTxt(x.verkaufsquote, '%')]; };

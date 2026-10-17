@@ -23,7 +23,7 @@ const verkaeufe = [
   { 'Verkauf-Nr': '4', 'Verkauft am': D(16), 'Status': 'Zu packen', 'Preis CHF': 20, 'Auszahlung CHF': 17 }
 ];
 const retouren = [{ 'Eröffnet am': D(15) }];
-const R = function (von, bis) { return JSON.parse(JSON.stringify(c.kennzahlenRechnen_(listings, verkaeufe, retouren, D(17).getTime(), von, bis))); };
+const R = function (von, bis) { return JSON.parse(JSON.stringify(c.kennzahlenRechnen_(listings, verkaeufe, retouren, D(17).getTime(), von, bis, 6, D(16).getTime()))); };
 /* Woche 12.–18.10. (KW 42) */
 const k = R('2026-10-12', '2026-10-18'), w = k.zeitraum;
 assert.strictEqual(k.einheit, 'tag');
@@ -46,4 +46,10 @@ const sep = R('2026-09-01', '2026-09-30'); assert.strictEqual(sep.zeitraum.verka
 assert.deepStrictEqual(JSON.parse(JSON.stringify(c.jetztR_(listings, verkaeufe, D(17).getTime(), 3))), { gelistet: 1, zuPacken: 1, zahlungOffen: 1, zahlTage: 3 });   // Nr. 2 seit 3 Tagen offen, Nr. 4 erst seit 1 Tag
 const leer = JSON.parse(JSON.stringify(c.kennzahlenRechnen_([], [], [], D(17).getTime(), '', '')));
 assert.strictEqual(leer.zeitraum.verkaeufe, 0); assert.strictEqual(leer.zeitraum.verkaufsquote, null);
+/* Abgelaufen ohne Mail «nicht verkauft» (Fehler 17.10.2026): nach dem Verkaufsbericht nicht verkauft, vorher offen */
+const ab = [{ 'PG-ID': 'P9', 'Status': 'Gelistet', 'Gelistet am': D(9), 'Zustand': 'Gebraucht' }, { 'PG-ID': 'P10', 'Status': 'Gelistet', 'Gelistet am': D(12), 'Zustand': 'Gebraucht' }];
+const mit = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(16).getTime()))).zeitraum;
+assert.deepStrictEqual([mit.nichtVerkauft, mit.laufend, mit.berichtFehlt], [1, 1, 0]);
+const ohne = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(14).getTime()))).zeitraum;
+assert.deepStrictEqual([ohne.nichtVerkauft, ohne.laufend, ohne.berichtFehlt], [0, 1, 1]);
 console.log('t_ricardo_kennzahlen ok');
