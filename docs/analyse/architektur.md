@@ -76,3 +76,9 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 | Admin (`admin`) | nur für «Admins»: Auswertung, Batches, Verbindungstest |
 | Foto-Seite (`?foto=PG-ID`) | Handy: Fotos aufnehmen und hochladen |
 | Overlays | Handbuch-Ansicht (`#hb-ansicht`), Feedback (`#fb`) |
+
+## Dienste im Apps-Script-Projekt
+
+| Dienst | Kennzeichnung | Wozu |
+|---|---|---|
+| Google Sheets API v4 | `Sheets` | mehrere Tabs in einem Aufruf lesen (apiWerte_, vorladen_). Fehlt der Dienst, liest das Tool wie bisher über SpreadsheetApp. Eingeschaltet am 17.10.2026. |

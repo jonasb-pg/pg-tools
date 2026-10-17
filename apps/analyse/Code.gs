@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-17.7';
+const VERSION = '2026-10-17.8';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -269,6 +269,7 @@ function api(lang, name, args) {
     ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
+  try { vorladen_(VORLADEN[name] || ['Einstellungen']); } catch (err) { /* dann liest jeder Tab für sich */ }
   try { return f.apply(null, args || []); }
   catch (e) { throw new Error(en_(String(e.message || e))); }
   finally {
@@ -371,7 +372,12 @@ function lies_(n) {
 function liesRoh_(n) {
   /* Die Werte eines Tabs pro Aufruf nur einmal holen (ausserhalb einer Sperre); die Objekte entstehen jedes Mal neu, Änderungen daran bleiben lokal. */
   let v = !IN_SPERRE && LAUF_MEMO[n];
-  if (!v) { const t = Date.now(); v = blatt_(n).getDataRange().getValues(); LESEN.push(n + ' ' + (Date.now() - t) + ' ms'); if (!IN_SPERRE) LAUF_MEMO[n] = v; }
+  if (!v) {
+    const t = Date.now();
+    v = (!IN_SPERRE && apiWerte_([n])[n]) || rasterWerte_(blatt_(n));
+    LESEN.push(n + ' ' + (Date.now() - t) + ' ms');
+    if (!IN_SPERRE) LAUF_MEMO[n] = v;
+  }
   const kopf = v[0].map(String), z = [];
   for (let i = 1; i < v.length; i++) {
     const o = { _r: i + 1 };
@@ -387,11 +393,75 @@ function liesRoh_(n) {
  */
 const STABIL = ['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel'];
 let MEMO = {};
+/**
+ * Tempo (Messung 17.10.2026 mit tempoTest): Jede Anfrage an Google Sheets kostet rund 0.3 s. getDataRange braucht drei davon (Länge, Breite, Werte),
+ * darum liest das Tool das ganze Raster in einem Aufruf und schneidet leere Zeilen und Spalten selbst ab. Gleiches Ergebnis wie getDataRange().getValues().
+ */
+function rasterWerte_(s) {
+  if (typeof s.getMaxRows !== 'function') return s.getDataRange().getValues();
+  const v = s.getRange(1, 1, Math.max(1, s.getMaxRows()), Math.max(1, s.getMaxColumns())).getValues(), leer = function (x) { return x === '' || x === null; };
+  let r = v.length, c = 0;
+  while (r > 1 && v[r - 1].every(leer)) r--;
+  for (let i = 0; i < r; i++) for (let j = v[i].length - 1; j >= c; j--) if (!leer(v[i][j])) { c = j + 1; break; }
+  return v.slice(0, r).map(function (z) { return z.slice(0, Math.max(c, 1)); });
+}
+/**
+ * Mehrere Tabs in einer einzigen Anfrage über den Dienst «Sheets» (Sheets API, im Projekt eingeschaltet am 17.10.2026): 9 Tabs in rund 0.5 s statt 9 s.
+ * Datumszellen kommen als Text im Format der Zelle (z.B. «16.10.2026 13:45:27»); das Tool liest beides. Ohne Dienst: leeres Ergebnis, dann liest SpreadsheetApp.
+ */
+function apiWerte_(namen) {
+  const aus = {};
+  if (!namen.length || typeof Sheets === 'undefined') return aus;
+  try {
+    const r = Sheets.Spreadsheets.Values.batchGet(ss_().getId(), { ranges: namen.map(function (n) { return "'" + String(n).replace(/'/g, "''") + "'"; }),
+      valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING' });
+    (r.valueRanges || []).forEach(function (vr, i) {
+      const z = vr.values && vr.values.length ? vr.values : [[]];
+      let c = 1;
+      z.forEach(function (row) { if (row.length > c) c = row.length; });
+      aus[namen[i]] = z.map(function (row) { const o = []; for (let j = 0; j < c; j++) o.push(row[j] === undefined || row[j] === null ? '' : row[j]); return o; });
+    });
+  } catch (err) { return {}; }                                         // z.B. Dienst nicht eingeschaltet: dann wie bisher
+  return aus;
+}
+/** Die Tabs, die ein Aufruf braucht, vorab in einer Anfrage holen (ausser denen im Zwischenspeicher). */
+const VORLADEN = {
+  startDaten: ['Einstellungen', 'Produkte', 'Bestellliste', 'Listen', 'Stufen'],
+  suche: ['Einstellungen', 'Produkte', 'Stufen'],
+  werkstatt: ['Einstellungen', 'Testkonten', 'Testmittel'],
+  adminDaten: ['Einstellungen', 'Produkte', 'Stufen', 'Batches'],
+  starteAnalyse: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
+  pruefen: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
+  ricardoText: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
+  abschliessen: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
+  kennzahlen: ['Einstellungen', 'Analysen', 'Log'],
+  ersatzteile: ['Einstellungen', 'Ersatzteile', 'Bestellliste', 'Produkte'],
+  bestellliste: ['Einstellungen', 'Bestellliste'],
+  feedbackListe: ['Einstellungen', 'Feedback'],
+  warteschlange: ['Einstellungen', 'Produkte', 'Stufen']
+};
+function vorladen_(namen) {
+  if (IN_SPERRE || !namen || !namen.length || typeof Sheets === 'undefined') return;
+  let offen = namen.filter(function (n) { return !LAUF_MEMO[n] && !(STABIL.indexOf(n) > -1 && MEMO[n]); });
+  const stabil = offen.filter(function (n) { return STABIL.indexOf(n) > -1; });
+  if (stabil.length) {
+    try {
+      const da = CacheService.getScriptCache().getAll(stabil.map(function (n) { return 'tab:' + n; }));
+      stabil.forEach(function (n) { if (da['tab:' + n]) MEMO[n] = da['tab:' + n]; });
+      offen = offen.filter(function (n) { return !MEMO[n]; });
+    } catch (err) { /* dann eben lesen */ }
+  }
+  if (!offen.length) return;
+  const t = Date.now(), w = apiWerte_(offen), da = Object.keys(w);
+  da.forEach(function (n) { LAUF_MEMO[n] = w[n]; });
+  if (da.length) LESEN.push(da.join('+') + ' ' + (Date.now() - t) + ' ms');
+}
 function vergiss_(n) {
   delete LAUF_MEMO[n];
   if (['Produkte', 'Bestellliste', 'Listen'].indexOf(n) > -1) startVergessen_();
   if (n === 'Kosten') try { CacheService.getScriptCache().remove('kosten:' + Utilities.formatDate(new Date(), TZ, 'MM.yyyy')); } catch (err) { /* läuft ab */ }
   if (n === 'Analysen') try { CacheService.getScriptCache().remove('kennzahlen'); } catch (err) { /* läuft ab */ }
+  if (['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel', 'Listen', 'Score-Regeln'].indexOf(n) > -1) uebNeu_();   // betrifft jeden Überblick
   if (STABIL.indexOf(n) < 0) return;
   delete MEMO[n];
   try { CacheService.getScriptCache().remove('tab:' + n); } catch (err) { /* läuft nach 5 Minuten ab */ }
@@ -661,6 +731,7 @@ function abgleichen() {
     const tag = tagsueber_(e);
     if (!tag) schritt(function () { return handbuecher_(e); }, 'Handbücher');
     if (tag && Date.now() - t0 >= 30000) log_('Tempo', '', 'Abgleich ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + dauer.join(', '));
+    if (Date.now() - t0 < 180000) schritt(function () { return vorwaermen_(e, 8); }, 'vorwärmen');   // höchstens 8 Stück, nur wenn der Lauf noch Zeit hat
     PropertiesService.getScriptProperties().setProperty('ABGLEICH_ZULETZT', zeit_());
     try { startPaket_(); } catch (err) { /* nicht kritisch */ }          // Startseite für die nächsten 10 Minuten vorbereiten
     return aus;
@@ -1434,6 +1505,7 @@ function handbuchAuswerten_(j, x, herkunft) {
 
 /** Schreibt oder ersetzt die Zeile eines Modells im Handbuch-Sheet. */
 function handbuchSchreiben_(e, zeile) {
+  uebNeu_();                                                            // ein neues Handbuch ändert den Überblick
   gesperrt_(function () {
     const s = handbuchBlatt_(e), kopf = kopf_(s), v = s.getDataRange().getValues();
     const row = kopf.map(function (k) { return zeile[k] === undefined || zeile[k] === null ? '' : zeile[k]; });
@@ -1670,7 +1742,40 @@ function ueberblick_(p, e) {
   };
 }
 
-function starteAnalyse(id) { return ueberblick_(produkt_(id), einst_()); }
+function starteAnalyse(id) { return ueberblickSpeicher_(produkt_(id), einst_()); }
+
+/**
+ * Überblick pro Produkt im Zwischenspeicher (6 Stunden): «Analyse starten», «Zustand prüfen» und der Ricardo-Text brauchen ihn je neu, und er kostet sonst
+ * mehrere Sekunden (Recherche suchen, Handbuch-Sheet öffnen). Der Schlüssel enthält die Produktzeile: Ändert sie (z.B. Recherche fertig), gilt der alte nicht mehr.
+ * Änderungen, die alle Produkte betreffen (Einstellungen, Stufen, Testmittel, Handbücher), machen über uebNeu_ alle ungültig. Der Abgleich wärmt die Warteschlange vor.
+ */
+const UEB_TTL = 21600;
+function uebNeu_() { try { CacheService.getScriptCache().put('ueb-gen', String(Date.now()), UEB_TTL); } catch (err) { /* läuft ab */ } }
+function uebSchluessel_(p, gen) {
+  const s = JSON.stringify(p);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return 'ueb:' + VERSION + ':' + LANG + ':' + gen + ':' + String(p['PG-ID']) + ':' + h.toString(36);
+}
+function ueberblickSpeicher_(p, e) {
+  let c = null, k = '';
+  try { c = CacheService.getScriptCache(); k = uebSchluessel_(p, c.get('ueb-gen') || '0'); const alt = c.get(k); if (alt) return JSON.parse(alt); } catch (err) { c = null; }
+  const u = ueberblick_(p, e);
+  if (c && u.recherche) try { const s = JSON.stringify(u); if (s.length < 95000) c.put(k, s, UEB_TTL); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
+  return u;
+}
+/** Abgleich: den Überblick für die nächsten Stücke der Warteschlange vorberechnen, damit «Analyse starten» sofort da ist. Höchstens n Stück pro Lauf. */
+function vorwaermen_(e, n) {
+  const c = CacheService.getScriptCache(), gen = c.get('ueb-gen') || '0';
+  let gemacht = 0;
+  lies_('Produkte').z.filter(function (r) { return inSchlange_(r) && r['Recherche-Status'] === 'Bereit'; }).some(function (p) {
+    if (gemacht >= n) return true;
+    if (c.get(uebSchluessel_(p, gen))) return false;
+    try { ueberblickSpeicher_(p, e); gemacht++; } catch (err) { /* nächstes Stück */ }
+    return false;
+  });
+  return gemacht ? { vorgewaermt: gemacht } : {};
+}
 
 /* ------------------------------------------------------------------ */
 /* Matchmaker                                                          */
@@ -1951,7 +2056,7 @@ function kaeuferSaetze_(x, u, d) {
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
 function pruefen(d) {
   d = d || {};
-  const e = einst_(), x = urteil_(d, ueberblick_(produkt_(d.id), e), e);
+  const e = einst_(), x = urteil_(d, ueberblickSpeicher_(produkt_(d.id), e), e);
   return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
     versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x) };
 }
@@ -1985,7 +2090,7 @@ function abschliessen(d) {
   const e = einst_(), p = produkt_(d.id), nachMm = d.nachMm === true, pg = String(p['PG-ID']);
   const nurEinmal = function (x) { if (x['Analyse-Status'] === 'Erledigt' && !nachMm) throw new Error('Produkt ' + d.id + ' ist bereits analysiert.'); };
   nurEinmal(p);
-  const u = ueberblick_(p, e), x = urteil_(d, u, e);
+  const u = ueberblickSpeicher_(p, e), x = urteil_(d, u, e);
   if (x.offen) return { offen: x.offen };
   const mm = x.reusable && d.kanal === 'matchmaker' ? mmPruefen_(d) : null;
   const ric = !mm && x.reusable && d.kanal === 'ricardo' ? ricardoPruefen_(d, u, x, e, p) : null;
@@ -2206,7 +2311,7 @@ function fotoFehlt_(st, maengel) {
 /** Titel und Artikelbeschrieb: Die KI schreibt Titel, Einleitung und Stichpunkte aus der Recherche; Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter. */
 function ricardoText(d) {
   d = d || {};
-  const e = einst_(), p = produkt_(d.id), u = ueberblick_(p, e), x = urteil_(d, u, e);
+  const e = einst_(), p = produkt_(d.id), u = ueberblickSpeicher_(p, e), x = urteil_(d, u, e);
   if (x.offen || !x.reusable) throw new Error('Zuerst die Analyse fertig machen.');
   const info = function (f) { const i = u.infos.filter(function (y) { return y.feld === f; })[0]; return i && !/^(unbekannt|entfällt)$/i.test(i.inhalt) ? i.inhalt : ''; };
   const z = ['Produkt: ' + p['Bezeichnung'], 'Marke: ' + u.ident.marke, 'Modell: ' + u.ident.modell];
@@ -2876,6 +2981,10 @@ function tempoTest() {
     return JSON.parse(r.getContentText()).valueRanges.length + ' Bereiche';
   });
   ['Testkonten', 'Testmittel', 'Stufen'].forEach(function (n) { const s = ss.getSheetByName(n); let lr, lc; t('  ' + n + ' getLastRow', function () { lr = s.getLastRow(); return lr; }); t('  ' + n + ' getLastColumn', function () { lc = s.getLastColumn(); return lc; }); t('  ' + n + ' feste Grösse lesen', function () { return s.getRange(1, 1, Math.max(lr, 1), Math.max(lc, 1)).getValues().length; }); t('  ' + n + ' A1:Z60 lesen', function () { return s.getRange('A1:Z60').getValues().length; }); });
+  ['Produkte', 'Analysen', 'Listen'].forEach(function (n) { const s = ss.getSheetByName(n); let mr, mc; t('  ' + n + ' getMaxRows', function () { mr = s.getMaxRows(); return mr; }); t('  ' + n + ' getMaxColumns', function () { mc = s.getMaxColumns(); return mc; }); t('  ' + n + ' ganzes Raster lesen', function () { return s.getRange(1, 1, mr, mc).getValues().length; }); t('  ' + n + ' getDataRange', function () { return s.getDataRange().getValues().length; }); });
+  t('Sheets-Dienst: alle ' + tabs.length + ' Tabs in einem Aufruf', function () { const r = Sheets.Spreadsheets.Values.batchGet(ss.getId(), { ranges: tabs.map(function (n) { return "'" + n + "'"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); return r.valueRanges.length + ' Bereiche, ' + r.valueRanges.map(function (x) { return (x.values || []).length; }).join('/'); });
+  t('Sheets-Dienst: nochmals', function () { const r = Sheets.Spreadsheets.Values.batchGet(ss.getId(), { ranges: tabs.map(function (n) { return "'" + n + "'"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); return r.valueRanges.length; });
+  t('Sheets-Dienst: 1 Tab', function () { const r = Sheets.Spreadsheets.Values.get(ss.getId(), "'Testkonten'"); return (r.values || []).length; });
   t('Zwischenspeicher lesen', function () { CacheService.getScriptCache().get('tab:Einstellungen'); });
   console.log(aus.join('\n'));
   return aus;
