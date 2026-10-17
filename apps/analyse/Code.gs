@@ -2856,3 +2856,27 @@ function umbau_(ss) {
 
   /* Die Übersicht schreibt seit 2026-10-16.7 die gemeinsame Basis (Basis.gs) bei jedem «einrichten» ganz neu: ANALYSE_KATALOG. */
 }
+
+/**
+ * Tempo-Messung (nur lesen, schreibt nichts). Im Editor ausführen, Ergebnis im Ausführungsprotokoll.
+ * Vergleicht: jeden Tab einzeln mit SpreadsheetApp, eine winzige Zelle (reine Wartezeit), alle Tabs in einem Aufruf über die Sheets-API, Zwischenspeicher.
+ */
+function tempoTest() {
+  const aus = [], t = function (name, f) { const a = Date.now(); let n = ''; try { n = f(); } catch (err) { n = 'Fehler: ' + err.message; } aus.push(name + ': ' + (Date.now() - a) + ' ms' + (n !== undefined && n !== '' ? ' (' + n + ')' : '')); };
+  let ss;
+  t('Sheet öffnen', function () { ss = ss_(); return ss.getSheets().length + ' Tabs'; });
+  t('1 Zelle Einstellungen!A1', function () { return ss.getSheetByName('Einstellungen').getRange('A1').getValue() ? 'ok' : ''; });
+  t('1 Zelle nochmals', function () { ss.getSheetByName('Einstellungen').getRange('A2').getValue(); });
+  const tabs = ['Einstellungen', 'Produkte', 'Bestellliste', 'Testkonten', 'Testmittel', 'Stufen', 'Batches', 'Analysen', 'Listen'];
+  tabs.forEach(function (n) { t('Tab ' + n, function () { const s = ss.getSheetByName(n); const v = s.getDataRange().getValues(); return v.length + ' Zeilen'; }); });
+  t('Sheets-API, alle ' + tabs.length + ' Tabs in einem Aufruf', function () {
+    const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + ss.getId() + '/values:batchGet?' + tabs.map(function (n) { return 'ranges=' + encodeURIComponent("'" + n + "'"); }).join('&') + '&valueRenderOption=UNFORMATTED_VALUE';
+    const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return 'HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 120);
+    return JSON.parse(r.getContentText()).valueRanges.length + ' Bereiche';
+  });
+  ['Testkonten', 'Testmittel', 'Stufen'].forEach(function (n) { const s = ss.getSheetByName(n); let lr, lc; t('  ' + n + ' getLastRow', function () { lr = s.getLastRow(); return lr; }); t('  ' + n + ' getLastColumn', function () { lc = s.getLastColumn(); return lc; }); t('  ' + n + ' feste Grösse lesen', function () { return s.getRange(1, 1, Math.max(lr, 1), Math.max(lc, 1)).getValues().length; }); t('  ' + n + ' A1:Z60 lesen', function () { return s.getRange('A1:Z60').getValues().length; }); });
+  t('Zwischenspeicher lesen', function () { CacheService.getScriptCache().get('tab:Einstellungen'); });
+  console.log(aus.join('\n'));
+  return aus;
+}
