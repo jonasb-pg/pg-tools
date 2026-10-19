@@ -2769,7 +2769,7 @@ function adresseUebernehmen(nr, p) {
 /** Im Editor ausführen: welche Adress-Scopes gibt der Post-Zugang frei? Danach Prüfung der Absenderadresse von Pretty Good. */
 function postAdresseTest() {
   const pr = PropertiesService.getScriptProperties(), id = String(pr.getProperty('POST_CLIENT_ID') || '').trim(), geheim = String(pr.getProperty('POST_CLIENT_SECRET') || '').trim();
-  const scopes = ['DCAPI_ADDRESS_VALIDATE', 'DCAPI_ADDRESS_AUTOCOMPLETE', 'DCAPI_ADDRESS_READ', 'DCAPI_BARCODE_READ'];
+  const scopes = ['EIRENE_ADDRESS_QUERY_BUILDINGVERIFICATION', 'DCAPI_ADDRESS_VALIDATE', 'DCAPI_BARCODE_READ'];
   const aus = scopes.map(function (sc) {
     const r = UrlFetchApp.fetch(POST_TOKEN_URL, { method: 'post', muteHttpExceptions: true, payload: { grant_type: 'client_credentials', client_id: id, client_secret: geheim, scope: sc } });
     return sc + ': ' + r.getResponseCode();
