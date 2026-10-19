@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-17.3';
+const VERSION = '2026-10-19.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1222,8 +1222,12 @@ function importVerkaeufe(text) {
     Object.keys(ergaenzt).forEach(function (i) { sv.getRange(Number(i) + 2, 1, 1, V_COLS.length).setValues([vAlt[i]]); });
     if (neu.length) sv.getRange(sv.getLastRow() + 1, 1, neu.length, V_COLS.length).setValues(neu);
     adressenAufraeumen_(sv);
+    /* Entscheid Jonas 17.10.2026: Was abgelaufen ist und im Bericht nicht als Verkauf vorkam, ist nicht verkauft, auch ohne Ricardo-Mail. */
+    const abgelaufen = abgelaufen_(lv, Date.now(), Number(cfg_('Laufzeit Tage')) || 6);
+    abgelaufen.forEach(function (i) { lv[i][col_('Status') - 1] = 'Unverkauft'; lv[i][col_('Bearbeitet von') - 1] = 'Verkaufsbericht'; geaendert[i] = true; });
     Object.keys(geaendert).forEach(function (i) { sl.getRange(Number(i) + 2, 1, 1, L_COLS.length).setValues([lv[i]]); });
     PropertiesService.getScriptProperties().setProperty('LETZTER_IMPORT', String(new Date().getTime()));
+    if (abgelaufen.length) log_('Unverkauft nach Bericht', '', abgelaufen.map(function (i) { return lv[i][0]; }).join(', '));
     wochen_();
     log_('Verkaufsbericht', '', neu.length + ' neu, ' + schonDa + ' bekannt, ' + Object.keys(ergaenzt).length + ' Adressen ergänzt, ' + zugeordnet + ' zugeordnet');
     const mailStart = Number(PropertiesService.getScriptProperties().getProperty(MAIL_START)) || 0;
@@ -1233,6 +1237,16 @@ function importVerkaeufe(text) {
       fehlten: mailStart ? neu.filter(function (z) { const w = z[V_COLS.indexOf('Verkauft am')]; return w instanceof Date && w.getTime() > mailStart + 3600000; }).length : 0 };
     return r;
   } finally { lock.releaseLock(); }
+}
+
+/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit vorbei ist. Läuft nach dem Einlesen der Verkäufe: Was dann noch «Gelistet» ist, wurde nicht verkauft. */
+function abgelaufen_(lv, jetzt, laufzeitTage) {
+  const st = col_('Status') - 1, gl = col_('Gelistet am') - 1, aus = [];
+  lv.forEach(function (row, i) {
+    const g = row[gl];
+    if (row[st] === 'Gelistet' && g instanceof Date && g.getTime() + laufzeitTage * 86400000 <= jetzt) aus.push(i);
+  });
+  return aus;
 }
 
 /** Offene Verkäufe für die Pack- und Zahlungsliste. */

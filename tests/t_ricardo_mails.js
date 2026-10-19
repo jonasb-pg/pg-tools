@@ -71,6 +71,8 @@ kaeufer_c hat dir eine neue Nachricht geschickt. Öffne Nachrichten, um die Unte
 In Nachrichten antworten
 
 https://www.ricardo.ch/de/my-ricardo/messages/?conversationId=abc&orderId=53990997&orderMode=selling&utm_campaign=rtm_core&utm_content=body_cta`;
+/* Frist immer zwei Tage in der Zukunft, sonst veraltet der Test (fest «18. Oktober» schlug ab 19.10.2026 fehl) */
+const FRIST_D = new Date(Date.now() + 2 * 864e5), FRIST_TXT = FRIST_D.getDate() + '. ' + ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'][FRIST_D.getMonth()] + ' ' + FRIST_D.getFullYear();
 const ANGEBOT = `Hallo Jonas,
 
 Du hast einen Preisvorschlag von CHF 75.00 erhalten. Du hast nun 48 Stunden Zeit, um diesen anzunehmen oder abzulehnen.
@@ -90,7 +92,7 @@ Total
 
 .....................................................................
 
-Läuft ab am 18. Oktober 2026, 12:08 Uhr.
+Läuft ab am ${FRIST_TXT}, 12:08 Uhr.
 
 Antworten
 
@@ -142,7 +144,7 @@ ok(f.art === 'Frage' && f.artikel === '1331877810' && f.von === 'kaeufer_b' && f
 const n = c.ricardoMail_('Neue Nachricht zu: SUP-Board-Set Rot - 1331786830', NACHRICHT);
 ok(n.art === 'Nachricht' && n.artikel === '1331786830' && n.verkauf === '53990997' && n.von === 'kaeufer_c' && n.link.indexOf('conversationId=abc') > 0 && n.link.indexOf('utm_') < 0, 'Nachricht');
 const a = c.ricardoMail_('Du hast einen Preisvorschlag von CHF 75.00 für "Neu: Haartrockner Z" erhalten', ANGEBOT);
-ok(a.art === 'Preisvorschlag' && a.betrag === 75 && a.preis === 87 && a.artikel === '1332215532' && a.frist.getDate() === 18 && a.frist.getMonth() === 9 && a.frist.getHours() === 12, 'Preisvorschlag');
+ok(a.art === 'Preisvorschlag' && a.betrag === 75 && a.preis === 87 && a.artikel === '1332215532' && a.frist.getDate() === FRIST_D.getDate() && a.frist.getMonth() === FRIST_D.getMonth() && a.frist.getHours() === 12, 'Preisvorschlag');
 ok(c.ricardoMail_('Bewerte deine Verkaufserfahrung mit x für: y', 'egal') === null, 'Bewertung wird ignoriert');
 ok(c.ricardoMail_('Ereader pocketbook inkpad4', 'Ich habe bezahlt') === null, 'Mail von Käufer wird ignoriert');
 

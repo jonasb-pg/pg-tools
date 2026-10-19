@@ -52,4 +52,7 @@ const mit = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).get
 assert.deepStrictEqual([mit.nichtVerkauft, mit.laufend, mit.berichtFehlt], [1, 1, 0]);
 const ohne = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(14).getTime()))).zeitraum;
 assert.deepStrictEqual([ohne.nichtVerkauft, ohne.laufend, ohne.berichtFehlt], [0, 1, 1]);
+/* Beim Einlesen des Verkaufsberichts: abgelaufene «Gelistet» werden «Unverkauft» */
+const LC = vm.runInContext('L_COLS', c), zeile = function (st, g) { const r = LC.map(function () { return ''; }); r[LC.indexOf('Status')] = st; r[LC.indexOf('Gelistet am')] = g; return r; };
+assert.deepStrictEqual(Array.from(c.abgelaufen_([zeile('Gelistet', D(9)), zeile('Gelistet', D(12)), zeile('Verkauft', D(9)), zeile('Gelistet', '')], D(17).getTime(), 6)), [0]);
 console.log('t_ricardo_kennzahlen ok');
