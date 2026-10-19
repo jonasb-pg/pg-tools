@@ -19,10 +19,10 @@ OFFEN = [dict(nr='50000002', pgId='PG-002', titel='Neu: Kamera', am='16.10.2026'
 SCHICHT2 = {'art': 'schicht2', 'links': LINKS, 'verkaeufe': {'offen': OFFEN, 'zuPacken': 2}, 'letzterImport': '19.10.2026', 'postBereit': True, 'entscheide': ['Neu listen', 'Anderer Kanal', 'Entsorgung'],
             'unverkauft': [{'id': 'PG-010', 'status': 'Unverkauft', 'name': 'Bügeleisen', 'ort': 'R1', 'link': 'https://www.ricardo.ch/de/a/neu-x-1300000010/', 'artikel': '1300000010', 'kopieren': 'https://www.ricardo.ch/de/list/?prefill=1300000010'}],
             'ohneMail': [{'id': 'PG-011', 'name': 'Schläger', 'link': 'https://www.ricardo.ch/de/a/neu-y-1300000011/', 'ende': '18.10.2026'}], 'regale': {}}
-SCHICHT3 = {'art': 'schicht3', 'links': LINKS, 'versand': [dict(OFFEN[0], status='Bereit zum Versand', sendung='99.60.123456.12345678')], 'warten': 3, 'regale': {}}
+SCHICHT3 = {'art': 'schicht3', 'links': LINKS, 'versand': [dict(OFFEN[0], status='Bereit zum Versand', sendung='99.60.123456.12345678')], 'warten': [dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000009'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000010'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000011')], 'regale': {}}
 SCHICHT1 = {'art': 'schicht1', 'links': LINKS, 'bereit': [{'id': 'PG-010', 'status': 'Bereit', 'name': 'Bügeleisen', 'ort': 'R1', 'regal': 'Ricardo Offline', 'wieder': True}], 'analyse': 4, 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6, 'regale': {}}
 DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': [], 'maengelPflicht': [], 'laufzeit': 6, 'retoureGruende': [], 'kiAktiv': True, 'mailAktiv': True, 'aktiv': 30, 'schwelle': 90},
-         'analyseListe': [], 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': []}, 'mailsJetzt': AU, 'aufgaben': AU,
+         'analyseListe': [], 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
          'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
          'entscheidUnverkauft': dict(SCHICHT2, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
@@ -40,10 +40,12 @@ with sync_playwright() as p:
     s.on('pageerror', lambda e: err.append(str(e)))
     s.set_content(html); s.wait_for_timeout(300)
     ok(s.text_content('#z-f-taeglich') == '3', 'Zähler Täglich beim Start (1 melden + 1 Aufgabe + 1 Storno)')
+    ok(s.is_visible('#s-ablauf') and s.text_content('#f-titel') == 'Täglich', 'Start im Ablauf Täglich')
     s.click('#nav-f-taeglich'); s.wait_for_timeout(200)
     t = s.text_content('#f-schritte')
     ok(s.is_visible('#s-ablauf') and 'Bank-Export hochladen' in t and 'Zahlung bei Ricardo melden' in t and 'Storno prüfen' in t and 'Retouren' in t, 'Täglich: alle Schritte')
     ok(s.locator('#f-schritte .karte.schritt').count() == 7, 'Täglich: 7 Schritte')
+    ok(s.locator('#f-schritte #rt-offen-karte').count() == 1, 'Retouren im Ablauf Täglich eingebaut')
     ok('Neu: Soundkarte' in t and 'bezahlt 17.10.2026' in t, 'Melden-Liste')
     ok('Vorschlag CHF 75.00' in t, 'Preisvorschlag im Ablauf')
     ok(s.locator('.ricardo-zeile').count() >= 5, 'Zeilen «Auf Ricardo»')
@@ -63,7 +65,8 @@ with sync_playwright() as p:
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-taeglich.png', full_page=True)
     s.click('#nav-f-schicht1'); s.wait_for_timeout(200)
     t = s.text_content('#f-schritte')
-    ok('4 aus der Analyse, 1 angefangen' in t and 'wieder listen' in t and 'Angebot erfassen' in t, 'Schicht 1')
+    ok('4 aus der Analyse, 1 angefangen' in t and 'wieder listen' in t and s.is_visible('#q') and s.locator('#f-schritte #such-karte').count() == 1 and s.locator('#f-schritte #u-karte').count() == 1, 'Listing mit Suche und laufenden Angeboten eingebaut')
+    ok(s.text_content('#f-titel') == 'Listing', 'Name Listing')
     s.click('#nav-f-schicht2'); s.wait_for_timeout(200)
     t = s.text_content('#f-schritte')
     ok('Verkaufsbericht einlesen' in t and 'Bügeleisen' in t and 'Schläger' in t and 'Neu: Kamera' in t and 'Adresse fehlt' in t, 'Schicht 2 Inhalte')
@@ -78,8 +81,11 @@ with sync_playwright() as p:
     ok('Sendung 99.60.123456.12345678' in t and 'Nicht bezahlt: 3 Pakete' in t, 'Schicht 3')
     s.click('#f-schritte button:text-is("Versendet")'); s.click('#dialog-ja'); s.wait_for_timeout(200)
     ok(['setzeVerkauf', ['50000002', 'versendet']] in s.evaluate('AUFRUFE'), 'Versendet')
+    s.click('#f-schritte button:text-is("Zahlung erhalten") >> nth=0'); s.click('#dialog-ja'); s.wait_for_timeout(200)
+    ok(['setzeVerkauf', ['50000009', 'bezahlt']] in s.evaluate('AUFRUFE'), 'Zahlung von Hand im Ablauf Versenden')
+    ok(s.is_hidden('#nav-aufgaben') and s.is_hidden('#nav-verkauf') and s.is_hidden('#nav-listen'), 'Alte Reiter ausgeblendet')
     s.click('#l-en'); s.wait_for_timeout(200)
-    ok('Shift 3: Shipping' in s.text_content('#f-titel'), 'Englisch')
+    ok('Shipping' in s.text_content('#f-titel'), 'Englisch')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-schicht3.png', full_page=True)
     ok(not err, 'keine JS-Fehler ' + str(err))
     b.close()

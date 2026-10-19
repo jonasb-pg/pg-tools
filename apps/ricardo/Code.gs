@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.5';
+const VERSION = '2026-10-19.6';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -33,7 +33,7 @@ const RICARDO_A = 'https://www.ricardo.ch/de/a/', RICARDO_ORDER = 'https://www.r
 // Wird ADRESSE_TAGE nach dem Verkauf gelöscht. Der Name bleibt, damit Zahlung und Rückzahlung zugeordnet werden können
 const ADRESSE = ['Strasse', 'Hausnummer', 'Postfach'];
 const V_OFFEN = ['Zu packen', 'Wartet auf Zahlung', 'Bereit zum Versand'];
-// Entscheid pro unverkauftem Stück (Schicht 2). «Neu listen» setzt das Stück auf «Bereit», es erscheint wieder in Schicht 1
+// Entscheid pro unverkauftem Stück (Packen). «Neu listen» setzt das Stück auf «Bereit», es erscheint wieder im Ablauf «Listing»
 const ENTSCHEIDE_UNVERKAUFT = ['Neu listen', 'Anderer Kanal', 'Entsorgung'];
 const R_COLS = ['Retoure-Nr', 'Status', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Käufer', 'Name', 'Verkauft am', 'Eröffnet am', 'Grund', 'Notiz',
   'Rückzahlung CHF', 'Rückzahlung am', 'Ricardo storniert am', 'Abgeschlossen am',
@@ -1302,7 +1302,7 @@ function vZeile_(v) {
     sendung: String(v['Sendungsnummer'] || ''), artikel: String(v['Artikel-Nr'] || ''), link: RICARDO_ORDER + String(v['Verkauf-Nr']) + '/', ohneAdresse: !String(v['Nachname'] || '').trim() || !String(v['PLZ'] || '').trim() };
 }
 
-/** aktion: 'gepackt', 'bezahlt' (Zahlung von Hand), 'versendet' (Schicht 3) oder 'ricardoBezahlt' (Zahlung auf Ricardo gemeldet). */
+/** aktion: 'gepackt', 'bezahlt' (Zahlung von Hand), 'versendet' (Versenden) oder 'ricardoBezahlt' (Zahlung auf Ricardo gemeldet). */
 function setzeVerkauf(nr, aktion) {
   nr = String(nr).trim();
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -1321,7 +1321,7 @@ function setzeVerkauf(nr, aktion) {
       if (v['Status'] !== 'Zu packen') throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
       v['Status'] = bezahlt ? 'Bereit zum Versand' : 'Wartet auf Zahlung'; v['Gepackt am'] = new Date();
     } else if (aktion === 'bezahlt') {
-      /* Zahlung von Hand erfasst (ohne Bank-Upload). Versendet wird erst in Schicht 3 */
+      /* Zahlung von Hand erfasst (ohne Bank-Upload). Versendet wird erst im Ablauf «Versenden» */
       if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
       if (bezahlt) throw new Error('Zahlung ist schon erfasst (' + datum_(v['Bezahlt am']) + ').');
       v['Bezahlt am'] = new Date(); v['Bank-Zahlung'] = 'von Hand: ' + nutzer_();
@@ -2452,10 +2452,10 @@ function retoureSchritt(rtNr, schritt, wert) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Abläufe: Täglich, Schicht 1 Listen, Schicht 2 Packen, Schicht 3 Versenden */
+/* Abläufe: Täglich, Listing, Packen, Versenden */
 /* ------------------------------------------------------------------ */
 /* Entscheid Jonas 19.10.2026: Jeder Ablauf führt Schritt für Schritt durch Tool, Lager und Ricardo, mit direktem Link zur Ricardo-Seite.
-   Zahlungen kommen aus dem Bank-Export (Täglich), die Etikette beim Packen (Schicht 2), versendet wird nur, was gepackt und bezahlt ist (Schicht 3). */
+   Zahlungen kommen aus dem Bank-Export (Täglich), die Etikette beim Packen, versendet wird nur, was gepackt und bezahlt ist (Versenden). */
 const RICARDO_LISTEN = 'https://www.ricardo.ch/de/list/', RICARDO_VERKAUFT = 'https://www.ricardo.ch/de/my-ricardo/selling/orders/',
   RICARDO_AM_VERKAUFEN = 'https://www.ricardo.ch/de/my-ricardo/selling/offers/';
 
@@ -2518,7 +2518,7 @@ function ablauf(art) {
   if (art === 'schicht3') {
     const vs = alleVerkaeufe_();
     const versand = vs.filter(function (v) { return v['Status'] === 'Bereit zum Versand'; }).map(vZeile_);
-    return { art: art, links: links, versand: versand, warten: vs.filter(function (v) { return v['Status'] === 'Wartet auf Zahlung'; }).length,
+    return { art: art, links: links, versand: versand, warten: vs.filter(function (v) { return v['Status'] === 'Wartet auf Zahlung'; }).map(vZeile_),
       regale: { unpaid: regal_('Verkauft') } };
   }
   throw new Error('Unbekannter Ablauf.');
@@ -2602,7 +2602,7 @@ function bankBestaetigen(liste) {
   } finally { lock.releaseLock(); }
 }
 
-/* ---------- Unverkauft: Entscheid pro Stück (Schicht 2) ---------- */
+/* ---------- Unverkauft: Entscheid pro Stück (Packen) ---------- */
 
 function entscheidUnverkauft(id, entscheid) {
   if (ENTSCHEIDE_UNVERKAUFT.indexOf(entscheid) === -1) throw new Error('Unbekannter Entscheid.');
@@ -2645,7 +2645,7 @@ function verkaufStornieren(nr) {
   } finally { lock.releaseLock(); }
 }
 
-/* ---------- Etikette (Schicht 2) ---------- */
+/* ---------- Etikette (Packen) ---------- */
 
 /** Post-Produkt aus Lieferart bzw. Versandklasse: A-Post = PRI, sonst ECO. Sperrgut zusätzlich SP. */
 function przl_(klasse) {
@@ -2684,7 +2684,7 @@ function etikette(nr, vorschau) {
 /* ------------------------------------------------------------------ */
 /* Post: Etiketten über die Barcode API (Digital Commerce API)         */
 /* ------------------------------------------------------------------ */
-/* Entscheid Jonas 19.10.2026: Etikette beim Packen (Schicht 2), Knopf pro Verkauf. Zugang in den Script-Eigenschaften POST_CLIENT_ID und
+/* Entscheid Jonas 19.10.2026: Etikette beim Packen (Packen), Knopf pro Verkauf. Zugang in den Script-Eigenschaften POST_CLIENT_ID und
    POST_CLIENT_SECRET, nie im Sheet. Token gilt 5 Minuten. Eine Etikette pro Anfrage. printPreview = true liefert eine Muster-Etikette (SPECIMEN, kostenlos). */
 const POST_TOKEN_URL = 'https://api.post.ch/OAuth/token', POST_LABEL_URL = 'https://dcapi.apis.post.ch/barcode/v1/generateAddressLabel';
 function postToken_(neu) {
