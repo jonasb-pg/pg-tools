@@ -7,7 +7,7 @@ Stand: Version `2026-10-19.1`. Live: Bereitstellungsversion 9 vom 19.10.2026, 12
 | Komponente | Typ | ID / Adresse | Rolle |
 |---|---|---|---|
 | Analyse Tool (Code) | Apps Script, an Sheet gebunden | Script `1UahLr-Ek_4QzRuGzyk4YhuZf1WrslrvJDlls-Eee5iFHiuQZORuiYLqN` (neu seit 16.10.2026) | Server (`Code.gs`) und Oberfläche (`Index.html`) |
-| Web-App Test | Apps Script `/dev` | `https://script.google.com/a/macros/pretty-good.ch/s/AKfycbz-CuQ5QOygYatY8Sq7L8EK0FaulltyecT3u_wTjKEe/dev` | immer der gespeicherte Stand (HEAD), nur für Bearbeiter:innen des Scripts |
+| Web-App Test | Apps Script `/dev` | `https://script.google.com/a/macros/pretty-good.ch/s/AKfycbybqqJDajrNMiPKEQ4j64tzzWb8gUHOrdVrR1-UIvc/dev` | immer der gespeicherte Stand (HEAD), nur für Bearbeiter:innen des Scripts |
 | Web-App Live | Apps Script Bereitstellung | Bereitstellungsversion 9 | Analyseplatz; neue Version nur nach Bestätigung von Jonas (Claude stellt bereit) |
 | ANALYSE TOOL | Google Sheet | `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM` | Datenbank des Tools (siehe `datenmodell.md`) |
 | Return Tool | Google Sheet | `1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E` | **nur lesen**. Tab «Analyse» = Quelle der Warteschlange |

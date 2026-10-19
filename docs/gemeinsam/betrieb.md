@@ -15,6 +15,11 @@
 | 8 | Bei Änderung an `Basis.gs`: Datei «Basis» in beiden Projekten ersetzen, Hash prüfen | Hash in beiden Editoren = Repo |
 | 9 | Nach Änderungen an Tabs oder Basis: «einrichten» ausführen | Tab «Übersicht» zeigt neue Version |
 | 10 | Commit ins Repo mit Doku-Update | |
+| 11 | Bei einer neuen Bereitstellung (Live-Version): Sheet «TOOL LINKS» nachführen (Spalten Bereitstellung, Code-Version, Stand) | Zeile des Tools aktuell |
+
+## Sheet «TOOL LINKS»
+
+Sheet `1tkG0_EAGmBKguUhgcvjo621YGfPEeKxWObY-EtzP8nU` (Ordner 00_Claude-Eingang), Tab «Tools»: pro Tool Web-App (live), Test-Adresse (/dev), Sheet, Apps-Script-Projekt, Bereitstellungs-ID, Bereitstellung, Code-Version, Stand. Das Sheet ist die einzige Stelle für die Adressen; Doku im Repo verweist darauf. Pflicht: Jede neue Bereitstellung und jedes neue Tool wird dort eingetragen (Regel Jonas, 19.10.2026).
 
 Wichtig: Konstanten, die in Top-Level-Objekten (`SPALTEN`, `NEUE_EINSTELLUNGEN`) vorkommen, müssen **vor** diesen deklariert sein (`const` hat eine Temporal Dead Zone). Fehler vom 15.10.2026: `RICARDO_VERSAND`.
 

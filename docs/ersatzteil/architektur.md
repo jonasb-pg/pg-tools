@@ -1,6 +1,6 @@
 # Ersatzteil Tool
 
-Stand: Version `2026-10-17.1`. Code: `apps/ersatzteil/Code.gs`, `apps/ersatzteil/Index.html`, dazu `apps/basis/Basis.gs` als Datei «Basis». Sheet: «ERSATZTEIL TOOL» (ID `1RII8qKWcrcSOESBbfiP-AQg7rDDu4zLy8xXLKM8ycZE`, Ordner 00_Claude-Eingang). Mockups: Canvas «Ersatzteil-Tool Mockups».
+Stand: Version `2026-10-17.1`. Code: `apps/ersatzteil/Code.gs`, `apps/ersatzteil/Index.html`, dazu `apps/basis/Basis.gs` als Datei «Basis». Sheet: «ERSATZTEIL TOOL» (ID `1RII8qKWcrcSOESBbfiP-AQg7rDDu4zLy8xXLKM8ycZE`, Ordner 00_Claude-Eingang). Mockups: Canvas «Ersatzteil-Tool Mockups». Apps-Script-Projekt `1CYsmUXWDLFAfj6tmKg_AAGH1l34kXKFXfkQjzRgIM2F8st8kngsby-3C`, Bereitstellung Version 1 (19.10.2026 14:03), Adressen im Sheet «TOOL LINKS» (siehe `docs/gemeinsam/betrieb.md`).
 
 ## Zweck
 
@@ -50,6 +50,6 @@ Teile, Boxen, Ersatzteile (Log der Online-Suchen), Log, Kosten, Listen (Produkta
 
 ## Offen
 
-- Einspielen in ein neues Apps-Script-Projekt am Sheet, `ANTHROPIC_API_KEY` setzen, `einrichten`, Test-Bereitstellung, Test mit fünf echten Teilen am Handy.
+- Test mit fünf echten Teilen am Handy (eingespielt, Schlüssel gesetzt, `einrichten` gelaufen, Version 1 bereitgestellt am 19.10.2026).
 - Analyse Tool: Seite «Ersatzteile» liest zuerst den Tab «Teile» dieses Sheets, Shop-Liste und Anweisung von hier.
 - Boxen und Listen im Sheet mit den echten Werten füllen.

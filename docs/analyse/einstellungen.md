@@ -41,7 +41,7 @@ Quelle der Wahrheit ist das Sheet. `einrichten()` legt fehlende Zeilen aus `NEUE
 | Ersatzteil-Shops | = Konstante TEIL_SHOPS in apps/analyse/Code.gs (Wortlaut identisch) | Hier sucht die KI Ersatzteile zuerst, eine Zeile pro Shop: Name \| Domain \| Link \| Info. |
 | Ricardo ab VP CHF | 50 | Ab diesem Verkaufspreis schlägt das Tool im Entscheid «Auf Ricardo» vor. Die Person entscheidet. |
 | Ricardo-Foto-Ordner ID | 1DimLxvk4jqFf3gpbre1kKm5oE84_7TD4 | Der Drive-Ordner «RICARDO FOTOS». Pro Produkt ein Ordner mit der PG-ID, darin die Fotos vom Handy, das Hauptbild zuerst. |
-| Web-App-Adresse für Fotos | https://script.google.com/a/macros/pretty-good.ch/s/AKfycbz-CuQ5QOygYatY8Sq7L8EK0FaulltyecT3u_wTjKEe/dev | TEST-WERT. Vor Go-live leeren (leer = Live-Adresse der Web-App). |
+| Web-App-Adresse für Fotos | https://script.google.com/a/macros/pretty-good.ch/s/AKfycbybqqJDajrNMiPKEQ4j64tzzWb8gUHOrdVrR1-UIvc/dev | TEST-WERT. Vor Go-live leeren (leer = Live-Adresse der Web-App). |
 | Ricardo-Versand | = Konstante RICARDO_VERSAND in apps/analyse/Code.gs | Versandklassen wie bei Ricardo, eine pro Zeile: Name \| Preis CHF. Pretty Good versendet mit B-Post. |
 | KI-Modell Ricardo | claude-haiku-5-5 | Mit diesem Modell schreibt das Tool Titel und Artikelbeschrieb für Ricardo. |
 | Ricardo-Anweisung | = Konstante RICARDO_ANWEISUNG in apps/analyse/Code.gs | So schreibt die KI Titel und Artikelbeschrieb. Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter. |
