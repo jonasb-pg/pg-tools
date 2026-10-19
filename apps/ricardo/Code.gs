@@ -2528,7 +2528,7 @@ function ablauf(art) {
 
 /** Text für den Vergleich: klein, ohne Akzente und Satzzeichen, ae/oe/ue wie a/o/u (Banken schreiben Umlaute verschieden). */
 function bankNorm_(s) {
-  return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss').replace(/([aou])e/g, '$1').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';   // Hügli = Huegli = Hugli
+  return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss').replace(/([aou])e/g, '$1').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';   // Hügli = Huegli = Hugli
 }
 
 /**
