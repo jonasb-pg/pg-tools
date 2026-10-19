@@ -1633,7 +1633,7 @@ function ricardoMail_(betreff, text) {
   if (/nicht verkauft/i.test(betreff)) return { art: 'Nicht verkauft', artikel: g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/) || (/(\d{9,})/.exec(betreff) || [])[1] || '', titel: betreff };
   if (/bewerte|bewertung/i.test(betreff)) {
     const vk = g(/Verkaufs-Nr\.:\s*(\d+)/);
-    return { art: 'Bewertung', artikel: g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/), verkauf: vk, titel: betreff, von: g(/\n(\S+) (?:hat dich|bewerten)/),
+    return { art: 'Bewertung', artikel: g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/), verkauf: vk, titel: betreff.replace(/^Bewerte deine Verkaufserfahrung mit \S+ für:\s*/, ''), von: (/ mit (\S+) für:/.exec(betreff) || [])[1] || '',
       link: vk ? RICARDO_ORDER + vk + '/' : 'https://www.ricardo.ch/de/my-ricardo/selling/orders/' };
   }
   if (/reaktiviert/i.test(betreff)) {

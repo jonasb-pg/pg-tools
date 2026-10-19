@@ -145,7 +145,8 @@ const n = c.ricardoMail_('Neue Nachricht zu: SUP-Board-Set Rot - 1331786830', NA
 ok(n.art === 'Nachricht' && n.artikel === '1331786830' && n.verkauf === '53990997' && n.von === 'kaeufer_c' && n.link.indexOf('conversationId=abc') > 0 && n.link.indexOf('utm_') < 0, 'Nachricht');
 const a = c.ricardoMail_('Du hast einen Preisvorschlag von CHF 75.00 für "Neu: Haartrockner Z" erhalten', ANGEBOT);
 ok(a.art === 'Preisvorschlag' && a.betrag === 75 && a.preis === 87 && a.artikel === '1332215532' && a.frist.getDate() === FRIST_D.getDate() && a.frist.getMonth() === FRIST_D.getMonth() && a.frist.getHours() === 12, 'Preisvorschlag');
-ok(c.ricardoMail_('Bewerte deine Verkaufserfahrung mit x für: y', 'egal') === null, 'Bewertung wird ignoriert');
+const bw = c.ricardoMail_('Bewerte deine Verkaufserfahrung mit kaeufer_x für: Neu: Föhn', 'egal');
+ok(bw && bw.art === 'Bewertung' && bw.von === 'kaeufer_x' && bw.titel === 'Neu: Föhn', 'Bewertung erkannt (Entscheid Jonas 19.10.2026)');
 ok(c.ricardoMail_('Ereader pocketbook inkpad4', 'Ich habe bezahlt') === null, 'Mail von Käufer wird ignoriert');
 
 /* --- 2. Echtheit: nur die oberste Prüfung von Gmail zählt --- */
