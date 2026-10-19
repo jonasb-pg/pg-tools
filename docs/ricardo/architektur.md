@@ -1,6 +1,6 @@
 # Architektur Ricardo Tool
 
-Stand: Version `2026-10-19.9`. Live: Bereitstellung Version 18 (19.7), neue Version nur mit Go von Jonas. Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung.
+Stand: Version `2026-10-19.9`. Live: Bereitstellung Version 19 (19.10.2026, neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung. Post-Adressprüfung: Code bereit, Scope DCAPI_ADDRESS_VALIDATE beim Post-Zugang noch nicht freigeschaltet (invalid_scope, 19.10.2026).
 
 ## Komponenten
 
