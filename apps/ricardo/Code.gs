@@ -2766,13 +2766,22 @@ function adresseUebernehmen(nr, p) {
   } finally { lock.releaseLock(); }
   return adressePruefen(nr);
 }
-/** Im Editor ausführen: prüft die Absenderadresse von Pretty Good (Zugang und Scope). */
+/** Im Editor ausführen: welche Adress-Scopes gibt der Post-Zugang frei? Danach Prüfung der Absenderadresse von Pretty Good. */
 function postAdresseTest() {
-  const a = postAbsender_();
-  const x = postAdresse_({ nachname: a.name1, strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city });
-  const aus = 'Post-Adresse: ' + JSON.stringify(x);
-  console.log(aus);
-  return aus;
+  const pr = PropertiesService.getScriptProperties(), id = String(pr.getProperty('POST_CLIENT_ID') || '').trim(), geheim = String(pr.getProperty('POST_CLIENT_SECRET') || '').trim();
+  const scopes = ['DCAPI_ADDRESS_VALIDATE', 'DCAPI_ADDRESS_AUTOCOMPLETE', 'DCAPI_ADDRESS_READ', 'DCAPI_BARCODE_READ'];
+  const aus = scopes.map(function (sc) {
+    const r = UrlFetchApp.fetch(POST_TOKEN_URL, { method: 'post', muteHttpExceptions: true, payload: { grant_type: 'client_credentials', client_id: id, client_secret: geheim, scope: sc } });
+    return sc + ': ' + r.getResponseCode();
+  });
+  let pruefung = '';
+  try {
+    const a = postAbsender_();
+    pruefung = JSON.stringify(postAdresse_({ nachname: a.name1, strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city }));
+  } catch (err) { pruefung = 'Prüfung: ' + String(err.message || err).slice(0, 200); }
+  const text = 'Post-Scopes ' + aus.join(', ') + ' | ' + pruefung;
+  console.log(text);
+  return text;
 }
 
 /* ------------------------------------------------------------------ */

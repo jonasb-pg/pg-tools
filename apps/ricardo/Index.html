@@ -1389,6 +1389,7 @@
     'g.p.adr.vorschlag': ['Die Post kennt die Adresse so: {0}', 'Swiss Post knows the address as: {0}'], 'g.p.adr.uebernehmen': ['Vorschlag übernehmen', 'Use suggestion'],
     'g.p.adr.unbekannt': ['Die Post findet diese Adresse nicht. Adresse auf Ricardo prüfen, bei Bedarf der Käufer*in schreiben.', 'Swiss Post cannot find this address. Check it on Ricardo, contact the buyer if needed.'],
     'g.p.adr.fehler': ['Adressprüfung nicht möglich: {0}', 'Address check failed: {0}'],
+    'g.p.adr.aus': ['Adressprüfung der Post ist für diesen Zugang noch nicht freigeschaltet.', 'Swiss Post address check is not yet enabled for this access.'],
     'g.p.packen': ['Packen', 'Pack'], 'g.p.packen.p': ['Mit Matchmaker-Karte und Care-Flyer packen. Paket ins Regal «{0}».', 'Pack with matchmaker card and care flyer. Parcel onto the shelf «{0}».'],
     'g.p.gepackt': ['Gepackt', 'Packed'], 'g.p.post.fehlt': ['Post-Zugang fehlt: Etiketten gehen erst, wenn der Admin ihn einträgt.', 'Swiss Post access missing: labels work once the admin enters it.'],
     'g.p.bezahlt': ['bezahlt', 'paid'], 'g.p.adresse': ['Adresse fehlt', 'Address missing'],
@@ -1581,6 +1582,7 @@
     if (a.stand === 'ok') return kopf + '<div class="meldung ok">✓ ' + t('g.p.adr.ok') + '</div>';
     if (a.stand === 'vorschlag') return kopf + '<div class="meldung warn">' + t('g.p.adr.vorschlag', '<strong>' + adr(a.vorschlag) + '</strong>') + ' <button onclick="adresseUebernehmenFlow()">' + t('g.p.adr.uebernehmen') + '</button></div>';
     if (a.stand === 'unbekannt') return kopf + tun('ricardo', t('g.p.adr.unbekannt'), ricKnopf(o.link, t('g.verkauf.oeffnen')));
+    if (/invalid_scope/.test(a.text || '')) return kopf + '<p class="still">' + t('g.p.adr.aus') + '</p>';
     return kopf + '<div class="meldung warn">' + t('g.p.adr.fehler', esc(a.text || '')) + '</div>';
   }
   function adresseLaden(nr) {
