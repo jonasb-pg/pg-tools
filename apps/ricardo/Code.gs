@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.6';
+const VERSION = '2026-10-19.7';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -86,7 +86,8 @@ const DEFAULTS = [
   ['Rückzahlungen an', 'invoice@pretty-good.ch', 'An diese Adresse schickt das Tool bei jeder neuen Retoure eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto. Wer zahlt, klickt danach im Tool «Rückzahlung gemacht»'],
   ['Mail-Absender', 'care@pretty-good.ch', 'Von dieser Adresse kommen die Ricardo-Mails ins Postfach (Google-Gruppe). Das Tool verarbeitet nur Mails, die nachweislich von Ricardo stammen.'],
   ['Preisvorschlag bis Stunden nach Auktionsende', 24, 'Preisvorschläge, die bis so viele Stunden nach dem Ende der Auktion eintreffen, empfiehlt das Tool anzunehmen. Spätere ablehnen. Entscheid Jonas 16.10.2026.'],
-  ['Storno vorschlagen nach Tagen', 10, 'Ist ein Verkauf nach so vielen Tagen nicht bezahlt, erscheint er im Ablauf «Täglich» unter «Storno prüfen». Storniert wird nur von Hand.'],
+  ['Storno vorschlagen nach Tagen', 14, 'Ricardo gibt Käufer*innen 14 Tage zum Zahlen. Ist ein Verkauf danach nicht bezahlt, schlägt der Ablauf «Täglich» den Storno vor. Storniert wird nur von Hand.'],
+  ['Bewertungstext', 'Vielen Dank für den reibungslosen Kauf. Gerne wieder! Liebe Grüsse, Pretty Good', 'Immer gleicher Text für die Bewertung der Käufer*innen auf Ricardo. Erscheint im Ablauf «Täglich», sobald Ricardo per Mail zur Bewertung auffordert.'],
   ['Zahlungserinnerung nach Tagen', 3, 'Ist ein Verkauf nach so vielen Tagen nicht bezahlt und versendet, erscheint er unter «Zu erledigen» mit einem Text für die Erinnerung.'],
   ['Antwort-Anweisung', 'Kurz und freundlich, höchstens vier Sätze. Antworte in der Anrede der Frage (Du oder Sie), im Zweifel Sie. Schluss: «Liebe Grüsse, Pretty Good».', 'So schreibt Claude die Antwortentwürfe auf Fragen. In normalen Worten änderbar.']
 ];
@@ -1630,6 +1631,11 @@ function ricardoMail_(betreff, text) {
       frist: f && mon !== undefined ? zurich_(Number(f[3]), mon, Number(f[1]), Number(f[4]), Number(f[5])) : null, link: artikel ? RICARDO_A + artikel : '' };
   }
   if (/nicht verkauft/i.test(betreff)) return { art: 'Nicht verkauft', artikel: g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/) || (/(\d{9,})/.exec(betreff) || [])[1] || '', titel: betreff };
+  if (/bewerte|bewertung/i.test(betreff)) {
+    const vk = g(/Verkaufs-Nr\.:\s*(\d+)/);
+    return { art: 'Bewertung', artikel: g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/), verkauf: vk, titel: betreff, von: g(/\n(\S+) (?:hat dich|bewerten)/),
+      link: vk ? RICARDO_ORDER + vk + '/' : 'https://www.ricardo.ch/de/my-ricardo/selling/orders/' };
+  }
   if (/reaktiviert/i.test(betreff)) {
     const artikel = g(/Artikel-?Nr\.?:\s*(\d+)/) || g(/ricardo\.ch\/de\/a\/(\d+)/) || (/(\d{9,})/.exec(betreff) || [])[1] || '';
     return { art: 'Hinweis', artikel: artikel, titel: betreff, text: 'Ricardo hat das Angebot automatisch reaktiviert. Gilt bei uns nicht: auf Ricardo beenden oder bewusst laufen lassen.', link: artikel ? RICARDO_A + artikel : '' };
@@ -1658,7 +1664,7 @@ function mailsLesen_() {
         const d = msg.getDate();
         if (d.getTime() < ab) return;
         const info = ricardoMail_(msg.getSubject(), '');                    // Betreff zuerst: das Lesen des Texts kostet Zeit
-        if (!info && !/Ricardo|Preisvorschlag|verkauft|reaktiviert/i.test(msg.getSubject())) return;
+        if (!info && !/Ricardo|Preisvorschlag|verkauft|reaktiviert|bewert/i.test(msg.getSubject())) return;
         mails.push({ msg: msg, datum: d });
       });
     });
@@ -1787,7 +1793,7 @@ function mailWirkung_(info, k, fragen) {
     basis['Empfehlung'] = empfehlung_(L, info.datum);
     return !!eintrag(basis);
   }
-  if (info.art === 'Frage' || info.art === 'Nachricht' || info.art === 'Hinweis') {
+  if (info.art === 'Frage' || info.art === 'Nachricht' || info.art === 'Hinweis' || info.art === 'Bewertung') {
     const r = eintrag(basis);
     if (r && info.art === 'Frage' && info.text) fragen.push({ id: info.id, text: info.text, von: info.von, L: L, verkauf: basis['Verkauf-Nr'], k: k });
     return !!r;
@@ -1871,7 +1877,7 @@ function aufgaben() {
   const iRows = si && si.getLastRow() > 1 ? si.getRange(2, 1, si.getLastRow() - 1, I_COLS.length).getValues() : [];
   const zeit = function (d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'dd.MM. HH:mm') : ''; };
   const stunden = function (d) { return d instanceof Date ? Math.floor((jetzt - d.getTime()) / 3600000) : 0; };
-  const fragen = [], angebote = [], erinnert = {};
+  const fragen = [], angebote = [], bewertungen = [], erinnert = {}, bewText = String(cfg_('Bewertungstext') || '');
   let verpasst = 0;
   iRows.forEach(function (r) {
     if (r[ii('Art')] === 'Zahlungserinnerung') { erinnert[String(r[ii('Verkauf-Nr')])] = true; return; }
@@ -1883,6 +1889,7 @@ function aufgaben() {
       artikel: String(r[ii('Artikel-Nr')]), von: r[ii('Von')], text: r[ii('Text')], entwurf: r[ii('Entwurf')], link: r[ii('Link')],
       betrag: r[ii('Betrag CHF')] === '' ? '' : Number(r[ii('Betrag CHF')]).toFixed(2), preis: r[ii('Preis CHF')] === '' ? '' : Number(r[ii('Preis CHF')]).toFixed(2),
       frist: zeit(f), restStunden: f instanceof Date ? Math.max(0, Math.floor((f.getTime() - jetzt) / 3600000)) : '', empfehlung: r[ii('Empfehlung')] };
+    if (o.art === 'Bewertung') { o.entwurf = bewText; bewertungen.push(o); return; }
     (o.art === 'Preisvorschlag' ? angebote : fragen).push(o);
   });
   /* Zahlung überfällig: Verkauf seit N Tagen offen und noch keine Erinnerung als erledigt markiert */
@@ -1899,7 +1906,7 @@ function aufgaben() {
   fragen.sort(function (a, b) { return b.alter - a.alter; });
   angebote.sort(function (a, b) { return (a.restStunden === '' ? 999 : a.restStunden) - (b.restStunden === '' ? 999 : b.restStunden); });
   zahlung.sort(function (a, b) { return b.tage - a.tage; });
-  return { fragen: fragen, angebote: angebote, zahlung: zahlung, verpasst: verpasst, anzahl: fragen.length + angebote.length + zahlung.length, kontrolle: mailKontrolle_() };
+  return { fragen: fragen, angebote: angebote, bewertungen: bewertungen, zahlung: zahlung, verpasst: verpasst, anzahl: fragen.length + angebote.length + bewertungen.length + zahlung.length, kontrolle: mailKontrolle_() };
 }
 
 /** Kommen überhaupt Mails an? Für «Zu erledigen» und Admin › Betrieb. */
@@ -2486,12 +2493,13 @@ function ablauf(art) {
     bezahlt: datum_(v['Bezahlt am']), link: RICARDO_ORDER + String(v['Verkauf-Nr']) + '/' }; };
   const links = { listen: RICARDO_LISTEN, verkauft: RICARDO_VERKAUFT, amVerkaufen: RICARDO_AM_VERKAUFEN, artikel: RICARDO_A };
   if (art === 'taeglich') {
-    const vs = alleVerkaeufe_(), stornoTage = Number(cfg_('Storno vorschlagen nach Tagen')) || 10;
+    const vs = alleVerkaeufe_(), stornoTage = Number(cfg_('Storno vorschlagen nach Tagen')) || 14;
     const melden = vs.filter(function (v) { return v['Bezahlt am'] instanceof Date && !(v['Ricardo bezahlt gemeldet am'] instanceof Date) && ['Storniert', 'Retourniert'].indexOf(v['Status']) === -1; }).map(kurz);
     const storno = vs.filter(function (v) { return V_OFFEN.indexOf(v['Status']) !== -1 && !(v['Bezahlt am'] instanceof Date) && v['Verkauft am'] instanceof Date && jetzt - v['Verkauft am'].getTime() >= stornoTage * 86400000; })
       .map(function (v) { const k = kurz(v); k.storno = RICARDO_ORDER + 'cancelation/' + k.nr + '/'; k.status = v['Status']; return k; });
     const bank = Number(pr.getProperty('BANK_LETZTE')) || 0;
-    return { art: art, links: links, aufgaben: aufgaben(), melden: melden, storno: storno, stornoTage: stornoTage, retouren: retouren().offen.length,
+    const offen = vs.filter(function (v) { return V_OFFEN.indexOf(v['Status']) !== -1 && !(v['Bezahlt am'] instanceof Date); }).map(kurz);
+    return { art: art, links: links, aufgaben: aufgaben(), melden: melden, storno: storno, offen: offen, stornoTage: stornoTage,
       letzteBank: bank ? Utilities.formatDate(new Date(bank), TZ, 'dd.MM.yyyy HH:mm') : '' };
   }
   if (art === 'schicht1') {
@@ -2666,7 +2674,7 @@ function etikette(nr, vorschau) {
   const klasse = String(v['Lieferart'] || '') + ' ' + String(v['Versandklasse'] || '');   // Lieferart aus Ricardo («Paket B-Post»), Sperrgut aus der Versandklasse
   const e = { id: 'Ricardo ' + nr, firma: String(v['Firma'] || '').trim(), vorname: String(v['Vorname'] || '').trim(), nachname: String(v['Nachname'] || '').trim(),
     strasse: String(v['Strasse'] || '').trim(), nr: String(v['Hausnummer'] || '').trim(), postfach: String(v['Postfach'] || '').trim(),
-    plz: String(v['PLZ']).trim(), ort: String(v['Ort']).trim() };
+    plz: String(v['PLZ']).trim(), ort: String(v['Ort']).trim(), zusatz: ('Ricardo ' + nr + (v['PG-ID'] ? ' ' + String(v['PG-ID']).trim() : '')) };
   const anfrage = postAnfrage_(e, vorschau);
   anfrage.item.attributes.przl = przl_(klasse);
   const r = postEtiketteAnfrage_(anfrage);
@@ -2711,7 +2719,9 @@ function postAnfrage_(e, vorschau) {
   Object.keys(empf).forEach(function (k) { if (empf[k] === undefined || empf[k] === '') delete empf[k]; });
   const attr = { przl: [e.przl || 'ECO'] };
   if (e.gramm) attr.weight = Math.min(99999, Math.round(Number(e.gramm)));
-  return { language: 'DE', frankingLicense: String(cfg_('Post Frankierlizenz') || '60162228'), ppFranking: false, customer: postAbsender_(),
+  const absender = postAbsender_();
+  if (e.zusatz) absender.name2 = String(e.zusatz).slice(0, 35);   // Entscheid Jonas 19.10.2026: Verkauf-Nr und PG-ID beim Absender, damit man das Paket zuordnen kann
+  return { language: 'DE', frankingLicense: String(cfg_('Post Frankierlizenz') || '60162228'), ppFranking: false, customer: absender,
     labelDefinition: { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'PDF', imageResolution: 300, printPreview: !!vorschau },
     item: { itemID: String(e.id || '').slice(0, 35), recipient: empf, attributes: attr } };
 }
