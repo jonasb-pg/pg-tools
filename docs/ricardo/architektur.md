@@ -1,6 +1,6 @@
 # Architektur Ricardo Tool
 
-Stand: Version `2026-10-19.5`. Live: Bereitstellung Version 17 (19.10.2026, neue Version nur mit Go von Jonas). Abläufe Täglich und Schicht 1–3 im Menü «Abläufe».
+Stand: Version `2026-10-19.7`. Live: Bereitstellung Version 18 (19.10.2026, neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden; Retouren unter Verwaltung.
 
 ## Komponenten
 
