@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.9';
+const VERSION = '2026-10-19.10';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -958,6 +958,45 @@ function setzeStatus(id, neu) {
     log_('Status ' + neu, id, '');
     return uebersicht();
   } finally { lock.releaseLock(); }
+}
+
+/* Entscheid Jonas 19.10.2026: keine angefangenen Listings. Wer ein Listing nicht bis «Gelistet» abschliesst, dessen Stück fällt zurück
+   (Status «Abgebrochen», damit frei): es erscheint wieder in der Analyse-Liste bzw. in der Suche. Ausnahme: Stücke mit Entscheid «Neu listen». */
+const VERWERFEN_NACH_STUNDEN = 2;
+function verwerfbar_(rec) { return OFFEN.indexOf(rec['Status']) !== -1 && String(rec['Entscheid unverkauft'] || '') !== 'Neu listen'; }
+/** Web-App: Listing verlassen ohne «Gelistet». */
+function listingVerwerfen(id) {
+  id = String(id || '').trim();
+  if (!id) return false;
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id);
+    if (!zeile) return false;
+    const rec = zeileZuRec_(sh, zeile);
+    if (!verwerfbar_(rec)) return false;
+    rec['Status'] = 'Abgebrochen'; rec['Bearbeitet von'] = nutzer_();
+    schreibe_(sh, zeile, rec, true);
+    log_('Listing verworfen (nicht abgeschlossen)', id, '');
+    return true;
+  } finally { lock.releaseLock(); }
+}
+/** Sicherheitsnetz, falls der Browser einfach zugemacht wurde: angefangene Listings, die älter als VERWERFEN_NACH_STUNDEN sind, verwerfen. */
+function angefangeneVerwerfen_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  if (sh.getLastRow() < 2) return 0;
+  const grenze = Date.now() - VERWERFEN_NACH_STUNDEN * 3600000;
+  const vals = sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues();
+  const alt = [];
+  vals.forEach(function (row, i) {
+    const rec = {}; L_COLS.forEach(function (k, j) { rec[k] = row[j]; });
+    const am = rec['Angelegt am'];
+    if (rec['PG-ID'] && verwerfbar_(rec) && !(am instanceof Date && am.getTime() > grenze)) alt.push(i + 2);
+  });
+  if (!alt.length) return 0;
+  const sc = col_('Status');
+  alt.forEach(function (z) { sh.getRange(z, sc).setValue('Abgebrochen'); });
+  log_('Angefangene Listings verworfen', '', String(alt.length));
+  return alt.length;
 }
 
 function uebersicht() {
@@ -1964,7 +2003,7 @@ function api(lang, name, args) {
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
-    ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
+    ablauf: ablauf, listingVerwerfen: listingVerwerfen, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
@@ -2512,6 +2551,7 @@ function ablauf(art) {
       letzteBank: bank ? Utilities.formatDate(new Date(bank), TZ, 'dd.MM.yyyy HH:mm') : '' };
   }
   if (art === 'schicht1') {
+    angefangeneVerwerfen_();
     const ls1 = alleListings_(), lz1 = Number(cfg_('Laufzeit Tage')) || 6;
     const bereit = ls1.filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
       return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], regal: regal_(r['Status']), wieder: r['Entscheid unverkauft'] === 'Neu listen' };

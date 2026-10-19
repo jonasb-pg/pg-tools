@@ -33,7 +33,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'analyseListe': ANA, 'starteListing': R, 'lade': dict(R, id='PG-010', bezeichnung='Bügeleisen', analyse=False), 'speichereDetails': R, 'markiereGelistet': {'id': 'PG-100'},
          'adressePruefen': {'stand': 'vorschlag', 'quality': 'USABLE', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3000', 'ort': 'Bern'}, 'vorschlag': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
          'adresseUebernehmen': {'stand': 'ok', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
-         'aufgabeErledigt': AU, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
+         'aufgabeErledigt': AU, 'listingVerwerfen': True, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
          'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
          'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
@@ -102,6 +102,11 @@ with sync_playwright() as p:
     s.click('.f-wahl button:text-is("Entsorgung")'); s.wait_for_timeout(300)
     ok(['entscheidUnverkauft', ['PG-012', 'Entsorgung']] in A() and 'zur Entsorgung' in s.text_content('.f-tun'), 'Entsorgung: physischer Schritt')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-listing.png', full_page=True)
+    s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
+    s.click('#f-schritte .f-eintrag:has-text("Toaster X") button'); s.wait_for_timeout(300)
+    s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
+    ok(['listingVerwerfen', ['PG-100']] in A(), 'Listing verlassen ohne «Gelistet»: Stück wird verworfen')
+    ok(len([x for x in A() if x[0] == 'listingVerwerfen']) == 1, 'Abgeschlossenes Listing wird nicht verworfen')
     # ---------- Packen ----------
     s.click('#nav-f-schicht2'); s.wait_for_timeout(300)
     t = s.text_content('#f-schritte')

@@ -15,3 +15,9 @@ assert.strictEqual(c.adresseAuswerten_(500, null, e).stand, 'fehler');
 const a = JSON.parse(JSON.stringify(c.adresseAnfrage_({ vorname: 'Testa', nachname: 'Muster', strasse: 'Testweg', nr: '1', plz: '3000', ort: 'Bern' })));
 assert.deepStrictEqual(a.geographicLocation, { house: { street: 'Testweg', houseNumber: '1' }, zip: { zip: '3000', city: 'Bern' } });
 console.log('t_ricardo_adresse ok');
+/* Angefangene Listings verwerfen (19.10.2026): nur In Arbeit/Bereit, nie «Neu listen» */
+assert.strictEqual(c.verwerfbar_({ 'Status': 'In Arbeit' }), true);
+assert.strictEqual(c.verwerfbar_({ 'Status': 'Bereit' }), true);
+assert.strictEqual(c.verwerfbar_({ 'Status': 'Bereit', 'Entscheid unverkauft': 'Neu listen' }), false);
+assert.strictEqual(c.verwerfbar_({ 'Status': 'Gelistet' }), false);
+console.log('t_ricardo_adresse verwerfen ok');

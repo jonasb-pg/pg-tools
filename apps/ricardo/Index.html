@@ -773,6 +773,7 @@
   }
 
   function zeige(was) {
+    if (was !== 'ablauf') listingVerlassen();
     ANSICHT = was;
     ['listen', 'aufgaben', 'verkauf', 'ueber', 'retour', 'admin'].forEach(function (x) { $('s-' + x).hidden = was !== x; $('nav-' + x).className = was === x ? 'an' : ''; });
     $('s-ablauf').hidden = was !== 'ablauf';
@@ -981,7 +982,7 @@
     if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
     if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
     ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
-      melde(t('s4.fertig', r.id), 'ok');
+      melde(t('s4.fertig', r.id), 'ok'); LISTING_OFFEN = '';
       still('startDaten', [], function (s) { S = s; texte(); });
       if (typeof danach === 'function') danach(); else schliesse();
     });
@@ -1409,6 +1410,7 @@
     });
   }
   function ablaufStarten(art) {
+    listingVerlassen();
     FA = art; F = null; BANK = null; FALL = null; SCHR = 0; ADR = null; FERTIG = false; R = null;
     einbauLoesen(); zeige('ablauf'); $('f-schritte').innerHTML = ''; $('f-leiste').innerHTML = ''; ladeAblauf();
     if (art === 'schicht1') ladeAnalyse();
@@ -1504,7 +1506,8 @@
       l.push({ key: 'l' + id, titel: titel, info: info, tag: tag, start: laden });
     };
     /* Entscheid Jonas 19.10.2026: angefangene und bereite Stücke einfach in derselben Liste, zuoberst, ohne Sonderstatus (sonst bleiben Leichen liegen) */
-    F.bereit.forEach(function (x) { neu(x.id, x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), x.wieder ? t('g.l.wieder') : '', function () { weiter(x.id); }); });
+    /* Seit 19.10 (zweite Runde): angefangene Listings gibt es nicht mehr, nur Stücke mit Entscheid «Neu listen» */
+    F.bereit.filter(function (x) { return x.wieder; }).forEach(function (x) { neu(x.id, x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), t('g.l.wieder'), function () { weiter(x.id); }); });
     (ANA || []).forEach(function (a) {
       if (schon[a.id]) return;
       neu(a.id, a.titel || a.name, esc(a.id) + ' · ' + esc(zu(a.zustand)) + (a.preis ? ' · CHF ' + Number(a.preis).toFixed(2) : '') + ' · ' + t('th.fotos') + ' ' + esc(a.fotos || 0), t('g.l.neu'), function () { start(a.id); });
@@ -1629,7 +1632,7 @@
     FALL = f; SCHR = 0; zeichneAblauf(); window.scrollTo(0, 0);
   }
   function geheSchritt(i) { SCHR = i; zeichneAblauf(); window.scrollTo(0, 0); }
-  function zurListe() { FALL = null; FERTIG = false; R = null; einbauLoesen(); ladeAblauf(); if (FA === 'schicht1') ladeAnalyse(); window.scrollTo(0, 0); }
+  function zurListe() { listingVerlassen(); FALL = null; FERTIG = false; R = null; einbauLoesen(); ladeAblauf(); if (FA === 'schicht1') ladeAnalyse(); window.scrollTo(0, 0); }
   function fallFertig() { FERTIG = true; R = null; ladeAblauf(function () { if (FA === 'schicht1') ladeAnalyse(); }); window.scrollTo(0, 0); }
   function schritteVon(f) { return f.listing ? listingSchritte() : f.schritte(f); }
   function marken(l) { marke($('z-f-' + FA), l.length); }
@@ -1673,7 +1676,12 @@
     einbauen();
   }
   /* Listing: oeffne() meldet ein geladenes Stück hier an, egal ob aus der Liste, der Suche oder «ohne Analyse» */
+  var LISTING_OFFEN = '';
+  /* Listing verlassen ohne «Gelistet»: Stück fällt zurück (Server prüft, ob es verworfen werden darf) */
+  function listingVerlassen() { if (LISTING_OFFEN) { var id = LISTING_OFFEN; LISTING_OFFEN = ''; still('listingVerwerfen', [id], function () {}); } }
   function listingFall(r) {
+    if (LISTING_OFFEN && LISTING_OFFEN !== r.id) listingVerlassen();
+    LISTING_OFFEN = r.id;
     FALL = { key: 'l' + r.id, titel: r.bezeichnung, info: esc(r.id) + (r.lagerort ? ' · ' + esc(r.lagerort) : ''), listing: true };
     FERTIG = false; SCHR = 0; zeichneAblauf(); window.scrollTo(0, 0);
   }
