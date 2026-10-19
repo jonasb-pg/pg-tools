@@ -636,6 +636,7 @@
     'rt.seit': ['eröffnet {0}', 'opened {0}'], 'rt.verkauf': ['Verkauf {0}', 'Sale {0}'],
    
     'rt.s2': ['Rückzahlung gemacht', 'Refund made'], 'rt.s2.ok': ['CHF {0} zurückgezahlt am {1}', 'CHF {0} refunded on {1}'],
+    'rt.s4': ['Was passiert mit dem Stück?', 'What happens to the item?'], 'rt.s4.ok': ['Entscheid: {0}', 'Decision: {0}'],
     'rt.s3': ['Bei Ricardo storniert', 'Cancelled on Ricardo'], 'rt.s3.ok': ['Bei Ricardo storniert am {0}', 'Cancelled on Ricardo on {0}'],
     'rt.s3.frist': ['Provision zurückfordern bis {0} (noch {1} Tage)', 'Reclaim the commission by {0} ({1} days left)'], 'rt.s3.vorbei': ['Frist für die Provision war am {0}', 'The deadline for the commission was {0}'],
    
@@ -1133,7 +1134,9 @@
       var s = o.rueckzahlungAm ? ok(t('rt.s2.ok', esc(o.rueckzahlung), esc(o.rueckzahlungAm)))
         : '<div class="reihe" style="margin-bottom:8px">CHF <input type="text" id="rb-' + i + '" value="' + esc(o.betrag) + '" inputmode="decimal" style="width:110px;height:40px;font-size:15px"> <button class="haupt-knopf" onclick="retoureSchritt(' + i + ',\'rueckzahlung\')">' + t('rt.s2') + '</button></div>';
       if (o.ricardo) s += ok(t('rt.s3.ok', esc(o.ricardo)));
-      else s += '<div><button onclick="retoureSchritt(' + i + ',\'ricardo\')">' + t('rt.s3') + '</button><span class="klein">' + (o.ricardoTage == null ? '' : o.ricardoTage >= 0 ? t('rt.s3.frist', esc(o.ricardoFrist), o.ricardoTage) : t('rt.s3.vorbei', esc(o.ricardoFrist))) + '</span></div>';
+      else s += '<div style="margin-bottom:8px"><button onclick="retoureSchritt(' + i + ',\'ricardo\')">' + t('rt.s3') + '</button><span class="klein">' + (o.ricardoTage == null ? '' : o.ricardoTage >= 0 ? t('rt.s3.frist', esc(o.ricardoFrist), o.ricardoTage) : t('rt.s3.vorbei', esc(o.ricardoFrist))) + '</span></div>';
+      if (o.entscheid) s += ok(t('rt.s4.ok', esc(t('f.e.' + o.entscheid))));
+      else s += '<div><span class="klein" style="margin-bottom:4px">' + t('rt.s4') + '</span><div class="reihe">' + (RT.entscheide || []).map(function (e, j) { return '<button onclick="retoureEntscheid(' + i + ',' + j + ')">' + esc(t('f.e.' + e)) + '</button>'; }).join('') + '</div></div>';
       z += '<tr><td class="mono">' + esc(o.nr) + '<br>' + t('rt.seit', esc(o.eroeffnet)) + '</td>' +
         '<td>' + (o.pgId ? esc(o.pgId) + ' ' : '') + esc(o.titel) + '<span class="klein">' + esc(gr(o.grund)) + (o.notiz ? ': ' + esc(o.notiz) : '') + '</span><span class="klein">' + t('rt.verkauf', esc(o.verkauf)) + '</span></td>' +
         '<td>' + esc(o.name || o.kaeufer) + (o.name ? '<span class="klein">' + esc(o.kaeufer) + '</span>' : '') + (o.iban ? '<span class="klein mono">' + esc(o.iban) + '</span>' : '') + '</td><td class="betrag">CHF ' + esc(o.betrag) + '</td><td>' + s + '</td></tr>';
@@ -1146,6 +1149,7 @@
     var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], function (r) { RT = r; zeichneRetouren(); }); };
     if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
   }
+  function retoureEntscheid(i, j) { ruf('retoureSchritt', [RT.offen[i].nr, 'entscheid', RT.entscheide[j]], function (r) { RT = r; zeichneRetouren(); }); }
   function ladeDatei(p, ziel, danach) {
     var bin = atob(p.datei), bytes = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);

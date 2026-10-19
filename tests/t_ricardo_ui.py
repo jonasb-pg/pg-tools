@@ -23,6 +23,7 @@ with sync_playwright() as p:
     b = p.chromium.launch(); s = b.new_page(); err = []
     s.on('pageerror', lambda e: err.append(str(e)))
     s.set_content(html); s.wait_for_timeout(300)
+    s.evaluate("zeige('listen')"); s.wait_for_timeout(200)  # seit 19.7 startet das Tool mit «Täglich», der alte Reiter Listen ist ausgeblendet
     ok(s.is_visible('#ana-karte') and 'Toaster X 2 Schlitze' in s.inner_text('#ana-liste'), 'Liste «Aus der Analyse»')
     s.click('#ana-liste button'); s.wait_for_timeout(200)
     ok(s.is_visible('#arbeit'), 'Listing offen')

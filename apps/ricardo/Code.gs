@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.7';
+const VERSION = '2026-10-19.8';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -37,7 +37,7 @@ const V_OFFEN = ['Zu packen', 'Wartet auf Zahlung', 'Bereit zum Versand'];
 const ENTSCHEIDE_UNVERKAUFT = ['Neu listen', 'Anderer Kanal', 'Entsorgung'];
 const R_COLS = ['Retoure-Nr', 'Status', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Käufer', 'Name', 'Verkauft am', 'Eröffnet am', 'Grund', 'Notiz',
   'Rückzahlung CHF', 'Rückzahlung am', 'Ricardo storniert am', 'Abgeschlossen am',
-  'Preis CHF', 'Versand CHF', 'Provision CHF', 'Eröffnet von', 'IBAN', 'Adresse', 'PLZ', 'Ort'];
+  'Preis CHF', 'Versand CHF', 'Provision CHF', 'Eröffnet von', 'IBAN', 'Adresse', 'PLZ', 'Ort', 'Entscheid'];
 const ADRESSE_TAGE = 60; // so lange bleibt die Strasse nach dem Verkauf gespeichert (Garantie 30 Tage plus Reserve)
 const RETOURE_GRUENDE = ['Defekt', 'Transportschaden', 'Falscher Artikel'];
 // Ricardo nimmt den Antrag auf Rückerstattung der Provision bis 60 Tage nach Angebotsende an
@@ -254,7 +254,7 @@ const DOKU = [
   ['STATUS LISTING', [
     'In Arbeit > Bereit (alles vollständig) > Gelistet (Ricardo-Link gespeichert) > Verkauft (Verkaufsbericht) > Versendet (Zahlung bestätigt).',
     'Frei für ein neues Listing sind: Abgebrochen, Unverkauft, Storniert, Retour abgeschlossen. Dann legt das Tool eine neue Zeile an, die alte bleibt als Verlauf.',
-    'Retourniert: Retoure läuft. Retour abgeschlossen: Geld zurück und bei Ricardo storniert.',
+    'Retourniert: Retoure läuft. Retour abgeschlossen: Geld zurück, bei Ricardo storniert und Entscheid für das Stück getroffen (Neu listen, Anderer Kanal, Entsorgung). «Neu listen» setzt das Stück auf «Bereit».',
     'Nummern: PG-… kommt aus dem Return Tool bzw. der Analyse (Spalte «Analyse-Nr»). RC-0001 vergibt das Tool für Stücke ohne Inventar. RT-0001 sind Retouren.'
   ]],
   ['STATUS VERKAUF', [
@@ -2330,9 +2330,10 @@ function retouren() {
       eroeffnet: datum_(r['Eröffnet am']), grund: r['Grund'], notiz: r['Notiz'], iban: String(r['IBAN']),
       betrag: runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)).toFixed(2),
       rueckzahlung: r['Rückzahlung am'] ? Number(r['Rückzahlung CHF']).toFixed(2) : '', rueckzahlungAm: datum_(r['Rückzahlung am']),
-      ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null };
+      ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null,
+      entscheid: String(r['Entscheid'] || '') };
   });
-  return { offen: offen, abgeschlossen: alle.length - offen.length,
+  return { offen: offen, abgeschlossen: alle.length - offen.length, entscheide: ENTSCHEIDE_UNVERKAUFT,
     auszahlungen: offen.filter(function (o) { return !o.rueckzahlungAm; }).length };
 }
 
@@ -2425,7 +2426,8 @@ function rueckzahlungMail_(r) {
   }
 }
 
-/** schritt: 'rueckzahlung' (wert = Betrag) oder 'ricardo'. Sind beide erledigt, ist die Retoure abgeschlossen und das Stück wieder frei. */
+/** schritt: 'rueckzahlung' (wert = Betrag), 'ricardo' oder 'entscheid' (wert = Neu listen, Anderer Kanal, Entsorgung).
+    Sind alle drei erledigt, ist die Retoure abgeschlossen. Entscheid Jonas 19.10.2026: gleiche Auswahl wie bei unverkauften Stücken. */
 function retoureSchritt(rtNr, schritt, wert) {
   rtNr = String(rtNr).trim();
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -2434,7 +2436,7 @@ function retoureSchritt(rtNr, schritt, wert) {
     const r = rZeilen_().filter(function (x) { return String(x['Retoure-Nr']) === rtNr; })[0];
     if (!r) throw new Error('Retoure ' + rtNr + ' nicht gefunden.');
     if (r['Status'] === 'Abgeschlossen') throw new Error('Retoure ' + rtNr + ' ist bereits abgeschlossen.');
-    const feld = { rueckzahlung: 'Rückzahlung am', ricardo: 'Ricardo storniert am' }[schritt];
+    const feld = { rueckzahlung: 'Rückzahlung am', ricardo: 'Ricardo storniert am', entscheid: 'Entscheid' }[schritt];
     if (!feld) throw new Error('Unbekannte Aktion.');
     if (r[feld]) throw new Error('Dieser Schritt ist bereits erledigt.');
     if (schritt === 'rueckzahlung') {
@@ -2442,15 +2444,22 @@ function retoureSchritt(rtNr, schritt, wert) {
       if (!(betrag > 0)) throw new Error('Bitte einen Rückzahlungsbetrag eingeben.');
       r['Rückzahlung CHF'] = betrag; r[feld] = new Date();
       r['IBAN'] = ''; r['Adresse'] = ''; // nach der Zahlung nicht mehr nötig
+    } else if (schritt === 'entscheid') {
+      if (ENTSCHEIDE_UNVERKAUFT.indexOf(wert) === -1) throw new Error('Unbekannter Entscheid.');
+      r[feld] = wert;
     } else r[feld] = new Date();
-    const fertig = r['Rückzahlung am'] && r['Ricardo storniert am'];
+    const fertig = r['Rückzahlung am'] && r['Ricardo storniert am'] && r['Entscheid'];
     if (fertig) { r['Status'] = 'Abgeschlossen'; r['Abgeschlossen am'] = new Date(); }
     rt.getRange(r._zeile, 1, 1, R_COLS.length).setValues([R_COLS.map(function (k) { return r[k]; })]);
     if (fertig && r['PG-ID']) {
       const lz = findeZeile_(sl, String(r['PG-ID']));
       if (lz) {
         const rec = zeileZuRec_(sl, lz);
-        if (rec['Status'] === 'Retourniert') { rec['Status'] = 'Retour abgeschlossen'; schreibe_(sl, lz, rec, true); }
+        if (rec['Status'] === 'Retourniert') {
+          rec['Status'] = r['Entscheid'] === 'Neu listen' ? 'Bereit' : 'Retour abgeschlossen';
+          rec['Entscheid unverkauft'] = r['Entscheid']; rec['Bearbeitet von'] = nutzer_();
+          schreibe_(sl, lz, rec, true);
+        }
       }
     }
     log_('Retoure ' + schritt, String(r['PG-ID']), rtNr + (wert ? ' ' + wert : ''));
