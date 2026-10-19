@@ -32,6 +32,8 @@
   .nav button:hover { border-color:var(--ink); background:transparent; }
   .nav button.an { background:var(--pink); border-color:var(--ink); border-left-width:6px; }
   .nav button .zahl { margin-left:auto; }
+  .nav button.paus { height:auto; min-height:40px; font-size:14px; border-color:var(--linie); border-style:dashed; text-transform:none; letter-spacing:0; font-weight:600; }
+  .nav .paus-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
   .zahl { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 5px; border:2px solid var(--ink); border-radius:999px; background:var(--pink); font:600 13px/1 var(--sans); }
   .fuss { padding:12px; border-top:2px solid var(--ink); }
   .fuss .info { font-size:14px; color:var(--muted); margin:0 0 10px; }
@@ -326,6 +328,7 @@
       <button id="nav-scan" class="an" data-a="zeige" data-v="scan"><span data-t="nav.scan"></span></button>
       <button id="nav-teile" data-a="zeige" data-v="teile"><span data-t="nav.teile"></span></button>
       <button id="nav-werkstatt" data-a="zeige" data-v="werkstatt"><span data-t="nav.werkstatt"></span></button>
+      <div id="nav-pausiert"></div>
       <div class="sektion gross" id="nav-sektion2" data-t="nav.sektion2" hidden></div>
       <button id="nav-admin" data-a="zeige" data-v="admin" hidden><span data-t="nav.admin"></span></button>
     </div>
@@ -346,7 +349,7 @@
       <div class="uhr" id="uhr" hidden>
         <span class="hb-chip" id="hb-chip" hidden></span>
         <span class="zeit" id="uhr-zeit">00:00</span>
-        <button data-a="pause" id="uhr-knopf"></button>
+        <button data-a="parken" id="uhr-knopf"></button>
         <button data-a="abbruch" id="a-abbruch"></button>
       </div>
     </header>
@@ -508,7 +511,12 @@
     'ws.aktivfrage': ['Konto ist aktiv und nutzbar', 'Account is active and usable'], 'ws.geraetplatz': ['z.B. Foto-Handy', 'e.g. photo phone'], 'ws.mneu': ['Neues Testmittel', 'New test equipment'],
     'ws.hinzu': ['Hinzufügen', 'Add'], 'ws.mname': ['Name des Testmittels', 'Name of the test equipment'], 'ws.da': ['Vorhanden', 'Available'], 'ws.nichtda': ['Fehlt', 'Missing'], 'ws.gespeichert': ['Gespeichert.', 'Saved.'],
     'ws.auto': ['wird über die Testkonten gesetzt', 'set by the test accounts'],
-    'fuss.kuerzel': ['Kürzel', 'Initials'], 'fuss.ende': ['Beenden', 'End'], 'fuss.laeuft': ['Zuerst die laufende Analyse abschliessen oder abbrechen.', 'Finish or cancel the running analysis first.'],
+    'fuss.kuerzel': ['Kürzel', 'Initials'], 'fuss.ende': ['Beenden', 'End'], 'fuss.laeuft': ['Zuerst die laufende Analyse abschliessen, pausieren oder abbrechen.', 'Finish, pause or cancel the running analysis first.'],
+    'nav.pausiert': ['Pausiert', 'Paused'], 'pz.geparkt': ['«{0}» ist pausiert. Links unter «Pausiert» geht es weiter.', '«{0}» is paused. Continue on the left under «Paused».'],
+    'pz.warte': ['Kurz warten, das Tool arbeitet noch an dieser Analyse.', 'Wait a moment, the tool is still working on this analysis.'],
+    'pz.voll': ['Schon {0} Analysen pausiert. Zuerst eine davon abschliessen.', 'Already {0} analyses paused. Finish one of them first.'],
+    'pz.speicher': ['Pausieren hat nicht geklappt (Speicher des Browsers voll). Die Analyse bleibt offen.', 'Pausing failed (browser storage full). The analysis stays open.'],
+    'pz.titel': ['Pausiert, Schritt {0} von {1}, {2} Min.', 'Paused, step {0} of {1}, {2} min'],
     'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'],
     'start.titel': ['Session starten', 'Start session'],
     'start.platz': ['z.B. SW', 'e.g. SW'], 'start.knopf': ['Los', 'Go'], 'start.fehler': ['Bitte 2 bis 4 Buchstaben eingeben.', 'Please enter 2 to 4 letters.'],
@@ -613,7 +621,7 @@
     'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
     'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
     'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
-    'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pause', 'Pause'], 'weiter': ['Weiter', 'Resume'],
+    'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pausieren', 'Pause'], 'weiter': ['Weiter', 'Resume'],
     'liste.titel': ['Warteschlange', 'Queue'], 'liste.zahlen': ['{0} offen · {1} mit Recherche · {2} in Recherche · {3} mit Fehler', '{0} open · {1} researched · {2} in research · {3} with error'],
     'liste.zuletzt': ['Letzter Abgleich: {0}', 'Last sync: {0}'], 'liste.nie': ['noch nie', 'never'], 'liste.neu': ['Aktualisieren', 'Refresh'], 'liste.fehler': ['Fehler erneut versuchen', 'Retry errors'],
     'liste.leer': ['Die Warteschlange ist leer.', 'The queue is empty.'],
@@ -769,13 +777,13 @@
   function sessionStart() {
     var k = $('kuerzel').value.trim().toUpperCase();
     if (!/^[A-ZÄÖÜ]{2,4}$/.test(k)) { $('start-meldung').innerHTML = box(t('start.fehler'), 'warn'); return; }
-    K = k; merke('at-kuerzel', K); merke('at-kuerzel-tag', heute()); $('wer').textContent = K; $('start').hidden = true;
+    K = k; merke('at-kuerzel', K); merke('at-kuerzel-tag', heute()); $('wer').textContent = K; $('start').hidden = true; zeichnePausiert();
     ruf('anmelden', [K], function () {}, function () {});            // beginnt die Schicht (Kennzahlen); ein Fehler stört die Arbeit nicht
     if (!AN) $('q').focus();
   }
   function sessionEnde() {
     if (AN) { melde(t('fuss.laeuft'), true); return; }
-    K = ''; merke('at-kuerzel', null); merke('at-kuerzel-tag', null); $('wer').textContent = ''; $('kuerzel').value = ''; $('start-meldung').innerHTML = ''; $('start').hidden = false; $('kuerzel').focus();
+    K = ''; merke('at-kuerzel', null); merke('at-kuerzel-tag', null); $('wer').textContent = ''; zeichnePausiert(); $('kuerzel').value = ''; $('start-meldung').innerHTML = ''; $('start').hidden = false; $('kuerzel').focus();
   }
 
   /* ---------- Suche, Stück ohne Inventar ---------- */
@@ -821,6 +829,7 @@
   /* ---------- Analyse starten, recherchieren, beenden ---------- */
   function starten(id) { analyse(id, Date.now()); }
   function analyse(id, t0) {
+    if (meinePausierten().some(function (x) { return x.d.produkt.id === id; })) { weiterPausiert(id); return; }   // schon pausiert: dort weiter
     if (AN) { melde(t('fuss.laeuft'), true); return; }
     ruf('starteAnalyse', [id], function (d) { beginne(d, t0); });
   }
@@ -883,6 +892,50 @@
     $('uhr-knopf').textContent = t(AN.seit ? 'pause' : 'weiter');
     if (AN.seit && Date.now() - AN.seit > 5000) sichern();
     hbChip(); hbWarten(); ricTakt();
+  }
+  /* ---------- Pausierte Analysen (Entscheid Jonas 19.10.2026) ----------
+     Eine Analyse lässt sich pausieren und später an der gleichen Stelle fortsetzen; dazwischen kann man eine andere starten.
+     Nur auf diesem Gerät gespeichert (Browser), nur für das gleiche Kürzel sichtbar, nicht im Sheet. Pausierte Zeit zählt nicht. Das Stück bleibt am Platz. */
+  var PAUS_MAX = 10;
+  function pausierte() { try { var l = JSON.parse(lies('at-pausiert') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+  function meinePausierten() { return pausierte().filter(function (x) { return x.k === K; }); }
+  function pausierteSpeichern(l) { try { localStorage.setItem('at-pausiert', JSON.stringify(l)); return true; } catch (e) { return false; } }
+  function zeichnePausiert() {
+    var l = meinePausierten(), el = $('nav-pausiert');
+    if (!el) return;
+    el.innerHTML = !l.length ? '' : '<div class="sektion gross">' + tx('nav.pausiert') + ' (' + l.length + ')</div>' + l.map(function (x) {
+      var n = x.d.ablauf.length, min = Math.round((x.aktiv || 0) / 60000);
+      return '<button class="paus" data-a="weiterPausiert" data-v="' + esc(x.d.produkt.id) + '" title="' + esc(t('pz.titel', Math.min(x.i + 1, n), n, min)) + '"><span class="paus-name">' + esc(x.d.produkt.bezeichnung) + '</span><span class="zahl">' + min + '′</span></button>';
+    }).join('');
+  }
+  /* Legt die laufende Analyse zur Seite. Nicht, solange ein Aufruf an den Server läuft: dessen Antwort gehört zu dieser Analyse. */
+  function parken(still) {
+    if (!AN) return true;
+    if (!AN.seit) { pause(); return false; }                                  // alter Stand mit angehaltener Uhr: nur weiterlaufen lassen
+    if (Object.keys(OFFEN).length) { melde(t('pz.warte'), true); return false; }
+    var l = pausierte().filter(function (x) { return !(x.k === K && x.d.produkt.id === AN.d.produkt.id); });
+    if (l.filter(function (x) { return x.k === K; }).length >= PAUS_MAX) { melde(t('pz.voll', PAUS_MAX), true); return false; }
+    sichern();
+    var x = JSON.parse(JSON.stringify(AN)), name = AN.d.produkt.bezeichnung;
+    x.seit = null; x.k = K; x.pausiertAm = Date.now();
+    if (x.mm && x.mm.laeuft) x.mm = null;
+    l.unshift(x);
+    if (!pausierteSpeichern(l)) { melde(t('pz.speicher'), true); return false; }
+    ende(); zeichnePausiert();
+    if (!still) { melde(t('pz.geparkt', name)); $('q').focus(); }
+    return true;
+  }
+  function weiterPausiert(id) {
+    if (AN && AN.d.produkt.id === id) return;
+    if (AN && !parken(true)) return;                                         // die offene Analyse wird ihrerseits pausiert
+    var l = pausierte(), x = null;
+    l = l.filter(function (y) { if (!x && y.k === K && y.d.produkt.id === id) { x = y; return false; } return true; });
+    if (!x) { zeichnePausiert(); return; }
+    pausierteSpeichern(l);
+    delete x.k; delete x.pausiertAm;
+    AN = x; AN.seit = Date.now(); LAUF = {};
+    if (ANSICHT !== 'scan') zeige('scan');
+    sichern(); zeichneAnalyse(); zeichnePausiert(); window.scrollTo(0, 0);
   }
   function pause() {
     sichern();
@@ -1923,7 +1976,7 @@
   }
   var SEITEN = { scan: null, teile: ['bestellliste', zeichneBestell], werkstatt: ['werkstatt', zeichneWerkstatt], admin: ['adminDaten', zeichneAdmin] };
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
-  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
+  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
@@ -1936,7 +1989,7 @@
     if (lies('at-lang') === 'en') L = 'en';
     /* Das Kürzel gilt nur für heute: Am nächsten Tag meldet man sich neu an, damit die Schicht beginnt. Eine laufende Analyse behält es. */
     K = lies('at-kuerzel-tag') === heute() || lauf ? (lies('at-kuerzel') || '') : '';
-    texte(); $('wer').textContent = K;
+    texte(); $('wer').textContent = K; zeichnePausiert();
     logo.addEventListener('error', ohneLogo);
     if (logo.complete && !logo.naturalWidth) ohneLogo();
     document.addEventListener('click', function (ev) {
