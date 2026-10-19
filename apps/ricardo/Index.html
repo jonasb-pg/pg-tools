@@ -186,6 +186,11 @@
   #dialog .reihe { justify-content:flex-end; }
   [hidden] { display:none !important; }
   #sperre { position:fixed; inset:0; z-index:50; cursor:progress; }
+  /* Tempo 19.10.2026: Speichern im Hintergrund. Anzeige unten links, Fehler mit «Nochmals» */
+  #schlange { z-index:40; position:fixed; left:20px; bottom:20px; background:var(--weiss); color:var(--ink); border:1.5px solid var(--ink); padding:8px 14px; border-radius:24px; font-size:13px; font-weight:600; }
+  #schlange-fehler { z-index:45; position:fixed; left:50%; bottom:20px; transform:translateX(-50%); max-width:min(680px, calc(100% - 32px)); background:var(--ink); color:var(--weiss); padding:14px 16px; border-radius:6px; }
+  #schlange-fehler .knoepfe { margin-top:10px; display:flex; gap:8px; }
+  #schlange-fehler button { background:var(--weiss); color:var(--ink); }
   #lade { z-index:51; position:fixed; right:20px; bottom:20px; background:var(--ink); color:var(--weiss); padding:10px 16px; border-radius:24px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; font-size:13px; }
 
   @media (max-width: 860px) {
@@ -460,6 +465,8 @@
 </div></div>
 <div id="sperre" hidden></div>
 <div id="lade" hidden></div>
+<div id="schlange" hidden></div>
+<div id="schlange-fehler" role="alert" hidden></div>
 
 <script>
   var L = <?!= JSON.stringify(lang) ?>;
@@ -737,15 +744,99 @@
     $('dialog-nein').onclick = function () { $('dialog').hidden = true; };
   }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { $('dialog').hidden = true; $('fb').hidden = true; } });
+  /* Wartet die Oberfläche auf den Server (Lade-Anzeige, gesperrt). Läuft noch Gespeichertes im Hintergrund, kommt der Aufruf danach: Die Reihenfolge bleibt. */
   function ruf(name, args, ok) {
+    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); ruf(name, args, ok); }); return; }
     lade(true);
-    google.script.run.withSuccessHandler(function (x) { lade(false); ok(x); })
-      .withFailureHandler(function (e) { lade(false); melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); })
+    var t0 = Date.now();
+    google.script.run.withSuccessHandler(function (x) { messe(name, t0, true); lade(false); ok(x); })
+      .withFailureHandler(function (e) { messe(name, t0, true); lade(false); melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); })
       .api(L, name, args);
   }
   function still(name, args, ok) {
-    google.script.run.withSuccessHandler(ok).withFailureHandler(function () {}).api(L, name, args);
+    var t0 = Date.now();
+    google.script.run.withSuccessHandler(function (x) { messe(name, t0, false); ok(x); }).withFailureHandler(function () { messe(name, t0, false); }).api(L, name, args);
   }
+
+  /* ---------- Tempo 19.10.2026: Weg A ----------
+     1. Zeitmessung im Browser: wie lange jemand auf den Server wartet (blockierend) oder nicht. Alle 2 Minuten eine Zeile «Tempo UI» ins Log.
+     2. Speichern im Hintergrund: Der Bildschirm geht sofort weiter, die Aufrufe laufen der Reihe nach. Netzfehler: bis 3 Mal wiederholen.
+        Scheitert ein Aufruf, steht eine Meldung mit «Nochmals» da und der Fall kommt zurück in die Liste. */
+  var TEMPO = {};
+  function messe(name, t0, blk) {
+    if (name === 'uiTempo') return;
+    var x = TEMPO[name] = TEMPO[name] || { ms: [], blk: 0 };
+    x.ms.push(Date.now() - t0); if (blk) x.blk++;
+  }
+  function tempoZusammen() {
+    return Object.keys(TEMPO).map(function (k) {
+      var a = TEMPO[k].ms.slice().sort(function (x, y) { return x - y; });
+      return { n: k, anzahl: a.length, median: a[Math.floor((a.length - 1) / 2)], max: a[a.length - 1], blk: TEMPO[k].blk };
+    });
+  }
+  function tempoSenden() {
+    var z = tempoZusammen();
+    if (!z.length) return;
+    TEMPO = {};
+    try { google.script.run.withFailureHandler(function () {}).api(L, 'uiTempo', [z]); } catch (e) { /* ohne Messung */ }
+  }
+  setInterval(tempoSenden, 120000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') tempoSenden(); });
+  window.addEventListener('pagehide', tempoSenden);
+
+  var SCHLANGE = [], SCHLANGE_LAEUFT = false, WARTEN = [], SEQ = 0, ERLEDIGT = {}, PEND = {}, NEU_LADEN = {};
+  function schlangeBusy() { return SCHLANGE_LAEUFT || SCHLANGE.length > 0; }
+  /* opt: { keys: Fälle, die damit erledigt sind; text: für die Fehlermeldung; ok(x); fehler(meldung) } */
+  function hinter(name, args, opt) {
+    opt = opt || {};
+    (opt.keys || []).forEach(function (k) { PEND[k] = (PEND[k] || 0) + 1; ERLEDIGT[k] = 'offen'; });
+    SCHLANGE.push({ name: name, args: args, opt: opt, versuche: 0 });
+    schlangeWeiter();
+  }
+  function schlangeAnzeige() { var n = SCHLANGE.length; $('schlange').hidden = !n; $('schlange').textContent = t('q.speichert', n); }
+  function netzfehler(m) { return /network|netzwerk|failed to fetch|timeout|zeitüberschreitung|verbindung|connection|xhr/i.test(m); }
+  function schlangeWeiter() {
+    schlangeAnzeige();
+    if (SCHLANGE_LAEUFT) return;
+    if (!SCHLANGE.length) { nachSchlange(); return; }
+    SCHLANGE_LAEUFT = true;
+    var j = SCHLANGE[0], t0 = Date.now();
+    var fertig = function () { SCHLANGE.shift(); SCHLANGE_LAEUFT = false; (j.opt.keys || []).forEach(function (k) { PEND[k] = Math.max(0, (PEND[k] || 1) - 1); }); };
+    google.script.run.withSuccessHandler(function (x) {
+      messe(j.name, t0, false); fertig(); SEQ++;
+      (j.opt.keys || []).forEach(function (k) { if (!PEND[k]) ERLEDIGT[k] = SEQ; });
+      try { if (j.opt.ok) j.opt.ok(x); } catch (e) { /* Anzeige darf die Schlange nicht anhalten */ }
+      schlangeWeiter();
+    }).withFailureHandler(function (e) {
+      messe(j.name, t0, false);
+      var m = String((e && e.message) || e).replace(/^Error:\s*/, '');
+      if (netzfehler(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; setTimeout(schlangeWeiter, 2000 * j.versuche); return; }
+      fertig();
+      (j.opt.keys || []).forEach(function (k) { if (!PEND[k]) delete ERLEDIGT[k]; });   // der Fall kommt zurück in die Liste
+      schlangeFehler(j, m);
+      try { if (j.opt.fehler) j.opt.fehler(m); } catch (err) { /* weiter */ }
+      NEU_LADEN[FA] = 1;
+      schlangeWeiter();
+    }).api(L, j.name, j.args);
+  }
+  var FEHLER_JOB = null;
+  function schlangeFehler(j, m) {
+    FEHLER_JOB = { name: j.name, args: j.args, opt: j.opt };
+    $('schlange-fehler').innerHTML = '<strong>' + esc(t('q.fehler', j.opt.text || j.name)) + '</strong><br>' + esc(m)
+      + '<div class="knoepfe"><button onclick="nochmals()">' + t('q.nochmals') + '</button><button onclick="$(\'schlange-fehler\').hidden=true">' + t('q.zu') + '</button></div>';
+    $('schlange-fehler').hidden = false;
+  }
+  function nochmals() { var j = FEHLER_JOB; $('schlange-fehler').hidden = true; if (!j) return; FEHLER_JOB = null; hinter(j.name, j.args, j.opt); }
+  /* Schlange leer: zuerst wartende blockierende Aufrufe, dann die Abläufe still neu laden */
+  function nachSchlange() {
+    var w = WARTEN; WARTEN = [];
+    w.forEach(function (f) { f(); });
+    if (schlangeBusy()) return;
+    Object.keys(NEU_LADEN).forEach(function (art) { delete NEU_LADEN[art]; ablaufStill(art); });
+  }
+  /* Nach einem stillen Neuladen: Fälle, die vor dem Laden fertig gespeichert waren, zeigt jetzt der Server richtig */
+  function aufraeumen(snap) { Object.keys(ERLEDIGT).forEach(function (k) { if (ERLEDIGT[k] !== 'offen' && ERLEDIGT[k] <= snap) delete ERLEDIGT[k]; }); }
+  window.addEventListener('beforeunload', function (e) { if (schlangeBusy()) { e.preventDefault(); e.returnValue = ''; } });
 
   /* ---------- Sprache ---------- */
   function texte() {
@@ -905,12 +996,26 @@
       return '<button type="button" class="' + (k === klasseWahl ? 'an' : '') + '" onclick="klasseKnoepfe(\'' + k + '\');offen()">' + t('k.' + k) + '</button>';
     }).join('');
   }
+  /* Im geführten Listing (danach gesetzt) speichert der Schritt im Hintergrund und es geht sofort weiter. Scheitert es, zurück zu diesem Schritt. */
   function speichern(danach) {
     if (!R.zustandWahl) { melde(t('s1.zustand.fehlt'), 'stop'); return; }
     if (!klasseWahl) { melde(t('s1.klasse.fehlt'), 'stop'); return; }
-    ruf('speichereDetails', [R.id, { zustand: R.zustandWahl, maengel: $('d-maengel-block').hidden ? '' : $('d-maengel').value,
-      gewicht: klasseWahl === 'S' ? '30' : klasseWahl, sperrgut: klasseWahl === 'S', getestet: $('d-getestet').checked }], function (r) { aktualisiere(r); if (typeof danach === 'function') danach(); });
+    var d = { zustand: R.zustandWahl, maengel: $('d-maengel-block').hidden ? '' : $('d-maengel').value,
+      gewicht: klasseWahl === 'S' ? '30' : klasseWahl, sperrgut: klasseWahl === 'S', getestet: $('d-getestet').checked };
+    if (typeof danach !== 'function') { ruf('speichereDetails', [R.id, d], function (r) { aktualisiere(r); }); return; }
+    listingHinter([R.id, d], 0, t('g.l.pruefen')); danach();
   }
+  function listingHinter(args, schritt, text) {
+    var id = args[0];
+    wirdGespeichert();
+    hinter('speichereDetails', args, { text: text + ' ' + id,
+      ok: function (r) {                                                   // nur der letzte Stand zählt: kommt noch ein Speichern dieses Stücks, wartet die Anzeige darauf
+        if (SCHLANGE.some(function (j) { return j.name === 'speichereDetails' && j.args[0] === id; })) return;
+        if (R && R.id === r.id) aktualisiere(r);
+      },
+      fehler: function () { if (R && R.id === id && FALL && FALL.listing) { $('karte-zu').hidden = true; geheSchritt(schritt); } } });
+  }
+  function wirdGespeichert() { $('karte-zu').textContent = t('s3.speichert'); $('karte-zu').hidden = false; $('karte-auf').hidden = true; }
   function buendelPlus() {
     var z = $('b-id').value.trim(); if (!z) return;
     ruf('buendelHinzu', [R.id, z], function (r) { $('b-id').value = ''; fuelle(r); aktualisiere(r); });
@@ -931,7 +1036,11 @@
     if (R.analyse) { if (R.geaendert) frage(t('s2.analyse.frage'), los); else los(); }
     else if (R.titel) frage(t('s2.ersetzen'), los); else los();
   }
-  function textSpeichern(danach) { ruf('speichereDetails', [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }], function (r) { aktualisiere(r); if (typeof danach === 'function') danach(); }); }
+  function textSpeichern(danach) {
+    var args = [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }];
+    if (typeof danach !== 'function') { ruf('speichereDetails', args, function (r) { aktualisiere(r); }); return; }
+    listingHinter(args, 1, t('g.l.text')); danach();
+  }
   function zaehle() {
     $('t-zahl').textContent = t('s2.zeichen', $('t-titel').value.length, 60);
     $('b-zahl').textContent = t('s2.zeichen', $('t-beschrieb').value.length, 5000);
@@ -979,6 +1088,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, ersatz); else ersatz();
   }
   function gelistet(danach) {
+    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); gelistet(danach); }); return; }   // zuerst fertig speichern, dann prüfen
     if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
     if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
     ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
@@ -1012,7 +1122,10 @@
     leser.onerror = function () { melde(t('v.datei.fehler'), 'stop'); };
     leser.readAsText(d, 'UTF-8');
   }
-  function ladeVerkaeufe() { ruf('verkaeufe', [], function (v) { VK = v; zeichneVerkaeufe(); }); }
+  function ladeVerkaeufe() {
+    if (VK) { zeichneVerkaeufe(); still('verkaeufe', [], function (v) { if (v && gleich(v, VK)) return; if (v) { VK = v; if (ANSICHT === 'verkauf') zeichneVerkaeufe(); } }); return; }
+    ruf('verkaeufe', [], function (v) { VK = v; zeichneVerkaeufe(); });
+  }
   function gruende(id) { return '<select id="' + id + '">' + S.retoureGruende.map(function (g) { return '<option value="' + esc(g) + '">' + esc(gr(g)) + '</option>'; }).join('') + '</select>'; }
   function zeichneVerkaeufe() {
     marke($('z-verkauf'), VK.offen.length);
@@ -1052,7 +1165,12 @@
   /* ---------- Zu erledigen ---------- */
   var AU = null;
   /* frisch = true liest auch neue Mails (höchstens alle 5 Minuten, sonst nur die Liste) */
-  function ladeAufgaben(frisch) { ruf(frisch ? 'mailsJetzt' : 'aufgaben', [], function (a) { AU = a; zeichneAufgaben(); }); }
+  /* Schon Geladenes sofort zeigen, dann still nachladen (Tempo 19.10.2026). Neu gezeichnet wird nur, wenn sich etwas geändert hat (Eingaben bleiben). */
+  function gleich(a, b) { try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; } }
+  function ladeAufgaben(frisch) {
+    if (!frisch && AU) { zeichneAufgaben(); still('aufgaben', [], function (a) { if (a && gleich(a, AU)) return; if (a) { AU = a; if (ANSICHT === 'aufgaben') zeichneAufgaben(); } }); return; }
+    ruf(frisch ? 'mailsJetzt' : 'aufgaben', [], function (a) { AU = a; zeichneAufgaben(); });
+  }
   function alterKlasse(h) { return h >= 24 ? 'sehr-alt' : (h >= 4 ? 'alt' : ''); }
   function alterEtikett(h) { return '<span class="etikett ' + (h >= 24 ? 'rot' : (h >= 4 ? 'orange' : '')) + '">' + t('a.vor', h) + '</span>'; }
   function zeichneAufgaben() {
@@ -1118,7 +1236,10 @@
   function erinnert(nr) { ruf('erinnerungErledigt', [nr], nachAufgaben); }
 
   /* ---------- Retouren ---------- */
-  function ladeRetouren() { ruf('retouren', [], function (r) { RT = r; zeichneRetouren(); }); }
+  function ladeRetouren() {
+    if (RT) { zeichneRetouren(); still('retouren', [], function (r) { if (r && gleich(r, RT)) return; if (r) { RT = r; if (ANSICHT === 'retour') zeichneRetouren(); } }); return; }
+    ruf('retouren', [], function (r) { RT = r; zeichneRetouren(); });
+  }
   function retoureSuchen() {
     ruf('retoureSuche', [$('rt-q').value], function (l) {
       RTS = l;
@@ -1317,7 +1438,11 @@
   }
 
   /* ---------- Laufende Angebote ---------- */
-  function ladeUebersicht() { ruf('uebersicht', [], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); }
+  function ladeUebersicht() {
+    var da = function (u) { UE = u; zaehler(u.aktiv, u.schwelle); if (ANSICHT === 'ueber') zeichneUebersicht(); };
+    if (UE) { zeichneUebersicht(); still('uebersicht', [], function (u) { if (u && !gleich(u, UE)) da(u); }); return; }
+    ruf('uebersicht', [], da);
+  }
   function zeichneUebersicht() {
     if (!UE) return;
     marke($('z-ueber'), UE.liste.filter(function (x) { return x.abgelaufen; }).length);
@@ -1379,6 +1504,8 @@
     'g.l.reakt.r': ['Hat Ricardo das Angebot automatisch neu gestartet? Dann beenden.', 'Did Ricardo restart the listing automatically? Then end it.'],
     'g.l.wohin': ['Wohin', 'Where'], 'g.l.wohin.Anderer Kanal': ['Stück ins Regal für andere Kanäle stellen.', 'Put the item onto the shelf for other channels.'],
     'g.l.wohin.Entsorgung': ['Stück zur Entsorgung stellen.', 'Put the item out for disposal.'],
+    'q.speichert': ['Speichert … ({0})', 'Saving … ({0})'], 'q.fehler': ['Nicht gespeichert: {0}', 'Not saved: {0}'], 'q.nochmals': ['Nochmals', 'Retry'], 'q.zu': ['Schliessen', 'Close'],
+    's3.speichert': ['Wird gespeichert …', 'Saving …'],
     /* Packen */
     'g.p.bericht': ['Adressen fehlen', 'Addresses missing'], 'g.p.bericht.r': ['Auf «Verkaufsbericht erhalten» klicken (letzte 7 Tage). Die Datei hier einlesen.', 'Click «Verkaufsbericht erhalten» (last 7 days). Import the file here.'],
     'g.p.bericht.k': ['Verkäufe öffnen', 'Open sales'], 'g.p.bericht.letzter': ['Letzter Bericht: {0}', 'Last report: {0}'],
@@ -1415,7 +1542,37 @@
     einbauLoesen(); zeige('ablauf'); $('f-schritte').innerHTML = ''; $('f-leiste').innerHTML = ''; ladeAblauf();
     if (art === 'schicht1') ladeAnalyse();
   }
-  function ladeAblauf(danach) { ruf('ablauf', [FA], function (f) { F = f; if (f && f.art === 'taeglich' && f.melden) marke($('z-f-taeglich'), f.melden.length + f.aufgaben.anzahl + f.storno.length); zeichneAblauf(); if (danach) danach(); }); }
+  /* Vorgeladene Abläufe (VOR): Ein Klick zeigt sofort, was da ist, und lädt still nach. Nur beim ersten Mal wartet der Bildschirm. */
+  var VOR = {};
+  function ablaufDa(art, f) {
+    if (!f || f.art !== art) return;
+    VOR[art] = f;
+    if (art === 'taeglich' && f.melden) marke($('z-f-taeglich'), f.melden.length + f.aufgaben.anzahl + f.storno.length);
+  }
+  function ladeAblauf(danach) {
+    var art = FA;
+    if (VOR[art]) { F = VOR[art]; zeichneAblauf(); if (danach) danach(); ablaufStill(art); return; }
+    ruf('ablauf', [art], function (f) { ablaufDa(art, f); if (FA !== art) return; F = f; zeichneAblauf(); if (danach) danach(); });
+  }
+  /* Still neu laden. Läuft noch etwas im Hintergrund, erst danach (sonst käme ein alter Stand). Ein offener Fall wird nicht neu gezeichnet (Eingaben bleiben). */
+  function ablaufStill(art) {
+    if (schlangeBusy()) { NEU_LADEN[art] = 1; return; }
+    var snap = SEQ;
+    still('ablauf', [art], function (f) {
+      if (!f || f.art !== art) return;
+      var neu = !gleich(f, VOR[art]), vorher = Object.keys(ERLEDIGT).length;
+      ablaufDa(art, f); aufraeumen(snap);
+      if (FA === art && ANSICHT === 'ablauf') { F = f; if ((neu || Object.keys(ERLEDIGT).length !== vorher) && (!FALL || FERTIG)) zeichneAblauf(); }
+    });
+  }
+  function ablaufNeuZeichnen() { if (ANSICHT === 'ablauf' && F && (!FALL || FERTIG)) zeichneAblauf(); }
+  /* Beim Start die übrigen Abläufe der Reihe nach im Hintergrund holen */
+  function vorladen(arten) {
+    var art = arten.shift();
+    if (!art) return;
+    if (VOR[art]) { vorladen(arten); return; }
+    still('ablauf', [art], function (f) { ablaufDa(art, f); vorladen(arten); });
+  }
   function zaehlerLaden() { still('zaehler', [], function (z) { if (!z) return; marke($('z-f-schicht2'), z.zuPacken); marke($('z-f-schicht3'), z.versand); marke($('z-retour'), z.retouren); marke($('z-verkauf'), z.offen); }); }
   function ricKnopf(url, text) { return '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(url) + '\')">' + esc(text || t('g.oeffnen')) + '</button>'; }
   /* Was zu tun ist, direkt bei der Aktion: Ricardo (rosa) oder physisch (weiss), mit dem passenden Knopf */
@@ -1429,17 +1586,15 @@
   /* ---------- Fälle pro Ablauf ----------
      Ein Fall: { key, titel, info, tag, tagKlasse, start (optional: lädt zuerst Daten), schritte(fall) → [{ titel, html, aktion: [Text, Funktion], neben: [Text, Funktion] }] } */
   function faelle() {
-    if (FA === 'taeglich') return faelleTaeglich();
-    if (FA === 'schicht1') return faelleListing();
-    if (FA === 'schicht2') return faellePacken();
-    return faelleVersenden();
+    var l = FA === 'taeglich' ? faelleTaeglich() : FA === 'schicht1' ? faelleListing() : FA === 'schicht2' ? faellePacken() : faelleVersenden();
+    return l.filter(function (f) { return !ERLEDIGT[f.key]; });          // erledigt, aber der Server hat es noch nicht bestätigt: nicht nochmals zeigen
   }
   function faelleTaeglich() {
     var au = F.aufgaben, l = [];
     F.melden.forEach(function (o) {
       l.push({ key: 'm' + o.nr, titel: o.titel, info: vInfo(o), tag: t('g.melden'), o: o, schritte: function (f) {
         return [{ titel: t('g.melden'), html: tun('ricardo', t('g.melden.r'), ricKnopf(f.o.link, t('g.verkauf.oeffnen'))),
-          aktion: [t('g.melden.ok'), function () { ruf('setzeVerkauf', [f.o.nr, 'ricardoBezahlt'], function () { fallFertig(); }); }] }];
+          aktion: [t('g.melden.ok'), function () { hinter('setzeVerkauf', [f.o.nr, 'ricardoBezahlt'], { keys: [f.key], text: t('g.melden') + ' ' + f.o.nr }); fallFertig(); }] }];
       } });
     });
     au.angebote.forEach(function (o) {
@@ -1469,7 +1624,7 @@
       l.push({ key: 'z' + o.nr, titel: o.titel, info: (o.pgId ? esc(o.pgId) + ' · ' : '') + esc(o.kaeufer) + ' · CHF ' + esc(o.total), tag: t('a.tage', o.tage), tagKlasse: 'orange', o: o, schritte: function (f) {
         return [{ titel: t('g.erinnerung'), html: (f.o.meldet ? '<p><span class="etikett hell">' + t('a.meldet', esc(f.o.meldet)) + '</span></p>' : '') + textfeld('fx-text', f.o.entwurf, 6)
           + tun('ricardo', t('g.erinnerung.r'), '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(f.o.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>'),
-          aktion: [t('a.erinnert'), function () { ruf('erinnerungErledigt', [f.o.nr], function (a) { nachAufgaben(a); fallFertig(); }); }],
+          aktion: [t('a.erinnert'), function () { hinter('erinnerungErledigt', [f.o.nr], { keys: [f.key], text: t('g.erinnerung') + ' ' + f.o.nr, ok: aufgabenStill }); fallFertig(); }],
           neben: [t('g.tz.hand.k'), function () { zahlungHandNr(f.o.nr, f.o.pgId || f.o.titel, f.o.total); }] }];
       } });
     });
@@ -1477,7 +1632,7 @@
       l.push({ key: 's' + o.nr, titel: o.titel, info: vInfo(o), tag: t('g.storno.info', o.tage), tagKlasse: 'orange', o: o, schritte: function (f) {
         var s = [{ titel: t('g.storno'), html: '<p>' + t('g.storno.info', f.o.tage) + '</p>' + tun('ricardo', t('g.storno.r'), ricKnopf(f.o.storno, t('g.storno.k'))),
           aktion: [t('g.storno.ok'), function () {
-            frage(t('f.t6.frage', f.o.nr), function () { ruf('verkaufStornieren', [f.o.nr], function (x) { F = x; if (f.o.status === 'Wartet auf Zahlung') geheSchritt(1); else fallFertig(); }); });
+            frage(t('f.t6.frage', f.o.nr), function () { hinter('verkaufStornieren', [f.o.nr], { keys: [f.key], text: t('g.storno') + ' ' + f.o.nr }); if (f.o.status === 'Wartet auf Zahlung') geheSchritt(1); else fallFertig(); });
           }], neben: [t('g.tz.hand.k'), function () { zahlungHandNr(f.o.nr, f.o.pgId || f.o.titel, f.o.total); }] }];
         if (f.o.status === 'Wartet auf Zahlung') s.push({ titel: t('g.auspacken'), html: tun('physisch', t('g.storno.p', esc(regalName('unpaid')), esc(regalName('offline')))), aktion: [t('g.fertig'), fallFertig] });
         return s;
@@ -1486,9 +1641,20 @@
     return l;
   }
   function regalName(k) { return (F.regale && F.regale[k]) || ({ offline: 'Ricardo Offline', online: 'Ricardo Online', unpaid: 'Ricardo Unpaid' })[k]; }
-  function aufgabeFertig(id) { ruf('aufgabeErledigt', [id], function (a) { nachAufgaben(a); fallFertig(); }); }
+  function aufgabeFertig(id) { hinter('aufgabeErledigt', [id], { keys: [FALL ? FALL.key : ''].filter(String), text: t('a.erledigt'), ok: aufgabenStill }); fallFertig(); }
+  /* Aufgaben aus dem Hintergrund: Marke und Liste nachführen, einen offenen Fall aber nicht neu zeichnen */
+  function aufgabenStill(a) {
+    if (!a) return;
+    AU = a; marke($('z-aufgaben'), a.anzahl); if (ANSICHT === 'aufgaben') zeichneAufgaben();
+    if (VOR.taeglich) VOR.taeglich.aufgaben = a;
+    if (F && F.art === 'taeglich') { F.aufgaben = a; ablaufNeuZeichnen(); }
+  }
   function zahlungHandNr(nr, was, total) {
-    frage(t('v.f.bezahlt', was, total), function () { ruf('setzeVerkauf', [nr, 'bezahlt'], function () { fallFertig(); }); });
+    frage(t('v.f.bezahlt', was, total), function () {
+      hinter('setzeVerkauf', [nr, 'bezahlt'], { keys: ['z' + nr, 's' + nr], text: t('g.tz.hand.k') + ' ' + nr });
+      if (F && F.offen) F.offen = F.offen.filter(function (o) { return o.nr !== nr; });
+      if (FALL && !FERTIG) fallFertig(); else zeichneAblauf();
+    });
   }
   function zahlungHandIdx(i) { var o = F.offen[i]; zahlungHandNr(o.nr, o.pgId || o.titel, o.total); }
   function vorherTaeglich() {
@@ -1516,7 +1682,7 @@
     (F.ohneMail || []).forEach(function (x) {
       l.push({ key: 'e' + x.id, titel: x.name, info: esc(x.id) + ' · ' + t('f.s2.ende', esc(x.ende)), tag: t('g.l.abgelaufen'), tagKlasse: 'orange', o: x, schritte: function (f) {
         return [{ titel: t('g.l.ende'), html: tun('ricardo', t('g.l.ende.r', esc(f.o.ende)), f.o.link ? ricKnopf(f.o.link, t('g.angebot.oeffnen')) : ''),
-          aktion: [t('g.l.ende.ok'), function () { ruf('setzeStatus', [f.o.id, 'Unverkauft'], function () { f.schritte = entscheidSchritte; f.o.status = 'Unverkauft'; geheSchritt(0); ladeAblauf(); }); }] }];
+          aktion: [t('g.l.ende.ok'), function () { hinter('setzeStatus', [f.o.id, 'Unverkauft'], { text: t('g.l.ende.ok') + ' ' + f.o.id, fehler: function () { if (FALL === f) zurListe(); } }); f.schritte = entscheidSchritte; f.o.status = 'Unverkauft'; geheSchritt(0); NEU_LADEN.schicht1 = 1; }] }];
       } });
     });
     (F.unverkauft || []).forEach(function (x) {
@@ -1532,11 +1698,14 @@
     return s;
   }
   function entscheidFlow(j) {
-    var e = F.entscheide[j], x = FALL.o;
-    ruf('entscheidUnverkauft', [x.id, e], function (f) {
-      F = f; x.entscheid = e;
-      if (e === 'Neu listen') { x.kopieren = x.kopieren || ''; KOPIE[x.id] = x.kopieren; weiter(x.id); } else geheSchritt(1);
-    });
+    var e = F.entscheide[j], x = FALL.o, key = FALL.key;
+    /* «Neu listen» lädt danach das Stück: wartet. Die anderen Entscheide speichern im Hintergrund. */
+    if (e === 'Neu listen') {
+      ruf('entscheidUnverkauft', [x.id, e], function (f) { ablaufDa('schicht1', f); F = f; x.entscheid = e; x.kopieren = x.kopieren || ''; KOPIE[x.id] = x.kopieren; weiter(x.id); });
+      return;
+    }
+    hinter('entscheidUnverkauft', [x.id, e], { keys: [key, 'u' + x.id, 'e' + x.id], text: t('g.l.entscheid') + ' ' + x.id });
+    x.entscheid = e; geheSchritt(1);
   }
   var KOPIE = {};   // Ricardo-Link «Kopieren» für neu gelistete Stücke
   /* Listing eines Stücks: Prüfen, Text, Ricardo, Regal. Die Felder sind die bisherigen Karten, pro Schritt eine */
@@ -1572,7 +1741,7 @@
           F.postBereit ? '<button class="' + (o.sendung ? '' : 'haupt-knopf') + '" onclick="etikette(\'' + esc(o.nr) + '\')">' + t(o.sendung ? 'g.p.etikette.nochmals' : 'g.p.etikette.k') + '</button>' + (o.pdfUrl ? ' <a href="' + o.pdfUrl + '" download="Etikette ' + esc(o.nr) + '.pdf" target="_self">PDF</a>' : '') : '')),
         aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
       { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
-        aktion: [t('g.p.gepackt'), function () { ruf('setzeVerkauf', [o.nr, 'gepackt'], function () { fallFertig(); }); }] }
+        aktion: [t('g.p.gepackt'), function () { hinter('setzeVerkauf', [o.nr, 'gepackt'], { keys: [f.key], text: t('g.p.gepackt') + ' ' + o.nr }); NEU_LADEN.schicht3 = 1; fallFertig(); }] }
     ];
   }
   /* Entscheid Jonas 19.10.2026: keine Adressprüfung über die Post (kostenpflichtig). Angezeigt wird nur die Adresse aus dem Verkaufsbericht. */
@@ -1617,7 +1786,7 @@
           { titel: t('g.v.wagen'), html: tun('physisch', t('g.v.wagen.p', '<strong>' + esc(x.pgId || x.nr) + '</strong>', esc(regalName('unpaid'))), ''), aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
           { titel: t('g.v.bestaetigen'), html: tun('ricardo', t('g.v.bestaetigen.r', '<strong class="mono">' + esc(x.sendung || '–') + '</strong>'),
               '<button class="haupt-knopf" onclick="kopiereText(\'' + esc(x.sendung) + '\');oeffneLink(\'' + esc(x.link) + '\')">' + t(x.sendung ? 'g.v.bestaetigen.k' : 'g.verkauf.oeffnen') + '</button>'),
-            aktion: [t('g.v.versendet'), function () { ruf('setzeVerkauf', [x.nr, 'versendet'], function () { fallFertig(); }); }] }
+            aktion: [t('g.v.versendet'), function () { hinter('setzeVerkauf', [x.nr, 'versendet'], { keys: [f.key], text: t('g.v.versendet') + ' ' + x.nr }); fallFertig(); }] }
         ];
       } };
     });
@@ -1634,7 +1803,12 @@
   }
   function geheSchritt(i) { SCHR = i; zeichneAblauf(); window.scrollTo(0, 0); }
   function zurListe() { listingVerlassen(); FALL = null; FERTIG = false; R = null; einbauLoesen(); ladeAblauf(); if (FA === 'schicht1') ladeAnalyse(); window.scrollTo(0, 0); }
-  function fallFertig() { FERTIG = true; R = null; ladeAblauf(function () { if (FA === 'schicht1') ladeAnalyse(); }); window.scrollTo(0, 0); }
+  /* Fertig: sofort der nächste Fall. Was gespeichert wird, läuft im Hintergrund; danach lädt der Ablauf still neu. */
+  function fallFertig() {
+    if (FALL) { SEQ++; ERLEDIGT[FALL.key] = PEND[FALL.key] ? 'offen' : SEQ; }
+    FERTIG = true; R = null; zeichneAblauf(); window.scrollTo(0, 0);
+    ablaufStill(FA); if (FA === 'schicht1') ladeAnalyse();
+  }
   function schritteVon(f) { return f.listing ? listingSchritte() : f.schritte(f); }
   function marken(l) { marke($('z-f-' + FA), l.length); }
   function zeichneAblauf() {
@@ -1679,7 +1853,7 @@
   /* Listing: oeffne() meldet ein geladenes Stück hier an, egal ob aus der Liste, der Suche oder «ohne Analyse» */
   var LISTING_OFFEN = '';
   /* Listing verlassen ohne «Gelistet»: Stück fällt zurück (Server prüft, ob es verworfen werden darf) */
-  function listingVerlassen() { if (LISTING_OFFEN) { var id = LISTING_OFFEN; LISTING_OFFEN = ''; still('listingVerwerfen', [id], function () {}); } }
+  function listingVerlassen() { if (LISTING_OFFEN) { var id = LISTING_OFFEN; LISTING_OFFEN = ''; hinter('listingVerwerfen', [id], { text: id }); } }   // in der Schlange: nach einem noch laufenden Speichern
   function listingFall(r) {
     if (LISTING_OFFEN && LISTING_OFFEN !== r.id) listingVerlassen();
     LISTING_OFFEN = r.id;
@@ -1803,6 +1977,7 @@
   google.script.run.withSuccessHandler(function (s) {
     lade(false); S = s; texte(); ablaufStarten('taeglich');
     ladeAnalyse();
+    vorladen(['schicht1', 'schicht2', 'schicht3']);
     /* Tempo 19.10.2026: die Marken in einem Aufruf (statt verkaeufe, retouren und ein zweites ablauf('taeglich')); «Täglich» setzt seine Marke selbst */
     zaehlerLaden();
     still('mailsJetzt', [], function (a) { AU = a; marke($('z-aufgaben'), a.anzahl); if (ANSICHT === 'aufgaben') zeichneAufgaben(); });

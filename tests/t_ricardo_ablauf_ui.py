@@ -55,7 +55,8 @@ with sync_playwright() as p:
     A = lambda: s.evaluate('AUFRUFE')
     # ---------- Tempo 19.10.2026: Start mit wenigen Aufrufen ----------
     namen = [x[0] for x in A()]
-    ok(namen.count('ablauf') == 1 and namen.count('zaehler') == 1 and 'verkaeufe' not in namen and 'retouren' not in namen, 'Start: ein ablauf, ein zaehler, kein verkaeufe/retouren ' + str(namen))
+    arten = [x[1][0] for x in A() if x[0] == 'ablauf']
+    ok(arten == ['taeglich', 'schicht1', 'schicht2', 'schicht3'] and namen.count('zaehler') == 1 and 'verkaeufe' not in namen and 'retouren' not in namen, 'Start: Täglich, die anderen Abläufe einmal vorgeladen, ein zaehler, kein verkaeufe/retouren ' + str(namen))
     ok(s.text_content('#z-f-schicht2') == '2' and s.text_content('#z-f-schicht3') == '1' and s.text_content('#z-retour') == '4', 'Marken aus zaehler')
     ok(s.text_content('#z-f-taeglich').strip() != '', 'Marke Täglich aus dem Ablauf selbst')
     # ---------- Täglich: Liste der Fälle ----------

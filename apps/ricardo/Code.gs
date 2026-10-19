@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.11';
+const VERSION = '2026-10-19.12';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2053,6 +2053,19 @@ function erinnerungErledigt(nr) {
 let LANG = 'de';
 const TEMPO_GRENZE_MS = 3000;
 
+/**
+ * Tempo 19.10.2026 (Weg A): Die Oberfläche misst, wie lange jemand auf den Server wartet, und schickt alle 2 Minuten eine Zusammenfassung.
+ * z = [{ n: Aufruf, anzahl, median, max (ms), blk: davon blockierend }]. Eine Zeile «Tempo UI» im Log, ohne Sperre (appendRow).
+ */
+function uiTempo(z) {
+  const teile = (Array.isArray(z) ? z : []).slice(0, 40).filter(function (x) { return x && /^[A-Za-z]{1,40}$/.test(String(x.n)); }).map(function (x) {
+    const s = function (v) { return (Math.max(0, Number(v) || 0) / 1000).toFixed(1); };
+    return String(x.n) + ' ' + (Number(x.anzahl) || 0) + '× Median ' + s(x.median) + ' s, max ' + s(x.max) + ' s' + (Number(x.blk) ? ', ' + Number(x.blk) + '× wartend' : '');
+  });
+  if (teile.length) log_('Tempo UI', '', teile.join(' · ').slice(0, 1500));
+  return true;
+}
+
 /** Zahlen für die Marken auf der Startseite in einem Aufruf (früher drei: verkaeufe, retouren, ablauf). Ohne Bilder, ohne Mails. */
 function zaehler() {
   const vs = alleVerkaeufe_(), rs = rZeilen_();
@@ -2074,7 +2087,7 @@ function api(lang, name, args) {
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     ablauf: ablauf, listingVerwerfen: listingVerwerfen, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus,
-    zaehler: zaehler }[name];
+    zaehler: zaehler, uiTempo: uiTempo }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
   const t0 = Date.now();
@@ -2083,7 +2096,7 @@ function api(lang, name, args) {
   finally {
     /* Langsame Aufrufe festhalten (ein Schreibzugriff): So sieht man im Log, wo das Tool bremst. */
     const ms = Date.now() - t0;
-    if (ms >= TEMPO_GRENZE_MS) { console.log('Tempo ' + name + ' ' + ms + ' ms'); log_('Tempo', '', name + (name === 'ablauf' && args ? ' ' + args[0] : '') + ' ' + (ms / 1000).toFixed(1) + ' s'); }
+    if (ms >= TEMPO_GRENZE_MS && name !== 'uiTempo') { console.log('Tempo ' + name + ' ' + ms + ' ms'); log_('Tempo', '', name + (name === 'ablauf' && args ? ' ' + args[0] : '') + ' ' + (ms / 1000).toFixed(1) + ' s'); }
   }
   if (LANG === 'en' && r && typeof r === 'object') {
     if (r.fehlt) r.fehlt = r.fehlt.map(en_);
