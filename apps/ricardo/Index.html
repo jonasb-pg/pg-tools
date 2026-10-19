@@ -1566,14 +1566,16 @@
         aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
       { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? '' : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t('g.p.etikette.da', esc(o.sendung)) + '</span>' : ''),
           F.postBereit ? '<button class="' + (o.sendung ? '' : 'haupt-knopf') + '" onclick="etikette(\'' + esc(o.nr) + '\')">' + t(o.sendung ? 'g.p.etikette.nochmals' : 'g.p.etikette.k') + '</button>' + (o.pdfUrl ? ' <a href="' + o.pdfUrl + '" download="Etikette ' + esc(o.nr) + '.pdf" target="_self">PDF</a>' : '') : '')),
-        start: function () { if (!o.ohneAdresse && F.postBereit && (!ADR || ADR.nr !== o.nr)) adresseLaden(o.nr); },
         aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
       { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
         aktion: [t('g.p.gepackt'), function () { ruf('setzeVerkauf', [o.nr, 'gepackt'], function () { fallFertig(); }); }] }
     ];
   }
+  /* Entscheid Jonas 19.10.2026: keine Adressprüfung über die Post (kostenpflichtig). Angezeigt wird nur die Adresse aus dem Verkaufsbericht. */
+  var ADR_PRUEFEN = false;
   function adresseHtml(o) {
     if (o.ohneAdresse) return '<div class="meldung warn">' + t('g.p.adr.fehlt') + '</div>';
+    if (!ADR_PRUEFEN) return '<p><strong>' + esc(o.name) + '</strong><br>' + esc(o.ort || '') + '</p>';
     if (!F.postBereit) return '<div class="meldung warn">' + t('g.p.post.fehlt') + '</div>';
     var a = ADR && ADR.nr === o.nr ? ADR : null;
     if (!a || a.laeuft) return '<p class="still">' + t('g.p.adr.laeuft') + '</p>';
