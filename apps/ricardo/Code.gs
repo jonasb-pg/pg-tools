@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.2';
+const VERSION = '2026-10-19.3';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1230,12 +1230,9 @@ function importVerkaeufe(text) {
     Object.keys(ergaenzt).forEach(function (i) { sv.getRange(Number(i) + 2, 1, 1, V_COLS.length).setValues([vAlt[i]]); });
     if (neu.length) sv.getRange(sv.getLastRow() + 1, 1, neu.length, V_COLS.length).setValues(neu);
     adressenAufraeumen_(sv);
-    /* Entscheid Jonas 17.10.2026: Was abgelaufen ist und im Bericht nicht als Verkauf vorkam, ist nicht verkauft, auch ohne Ricardo-Mail. */
-    const abgelaufen = abgelaufen_(lv, Date.now(), Number(cfg_('Laufzeit Tage')) || 6);
-    abgelaufen.forEach(function (i) { lv[i][col_('Status') - 1] = 'Unverkauft'; lv[i][col_('Bearbeitet von') - 1] = 'Verkaufsbericht'; geaendert[i] = true; });
+    /* Entscheid Jonas 19.10.2026: «Unverkauft» setzt nur die Ricardo-Mail «nicht verkauft» (mailWirkung_), nicht der Bericht. */
     Object.keys(geaendert).forEach(function (i) { sl.getRange(Number(i) + 2, 1, 1, L_COLS.length).setValues([lv[i]]); });
     PropertiesService.getScriptProperties().setProperty('LETZTER_IMPORT', String(new Date().getTime()));
-    if (abgelaufen.length) log_('Unverkauft nach Bericht', '', abgelaufen.map(function (i) { return lv[i][0]; }).join(', '));
     wochen_();
     log_('Verkaufsbericht', '', neu.length + ' neu, ' + schonDa + ' bekannt, ' + Object.keys(ergaenzt).length + ' Adressen ergänzt, ' + zugeordnet + ' zugeordnet');
     const mailStart = Number(PropertiesService.getScriptProperties().getProperty(MAIL_START)) || 0;
@@ -1247,7 +1244,7 @@ function importVerkaeufe(text) {
   } finally { lock.releaseLock(); }
 }
 
-/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit (eigene oder Einstellung) vorbei ist. Läuft nach dem Einlesen der Verkäufe: Was dann noch «Gelistet» ist, wurde nicht verkauft. */
+/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit (eigene oder Einstellung) vorbei ist. Für Hinweise: Fehlt dazu die Mail «nicht verkauft», stimmt etwas mit dem Mail-Abruf nicht. */
 function abgelaufen_(lv, jetzt, laufzeitTage) {
   const st = col_('Status') - 1, gl = col_('Gelistet am') - 1, lz = col_('Laufzeit Tage') - 1, aus = [];
   lv.forEach(function (row, i) {
@@ -2127,9 +2124,8 @@ function jetztR_(listings, verkaeufe, jetzt, zahlTage) {
   };
 }
 /**
- * Ein Angebot mit Status «Gelistet», dessen Laufzeit vorbei ist und das im danach eingelesenen Verkaufsbericht nicht vorkam, zählt als nicht verkauft,
- * auch wenn die Ricardo-Mail «nicht verkauft» fehlt (Fehler 17.10.2026: 9 abgelaufene Angebote standen als «laufen noch»).
- * Ist die Laufzeit vorbei, der Bericht aber noch nicht eingelesen, ist das Ergebnis offen («bericht»).
+ * Nicht verkauft = Status «Unverkauft», gesetzt von der Ricardo-Mail «nicht verkauft» (Entscheid Jonas 19.10.2026).
+ * Ein Angebot, das noch «Gelistet» ist, obwohl seine Laufzeit vorbei ist, zählt als «ohne Mail»: Es läuft nicht mehr, aber die Mail fehlt (Hinweis im Tool).
  */
 function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, laufzeitTage, letzterImport) {
   const tag = function (d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : ''; };
@@ -2143,7 +2139,7 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, lauf
   });
   const gelistet = function (d, eigen) {
     const ende = d.getTime() + laufzeitVon_(eigen, laufzeitTage) * 86400000;
-    return ende > jetzt ? 'laeuft' : ((letzterImport || 0) >= ende ? 'nicht' : 'bericht');
+    return ende > jetzt ? 'laeuft' : 'ohneMail';
   };
   const an = listings.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) {
     const st = String(x['Status'] || '');
@@ -2156,13 +2152,13 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, lauf
   const drin = function (x) { return x.tag >= v && x.tag <= b; };
   const rechne = function (V, A, R) {
     const g = V.filter(function (x) { return !x.storno; }), mitNeu = g.filter(function (x) { return x.neu > 0; });
-    const n = { verkauft: 0, nicht: 0, laeuft: 0, bericht: 0 };
+    const n = { verkauft: 0, nicht: 0, laeuft: 0, ohneMail: 0 };
     A.forEach(function (x) { n[x.ergebnis]++; });
     return { verkaeufe: g.length, storniert: V.length - g.length,
       umsatz: r2(g.reduce(function (t, x) { return t + x.preis; }, 0)), auszahlung: r2(g.reduce(function (t, x) { return t + x.aus; }, 0)),
       schnitt: g.length ? r2(g.reduce(function (t, x) { return t + x.preis; }, 0) / g.length) : null,
       vomNeupreis: mitNeu.length ? Math.round(mitNeu.reduce(function (t, x) { return t + x.preis / x.neu; }, 0) / mitNeu.length * 100) : null,
-      angeboten: A.length, verkauft: n.verkauft, nichtVerkauft: n.nicht, laufend: n.laeuft, berichtFehlt: n.bericht, verkaufsquote: pz(n.verkauft, n.verkauft + n.nicht),
+      angeboten: A.length, verkauft: n.verkauft, nichtVerkauft: n.nicht, laufend: n.laeuft, ohneMail: n.ohneMail, verkaufsquote: pz(n.verkauft, n.verkauft + n.nicht),
       retouren: R.length, retourenquote: pz(R.length, g.length) };
   };
   const V = vk.filter(drin), A = an.filter(drin), R = rt.filter(drin);

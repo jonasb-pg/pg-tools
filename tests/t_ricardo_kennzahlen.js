@@ -46,13 +46,13 @@ const sep = R('2026-09-01', '2026-09-30'); assert.strictEqual(sep.zeitraum.verka
 assert.deepStrictEqual(JSON.parse(JSON.stringify(c.jetztR_(listings, verkaeufe, D(17).getTime(), 3))), { gelistet: 1, zuPacken: 1, zahlungOffen: 1, zahlTage: 3 });   // Nr. 2 seit 3 Tagen offen, Nr. 4 erst seit 1 Tag
 const leer = JSON.parse(JSON.stringify(c.kennzahlenRechnen_([], [], [], D(17).getTime(), '', '')));
 assert.strictEqual(leer.zeitraum.verkaeufe, 0); assert.strictEqual(leer.zeitraum.verkaufsquote, null);
-/* Abgelaufen ohne Mail «nicht verkauft» (Fehler 17.10.2026): nach dem Verkaufsbericht nicht verkauft, vorher offen */
+/* Abgelaufen ohne Mail «nicht verkauft»: bleibt offen, Hinweis «ohne Mail» */
 const ab = [{ 'PG-ID': 'P9', 'Status': 'Gelistet', 'Gelistet am': D(9), 'Zustand': 'Gebraucht' }, { 'PG-ID': 'P10', 'Status': 'Gelistet', 'Gelistet am': D(12), 'Zustand': 'Gebraucht' }];
 const mit = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(16).getTime()))).zeitraum;
-assert.deepStrictEqual([mit.nichtVerkauft, mit.laufend, mit.berichtFehlt], [1, 1, 0]);
+assert.deepStrictEqual([mit.nichtVerkauft, mit.laufend, mit.ohneMail], [0, 1, 1]);   // nur die Mail setzt «Unverkauft» (Jonas 19.10.2026)
 const ohne = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(14).getTime()))).zeitraum;
-assert.deepStrictEqual([ohne.nichtVerkauft, ohne.laufend, ohne.berichtFehlt], [0, 1, 1]);
-/* Beim Einlesen des Verkaufsberichts: abgelaufene «Gelistet» werden «Unverkauft» */
+assert.deepStrictEqual([ohne.nichtVerkauft, ohne.laufend, ohne.ohneMail], [0, 1, 1]);
+/* Abgelaufene «Gelistet» erkennen (für Hinweise) */
 const LC = vm.runInContext('L_COLS', c), zeile = function (st, g) { const r = LC.map(function () { return ''; }); r[LC.indexOf('Status')] = st; r[LC.indexOf('Gelistet am')] = g; return r; };
 assert.deepStrictEqual(Array.from(c.abgelaufen_([zeile('Gelistet', D(9)), zeile('Gelistet', D(12)), zeile('Verkauft', D(9)), zeile('Gelistet', '')], D(17).getTime(), 6)), [0]);
 /* Eigene Laufzeit pro Listing (Jonas 19.10.2026: nicht immer 6 Tage) */
