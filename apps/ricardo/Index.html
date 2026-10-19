@@ -294,6 +294,7 @@
               <label for="r-link" data-t="s4.link"></label>
               <div class="reihe">
                 <div class="breit"><input type="text" id="r-link" placeholder="https://www.ricardo.ch/de/a/..."></div>
+                <div style="width:130px"><input type="number" id="r-tage" min="1" max="30" step="1" aria-label="Laufzeit Tage" title="Laufzeit in Tagen"></div>
                 <button class="haupt-knopf" onclick="gelistet()" data-t="s4.speichern"></button>
               </div>
               <p class="still" style="margin-top:10px" data-t="s4.regal"></p>
@@ -477,14 +478,14 @@
     'f.ref': ['Referenz-Nr.', 'Reference no. (Referenz-Nr.)'], 'f.ref.h': ['Damit wird der Verkauf später automatisch diesem Stück zugeordnet.', 'This links the sale to this item automatically later.'],
     'f.art': ['Angebotsart', 'Listing type (Angebotsart)'], 'f.art.w': ['Auktion', 'Auktion (auction)'],
     'f.preis': ['Startpreis', 'Starting price (Startpreis)'], 'f.preis.h': ['Kein Sofort-Kaufpreis.', 'No buy-now price.'],
-    'f.laufzeit': ['Laufzeit', 'Duration (Laufzeit)'], 'f.laufzeit.w': ['{0} Tage', '{0} days'], 'f.laufzeit.h': ['Das Enddatum entsprechend setzen.', 'Set the end date accordingly.'],
+    'f.laufzeit': ['Laufzeit', 'Duration (Laufzeit)'], 'f.laufzeit.w': ['{0} Tage', '{0} days'], 'f.laufzeit.h': ['Vorschlag. Weicht die Laufzeit auf Ricardo ab, unten beim Speichern die richtige Zahl eintragen.', 'Suggestion. If the duration on Ricardo differs, enter the right number below when saving.'],
     'f.reakt': ['Reaktivierung', 'Reactivation (Reaktivierung)'], 'f.aus': ['Ausschalten', 'Switch off'], 'f.reakt.h': ['Der Schalter «Automatische Reaktivierung» ist bei Ricardo standardmässig eingeschaltet.', 'The switch «Automatische Reaktivierung» is on by default on Ricardo.'],
     'f.versand': ['Versand', 'Shipping (Versand)'], 'f.versand.w': ['Einschalten: {0}', 'Switch on: {0}'], 'f.versand.h': ['Versandkosten für den Käufer: CHF {0}. Zeigt Ricardo einen anderen Betrag, mit diesem überschreiben.', 'Shipping cost for the buyer: CHF {0}. If Ricardo shows another amount, overwrite it with this one.'],
     'f.abholung': ['Abholung', 'Pick-up (Abholung)'], 'f.abholung.h': ['Ist bei Ricardo standardmässig eingeschaltet.', 'Is on by default on Ricardo.'],
     'f.boost': ['Boost', 'Boost'], 'f.boost.w': ['Keinen wählen', 'Choose none'],
     's4.titel': ['Abschliessen', 'Finish'], 's4.pruefen': ['Vor dem Veröffentlichen bei Ricardo prüfen und abhaken:', 'Check and tick before publishing on Ricardo:'],
     'p.4': ['Abholung ist ausgeschaltet', 'Pick-up is off'], 'p.5': ['Automatische Reaktivierung ist ausgeschaltet', 'Automatic reactivation is off'], 'p.6': ['Kein Boost gewählt', 'No boost chosen'],
-    's4.link': ['Link des veröffentlichten Angebots', 'Link of the published listing'], 's4.speichern': ['Als gelistet speichern', 'Save as listed'],
+    's4.link': ['Link des veröffentlichten Angebots und Laufzeit in Tagen', 'Link of the published listing and duration in days'], 's4.speichern': ['Als gelistet speichern', 'Save as listed'],
     's4.regal': ['Danach das Stück ins Regal «Ricardo Online» stellen.', 'Then put the item on the shelf «Ricardo Online».'], 's4.abbrechen': ['Dieses Listing abbrechen', 'Discard this listing'],
     's4.haken': ['Bitte zuerst alle Punkte der Kontrollliste abhaken.', 'Please tick all points of the checklist first.'],
     's4.fertig': ['{0} ist als gelistet gespeichert. Stück ins Regal «Ricardo Online» stellen.', '{0} is saved as listed. Put the item on the shelf «Ricardo Online».'],
@@ -579,7 +580,7 @@
     'ad.einst': ['Einstellungen', 'Settings'], 'ad.einst.speichern': ['Einstellungen speichern', 'Save settings'], 'ad.einst.gespeichert': ['Einstellungen gespeichert.', 'Settings saved.'],
     'ad.einst.text': ['Die Versandtarife stehen im Sheet im Tab «Versand».', 'The shipping rates are in the sheet in the tab «Versand».'],
     'u.titel': ['Laufende Angebote', 'Running listings'], 'u.filter': ['Nach PG-ID oder Name filtern', 'Filter by PG-ID or name'],
-    'u.hinweis': ['Angebote, die länger als {0} Tage online sind, gelten als abgelaufen. Letzter Verkaufsbericht: {1}. «Unverkauft» geht erst, wenn nach dem Ende des Angebots ein Bericht eingelesen wurde.', 'Listings online for more than {0} days count as expired. Last sales report: {1}. «Unsold» only works once a report was imported after the listing ended.'],
+    'u.hinweis': ['Ein Angebot gilt als abgelaufen, wenn seine Laufzeit vorbei ist (eingetragen beim Listen, sonst {0} Tage). Letzter Verkaufsbericht: {1}. Beim Einlesen des Berichts gehen abgelaufene, nicht verkaufte Angebote automatisch auf «Unverkauft».', 'A listing counts as expired when its duration is over (entered when listing, otherwise {0} days). Last sales report: {1}. When the report is imported, expired unsold listings automatically go to «Unsold».'],
     'u.keiner': ['noch keiner', 'none yet'], 'u.leer': ['Keine laufenden Angebote.', 'No running listings.'], 'u.bearbeiten': ['Bearbeiten', 'Edit'], 'u.unverkauft': ['Unverkauft', 'Unsold'],
     'u.abgelaufen': ['Abgelaufen', 'Expired'], 'u.seit': ['seit {0}', 'since {0}'], 'u.angebot': ['Angebot', 'Listing'],
     'u.frage': ['{0} als unverkauft markieren? Das Stück neu triagieren (Caritas, Heilsarmee oder Lagerverkauf) und im Return Tool den neuen Kanal eintragen.', 'Mark {0} as unsold? Re-triage the item (Caritas, Heilsarmee or warehouse sale) and enter the new channel in the Return Tool.']
@@ -723,7 +724,7 @@
   /* ---------- Arbeitsbereich ---------- */
   function oeffne(r) {
     R = r; $('arbeit').hidden = false;
-    $('r-link').value = ''; $('b-id').value = ''; $('t-quelle').textContent = S.kiAktiv ? '' : t('s2.keinki');
+    $('r-link').value = ''; $('r-tage').value = S.laufzeit || 6; $('b-id').value = ''; $('t-quelle').textContent = S.kiAktiv ? '' : t('s2.keinki');
     kontrolle();
     fuelle(r); aktualisiere(r);
     window.scrollTo(0, $('arbeit').offsetTop - 10);
@@ -855,7 +856,7 @@
   }
   function gelistet() {
     if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
-    ruf('markiereGelistet', [R.id, $('r-link').value], function (r) {
+    ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
       melde(t('s4.fertig', r.id), 'ok');
       schliesse(); still('startDaten', [], function (s) { S = s; texte(); });
     });

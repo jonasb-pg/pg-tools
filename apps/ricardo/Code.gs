@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.1';
+const VERSION = '2026-10-19.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -13,7 +13,7 @@ const L_COLS = ['PG-ID', 'Status', 'EAN', 'Bezeichnung', 'Kategorie', 'Neupreis 
   'Titel', 'Beschrieb', 'Ricardo-Link', 'Bearbeitet von',
   'Angelegt am', 'Gelistet am', 'Verkauft am', 'Versendet am', 'Spezifikationen', 'Produktlink', 'Quelle Tab',
   'Bündel-IDs', 'Bündel-Inhalt', 'Getestet', 'Erzielter Preis CHF', 'Verkauf-Nr', 'Mängel Text', 'Text Englisch',
-  'Analyse-Nr', 'Foto-Ordner', 'Text geändert'];
+  'Analyse-Nr', 'Foto-Ordner', 'Text geändert', 'Laufzeit Tage'];
 
 const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW', 'Preis CHF', 'Versand CHF', 'Total CHF',
   'Provision CHF', 'Auszahlung CHF', 'Status', 'Käufer', 'Firma', 'Vorname', 'Nachname', 'Strasse', 'Hausnummer', 'Postfach',
@@ -67,7 +67,7 @@ const DEFAULTS = [
   ['Analyse Tool ID', ANALYSE_ID, 'ANALYSE TOOL: Tab «Ricardo» mit den analysierten Stücken (Titel, Beschrieb, Zustand, Preis, Versand, Fotos). Wird nur gelesen, nie beschrieben'],
   ['Such-Tabs', 'Online', 'Tabs im Return Tool, aus denen gelistet werden darf (Komma-getrennt)'],
   ['Hinweis-Tabs', 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden', 'Wird nur durchsucht, wenn in den Such-Tabs nichts gefunden wird'],
-  ['Laufzeit Tage', 6, 'Laufzeit der Auktion; danach gilt ein Angebot als abgelaufen'],
+  ['Laufzeit Tage', 6, 'Vorschlag für die Laufzeit der Auktion. Beim Listen kann man pro Angebot eine andere Laufzeit eintragen (Spalte «Laufzeit Tage» im Tab «Listings»).'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
   ['Schlusssatz', SCHLUSSSATZ, 'Steht am Ende jedes Beschriebs. Keine Domain verwenden. Gleicher Satz wie «Ricardo-Schlusssatz» im ANALYSE TOOL'],
   ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
@@ -911,7 +911,10 @@ function kiText_(rec) {
 /* Statuswechsel                                                       */
 /* ------------------------------------------------------------------ */
 
-function markiereGelistet(id, link) {
+/** Laufzeit eines Angebots in Tagen: eigener Wert im Listing, sonst die Einstellung (Entscheid Jonas 19.10.2026: Laufzeiten sind nicht immer 6 Tage). */
+function laufzeitVon_(wert, standard) { const n = Number(wert); return n >= 1 && n <= 30 ? n : (Number(standard) || 6); }
+
+function markiereGelistet(id, link, tage) {
   link = String(link || '').trim();
   if (!/^https:\/\/(www\.)?ricardo\.ch\/\S*\d{6,}\S*$/.test(link)) throw new Error('Das ist kein gültiger Ricardo-Angebotslink. Bitte die Adresse des veröffentlichten Angebots einfügen.');
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -923,7 +926,10 @@ function markiereGelistet(id, link) {
     if (pruefe_(rec).length) throw new Error('Listing ist noch nicht vollständig: ' + pruefe_(rec).join('; '));
     const alle = listingsIndex_();
     for (const k in alle) if (k !== id && alle[k].link === link) throw new Error('Dieser Ricardo-Link ist bereits bei ' + k + ' hinterlegt.');
+    const n = Number(tage);
+    if (tage !== undefined && tage !== '' && !(n >= 1 && n <= 30 && Math.round(n) === n)) throw new Error('Laufzeit: bitte eine ganze Zahl von 1 bis 30 Tagen eintragen.');
     rec['Status'] = 'Gelistet'; rec['Ricardo-Link'] = link; rec['Gelistet am'] = new Date(); rec['Bearbeitet von'] = nutzer_();
+    rec['Laufzeit Tage'] = laufzeitVon_(tage, cfg_('Laufzeit Tage'));
     schreibe_(sh, zeile, rec, true);
     log_('Gelistet', id, link);
     return lade_(id);
@@ -942,7 +948,7 @@ function setzeStatus(id, neu) {
     if (erlaubt[neu].indexOf(rec['Status']) === -1) throw new Error('Wechsel von «' + rec['Status'] + '» zu «' + neu + '» ist nicht möglich.');
     if (neu === 'Unverkauft') {
       const g = rec['Gelistet am'];
-      const ende = g instanceof Date ? new Date(g.getTime() + (Number(cfg_('Laufzeit Tage')) || 6) * 86400000) : null;
+      const ende = g instanceof Date ? new Date(g.getTime() + laufzeitVon_(rec['Laufzeit Tage'], cfg_('Laufzeit Tage')) * 86400000) : null;
       const imp = Number(PropertiesService.getScriptProperties().getProperty('LETZTER_IMPORT')) || 0;
       if (ende && ende.getTime() > new Date().getTime()) throw new Error('Das Angebot läuft noch bis ' + datum_(ende) + '.');
       if (ende && imp < ende.getTime()) throw new Error('Bitte zuerst den aktuellen Verkaufsbericht einlesen. Das Angebot endete am ' + datum_(ende) + ', der letzte Import war ' + (imp ? 'am ' + datum_(new Date(imp)) : 'noch nie') + '. Sonst wird ein verkauftes Stück als unverkauft markiert.');
@@ -969,7 +975,7 @@ function uebersicht() {
       out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],
         zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''), regal: regal_(rec['Status']), quelle: String(rec['Quelle Tab'] || ''),
         seit: datum_(rec['Gelistet am'] || rec['Angelegt am']),
-        abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeit });
+        laufzeit: laufzeitVon_(rec['Laufzeit Tage'], laufzeit), abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeitVon_(rec['Laufzeit Tage'], laufzeit) });
     });
   }
   const rang = { 'In Arbeit': 1, 'Bereit': 2, 'Gelistet': 3 };
@@ -1239,12 +1245,12 @@ function importVerkaeufe(text) {
   } finally { lock.releaseLock(); }
 }
 
-/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit vorbei ist. Läuft nach dem Einlesen der Verkäufe: Was dann noch «Gelistet» ist, wurde nicht verkauft. */
+/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit (eigene oder Einstellung) vorbei ist. Läuft nach dem Einlesen der Verkäufe: Was dann noch «Gelistet» ist, wurde nicht verkauft. */
 function abgelaufen_(lv, jetzt, laufzeitTage) {
-  const st = col_('Status') - 1, gl = col_('Gelistet am') - 1, aus = [];
+  const st = col_('Status') - 1, gl = col_('Gelistet am') - 1, lz = col_('Laufzeit Tage') - 1, aus = [];
   lv.forEach(function (row, i) {
     const g = row[gl];
-    if (row[st] === 'Gelistet' && g instanceof Date && g.getTime() + laufzeitTage * 86400000 <= jetzt) aus.push(i);
+    if (row[st] === 'Gelistet' && g instanceof Date && g.getTime() + laufzeitVon_(row[lz], laufzeitTage) * 86400000 <= jetzt) aus.push(i);
   });
   return aus;
 }
@@ -1789,7 +1795,7 @@ function empfehlung_(L, eingang) {
   if (['Verkauft', 'Versendet', 'Retourniert', 'Retour abgeschlossen'].indexOf(st) !== -1) return 'Ablehnen: Stück ist schon verkauft';
   const g = L[col_('Gelistet am') - 1];
   if (!(g instanceof Date)) return 'Annehmen (Auktionsende unbekannt)';
-  const ende = g.getTime() + (Number(cfg_('Laufzeit Tage')) || 6) * 86400000, h = Number(cfg_('Preisvorschlag bis Stunden nach Auktionsende')) || 24;
+  const ende = g.getTime() + laufzeitVon_(L[col_('Laufzeit Tage') - 1], cfg_('Laufzeit Tage')) * 86400000, h = Number(cfg_('Preisvorschlag bis Stunden nach Auktionsende')) || 24;
   return eingang.getTime() <= ende + h * 3600000 ? 'Annehmen' : 'Ablehnen: kam mehr als ' + h + ' h nach Auktionsende';
 }
 
@@ -2132,14 +2138,14 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, lauf
     const l = nachId[String(x['PG-ID'] || '')] || {}, neu = Number(l['Neupreis CHF']) || 0;
     return { tag: tag(x['Verkauft am']), ms: x['Verkauft am'].getTime(), grade: gradeR_(l['Zustand']), storno: x['Status'] === 'Storniert', preis: Number(x['Preis CHF']) || 0, aus: Number(x['Auszahlung CHF']) || 0, neu: neu };
   });
-  const gelistet = function (d) {
-    const ende = d.getTime() + (laufzeitTage || 6) * 86400000;
+  const gelistet = function (d, eigen) {
+    const ende = d.getTime() + laufzeitVon_(eigen, laufzeitTage) * 86400000;
     return ende > jetzt ? 'laeuft' : ((letzterImport || 0) >= ende ? 'nicht' : 'bericht');
   };
   const an = listings.filter(function (x) { return x['Gelistet am'] instanceof Date; }).map(function (x) {
     const st = String(x['Status'] || '');
     return { tag: tag(x['Gelistet am']), ms: x['Gelistet am'].getTime(), grade: gradeR_(x['Zustand']),
-      ergebnis: st === 'Unverkauft' ? 'nicht' : (st === 'Gelistet' ? gelistet(x['Gelistet am']) : (['Verkauft', 'Versendet'].indexOf(st) > -1 || x['Verkauft am'] instanceof Date ? 'verkauft' : 'laeuft')) };
+      ergebnis: st === 'Unverkauft' ? 'nicht' : (st === 'Gelistet' ? gelistet(x['Gelistet am'], x['Laufzeit Tage']) : (['Verkauft', 'Versendet'].indexOf(st) > -1 || x['Verkauft am'] instanceof Date ? 'verkauft' : 'laeuft')) };
   });
   const rt = retouren.filter(function (x) { return x['Eröffnet am'] instanceof Date; }).map(function (x) { return { tag: tag(x['Eröffnet am']), ms: x['Eröffnet am'].getTime() }; });
   const alle = vk.concat(an).map(function (x) { return x.tag; }).filter(String).sort();
