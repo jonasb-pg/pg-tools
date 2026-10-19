@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.12';
+const VERSION = '2026-10-19.13';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1342,15 +1342,6 @@ function importVerkaeufe(text) {
   } finally { lock.releaseLock(); }
 }
 
-/** Zeilen (Index in lv) mit Status «Gelistet», deren Laufzeit (eigene oder Einstellung) vorbei ist. Für Hinweise: Fehlt dazu die Mail «nicht verkauft», stimmt etwas mit dem Mail-Abruf nicht. */
-function abgelaufen_(lv, jetzt, laufzeitTage) {
-  const st = col_('Status') - 1, gl = col_('Gelistet am') - 1, lz = col_('Laufzeit Tage') - 1, aus = [];
-  lv.forEach(function (row, i) {
-    const g = row[gl];
-    if (row[st] === 'Gelistet' && g instanceof Date && g.getTime() + laufzeitVon_(row[lz], laufzeitTage) * 86400000 <= jetzt) aus.push(i);
-  });
-  return aus;
-}
 
 /** Offene Verkäufe für die Pack- und Zahlungsliste. */
 function verkaeufe() {

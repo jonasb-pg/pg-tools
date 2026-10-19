@@ -1794,9 +1794,7 @@
   function urteilLokal(d) {
     if (!window.URTEIL || !AN || !AN.d.einst) return null;
     try {
-      var x = window.URTEIL.urteil(JSON.parse(JSON.stringify(d)), AN.d, AN.d.einst);
-      return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
-        versiegelt: x.versiegelt, ricardoZustand: window.URTEIL.ricardoZustand(x), verkaufsinfo: x.verkaufsinfo };
+      return window.URTEIL.pruefen(JSON.parse(JSON.stringify(d)), AN.d, AN.d.einst);
     } catch (e) { return null; }
   }
   /*

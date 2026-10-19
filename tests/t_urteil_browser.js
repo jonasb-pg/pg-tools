@@ -22,9 +22,7 @@ const faelle = [
 ];
 faelle.forEach(function (d, i) {
   const s = JSON.parse(JSON.stringify(c.pruefenAus_(c.urteil_(JSON.parse(JSON.stringify(d)), u, u.einst))));
-  const x = b.URTEIL.urteil(JSON.parse(JSON.stringify(d)), u, u.einst);
-  const r = JSON.parse(JSON.stringify(x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
-    versiegelt: x.versiegelt, ricardoZustand: b.URTEIL.ricardoZustand(x), verkaufsinfo: x.verkaufsinfo }));
+  const r = JSON.parse(JSON.stringify(b.URTEIL.pruefen(JSON.parse(JSON.stringify(d)), u, u.einst)));
   assert.deepStrictEqual(r, s, 'Fall ' + (i + 1) + ' gleich wie der Server');
 });
 console.log('t_urteil_browser ok (' + faelle.length + ' Fälle, ' + quelle.length + ' Zeichen)');

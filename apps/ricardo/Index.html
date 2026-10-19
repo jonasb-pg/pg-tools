@@ -1289,13 +1289,7 @@
     if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
   }
   function retoureEntscheid(i, j) { ruf('retoureSchritt', [RT.offen[i].nr, 'entscheid', RT.entscheide[j]], function (r) { RT = r; zeichneRetouren(); }); }
-  function ladeDatei(p, ziel, danach) {
-    var bin = atob(p.datei), bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    var u = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    ziel.innerHTML = '<a id="v-dl" href="' + u + '" download="' + esc(p.name) + '" target="_self">' + t('rt.speichern', esc(p.name)) + '</a>' + danach;
-    $('v-dl').click();
-  }
+
 
   /* ---------- Admin ---------- */
   var AD = null, EINST = [];

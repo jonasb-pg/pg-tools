@@ -52,12 +52,7 @@ const mit = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).get
 assert.deepStrictEqual([mit.nichtVerkauft, mit.laufend, mit.ohneMail], [0, 1, 1]);   // nur die Mail setzt «Unverkauft» (Jonas 19.10.2026)
 const ohne = JSON.parse(JSON.stringify(c.kennzahlenRechnen_(ab, [], [], D(17).getTime(), '', '', 6, D(14).getTime()))).zeitraum;
 assert.deepStrictEqual([ohne.nichtVerkauft, ohne.laufend, ohne.ohneMail], [0, 1, 1]);
-/* Abgelaufene «Gelistet» erkennen (für Hinweise) */
-const LC = vm.runInContext('L_COLS', c), zeile = function (st, g) { const r = LC.map(function () { return ''; }); r[LC.indexOf('Status')] = st; r[LC.indexOf('Gelistet am')] = g; return r; };
-assert.deepStrictEqual(Array.from(c.abgelaufen_([zeile('Gelistet', D(9)), zeile('Gelistet', D(12)), zeile('Verkauft', D(9)), zeile('Gelistet', '')], D(17).getTime(), 6)), [0]);
 /* Eigene Laufzeit pro Listing (Jonas 19.10.2026: nicht immer 6 Tage) */
-const zeileL = function (st, g, tage) { const r = zeile(st, g); r[LC.indexOf('Laufzeit Tage')] = tage; return r; };
-assert.deepStrictEqual(Array.from(c.abgelaufen_([zeileL('Gelistet', D(9), 10), zeileL('Gelistet', D(9), 7), zeileL('Gelistet', D(9), '')], D(17).getTime(), 6)), [1, 2]);
 const lang = JSON.parse(JSON.stringify(c.kennzahlenRechnen_([{ 'PG-ID': 'L1', 'Status': 'Gelistet', 'Gelistet am': D(9), 'Laufzeit Tage': 10 }], [], [], D(17).getTime(), '', '', 6, D(16).getTime()))).zeitraum;
 assert.deepStrictEqual([lang.nichtVerkauft, lang.laufend], [0, 1]);
 assert.strictEqual(c.laufzeitVon_('', 6), 6); assert.strictEqual(c.laufzeitVon_(10, 6), 10); assert.strictEqual(c.laufzeitVon_(99, 6), 6);

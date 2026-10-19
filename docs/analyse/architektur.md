@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-19.4` (Weg A). Live: Bereitstellungsversion 12 vom 19.10.2026, 19:58. Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-19.5` (Weg A, aufgeräumt). Live: Bereitstellungsversion 12 vom 19.10.2026, 19:58. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 

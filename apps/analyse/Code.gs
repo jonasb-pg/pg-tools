@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-19.4';
+const VERSION = '2026-10-19.5';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -260,15 +260,15 @@ function doGet() {
  * Weg A (Entscheid Jonas 19.10.2026): Das Urteil rechnet der Browser selbst, mit genau diesem Code (kein Warten auf den Server bei «Zustand» und «Entscheid»).
  * Der Server prüft beim Abschliessen noch einmal und entscheidet verbindlich. Was urteil_ braucht, kommt hier mit; ein neuer Helfer muss in diese Liste.
  */
-const URTEIL_FUNKTIONEN = [urteil_, ricardoZustand_, kaeuferSaetze_, geprueft_, zustandSatz_, reparatur_, norm_];
+const URTEIL_FUNKTIONEN = [urteil_, pruefenAus_, ricardoZustand_, kaeuferSaetze_, geprueft_, zustandSatz_, reparatur_, norm_];
 function urteilQuelle_() {
   const werte = { KO: KO, GRADES: GRADES, VERSIEGELT: VERSIEGELT, NEU_OVP: NEU_OVP };
   return '(function () { var ' + Object.keys(werte).map(function (k) { return k + ' = ' + JSON.stringify(werte[k]); }).join(', ') + ';\n'
     + 'var kurzName_ = ' + kurzName_.toString() + ', undListe_ = ' + undListe_.toString() + ';\n'
     + URTEIL_FUNKTIONEN.map(function (f) { return f.toString(); }).join('\n')
-    + '\nwindow.URTEIL = { urteil: urteil_, ricardoZustand: ricardoZustand_ }; })();';
+    + '\nwindow.URTEIL = { urteil: urteil_, pruefen: function (d, u, e) { return pruefenAus_(urteil_(d, u, e)); } }; })();';
 }
-/** Wie pruefen(), aber ohne Server: gleiche Antwort aus urteil_. Für die Tests und als Vorlage für die Oberfläche. */
+/** Die Antwort von pruefen() aus dem Urteil. Läuft auf dem Server und (über urteilQuelle_) im Browser: eine einzige Stelle. */
 function pruefenAus_(x) {
   return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
     versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x), verkaufsinfo: x.verkaufsinfo };
@@ -448,7 +448,7 @@ function liesRoh_(n) {
 const STABIL = ['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel'];
 let MEMO = {};
 /**
- * Tempo (Messung 17.10.2026 mit tempoTest): Jede Anfrage an Google Sheets kostet rund 0.3 s. getDataRange braucht drei davon (Länge, Breite, Werte),
+ * Tempo (Messung 17.10.2026): Jede Anfrage an Google Sheets kostet rund 0.3 s. getDataRange braucht drei davon (Länge, Breite, Werte),
  * darum liest das Tool das ganze Raster in einem Aufruf und schneidet leere Zeilen und Spalten selbst ab. Gleiches Ergebnis wie getDataRange().getValues().
  */
 function rasterWerte_(s) {
@@ -3128,51 +3128,3 @@ function umbau_(ss) {
   /* Die Übersicht schreibt seit 2026-10-16.7 die gemeinsame Basis (Basis.gs) bei jedem «einrichten» ganz neu: ANALYSE_KATALOG. */
 }
 
-/**
- * Tempo-Messung (nur lesen, schreibt nichts). Im Editor ausführen, Ergebnis im Ausführungsprotokoll.
- * Vergleicht: jeden Tab einzeln mit SpreadsheetApp, eine winzige Zelle (reine Wartezeit), alle Tabs in einem Aufruf über die Sheets-API, Zwischenspeicher.
- */
-function tempoTest() {
-  const aus = [], t = function (name, f) { const a = Date.now(); let n = ''; try { n = f(); } catch (err) { n = 'Fehler: ' + err.message; } aus.push(name + ': ' + (Date.now() - a) + ' ms' + (n !== undefined && n !== '' ? ' (' + n + ')' : '')); };
-  let ss;
-  t('Sheet öffnen', function () { ss = ss_(); return ss.getSheets().length + ' Tabs'; });
-  t('1 Zelle Einstellungen!A1', function () { return ss.getSheetByName('Einstellungen').getRange('A1').getValue() ? 'ok' : ''; });
-  t('1 Zelle nochmals', function () { ss.getSheetByName('Einstellungen').getRange('A2').getValue(); });
-  const tabs = ['Einstellungen', 'Produkte', 'Bestellliste', 'Testkonten', 'Testmittel', 'Stufen', 'Batches', 'Analysen', 'Listen'];
-  tabs.forEach(function (n) { t('Tab ' + n, function () { const s = ss.getSheetByName(n); const v = s.getDataRange().getValues(); return v.length + ' Zeilen'; }); });
-  t('Sheets-API, alle ' + tabs.length + ' Tabs in einem Aufruf', function () {
-    const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + ss.getId() + '/values:batchGet?' + tabs.map(function (n) { return 'ranges=' + encodeURIComponent("'" + n + "'"); }).join('&') + '&valueRenderOption=UNFORMATTED_VALUE';
-    const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) return 'HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 120);
-    return JSON.parse(r.getContentText()).valueRanges.length + ' Bereiche';
-  });
-  ['Testkonten', 'Testmittel', 'Stufen'].forEach(function (n) { const s = ss.getSheetByName(n); let lr, lc; t('  ' + n + ' getLastRow', function () { lr = s.getLastRow(); return lr; }); t('  ' + n + ' getLastColumn', function () { lc = s.getLastColumn(); return lc; }); t('  ' + n + ' feste Grösse lesen', function () { return s.getRange(1, 1, Math.max(lr, 1), Math.max(lc, 1)).getValues().length; }); t('  ' + n + ' A1:Z60 lesen', function () { return s.getRange('A1:Z60').getValues().length; }); });
-  ['Produkte', 'Analysen', 'Listen'].forEach(function (n) { const s = ss.getSheetByName(n); let mr, mc; t('  ' + n + ' getMaxRows', function () { mr = s.getMaxRows(); return mr; }); t('  ' + n + ' getMaxColumns', function () { mc = s.getMaxColumns(); return mc; }); t('  ' + n + ' ganzes Raster lesen', function () { return s.getRange(1, 1, mr, mc).getValues().length; }); t('  ' + n + ' getDataRange', function () { return s.getDataRange().getValues().length; }); });
-  t('Sheets-Dienst: alle ' + tabs.length + ' Tabs in einem Aufruf', function () { const r = Sheets.Spreadsheets.Values.batchGet(ss.getId(), { ranges: tabs.map(function (n) { return "'" + n + "'"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); return r.valueRanges.length + ' Bereiche, ' + r.valueRanges.map(function (x) { return (x.values || []).length; }).join('/'); });
-  t('Sheets-Dienst: nochmals', function () { const r = Sheets.Spreadsheets.Values.batchGet(ss.getId(), { ranges: tabs.map(function (n) { return "'" + n + "'"; }), valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' }); return r.valueRanges.length; });
-  t('Sheets-Dienst: 1 Tab', function () { const r = Sheets.Spreadsheets.Values.get(ss.getId(), "'Testkonten'"); return (r.values || []).length; });
-  t('Zwischenspeicher lesen', function () { CacheService.getScriptCache().get('tab:Einstellungen'); });
-  console.log(aus.join('\n'));
-  return aus;
-}
-
-/** Tempo-Messung der echten Aufrufe der Oberfläche (nur lesen). Im Editor ausführen. Jeder Aufruf zweimal: zuerst kalt, dann mit Zwischenspeicher. */
-function tempoEcht() {
-  const aus = [], mal = function (name, args) {
-    LAUF_MEMO = {}; MEMO = {}; LESEN = []; KOPF_MEMO = {};               // wie ein neuer Aufruf aus der Web-App
-    const t = Date.now();
-    try { api('de', name, args || []); aus.push(name + ': ' + (Date.now() - t) + ' ms · ' + LESEN.join(', ')); }
-    catch (err) { aus.push(name + ': Fehler ' + err.message); }
-  };
-  const p = lies_('Produkte').z.filter(function (r) { return inSchlange_(r) && r['Recherche-Status'] === 'Bereit'; })[0];
-  ['startDaten', 'werkstatt', 'adminDaten'].forEach(function (n) { mal(n); mal(n); });
-  if (p) {
-    const id = String(p['PG-ID']);
-    mal('starteAnalyse', [id]); mal('starteAnalyse', [id]);
-    mal('pruefen', [{ id: id }]);
-    mal('suche', [String(p['Bezeichnung']).slice(0, 20)]);
-    mal('fotoStand', [id]); mal('fotoStand', [id]);
-  }
-  console.log(aus.join('\n'));
-  return aus;
-}
