@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-19.1`. Live: Bereitstellungsversion 9 vom 19.10.2026, 12:42. Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-19.2` (im Repo; Bereitstellung als Version 10 folgt). Live: Bereitstellungsversion 9 vom 19.10.2026, 12:42. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 

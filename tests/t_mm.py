@@ -22,9 +22,12 @@ with sync_playwright() as p:
       window.D={produkt:{id:'PG-1',bezeichnung:'Bosch Unlimited 7',vp:180,budget:15,stufe:'Vollprüfung'},ablauf:['ident','entscheid'],zustand:{grade:[['B','Leichte Spuren','x']]},recherche:true,infos:[],handbuch:null,ident:{marke:'Bosch',modell:'BCS71'},
       funktion:{liste:[],mittel:[],defekte:[],hinweise:[]},liefer:{teile:[]},sicher:[],reset:[],reparatur:{stundenansatz:50,grenze:25},ricardo:{vorschlag:true,versand:[],fotoUrl:''}};
       beginne(D, Date.now()-120000); AN.s.grade='B';""")
-    pg.click('button[data-a=weiter]'); pg.wait_for_timeout(80)
+    pg.click('button[data-a=identJa]'); pg.wait_for_timeout(80)
     pg.screenshot(path='mm1.png')
     pg.wait_for_timeout(400); pg.screenshot(path='mm2.png')
+    t=pg.inner_text('#schritt')
+    assert 'Empfehlung: Regal Matchmaker' in t and pg.locator('button[data-a=kanal][data-v=ricardo]').count()==1 and pg.locator('button[data-a=kanal][data-v=regal]').count()==1, 'Matchmaker als Empfehlung, Ricardo und Regal waehlbar'
+    print('mm empfehlung, andere waehlbar ok')
     pg.click('button[data-a=kanal][data-v=matchmaker]'); pg.wait_for_timeout(200)
     a=pg.evaluate('ARGS.abschliessen[0]'); print('abschluss kanal',a['kanal'],'mm',a['mm']['gesucht'],'stand i',a['stand']['i'],'nachMm',a['nachMm'])
     pg.screenshot(path='mm3.png')

@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-19.1';
+const VERSION = '2026-10-19.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -57,6 +57,7 @@ const KO = { sperre: 'Kontosperre: Gerät ist noch mit einem Konto verbunden', s
   reset: 'Gerät lässt sich nicht zurücksetzen', kern: 'Kernfunktion nicht prüfbar', frei: '', defekt: '', reparatur: '' };
 const GRADES = ['A', 'B', 'C'];
 const VERSIEGELT = 'Originalversiegelt, ungeöffnet. Nicht geprüft.';
+const NEU_OVP = 'Neu und unbenutzt, Verpackung geöffnet. Zurücksetzen entfällt.';
 
 /* Tab «Stufen»: Der Verkaufspreis bestimmt Zeitbudget, Tiefe der Recherche und Umfang der Funktionsprüfung. einrichten() legt den Tab mit diesen Startwerten an, wenn er fehlt. */
 const STUFEN_KOPF = ['Herkunft', 'VP ab CHF', 'Stufe', 'Minuten', 'Websuchen', 'KI-Modell', 'Recherche-Umfang', 'Prüfumfang', 'Hinweis'];
@@ -266,7 +267,7 @@ function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
   const f = { startDaten: startDaten, suche: suche, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
   try { vorladen_(VORLADEN[name] || ['Einstellungen']); } catch (err) { /* dann liest jeder Tab für sich */ }
@@ -287,6 +288,7 @@ const EN_REGELN = [
   [/^Produkt (\S+) ist bereits analysiert\.$/, 'Product $1 has already been analysed.'],
   [/^Bitte einen Produktnamen oder einen Link eingeben\.$/, 'Please enter a product name or a link.'],
   [/^Bitte zuerst ein Kürzel eingeben\.$/, 'Please enter your initials first.'],
+  [/^Bitte einen Verkaufspreis \(VP\) eingeben\.$/, 'Please enter a sales price (VP).'],
   [/^Bitte eine Frage eingeben\.$/, 'Please enter a question.'],
   [/^Nur für Admins\.$/, 'Admins only.'],
   [/^Der Claude-Schlüssel fehlt\. .*$/, 'The Claude key is missing. Please add it to the script properties as ANTHROPIC_API_KEY.'],
@@ -1744,6 +1746,19 @@ function ueberblick_(p, e) {
 
 function starteAnalyse(id) { return ueberblickSpeicher_(produkt_(id), einst_()); }
 
+/** Feedback DS 19.10.2026: Fehlt der Preis (VP), wird er in der Identität nachgetragen; der Neupreis (OVP) freiwillig. Schreibt nur in «Produkte», nie ins Return Tool. */
+function preisSetzen(id, vp, ovp) {
+  const v = zahl_(vp), o = zahl_(ovp);
+  if (!(v > 0)) throw new Error('Bitte einen Verkaufspreis (VP) eingeben.');
+  gesperrt_(function () {
+    const p = produkt_(id), r = {}; r[p._r] = v;
+    setz_('Produkte', 'VP CHF', r);
+    if (o > 0 && !(zahl_(p['Neupreis CHF']) > 0)) { const q = {}; q[p._r] = o; setz_('Produkte', 'Neupreis CHF', q); }
+  });
+  log_('Preis nachgetragen', String(id), 'VP ' + v + (o > 0 ? ', OVP ' + o : ''));
+  return starteAnalyse(id);
+}
+
 /**
  * Überblick pro Produkt im Zwischenspeicher (6 Stunden): «Analyse starten», «Zustand prüfen» und der Ricardo-Text brauchen ihn je neu, und er kostet sonst
  * mehrere Sekunden (Recherche suchen, Handbuch-Sheet öffnen). Der Schlüssel enthält die Produktzeile: Ändert sie (z.B. Recherche fertig), gilt der alte nicht mehr.
@@ -1938,6 +1953,8 @@ function urteil_(d, u, e) {
   const satz = function (x) { x = String(x).trim(); return /[.!?]$/.test(x) ? x : x + '.'; };
   const liste = function (x) { return (Array.isArray(x) ? x : []).map(function (y) { return String(y == null ? '' : y).trim(); }).filter(String); };
   const ko = d.ko && KO[d.ko.art] !== undefined ? d.ko : null, versiegelt = !ko && d.versiegelt === true, ja = !ko, fn = Array.isArray(d.fn) ? d.fn : [], offen = [];
+  /* Entscheid Jonas 19.10.2026 (Feedback DS, SW): neu und unbenutzt, Verpackung geöffnet. Hygiene gilt als erfüllt, Zurücksetzen entfällt (keine Daten der Vorbesitzerin). */
+  const neuOvp = !ko && !versiegelt && d.neuOvp === true;
   let grund = '';
   if (ko) {
     const text = String(ko.text || '').trim();
@@ -1962,6 +1979,7 @@ function urteil_(d, u, e) {
     if (nichtGeprueftKurz.length) auto.push(satz('Nicht geprüft: ' + nichtGeprueftKurz.join(', ')));
     if (rep.length) auto.push(satz('Repariert: ' + rep.map(function (r) { return r.text || r.was; }).join('; ')));
     if (ja && u.firmware && d.fwAbbruch === true) auto.push('Firmware nicht aktualisiert (Update dauerte zu lang).');
+    if (neuOvp) auto.push(NEU_OVP);
   }
   const befundAuto = auto.join(' ');
 
@@ -1969,7 +1987,7 @@ function urteil_(d, u, e) {
   if (!ko && !versiegelt) {
     if (!u.ablauf.length) return { offen: [['o.recherche']] };
     u.ablauf.forEach(function (s) {
-      if (s === 'hygiene' && d.unbenutzt !== true) offen.push(['o.hygiene']);
+      if (s === 'hygiene' && d.unbenutzt !== true && !neuOvp) offen.push(['o.hygiene']);
       if (s === 'sicher' && d.sicher !== true) offen.push(['o.sicher']);
       if (s === 'sperre' && d.sperreFrei !== true) offen.push(['o.sperre']);
       if (s === 'funktion') {
@@ -1977,7 +1995,7 @@ function urteil_(d, u, e) {
         else if (fn.indexOf('nok') > -1) offen.push(['o.defekt']);
         else if (u.funktion.liste.some(function (x, i) { return x.g === 'Kern' && fn[i] === 'np'; })) offen.push(['o.kern']);
       }
-      if (s === 'reset' && !(Number(d.reset) >= u.reset.length)) offen.push(['o.reset']);
+      if (s === 'reset' && !neuOvp && !(Number(d.reset) >= u.reset.length)) offen.push(['o.reset']);
       if (s === 'zustand' && GRADES.indexOf(d.grade) < 0) offen.push(['o.zustand']);
     });
     if (offen.length) return { offen: offen, befundAuto: befundAuto };
@@ -2067,14 +2085,15 @@ function schritte_(d, u, bis) {
   const ko = d.ko ? d.ko.art : '';                                           // wer erst «unbenutzt» und nach «Zurück» «benutzt» antwortet: es gilt das K.-o.
   const zeile = function (s, punkt, herkunft, ergebnis) { z.push({ 'Block': SCHRITTE[s], 'Schritt': txt_(punkt), 'Herkunft Schritt': herkunft, 'Ergebnis': ergebnis }); };
   u.ablauf.slice(0, bis + 1).forEach(function (s) {
-    if (s === 'hygiene') zeile(s, 'Produkt ist unbenutzt', 'Ablauf', d.unbenutzt === true && ko !== 'hygiene' ? 'ok' : 'nicht ok');
+    if (s === 'hygiene') zeile(s, 'Produkt ist unbenutzt', 'Ablauf', (d.unbenutzt === true || d.neuOvp === true) && ko !== 'hygiene' ? 'ok' : 'nicht ok');
     if (s === 'sicher') u.sicher.forEach(function (x) { zeile(s, x, 'Sicherheitspunkte', d.sicher === true || nok.indexOf(x) < 0 ? 'ok' : 'nicht ok'); });
     if (s === 'voll') u.liefer.teile.forEach(function (x) { zeile(s, x, 'Recherche', fehlt.indexOf(x) > -1 ? 'fehlt' : 'ok'); });
     if (s === 'sperre') zeile(s, 'Gerät ist mit keinem Konto verbunden', 'Ablauf', d.sperreFrei === true && ko !== 'sperre' ? 'ok' : 'nicht ok');
     if (s === 'funktion') u.funktion.liste.forEach(function (x, i) {
       if (['ok', 'nok', 'np'].indexOf(fn[i]) > -1) zeile(s, x.t, x.g === 'Kern' ? 'Kernfunktion' : 'Weitere Funktion', { ok: 'ok', nok: 'nicht ok', np: 'nicht prüfbar' }[fn[i]]);
     });
-    if (s === 'reset') u.reset.forEach(function (x, i) { if (i < Number(d.reset)) zeile(s, x[0], 'Ablauf', 'ok'); });
+    if (s === 'reset' && d.neuOvp === true && !ko) zeile(s, 'Zurücksetzen', 'Ablauf', 'entfällt (neu, unbenutzt)');
+    else if (s === 'reset') u.reset.forEach(function (x, i) { if (i < Number(d.reset)) zeile(s, x[0], 'Ablauf', 'ok'); });
   });
   return z;
 }
@@ -2093,6 +2112,8 @@ function abschliessen(d) {
   const u = ueberblickSpeicher_(p, e), x = urteil_(d, u, e);
   if (x.offen) return { offen: x.offen };
   const mm = x.reusable && d.kanal === 'matchmaker' ? mmPruefen_(d) : null;
+  /* Entscheid Jonas 19.10.2026: Matchmaker ist bei einem Treffer die klare Empfehlung, die Person darf aber anders entscheiden. Das steht im Log. */
+  if (x.reusable && d.mmEmpfohlen && d.kanal !== 'matchmaker') log_('Matchmaker-Empfehlung übergangen', pg, txt_(String(d.mmEmpfohlen)) + ' → ' + (d.kanal || 'Regal'));
   const ric = !mm && x.reusable && d.kanal === 'ricardo' ? ricardoPruefen_(d, u, x, e, p) : null;
   if (ric) blatt_('Ricardo');                                         // legt den Tab beim ersten Mal an, ausserhalb der Sperre
   const regal = mm ? 'Matchmaker' : (ric ? 'Ricardo Offline' : (x.reusable ? 'Analysiert' : ''));

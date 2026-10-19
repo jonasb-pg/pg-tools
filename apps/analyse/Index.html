@@ -474,6 +474,7 @@
   <div class="fs-kopf"><span class="gross" data-t="fs.titel"></span><span class="mono" id="fs-id" style="font-size:22px"></span><strong id="fs-name"></strong></div>
   <div id="fs-liste"></div>
   <input type="file" id="fs-datei" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fs-galerie" accept="image/*" multiple hidden>
   <p class="still" data-t="fs.hinweis"></p>
 </div>
 <div id="lade" hidden></div>
@@ -552,7 +553,18 @@
     're.keine': ['Für dieses Produkt gibt es noch keine Recherche.', 'There is no research for this product yet.'], 're.jetzt': ['Jetzt recherchieren', 'Research now'],
     're.laeuft': ['Die Recherche läuft, das dauert etwa eine Minute.', 'Research is running, this takes about a minute.'],
     'id.frage': ['Ist es genau dieses Produkt?', 'Is it exactly this product?'], 'id.marke': ['Marke', 'Brand'], 'id.modell': ['Modell', 'Model'], 'id.nr': ['Herstellernr.', 'Manufacturer no.'],
-    'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
+    'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'],
+    'id.neuovp': ['Ja, neu und unbenutzt (Verpackung offen)', 'Yes, new and unused (box opened)'],
+    'id.neuovp.hilfe': ['Neu und unbenutzt, auch wenn die Verpackung geöffnet ist: Hygiene und Zurücksetzen entfallen, Grade A ist vorgewählt.', 'New and unused, even if the box is opened: hygiene and reset are skipped, grade A is preselected.'],
+    'id.vp': ['Verkaufspreis (VP) CHF', 'Sales price (VP) CHF'], 'id.ovp': ['Neupreis (OVP) CHF, freiwillig', 'New price (RRP) CHF, optional'],
+    'id.preisfehlt': ['Für dieses Stück fehlt der Preis. Bitte hier eintragen.', 'The price is missing for this item. Please enter it here.'],
+    'id.vpfehlt': ['Bitte zuerst den Verkaufspreis (VP) eintragen.', 'Please enter the sales price (VP) first.'],
+    'en.bearbeiten': ['Befund bearbeiten', 'Edit finding'], 'en.befund.eigen': ['Deine Angaben (Mängel, Hinweise)', 'Your notes (defects, remarks)'],
+    'en.befund.auto': ['Vom Tool: {0}', 'From the tool: {0}'], 'en.befund.ok': ['Übernehmen', 'Apply'],
+    'en.befund.ric': ['Befund geändert: Den Ricardo-Text bei Bedarf mit «Neu schreiben» anpassen.', 'Finding changed: update the Ricardo text with «Rewrite» if needed.'],
+    'ri.empfohlen': ['Vorschlag', 'Suggested'], 'mm.empfehlung': ['Empfehlung: Regal Matchmaker', 'Recommended: shelf “Matchmaker”'], 'mm.anders': ['Oder anders entscheiden:', 'Or decide differently:'],
+    'fo.titel': ['Fotos', 'Photos'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
+    'fs.galerie': ['Aus Galerie', 'From gallery'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
     'id.welches': ['Welches Modell ist es?', 'Which model is it?'], 'id.platz': ['Modell, wie es auf dem Gerät steht', 'Model as written on the device'], 'id.neu': ['Neu recherchieren', 'Research again'], 'id.doch': ['Doch richtig', 'It is correct after all'],
     'id.rueckruf': ['Rückruf', 'Recall'], 'id.rfrage': ['Betrifft der Rückruf dieses Gerät?', 'Does the recall affect this device?'], 'id.rnein': ['Nein, nicht betroffen', 'No, not affected'], 'id.rja': ['Ja, betroffen', 'Yes, affected'],
     'hy.frage': ['Wurde das Produkt benutzt?', 'Has the product been used?'], 'hy.nein': ['Unbenutzt', 'Unused'], 'hy.ja': ['Benutzt', 'Used'],
@@ -835,7 +847,7 @@
   }
   /* Was die Person im Lauf einer Analyse antwortet. Daraus entsteht in daten() das, was der Server beurteilt. Testmittel, die nicht als vorhanden im Inventar stehen, fragt der Schritt «Funktion». */
   function leer(d) {
-    return { versiegelt: false, rueckrufFrei: false, unbenutzt: false, sicher: false, sicherNein: false, sicherWahl: {}, fehlt: {}, fehltText: '', sperreFrei: false, fn: {},
+    return { versiegelt: false, neuOvp: false, rueckrufFrei: false, unbenutzt: false, sicher: false, sicherNein: false, sicherWahl: {}, fehlt: {}, fehltText: '', sperreFrei: false, fn: {},
       mittelFehlt: [], mittelDa: [],              // nichts wird als fehlend angenommen: Unbekanntes fragt der Schritt «Funktion»
       reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '' };
   }
@@ -1117,11 +1129,11 @@
   function zeichneSchritt() {
     var d = AN.d, s = AN.s, ohne = !d.recherche, ort;
     $('schiene').innerHTML = d.ablauf.map(function (k, n) {
-      var kl = n === AN.i ? 'aktiv' : (n < AN.i ? (s.ab !== null && n > s.ab ? 'aus' : 'fertig') : '');
+      var kl = n === AN.i ? 'aktiv' : (entfaellt(k) ? 'aus' : (n < AN.i ? (s.ab !== null && n > s.ab ? 'aus' : 'fertig') : ''));
       return '<li class="' + kl + '"' + (kl === 'aus' || kl === 'aktiv' ? '' : ' data-a="springe" data-v="' + n + '"') + '><span class="nr">' + (n + 1) + '</span><span class="name">' + tx('s.' + k) + '</span></li>'; }).join('');
     /* Zustand und Entscheid zeigen, was der Server sagt. Hat sich seit dem letzten Mal etwas geändert, wird es zuerst verworfen und neu geholt: So steht nie ein altes Urteil da. */
     if (!AN.gate && (ohne ? !!s.ko : (schritt() === 'zustand' || schritt() === 'entscheid'))) urteilHolen();
-    $('schritt').innerHTML = AN.gate ? GATE[AN.gate.art]() : (ohne ? (s.ko ? SEITE.entscheid() : ohneRecherche()) : SEITE[schritt()]());
+    $('schritt').innerHTML = (AN.gate ? GATE[AN.gate.art]() : (ohne ? (s.ko ? SEITE.entscheid() : ohneRecherche()) : SEITE[schritt()]())) + fotoKasten();
     $('infos').hidden = !LAUF.infosAuf;
     ort = d.produkt.id + '/' + AN.i + '/' + (AN.gate ? AN.gate.art + AN.gate.phase : '') + '/' + !!s.ko;
     if (ort !== LAUF.ort) { LAUF.ort = ort; window.scrollTo(0, 0); }
@@ -1131,7 +1143,7 @@
   function taste(aktion, text, klasse, mehr) { return '<button class="knopf ' + (klasse || '') + '" data-a="' + aktion + '"' + (mehr || '') + '>' + tx(text) + '</button>'; }
   function leiste(nurZurueck) {
     return '<div class="leiste">' + (AN.i > 0 || AN.gate || AN.s.ko ? '<button class="link" data-a="zurueck">' + tx('zurueck') + '</button>' : '')
-      + (nurZurueck ? '' : '<button class="link" data-a="infosAuf">' + tx('infos') + '</button><button class="link" data-a="produktKopieren">' + tx('kopie.produkt') + '</button>'
+      + (nurZurueck ? '' : '<button class="link" data-a="infosAuf">' + tx('infos') + '</button><button class="link" data-a="fotosAuf">' + tx('fo.titel') + '</button><button class="link" data-a="produktKopieren">' + tx('kopie.produkt') + '</button>'
         + '<button class="link rechts" data-a="raus">' + tx('raus') + '</button>') + '</div>'
       + (LAUF.raus && !nurZurueck ? '<label for="raus-grund">' + tx('raus.frage') + '</label><input type="text" id="raus-grund" data-enter="rausOk" placeholder="' + tx('raus.platz') + '" autocomplete="off">'
         + '<div class="knoepfe">' + taste('rausOk', 'raus.knopf', 'schwarz') + '</div>' : '');
@@ -1157,7 +1169,12 @@
       if (LAUF.sucht) h += box(t('re.laeuft'), 'warn'); else if (LAUF.suchFehler) h += box(LAUF.suchFehler, 'stop');
       if (LAUF.modellFrage) h += '<label for="modell-neu">' + tx('id.welches') + '</label><input type="text" id="modell-neu" maxlength="80" data-enter="modellNeu" placeholder="' + tx('id.platz') + '" autocomplete="off"' + (LAUF.sucht ? ' disabled' : '') + '>'
         + '<div class="knoepfe">' + taste('modellNeu', 'id.neu', 'pink', LAUF.sucht ? ' disabled' : '') + taste('modellFrage', 'id.doch', '', LAUF.sucht ? ' disabled' : '') + '</div>';
-      else h += '<div class="knoepfe">' + taste('weiter', 'id.ja', 'pink') + taste('versiegelt', 'id.versiegelt') + taste('modellFrage', 'id.nein') + '</div>';
+      else {
+        if (preisFehlt()) h += '<div class="meldung warn">' + tx('id.preisfehlt') + '</div><label for="id-vp">' + tx('id.vp') + '</label><input type="number" id="id-vp" min="1" step="any" inputmode="decimal" style="max-width:200px">'
+          + (zahlVon(d.produkt.ovp) > 0 ? '' : '<label for="id-ovp">' + tx('id.ovp') + '</label><input type="number" id="id-ovp" min="1" step="any" inputmode="decimal" style="max-width:200px">');
+        h += '<div class="knoepfe">' + taste('identJa', 'id.ja', 'pink') + taste('neuOvp', 'id.neuovp') + taste('versiegelt', 'id.versiegelt') + taste('modellFrage', 'id.nein') + '</div>'
+          + '<p class="still">' + tx('id.neuovp.hilfe') + '</p>';
+      }
       return karte('ident', h);
     },
     handbuch: function () {
@@ -1252,14 +1269,26 @@
         + '<dt>' + tx('en.preise') + '</dt><dd>' + tx('en.preiswert', chf(p.ovp), chf(p.vp)) + '</dd>'
         + '<dt>' + tx('en.stufe') + '</dt><dd>' + esc(p.stufe) + '</dd><dt>' + tx('en.dauer') + '</dt><dd>' + tx('en.dauerwert', (Math.round(aktivMs() / 6000) / 10).toFixed(1), p.budget || '–') + '</dd>'
         + (r.rep.length ? '<dt>' + tx('en.rep') + '</dt><dd>' + r.rep.map(function (x) { return tx('en.repwert', x.text || x.was, x.min, x.kosten.toFixed(2)); }).join('<br>') + '</dd>' : '') + '</dl>'
-        + (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund) + '</div>' : '')
+        + befundTeil(r)
         + (r.hinweis ? '<div class="meldung gelb"><h3>' + tx('en.htitel') + '</h3>' + tx('en.hinweis') + '</div>' : '')
         + (!r.reusable ? '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink') + '</div>' : (m = mmTeil()).html + (m.sperrt ? ''
-          : (AN.s.kanal === 'ricardo' ? ricardoTeil(r) : '<p class="frage">' + tx('ri.wohin') + '</p><div class="kanal"><div>' + taste('kanal', 'ri.ricardo', 'pink', ' data-v="ricardo"')
-            + (AN.d.ricardo && AN.d.ricardo.vorschlag ? '<span class="vorschlag">' + tx('ri.vorschlag') + '</span>' : '') + '</div><div>' + taste('kanal', 'ri.regal', '', ' data-v="regal"') + '</div></div>')));
+          : (AN.s.kanal === 'ricardo' ? ricardoTeil(r) : (m.empfehlung ? '' : '<p class="frage">' + tx('ri.wohin') + '</p>') + '<div class="kanal"><div>' + taste('kanal', 'ri.ricardo', m.empfehlung ? '' : 'pink', ' data-v="ricardo"')
+            + (AN.d.ricardo && AN.d.ricardo.vorschlag ? '<span class="vorschlag">' + tx('ri.empfohlen') + '</span>' : '') + '</div><div>' + taste('kanal', 'ri.regal', '', ' data-v="regal"') + '</div></div>')));
       return '<div class="karte">' + h + leiste(true) + '</div>';
     }
   };
+  /* Feedback DS 19.10.2026: Befund im Entscheid bearbeiten. Bearbeitet werden die eigenen Angaben (Mängel, Hinweise); was das Tool weiss, steht darunter. */
+  function befundTeil(r) {
+    var bearbeitbar = r.reusable && !r.versiegelt;
+    if (!LAUF.befundAuf || !bearbeitbar) return (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund)
+      + (bearbeitbar ? ' <button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button>' : '') + '</div>'
+      : (bearbeitbar ? '<p><button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button></p>' : ''))
+      + (LAUF.befundGeaendert && AN.s.kanal === 'ricardo' ? '<p class="still">' + tx('en.befund.ric') + '</p>' : '');
+    return '<div class="meldung"><h3>' + tx('en.befund') + '</h3><label for="maengel-en">' + tx('en.befund.eigen') + '</label><textarea id="maengel-en" data-e="maengel">' + esc(AN.s.maengel) + '</textarea>'
+      + (r.befundAuto ? '<p class="still">' + tx('en.befund.auto', r.befundAuto) + '</p>' : '') + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + '</div></div>';
+  }
+  function befundAuf() { LAUF.befundAuf = true; zeichneSchritt(); if ($('maengel-en')) $('maengel-en').focus(); }
+  function befundOk() { LAUF.befundAuf = false; LAUF.befundGeaendert = true; stand(); }
   /* ---------- Matchmaker ---------- */
   /* Läuft einmal pro Analyse im Hintergrund, nach der bestätigten Identität (oder beim Entscheid, falls noch nicht). aus = Aufträge, die beim Wiedereinstieg nicht mehr zählen. */
   function mmStart() {
@@ -1278,7 +1307,8 @@
     if (!x) { mmStart(); x = AN.mm; }
     if (x.laeuft) return { sperrt: true, html: '<p class="hb-warte"><span class="dreh"></span>' + tx('mm.prueft') + '</p>' };
     if (x.fehler) return { sperrt: false, html: '<div class="meldung warn">' + tx('mm.fehler', x.fehler) + '<div class="knoepfe">' + taste('mmNochmal', 'mm.nochmal') + '</div></div>' };
-    if (x.passt && x.passt.length) return { sperrt: true, html: '<div class="meldung ok"><h3>' + tx('mm.titel') + '</h3>' + auftrag(x.passt[0]) + '</div><div class="knoepfe">' + taste('kanal', 'mm.knopf', 'pink', ' data-v="matchmaker"') + '</div>' };
+    /* Entscheid Jonas 19.10.2026: Ein Treffer ist die klare Empfehlung (Matchmaker zuerst, pink); Ricardo oder Regal bleiben wählbar. */
+    if (x.passt && x.passt.length) return { sperrt: false, empfehlung: true, html: '<div class="meldung ok"><h3>' + tx('mm.titel') + '</h3>' + auftrag(x.passt[0]) + '<p><strong>' + tx('mm.empfehlung') + '</strong></p></div><div class="knoepfe">' + taste('kanal', 'mm.knopf', 'pink', ' data-v="matchmaker"') + '</div><p class="frage">' + tx('mm.anders') + '</p>' };
     return { sperrt: false, html: x.aehnlich && x.aehnlich.length ? '<div class="meldung"><h3>' + tx('mm.aehnlich') + '</h3>' + x.aehnlich.map(auftrag).join('') + '</div>' : '' };
   }
   /* Wiedereinstieg aus dem Regal «Matchmaker»: Stand der Analyse zurück, direkt zum Entscheid. Der alte Auftrag zählt nicht mehr, die anderen werden neu geprüft. */
@@ -1355,7 +1385,21 @@
 
   /* ---------- Was im Ablauf geklickt wird ---------- */
   function stand() { if (LAUF.urteilFehler) LAUF.urteilBild = ''; sichern(); zeichneSchritt(); }      // nach einem Fehler holt der nächste Klick das Urteil noch einmal
-  function weiter() { if (schritt() === 'ident') mmStart(); AN.i++; LAUF.raus = false; stand(); }       // nach der bestätigten Identität: Matchmaker im Hintergrund
+  function weiter() { if (schritt() === 'ident') mmStart(); AN.i++; ueberspringen(1); LAUF.raus = false; stand(); }       // nach der bestätigten Identität: Matchmaker im Hintergrund
+  /* Neu und unbenutzt (Verpackung offen), Entscheid Jonas 19.10.2026: Hygiene und Zurücksetzen entfallen */
+  var ENTFAELLT_NEU = ['hygiene', 'reset'];
+  function entfaellt(k) { return !!(AN && AN.s.neuOvp && ENTFAELLT_NEU.indexOf(k) > -1); }
+  function ueberspringen(r) { while (AN.i > 0 && AN.i < AN.d.ablauf.length - 1 && entfaellt(schritt())) AN.i += r; }
+  /* Fehlt der VP, wird er zuerst gespeichert (preisSetzen). Danach kommt der Überblick neu, weil Stufe und Zeitbudget vom VP abhängen. */
+  function preisFehlt() { return !(zahlVon(AN.d.produkt.vp) > 0); }
+  function mitPreis(danach) {
+    if (!preisFehlt()) { danach(); return; }
+    var vp = $('id-vp') ? zahlVon($('id-vp').value) : 0, ovp = $('id-ovp') ? zahlVon($('id-ovp').value) : 0, id = AN.d.produkt.id;
+    if (!(vp > 0)) { melde(t('id.vpfehlt'), true); if ($('id-vp')) $('id-vp').focus(); return; }
+    ruf('preisSetzen', [id, vp, ovp || ''], function (d) { if (!AN || AN.d.produkt.id !== id) return; AN.d = d; sichern(); danach(); });
+  }
+  function identJa() { mitPreis(function () { AN.s.neuOvp = false; weiter(); }); }
+  function neuOvp() { mitPreis(function () { var s = AN.s; s.neuOvp = true; s.unbenutzt = true; if (!s.grade) s.grade = 'A'; weiter(); }); }
   /* Ohne weitere Prüfung nicht reusable: Der Ablauf springt zum Entscheid, die Schritte dazwischen entfallen. */
   function ko(art, text, mehr) {
     var k = { schritt: schritt() || '', art: art, text: text || '' };
@@ -1384,8 +1428,16 @@
     else if (AN.gate) AN.gate = null;
     else if (AN.nachMm) return;
     else if (s.ko || s.versiegelt) { AN.i = s.ab || 0; s.ko = null; s.versiegelt = false; s.ab = null; }
-    else AN.i--;
+    else { AN.i--; ueberspringen(-1); }
     stand();
+  }
+  /* Feedback DS 19.10.2026: Fotos nicht erst am Schluss. Der Kasten zeigt QR-Code und Fotos wie im Ricardo-Teil (nicht doppelt, wenn der Ricardo-Teil offen ist). */
+  function fotosAuf() { LAUF.fotosAuf = !LAUF.fotosAuf; zeichneSchritt(); if (LAUF.fotosAuf) fotoHolen(); }
+  function fotoKasten() {
+    if (!LAUF.fotosAuf || !AN || (schritt() === 'entscheid' && AN.s.kanal === 'ricardo') || !AN.d.ricardo) return '';
+    return '<div class="karte"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h3 class="gruppe" style="margin:0">' + tx('fo.titel') + '</h3><button class="link" data-a="fotosAuf" aria-label="' + tx('fo.titel') + '">×</button></div><p class="still">' + tx('fo.text') + '</p>'
+      + '<div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(AN.d.ricardo.fotoUrl) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
+      + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>';
   }
   function infosAuf() { LAUF.infosAuf = !LAUF.infosAuf; zeichneSchritt(); if (LAUF.infosAuf) $('infos').scrollIntoView({ block: 'nearest' }); }
   /* Für eine Frage an ein KI-Modell in einem anderen Fenster: was man dort über das Produkt braucht. */
@@ -1396,7 +1448,7 @@
   function raus() { LAUF.raus = !LAUF.raus; zeichneSchritt(); if (LAUF.raus) $('raus-grund').focus(); }
   function rausOk() { var g = $('raus-grund').value.trim(); if (g) ko('frei', g); else $('raus-grund').focus(); }
   function rueckrufFrei() { AN.s.rueckrufFrei = true; stand(); }
-  function versiegelt() { AN.s.versiegelt = true; AN.s.ab = 0; AN.i = AN.d.ablauf.length - 1; mmStart(); stand(); }
+  function versiegelt() { mitPreis(function () { AN.s.versiegelt = true; AN.s.neuOvp = false; AN.s.ab = 0; AN.i = AN.d.ablauf.length - 1; mmStart(); stand(); }); }
   function setze(feld) { AN.s[feld] = true; weiter(); }
   function schalte(m, n) { if (m[n]) delete m[n]; else m[n] = 1; stand(); }
   function sicherNein() { AN.s.sicherNein = true; stand(); }
@@ -1562,8 +1614,9 @@
   }
   /* Nach jeder Änderung an den Fotos: nur den Foto-Teil und die Liste «Es fehlt noch» neu zeichnen, die Textfelder behalten den Cursor. */
   function ricNachfuehren() {
-    if (!AN || AN.s.kanal !== 'ricardo' || !$('ric-slots')) return;
+    if (!AN || !$('ric-slots')) return;
     $('ric-slots').innerHTML = fotoSlots();
+    if (!$('ric-fehlt')) return;                                                 // Foto-Kasten vor dem Entscheid: nur die Fotos
     var f = ricFehlt();
     $('ric-fehlt').textContent = f.length ? t('ri.fehlt', f.join(', ')) : '';
     $('ric-ab').disabled = f.length > 0;
@@ -1579,7 +1632,7 @@
   }
   /* Läuft jede Sekunde mit der Uhr: alle 5 Sekunden nachfragen, solange der Ricardo-Teil offen ist. Den QR-Code zeichnen, sobald sein Platz da ist. */
   function ricTakt() {
-    if (!AN || AN.s.kanal !== 'ricardo' || !$('ric-slots')) return;
+    if (!AN || !$('ric-slots')) return;
     if (!RIC || RIC.id !== AN.d.produkt.id || Date.now() - (RIC.zeit || 0) > 5000) fotoHolen();
     qrZeichnen();
   }
@@ -1632,7 +1685,7 @@
       return '<div class="fs-zeile' + (offen ? ' offen' : '') + '"><div class="fs-titel"><div><strong>' + tx(titel) + '</strong><span class="still">' + tx(hilfe) + '</span></div>'
         + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx('fs.fehlt') : tx('fs.da', n)) + '</span>') + '</div>'
         + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
-        + (extra || '') + (FS.laedt === a ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt') + '</p>' : '<button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button>') + '</div>';
+        + (extra || '') + (FS.laedt === a ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt') + '</p>' : '<div class="knoepfe"><button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button><button class="knopf" data-a="fsGalerie" data-v="' + a + '">' + tx('fs.galerie') + '</button></div>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fsOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
     $('fs-liste').innerHTML = zeile('hauptbild', 'ri.haupt', 'fs.haupt', 1) + zeile('weitere', 'ri.weitere', 'fs.weitere', 2)
@@ -1640,6 +1693,9 @@
       + zeile('mangel', 'ri.mangel', 'fs.mangel', null, cb('mangel', st && st.ohneMangel, 'ri.ohneMangel'));
   }
   function fsFoto(art) { FS.art = art; $('fs-datei').value = ''; $('fs-datei').click(); }
+  /* Feedback DS 19.10.2026: Fotos auch aus der Galerie, mehrere auf einmal; sie werden nacheinander hochgeladen. */
+  function fsGalerie(art) { FS.art = art; $('fs-galerie').value = ''; $('fs-galerie').click(); }
+  function fsMehrere(liste) { var l = Array.prototype.slice.call(liste || []); var naechste = function () { var f = l.shift(); if (f) fsHoch(f, naechste); }; naechste(); }
   /* Fotos werden vor dem Hochladen auf höchstens 1600 Pixel verkleinert: schneller und für Ricardo mehr als genug. */
   function verkleinern(datei, fertig) {
     var r = new FileReader();
@@ -1656,13 +1712,13 @@
     };
     r.readAsDataURL(datei);
   }
-  function fsHoch(datei) {
+  function fsHoch(datei, danach) {
     var art = FS.art;
     if (!datei || !art) return;
     FS.laedt = art; fsZeichnen();
     verkleinern(datei, function (daten) {
       if (!daten) { FS.laedt = ''; fsZeichnen(); melde(t('fs.keinbild'), true); return; }
-      google.script.run.withSuccessHandler(function (st) { FS.laedt = ''; FS.st = st; fsZeichnen(); })
+      google.script.run.withSuccessHandler(function (st) { FS.laedt = ''; FS.st = st; fsZeichnen(); if (danach) danach(); })
         .withFailureHandler(function (e) { FS.laedt = ''; fsZeichnen(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'fotoHochladen', [FS.id, art, daten]);
     });
   }
@@ -1673,7 +1729,8 @@
   /* Alles, was der Server zum Urteilen braucht (urteil_ in Code.gs). */
   function daten() {
     var s = AN.s, d = AN.d;
-    return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), versiegelt: s.versiegelt, rueckrufFrei: s.rueckrufFrei, unbenutzt: s.unbenutzt, sicher: s.sicher,
+    return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), versiegelt: s.versiegelt, neuOvp: !!s.neuOvp, rueckrufFrei: s.rueckrufFrei,
+      mmEmpfohlen: AN.mm && AN.mm.passt && AN.mm.passt.length ? AN.mm.passt[0].gesucht : '', unbenutzt: s.unbenutzt, sicher: s.sicher,
       sicherNok: Object.keys(s.sicherWahl).map(function (n) { return d.sicher[n]; }), fehlt: Object.keys(s.fehlt).map(function (n) { return d.liefer.teile[n]; }).concat(s.fehltText.trim() ? [s.fehltText.trim()] : []),
       sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
       rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
@@ -1685,7 +1742,7 @@
     var x = daten(), id = x.id, bild, da = function () { return AN && AN.d.produkt.id === id; };
     /* Im Schritt «Zustand» wird nur nachgetragen, was schon im Befund steht. Ist inzwischen etwas anders, holt der zweite Aufruf es noch einmal. */
     var nach = function () { if (!AN.gate && schritt() === 'zustand' && $('befund-auto')) { $('befund-auto').innerHTML = befundAuto(); urteilHolen(); } else zeichneSchritt(); };
-    delete x.aktivSek; delete x.rueckmeldung; delete x.kanal; delete x.ricardo; delete x.mm; delete x.nachMm; delete x.stand;
+    delete x.aktivSek; delete x.mmEmpfohlen; delete x.rueckmeldung; delete x.kanal; delete x.ricardo; delete x.mm; delete x.nachMm; delete x.stand;
     bild = JSON.stringify(x);
     if (LAUF.urteilBild === bild) return;
     LAUF.urteil = null; LAUF.urteilFehler = '';
@@ -1978,7 +2035,7 @@
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
-    versiegelt: versiegelt, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
+    versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
     kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz };
 
@@ -1998,7 +2055,7 @@
       if (e.tagName === 'A') ev.preventDefault();
       A[e.getAttribute('data-a')](e.getAttribute('data-v'), e.getAttribute('data-k'), e);
     });
-    document.addEventListener('change', function (ev) { if (ev.target.id === 'hb-datei') handbuchHoch(ev.target.files[0]); if (ev.target.id === 'fs-datei') fsHoch(ev.target.files[0]); });
+    document.addEventListener('change', function (ev) { if (ev.target.id === 'hb-datei') handbuchHoch(ev.target.files[0]); if (ev.target.id === 'fs-datei') fsHoch(ev.target.files[0]); if (ev.target.id === 'fs-galerie') fsMehrere(ev.target.files); });
     ['dragover', 'dragleave', 'drop'].forEach(function (art) {
       document.addEventListener(art, function (ev) {
         var z = ev.target.closest && ev.target.closest('#hb-ablage');
