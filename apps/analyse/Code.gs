@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-19.2';
+const VERSION = '2026-10-19.3';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -270,6 +270,7 @@ function api(lang, name, args) {
     ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
+  TAKT = t0;
   try { vorladen_(VORLADEN[name] || ['Einstellungen']); } catch (err) { /* dann liest jeder Tab für sich */ }
   try { return f.apply(null, args || []); }
   catch (e) { throw new Error(en_(String(e.message || e))); }
@@ -279,6 +280,9 @@ function api(lang, name, args) {
   }
 }
 const TEMPO_GRENZE_MS = 2000;
+/** Abschnitt fürs Tempo-Log: wie lange seit dem letzten Abschnitt. */
+let TAKT = 0;
+function takt_(name) { const j = Date.now(); if (TAKT) LESEN.push(name + ' ' + (j - TAKT) + ' ms'); TAKT = j; }
 
 /** Fehlermeldungen entstehen auf Deutsch. Für die englische Oberfläche übersetzt diese Tabelle; Unbekanntes bleibt deutsch. */
 const EN_REGELN = [
@@ -350,6 +354,34 @@ function blatt_(n) {
   return s;
 }
 function kopf_(s) { return s.getRange(1, 1, 1, Math.max(1, s.getLastColumn())).getValues()[0].map(String); }
+/**
+ * Kopfzeile eines Tabs dieses Sheets ohne eigenen Lesezugriff, wenn möglich (Tempo 19.10.2026: jede Kopfzeile kostete zwei Anfragen).
+ * 1. aus den Werten, die dieser Aufruf schon gelesen hat (frisch, also sicher), 2. bei reinen Protokoll-Tabs aus dem Zwischenspeicher (10 Minuten),
+ * 3. sonst aus dem Sheet. Die Protokoll-Tabs legt nur das Tool an; ihre Spalten ändern sich nur mit «Einrichten», das den Speicher leert.
+ */
+const PROTOKOLL_TABS = ['Log', 'Kosten', 'Quellen-Log', 'Testmittel-Log', 'Prüfschritte', 'Feedback', 'Recherche'];
+let KOPF_MEMO = {};
+function kopfVon_(n) {
+  if (KOPF_MEMO[n]) return KOPF_MEMO[n].slice();
+  const v = (IN_SPERRE ? SPERR_MEMO[n] : LAUF_MEMO[n]);
+  if (v && v[0] && v[0].length) return (KOPF_MEMO[n] = v[0].map(String)).slice();
+  const fest = PROTOKOLL_TABS.indexOf(n) > -1;
+  if (fest) try { const alt = CacheService.getScriptCache().get('kopf:' + n); if (alt) return (KOPF_MEMO[n] = JSON.parse(alt)).slice(); } catch (err) { /* lesen */ }
+  const k = kopf_(blatt_(n));
+  KOPF_MEMO[n] = k;
+  if (fest) try { CacheService.getScriptCache().put('kopf:' + n, JSON.stringify(k), 600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return k.slice();
+}
+function kopfVergessen_() {
+  KOPF_MEMO = {};
+  try { CacheService.getScriptCache().removeAll(PROTOKOLL_TABS.map(function (n) { return 'kopf:' + n; })); } catch (err) { /* läuft ab */ }
+}
+/** Sheets-API (Dienst «Sheets») für Schreibzugriffe: eine Anfrage statt vier. Ohne Dienst (oder in den Tests) schreibt SpreadsheetApp wie bisher. */
+function api_() { return typeof Sheets !== 'undefined' && Sheets && Sheets.Spreadsheets && Sheets.Spreadsheets.Values ? Sheets.Spreadsheets.Values : null; }
+let SS_ID = '';
+function ssId_() { return SS_ID || (SS_ID = ss_().getId()); }
+function bereich_(n) { return "'" + String(n).replace(/'/g, "''") + "'"; }
+function wertFuersSheet_(v) { return v instanceof Date ? zeit_(v) : (v === undefined || v === null ? '' : v); }
 function spalte_(kopf, name, tab) {
   const c = kopf.indexOf(name) + 1;
   if (!c) throw new Error('Spalte «' + name + '» fehlt im Tab «' + tab + '».');
@@ -373,12 +405,14 @@ function lies_(n) {
 }
 function liesRoh_(n) {
   /* Die Werte eines Tabs pro Aufruf nur einmal holen (ausserhalb einer Sperre); die Objekte entstehen jedes Mal neu, Änderungen daran bleiben lokal. */
-  let v = !IN_SPERRE && LAUF_MEMO[n];
+  /* In einer Sperre gilt das Gelesene bis zum nächsten eigenen Schreiben in diesen Tab (vergiss_): Sonst schreibt niemand, die Sperre hält alle anderen fern. */
+  let v = IN_SPERRE ? SPERR_MEMO[n] : LAUF_MEMO[n];
   if (!v) {
     const t = Date.now();
-    v = (!IN_SPERRE && apiWerte_([n])[n]) || rasterWerte_(blatt_(n));
+    if (IN_SPERRE && api_()) try { SpreadsheetApp.flush(); } catch (err) { /* nichts offen */ }   // die Sheets-API sieht nur, was SpreadsheetApp schon geschrieben hat
+    v = apiWerte_([n])[n] || rasterWerte_(blatt_(n));                    // eine Anfrage statt drei, auch in der Sperre
     LESEN.push(n + ' ' + (Date.now() - t) + ' ms');
-    if (!IN_SPERRE) LAUF_MEMO[n] = v;
+    if (IN_SPERRE) SPERR_MEMO[n] = v; else LAUF_MEMO[n] = v;
   }
   const kopf = v[0].map(String), z = [];
   for (let i = 1; i < v.length; i++) {
@@ -459,19 +493,24 @@ function vorladen_(namen) {
   if (da.length) LESEN.push(da.join('+') + ' ' + (Date.now() - t) + ' ms');
 }
 function vergiss_(n) {
-  delete LAUF_MEMO[n];
+  delete LAUF_MEMO[n]; delete SPERR_MEMO[n];
   if (['Produkte', 'Bestellliste', 'Listen'].indexOf(n) > -1) startVergessen_();
   if (n === 'Kosten') try { CacheService.getScriptCache().remove('kosten:' + Utilities.formatDate(new Date(), TZ, 'MM.yyyy')); } catch (err) { /* läuft ab */ }
   if (n === 'Analysen' || n === 'Log') try { CacheService.getScriptCache().put('kz-gen', String(Date.now()), 21600); } catch (err) { /* läuft ab */ }
-  if (['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel', 'Listen', 'Score-Regeln'].indexOf(n) > -1) uebNeu_();   // betrifft jeden Überblick
+  /* betrifft jeden Überblick. Ausnahme (Tempo 19.10.2026): der Abgleich liest die Einstellungen alle 10 Minuten frisch und bucht Guthaben ab; das ändert
+     keinen Überblick und hat bisher alle vorbereiteten Überblicke verworfen, darum war «Analyse starten» fast immer langsam. */
+  if (!UEB_BLEIBT && ['Einstellungen', 'Stufen', 'Sicherheitspunkte', 'Testmittel', 'Listen', 'Score-Regeln'].indexOf(n) > -1) uebNeu_();
   if (STABIL.indexOf(n) < 0) return;
   delete MEMO[n];
   try { CacheService.getScriptCache().remove('tab:' + n); } catch (err) { /* läuft nach 5 Minuten ab */ }
 }
-function vergissAlle_() { STABIL.forEach(vergiss_); }
+let UEB_BLEIBT = false;
+/** f ausführen, ohne dass Schreiben in Einstellungen o.ä. die vorbereiteten Überblicke verwirft (nur für Werte, die im Überblick nicht vorkommen). */
+function ohneUebNeu_(f) { const alt = UEB_BLEIBT; UEB_BLEIBT = true; try { return f(); } finally { UEB_BLEIBT = alt; } }
+function vergissAlle_() { STABIL.forEach(vergiss_); kopfVergessen_(); }
 /** Einfacher Auslöser: Änderung von Hand im Sheet. Der Zwischenspeicher des Tabs gilt dann nicht mehr. */
 function onEdit(ev) {
-  try { vergiss_(ev.range.getSheet().getName()); } catch (err) { /* ohne Wirkung */ }
+  try { vergiss_(ev.range.getSheet().getName()); if (ev.range.getRow() === 1) kopfVergessen_(); } catch (err) { /* ohne Wirkung */ }
 }
 
 /**
@@ -480,7 +519,7 @@ function onEdit(ev) {
  */
 function rechercheVon_(k) {
   k = String(k || '');
-  const s = blatt_('Recherche'), kopf = kopf_(s), last = s.getLastRow(), c = kopf.indexOf('Schlüssel') + 1, z = [];
+  const s = blatt_('Recherche'), kopf = kopfVon_('Recherche'), last = s.getLastRow(), c = kopf.indexOf('Schlüssel') + 1, z = [];
   if (!k || last < 2 || !c) return { kopf: kopf, z: z };
   const zeilen = s.getRange(2, c, last - 1, 1).createTextFinder(k).matchEntireCell(true).matchCase(true).findAll()
     .map(function (x) { return x.getRow(); }).sort(function (a, b) { return a - b; });
@@ -504,9 +543,16 @@ function rechercheVon_(k) {
 /** Hängt Zeilen an. objs = Objekte mit Spaltennamen; ein Wert, der mit «=» beginnt, wird zur Formel. Nur innerhalb von gesperrt_ aufrufen. */
 function schreib_(n, objs) {
   if (!objs.length) return;
+  const kopf = kopfVon_(n);
   vergiss_(n);
-  const s = blatt_(n), kopf = kopf_(s);
-  const rows = objs.map(function (o) { return kopf.map(function (k) { return o[k] === undefined || o[k] === null ? '' : o[k]; }); });
+  const rows = objs.map(function (o) { return kopf.map(function (k) { return wertFuersSheet_(o[k]); }); });
+  /* Eine Anfrage: «append» hängt auf dem Server an, auch wenn zwei Aufrufe gleichzeitig schreiben. Darum braucht das Log keine Sperre mehr. */
+  const a = api_();
+  if (a) {
+    try { a.append({ values: rows }, ssId_(), bereich_(n), { valueInputOption: 'USER_ENTERED', insertDataOption: 'OVERWRITE' }); return; }
+    catch (err) { /* z.B. Tab fehlt (blatt_ legt ihn an) oder der Dienst streikt: dann wie bisher */ }
+  }
+  const s = blatt_(n);
   s.getRange(s.getLastRow() + 1, 1, rows.length, kopf.length).setValues(rows);
 }
 
@@ -514,9 +560,20 @@ function schreib_(n, objs) {
 function setz_(n, feld, werte) {
   const zeilen = Object.keys(werte);
   if (!zeilen.length) return;
+  const c = buchstabe_(spalte_(kopfVon_(n), feld, n));
   vergiss_(n);
-  const s = blatt_(n), c = buchstabe_(spalte_(kopf_(s), feld, n)), nachWert = {};
-  zeilen.forEach(function (r) { const k = typeof werte[r] + ':' + werte[r]; (nachWert[k] = nachWert[k] || { wert: werte[r], zellen: [] }).zellen.push(c + r); });
+  zellen_(n, zeilen.map(function (r) { return [c + r, werte[r]]; }));
+}
+/** Mehrere einzelne Zellen eines Tabs in einer Anfrage: liste = [[«C5», Wert], …]. */
+function zellen_(n, liste) {
+  if (!liste.length) return;
+  const a = api_();
+  if (a) {
+    a.batchUpdate({ valueInputOption: 'USER_ENTERED', data: liste.map(function (x) { return { range: bereich_(n) + '!' + x[0], values: [[wertFuersSheet_(x[1])]] }; }) }, ssId_());
+    return;
+  }
+  const s = blatt_(n), nachWert = {};
+  liste.forEach(function (x) { const k = typeof x[1] + ':' + x[1]; (nachWert[k] = nachWert[k] || { wert: x[1], zellen: [] }).zellen.push(x[0]); });
   Object.keys(nachWert).forEach(function (k) { s.getRangeList(nachWert[k].zellen).setValue(nachWert[k].wert); });
 }
 
@@ -536,14 +593,20 @@ function liste_(name) {
 /* Sperren                                                             */
 /* ------------------------------------------------------------------ */
 
-let IN_SPERRE = false;
-/** Führt f aus, während niemand sonst ins Sheet schreibt. Nur kurze Abschnitte ohne Netzwerk. Darf verschachtelt aufgerufen werden. */
-function gesperrt_(f) {
+let IN_SPERRE = false, SPERR_MEMO = {};
+/**
+ * Führt f aus, während niemand sonst ins Sheet schreibt. Nur kurze Abschnitte ohne Netzwerk. Darf verschachtelt aufgerufen werden.
+ * vor = Tabs, die f sicher liest: Sie kommen in einer einzigen Anfrage, nachdem die Sperre da ist (also frisch).
+ */
+function gesperrt_(f, vor) {
   if (IN_SPERRE) return f();
   const l = LockService.getScriptLock();
   l.waitLock(30000);
-  IN_SPERRE = true;
-  try { return f(); } finally { IN_SPERRE = false; LAUF_MEMO = {}; l.releaseLock(); }
+  IN_SPERRE = true; SPERR_MEMO = {};
+  try {
+    if (vor && vor.length) { try { SpreadsheetApp.flush(); } catch (err) { /* nichts offen */ } const t = Date.now(), w = apiWerte_(vor); Object.keys(w).forEach(function (n) { SPERR_MEMO[n] = w[n]; }); if (Object.keys(w).length) LESEN.push('Sperre ' + Object.keys(w).join('+') + ' ' + (Date.now() - t) + ' ms'); }
+    return f();
+  } finally { IN_SPERRE = false; SPERR_MEMO = {}; LAUF_MEMO = {}; l.releaseLock(); }
 }
 /** Führt f aus, wenn kein anderer Abgleich läuft; sonst null. Nach 6 Minuten (längste Laufzeit eines Scripts) gilt ein Abgleich als beendet. */
 function allein_(f) {
@@ -584,7 +647,8 @@ function hash_(s) {
     .map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
 }
 function log_(aktion, id, detail) {
-  try { gesperrt_(function () { schreib_('Log', [{ 'Zeit': zeit_(), 'Person': ich_(), 'Aktion': aktion, 'ID': id || '', 'Detail': txt_(String(detail || '').slice(0, 1500)) }]); }); }
+  const z = [{ 'Zeit': zeit_(), 'Person': ich_(), 'Aktion': aktion, 'ID': id || '', 'Detail': txt_(String(detail || '').slice(0, 1500)) }];
+  try { if (api_() && !IN_SPERRE) schreib_('Log', z); else gesperrt_(function () { schreib_('Log', z); }); }     // mit der Sheets-API ohne Sperre: «append» ist sicher
   catch (e) { /* das Log darf nie stören */ }
 }
 function istAdmin_(e) {
@@ -706,7 +770,7 @@ function ohneInventar(name, link, vp, kategorie, ovp) {
     schreib_('Produkte', [{ 'PG-ID': neu, 'Herkunft': 'Ohne Inventar', 'Bezeichnung': txt_(name), 'Anzahl': 1, 'Link': txt_(link), 'Kategorie': txt_(kategorie),
       'Neupreis CHF': zahl_(ovp), 'VP CHF': zahl_(vp), 'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_('', name), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' }]);
     return neu;
-  });
+  }, ['Produkte']);
   log_('Ohne Inventar angelegt', id, name);
   return { id: id };
 }
@@ -718,7 +782,7 @@ function ohneInventar(name, link, vp, kategorie, ovp) {
 /** Läuft alle 10 Minuten (Auslöser aus einrichten) und über den Knopf «Aktualisieren». Jeder Schritt läuft für sich; scheitert einer, laufen die anderen trotzdem. */
 function abgleichen() {
   const r = allein_(function () {
-    vergiss_('Einstellungen');                                          // Guthaben und Schalter frisch
+    ohneUebNeu_(function () { vergiss_('Einstellungen'); });           // Guthaben und Schalter frisch, die vorbereiteten Überblicke bleiben
     const e = einst_(), aus = { neu: 0, entfaellt: 0, fertig: 0, fehler: 0, gestartet: 0, hinweise: [] }, t0 = Date.now(), dauer = [];
     const schritt = function (f, name) {
       const t = Date.now();
@@ -1027,7 +1091,7 @@ function claude_(body, art, id, bezeichnung) {
       body = Object.assign({}, body, { messages: body.messages.concat([{ role: 'assistant', content: j.content }]) });
     }
   } finally {
-    if (antworten.length) { const zeile = kostenzeile_(art, id, bezeichnung, antworten, '', null, '', ''); try { gesperrt_(function () { schreib_('Kosten', [zeile]); }); } catch (e) { /* die Kostenzeile darf nie stören */ } }
+    if (antworten.length) { const zeile = kostenzeile_(art, id, bezeichnung, antworten, '', null, '', ''); try { if (api_() && !IN_SPERRE) schreib_('Kosten', [zeile]); else gesperrt_(function () { schreib_('Kosten', [zeile]); }); } catch (e) { /* die Kostenzeile darf nie stören */ } }
   }
   if (j.stop_reason !== 'end_turn') throw new Error('Claude hat die Antwort nicht abgeschlossen (' + j.stop_reason + ')');
   return j;
@@ -1231,8 +1295,10 @@ function handbuchBlatt_(e) {
   if (!s) throw new Error('Tab «Handbücher» fehlt im Handbuch-Sheet.');
   const kopf = kopf_(s);
   HANDBUCH_KOPF.forEach(function (k) { spalte_(kopf, k, 'Handbücher'); });
+  HB_KOPF = kopf;                                                         // gleich mitgeben: sonst liest jeder Aufrufer die Kopfzeile noch einmal
   return s;
 }
+let HB_KOPF = null;
 function handbuchOrdner_(e) {
   const id = String(e['Handbuch-Ordner ID'] || '').trim();
   if (!id) throw new Error('Die Einstellung «Handbuch-Ordner ID» fehlt.');
@@ -1247,7 +1313,15 @@ function handbuchDateiname_(x) { return (String(x.marke || '') + ' ' + String(x.
 /** Alle Zeilen des Handbuch-Sheets: { Schlüssel: Zeile }. */
 /** Eine Zeile des Handbuch-Sheets (Schlüssel hk) oder null, ohne das ganze Sheet zu lesen. */
 function handbuchZeile_(e, hk) {
-  const s = handbuchBlatt_(e), kopf = kopf_(s), c = kopf.indexOf('Schlüssel') + 1, last = s.getLastRow();
+  /* Tempo 19.10.2026: Das Handbuch-Sheet öffnen und suchen kostet 2 bis 4 Sekunden. Die Zeile bleibt 30 Minuten gemerkt; ein neues Handbuch aus dem Tool gilt sofort (ueb-gen). */
+  let c0 = null, key = '';
+  try { c0 = CacheService.getScriptCache(); key = 'hbz:' + (c0.get('ueb-gen') || '0') + ':' + String(hk).slice(0, 200); const alt = c0.get(key); if (alt) return JSON.parse(alt); } catch (err) { c0 = null; }
+  const o = handbuchZeileLesen_(e, hk);
+  if (c0) try { const t = JSON.stringify(o); if (t.length < 95000) c0.put(key, t, 1800); } catch (err) { /* ohne Zwischenspeicher */ }
+  return o;
+}
+function handbuchZeileLesen_(e, hk) {
+  const s = handbuchBlatt_(e), kopf = HB_KOPF || kopf_(s), c = kopf.indexOf('Schlüssel') + 1, last = s.getLastRow();
   if (!c || last < 2) return null;
   const f = s.getRange(2, c, last - 1, 1).createTextFinder(String(hk)).matchEntireCell(true).matchCase(true).findAll();
   for (let i = f.length - 1; i >= 0; i--) {
@@ -1312,7 +1386,7 @@ function handbuecher_(e) {
     gesperrt_(function () {                                              // Guthaben abbuchen, auch bei einem Fehler: der Aufruf hat gekostet
       const neu = {};
       lies_('Einstellungen').z.forEach(function (x) { if (String(x['Einstellung']).trim() === 'Handbuch-Guthaben') neu[x._r] = Math.max(0, (Number(x['Wert']) || 0) - 1); });
-      setz_('Einstellungen', 'Wert', neu);
+      ohneUebNeu_(function () { setz_('Einstellungen', 'Wert', neu); });    // nur das Guthaben: ändert keinen Überblick
     });
   }
   return gemacht ? { handbuecher: gemacht } : {};
@@ -1509,13 +1583,15 @@ function handbuchAuswerten_(j, x, herkunft) {
 function handbuchSchreiben_(e, zeile) {
   uebNeu_();                                                            // ein neues Handbuch ändert den Überblick
   gesperrt_(function () {
-    const s = handbuchBlatt_(e), kopf = kopf_(s), v = s.getDataRange().getValues();
+    const s = handbuchBlatt_(e), kopf = HB_KOPF || kopf_(s), v = s.getDataRange().getValues();
     const row = kopf.map(function (k) { return zeile[k] === undefined || zeile[k] === null ? '' : zeile[k]; });
     const c = kopf.indexOf('Schlüssel');
     let r = 0;
     for (let i = 1; i < v.length && !r; i++) if (String(v[i][c]) === String(zeile['Schlüssel'])) r = i + 1;
     s.getRange(r || s.getLastRow() + 1, 1, 1, kopf.length).setValues([row]);
+    SpreadsheetApp.flush();
   });
+  uebNeu_();                                                            // noch einmal nach dem Schreiben: Wer in der Zwischenzeit las, hat den alten Stand gemerkt
 }
 
 /**
@@ -1546,7 +1622,7 @@ function handbuchHochladen(id, daten) {
     Object.assign(zeile, { 'Status': 'Fehler', 'Hinweis': txt_(String(err.message || err).slice(0, 500)) });
   }
   handbuchSchreiben_(e, zeile);
-  return handbuchFuer_(e, x.marke, x.modell);
+  return handbuchFuer_(e, x.marke, x.modell, true);
 }
 /** «Kein Handbuch auffindbar»: Die Person hat gesucht und nichts gefunden. Das Tool fragt bei diesem Modell nicht mehr. */
 function handbuchKeins(id) {
@@ -1556,7 +1632,7 @@ function handbuchKeins(id) {
   handbuchSchreiben_(e, { 'Schlüssel': hk, 'Marke': txt_(x.marke), 'Modell': txt_(x.modell), 'EAN': ean_(p['Barcode']), 'Status': 'kein Handbuch', 'ManualsLib': String(alt['ManualsLib'] || ''),
     'Gelesen am': zeit_(), 'Erfasst von': ich_() || 'Tool', 'Hinweis': 'Von Hand: kein Handbuch auffindbar' });
   log_('Kein Handbuch', id, hk);
-  return handbuchFuer_(e, x.marke, x.modell);
+  return handbuchFuer_(e, x.marke, x.modell, true);
 }
 function hbBereit_(h) { return !!h && /^(gelesen|nur Bild)$/.test(h.status); }
 /** Das PDF eines Produkts aus dem Ordner «HANDBÜCHER PDF», für die Ansicht im Tool (Blättern und Suchen). Grosse PDFs öffnet die Oberfläche im Drive. */
@@ -1571,14 +1647,14 @@ function handbuchPdf(id) {
 /** Stand des Handbuchs für die Oberfläche, z.B. nach einem Neuladen während des Lesens. */
 function handbuchStand(id) {
   const k = String(produkt_(id)['Recherche-Schlüssel']), x = handbuchInfos_(rechercheVon_(k).z)[k] || {};
-  return handbuchFuer_(einst_(), x.marke, x.modell);
+  return handbuchFuer_(einst_(), x.marke, x.modell, true);              // die Oberfläche wartet auf eine Änderung: immer frisch
 }
 /** Was die Oberfläche zum Handbuch eines Modells braucht, oder null. Ein Fehler beim Lesen des Handbuch-Sheets darf die Analyse nicht aufhalten. */
-function handbuchFuer_(e, marke, modell) {
+function handbuchFuer_(e, marke, modell, frisch) {
   try {
     const hk = handbuchSchluessel_(marke, modell);
     if (!hk || !String(e['Handbuch-Sheet ID'] || '').trim()) return null;
-    const z = handbuchZeile_(e, hk);
+    const z = frisch ? handbuchZeileLesen_(e, hk) : handbuchZeile_(e, hk);
     if (!z) return null;
     const themen = {};
     HANDBUCH_THEMEN.forEach(function (t) { themen[t] = String(z[t] || ''); });
@@ -1649,7 +1725,7 @@ function funktionsAuswahl_(fn, umfang, e) {
 }
 
 function ueberblick_(p, e) {
-  const k = String(p['Recherche-Schlüssel']), gruen = Number(ss_().getRangeByName('Score_Gruen').getValue()), gelb = Number(ss_().getRangeByName('Score_Gelb').getValue());
+  const k = String(p['Recherche-Schlüssel']), sg = scoreGrenzen_(), gruen = sg[0], gelb = sg[1];
   const hilf = {}, nach = {}, vorhanden = {}, st = stufe_(lies_('Stufen').z, p['Herkunft'], p['VP CHF']);
   let infos = [];
   rechercheVon_(k).z.forEach(function (r) {
@@ -1744,6 +1820,14 @@ function ueberblick_(p, e) {
   };
 }
 
+/** Die Score-Grenzen (benannte Bereiche Score_Gruen, Score_Gelb): zwei Anfragen, darum 10 Minuten gemerkt. Ändert jemand «Score-Regeln», gelten sie sofort neu (onEdit). */
+function scoreGrenzen_() {
+  const c = CacheService.getScriptCache();
+  try { const alt = c.get('score:' + (c.get('ueb-gen') || '0')); if (alt) return JSON.parse(alt); } catch (err) { /* lesen */ }
+  const g = [Number(ss_().getRangeByName('Score_Gruen').getValue()), Number(ss_().getRangeByName('Score_Gelb').getValue())];
+  try { c.put('score:' + (c.get('ueb-gen') || '0'), JSON.stringify(g), 600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return g;
+}
 function starteAnalyse(id) { return ueberblickSpeicher_(produkt_(id), einst_()); }
 
 /** Feedback DS 19.10.2026: Fehlt der Preis (VP), wird er in der Identität nachgetragen; der Neupreis (OVP) freiwillig. Schreibt nur in «Produkte», nie ins Return Tool. */
@@ -2146,11 +2230,13 @@ function abschliessen(d) {
   const min = Math.round((Number(d.aktivSek) || 0) / 6) / 10, summe = function (feld) { return Math.round(x.rep.reduce(function (s, r) { return s + r[feld]; }, 0) * 100) / 100; };
   /* Protokolliert wird bis zum Schritt, an dem die Analyse geendet hat: beim K.-o. bis dorthin, bei einem versiegelten Stück nichts, sonst alles. */
   const bis = x.versiegelt ? -1 : (d.ko ? u.ablauf.indexOf(String(d.ko.schritt)) : u.ablauf.length - 1);
+  takt_('vorbereitet');
+  /* Tempo 19.10.2026: Was die Sperre liest, kommt in einer Anfrage (vorher je eine pro Tab und dreimal «Produkte»). */
   const fertig = gesperrt_(function () {
     nurEinmal(produkt_(d.id));                                        // noch einmal in der Sperre: in der Zwischenzeit kann jemand anderes abgeschlossen haben
-    const a = blatt_('Analysen'), letzte = a.getLastRow(), t = zeit_(), budget = u.produkt.budget;
+    const t = zeit_(), budget = u.produkt.budget;
     let max = 0;
-    if (letzte > 1) a.getRange(2, 1, letzte - 1, 1).getValues().forEach(function (v) { const n = /^A-(\d+)$/.exec(String(v[0])); if (n) max = Math.max(max, Number(n[1])); });
+    lies_('Analysen').z.forEach(function (r) { const n = /^A-(\d+)$/.exec(String(r['Analyse-Nr'])); if (n) max = Math.max(max, Number(n[1])); });
     const nr = 'A-' + ('00000' + (max + 1)).slice(-6);
     schreib_('Analysen', [{
       'Analyse-Nr': nr, 'PG-ID': String(p['PG-ID']), 'Bezeichnung': txt_(p['Bezeichnung']), 'Barcode': String(p['Barcode'] || ''), 'Kategorie': p['Kategorie'], 'Herkunft': p['Herkunft'],
@@ -2170,12 +2256,13 @@ function abschliessen(d) {
       testmittelBuchen_({ benoetigt: u.funktion.mittel.map(function (m) { return m.name; }), gefehlt: d.mittelFehlt || [], da: d.mittelDa || [] }, String(p['PG-ID']), kuerzel, t);
     }
     rueckmeldung_(String(p['Recherche-Schlüssel']), d.rueckmeldung || {});
-    const st = {};
-    lies_('Produkte').z.forEach(function (r) { if (String(r['PG-ID']) === String(p['PG-ID'])) st[r._r] = 'Erledigt'; });
+    const st = {}, alle = lies_('Produkte').z;
+    alle.forEach(function (r) { if (String(r['PG-ID']) === String(p['PG-ID'])) { st[r._r] = 'Erledigt'; r['Analyse-Status'] = 'Erledigt'; } });
     setz_('Produkte', 'Analyse-Status', st);
     PropertiesService.getScriptProperties().deleteProperty(REP_STAND + p['PG-ID']);       // kam das Stück aus dem Regal «Reparatur», ist sein Stand erledigt
-    return { nr: nr, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
-  });
+    return { nr: nr, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm };
+  }, ['Produkte', 'Analysen', 'Testmittel']);
+  takt_('gespeichert');
   if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute);
   return fertig;
 }
@@ -2219,11 +2306,13 @@ function testmittelBuchen_(tm, id, kuerzel, t) {
 
 /** «Stimmt» und «Stimmt nicht» aus der Analyse zählen. Daraus rechnet der Tab «Auswertung» die Trefferquote des Scores. */
 function rueckmeldung_(k, rm) {
-  const rech = rechercheVon_(k), s = blatt_('Recherche');
+  if (!Object.keys(rm || {}).length) return;                             // nichts bestätigt oder korrigiert: die Recherche nicht einmal suchen
+  const rech = rechercheVon_(k), neu = [];
   rech.z.forEach(function (r) {
     const art = rm[String(r['Feld'])], feld = art === 'ok' ? 'Von uns bestätigt (Anzahl)' : (art === 'falsch' ? 'Von uns korrigiert (Anzahl)' : '');
-    if (feld) s.getRange(r._r, spalte_(rech.kopf, feld, 'Recherche')).setValue((Number(r[feld]) || 0) + 1);
+    if (feld) neu.push([buchstabe_(spalte_(rech.kopf, feld, 'Recherche')) + r._r, (Number(r[feld]) || 0) + 1]);
   });
+  zellen_('Recherche', neu);                                             // alle Zähler in einer Anfrage
 }
 
 /* ------------------------------------------------------------------ */
@@ -2244,25 +2333,46 @@ function ricardoZustand_(x) {
 }
 /** Der Foto-Ordner eines Produkts in «RICARDO FOTOS», nach der PG-ID benannt. */
 function fotoOrdner_(e, id, anlegen) {
+  /* Tempo 19.10.2026: Den Ordner über den Namen suchen kostet zwei Anfragen an Drive. Seine ID bleibt 6 Stunden gemerkt. */
+  const c = CacheService.getScriptCache(), key = 'fo:' + id;
+  try { const fid = c.get(key); if (fid) { const f = DriveApp.getFolderById(fid); if (!f.isTrashed()) return f; } } catch (err) { /* neu suchen */ }
   const root = DriveApp.getFolderById(String(e['Ricardo-Foto-Ordner ID'] || '').trim()), it = root.getFoldersByName(id);
-  if (it.hasNext()) return it.next();
-  return anlegen ? root.createFolder(id) : null;
+  const f = it.hasNext() ? it.next() : (anlegen ? root.createFolder(id) : null);
+  if (f) try { c.put(key, f.getId(), 21600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return f;
+}
+/** PG-ID und Bezeichnung eines Stücks, ohne «Produkte» zu lesen, wenn sie schon bekannt sind (6 Stunden). Für die Foto-Abfrage, die alle 5 Sekunden kommt. */
+function produktKurz_(id) {
+  const c = CacheService.getScriptCache(), key = 'pk:' + String(id).slice(0, 100);
+  try { const alt = c.get(key); if (alt) return JSON.parse(alt); } catch (err) { /* lesen */ }
+  const p = produkt_(id), k = { pg: String(p['PG-ID']), bez: String(p['Bezeichnung']) };
+  try { c.put(key, JSON.stringify(k), 21600); } catch (err) { /* ohne Zwischenspeicher */ }
+  return k;
 }
 /** Welche Fotos ein Produkt schon hat. Die Dateinamen beginnen mit der Art (1 Hauptbild, 2 Weitere …), so steht das Hauptbild im Ordner immer zuerst. */
-function fotoStand(id) {
-  const e = einst_(), p = produkt_(id), f = fotoOrdner_(e, String(p['PG-ID']), false), zahl = {}, liste = [];
+/**
+ * kennung = was die Oberfläche schon hat. Ist im Ordner nichts neu, kommt nur { gleich: true } zurück, ohne Vorschaubilder:
+ * Die Oberfläche fragt alle 5 Sekunden nach, und die Bilder machen die Antwort sonst bis zu einigen hundert KB gross.
+ */
+function fotoStand(id, kennung) {
+  const e = einst_(), p = produktKurz_(id), f = fotoOrdner_(e, p.pg, false), zahl = {}, liste = [];
   Object.keys(FOTO_ARTEN).forEach(function (a) { zahl[a] = 0; });
-  let ohne = {};
+  let ohne = {}, dateien = [];
   if (f) {
-    try { ohne = JSON.parse(f.getDescription() || '{}'); } catch (err) { ohne = {}; }
+    const beschr = f.getDescription() || '{}';
+    try { ohne = JSON.parse(beschr); } catch (err) { ohne = {}; }
     const it = f.getFiles();
     while (it.hasNext()) {
       const x = it.next(), n = x.getName(), a = Object.keys(FOTO_ARTEN).filter(function (k) { return n.indexOf(FOTO_ARTEN[k]) === 0; })[0];
-      if (a && !x.isTrashed()) { zahl[a]++; liste.push({ id: x.getId(), art: a, name: n, bild: fotoBild_(x) }); }
+      if (a && !x.isTrashed()) dateien.push({ x: x, id: x.getId(), art: a, name: n });
     }
-  }
-  liste.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
-  return { id: String(p['PG-ID']), bezeichnung: String(p['Bezeichnung']), zahl: zahl, liste: liste, ordner: f ? f.getUrl() : '', ohneTypenschild: ohne.typenschild === true, ohneMangel: ohne.mangel === true };
+    dateien.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+    const k = dateien.map(function (y) { return y.id; }).join(',') + '|' + beschr;
+    if (kennung && String(kennung) === k) return { gleich: true, kennung: k };
+    kennung = k;
+  } else kennung = '';
+  dateien.forEach(function (y) { zahl[y.art]++; liste.push({ id: y.id, art: y.art, name: y.name, bild: fotoBild_(y.x) }); });
+  return { id: p.pg, bezeichnung: p.bez, zahl: zahl, liste: liste, ordner: f ? f.getUrl() : '', ohneTypenschild: ohne.typenschild === true, ohneMangel: ohne.mangel === true, kennung: kennung };
 }
 /**
  * Kleines Vorschaubild eines Fotos als data-URL, vom Server geliefert. Der Browser lädt so nichts direkt aus Drive:
@@ -3015,14 +3125,20 @@ function tempoTest() {
 /** Tempo-Messung der echten Aufrufe der Oberfläche (nur lesen). Im Editor ausführen. Jeder Aufruf zweimal: zuerst kalt, dann mit Zwischenspeicher. */
 function tempoEcht() {
   const aus = [], mal = function (name, args) {
-    LAUF_MEMO = {}; MEMO = {}; LESEN = [];                              // wie ein neuer Aufruf aus der Web-App
+    LAUF_MEMO = {}; MEMO = {}; LESEN = []; KOPF_MEMO = {};               // wie ein neuer Aufruf aus der Web-App
     const t = Date.now();
     try { api('de', name, args || []); aus.push(name + ': ' + (Date.now() - t) + ' ms · ' + LESEN.join(', ')); }
     catch (err) { aus.push(name + ': Fehler ' + err.message); }
   };
   const p = lies_('Produkte').z.filter(function (r) { return inSchlange_(r) && r['Recherche-Status'] === 'Bereit'; })[0];
   ['startDaten', 'werkstatt', 'adminDaten'].forEach(function (n) { mal(n); mal(n); });
-  if (p) { mal('starteAnalyse', [String(p['PG-ID'])]); mal('starteAnalyse', [String(p['PG-ID'])]); }
+  if (p) {
+    const id = String(p['PG-ID']);
+    mal('starteAnalyse', [id]); mal('starteAnalyse', [id]);
+    mal('pruefen', [{ id: id }]);
+    mal('suche', [String(p['Bezeichnung']).slice(0, 20)]);
+    mal('fotoStand', [id]); mal('fotoStand', [id]);
+  }
   console.log(aus.join('\n'));
   return aus;
 }

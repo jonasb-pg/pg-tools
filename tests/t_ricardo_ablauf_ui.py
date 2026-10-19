@@ -34,7 +34,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'adressePruefen': {'stand': 'vorschlag', 'quality': 'USABLE', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3000', 'ort': 'Bern'}, 'vorschlag': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
          'adresseUebernehmen': {'stand': 'ok', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
          'aufgabeErledigt': AU, 'listingVerwerfen': True, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
-         'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
+         'zaehler': {'offen': 3, 'zuPacken': 2, 'versand': 1, 'retouren': 4}, 'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
          'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
@@ -53,6 +53,11 @@ with sync_playwright() as p:
     nav = s.inner_text('.nav')
     ok(all(x in nav.upper() for x in ['TÄGLICH', 'LISTING', 'PACKEN', 'VERSENDEN', 'RETOUREN', 'LAUFENDE ANGEBOTE']) and s.is_hidden('#nav-aufgaben') and s.is_hidden('#nav-verkauf') and s.is_hidden('#nav-listen'), 'Navigation: 4 Abläufe, Verwaltung')
     A = lambda: s.evaluate('AUFRUFE')
+    # ---------- Tempo 19.10.2026: Start mit wenigen Aufrufen ----------
+    namen = [x[0] for x in A()]
+    ok(namen.count('ablauf') == 1 and namen.count('zaehler') == 1 and 'verkaeufe' not in namen and 'retouren' not in namen, 'Start: ein ablauf, ein zaehler, kein verkaeufe/retouren ' + str(namen))
+    ok(s.text_content('#z-f-schicht2') == '2' and s.text_content('#z-f-schicht3') == '1' and s.text_content('#z-retour') == '4', 'Marken aus zaehler')
+    ok(s.text_content('#z-f-taeglich').strip() != '', 'Marke Täglich aus dem Ablauf selbst')
     # ---------- Täglich: Liste der Fälle ----------
     t = s.text_content('#f-schritte')
     ok('4 offen' in t and 'Neu: Soundkarte' in t and 'Neu: Föhn Z' in t and 'Bewerte kaeufer_x' in t and 'Neu: Lampe' in t, 'Täglich: Liste mit 4 Fällen')

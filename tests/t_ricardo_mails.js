@@ -211,6 +211,7 @@ au = c.aufgabeErledigt('m2');
 ok(au.fragen.length === 0 && pe[1][I_COLS.indexOf('Status')] === 'Erledigt', 'Frage erledigt');
 // Zahlung überfällig nach 3 Tagen, Erinnerung erledigt blendet aus
 blaetter['Verkäufe'][0][V_COLS.indexOf('Verkauft am')] = new Date(Date.now() - 4 * 864e5);
+c.vergiss_();                                                     // neuer Aufruf: Sheet frisch lesen
 au = c.aufgaben();
 ok(au.zahlung.length === 1 && au.zahlung[0].nr === '54006286' && au.zahlung[0].link === 'https://www.ricardo.ch/de/my-ricardo/selling/order/54006286' && au.zahlung[0].meldet, 'Zahlung überfällig mit Link und Hinweis');
 au = c.erinnerungErledigt('54006286');

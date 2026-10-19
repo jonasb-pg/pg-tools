@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.10';
+const VERSION = '2026-10-19.11';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -134,7 +134,7 @@ function einrichten() {
     e.appendRow(d[0] === 'Admins' ? [d[0], Session.getEffectiveUser().getEmail(), d[2]] : d);
     e.getRange(e.getLastRow(), 2).setNumberFormat('@').setFontColor('#0000FF');
   });
-  CFG = null;
+  cfgVergessen_();
 
   let v = ss.getSheetByName(TAB_V);
   if (!v) {
@@ -370,7 +370,7 @@ function suche(q, frisch) {
   const listings = listingsIndex_();
   let treffer = [];
   const ana = {};
-  leseAnalyse_().filter(passt).forEach(function (r) {
+  leseAnalyse_(frisch).filter(passt).forEach(function (r) {
     const l = listings[r.id];
     r.status = l ? l.status : ''; r.teilVon = l && l.teilVon ? l.teilVon : '';
     ana[r.id] = true; treffer.push(r);
@@ -409,31 +409,32 @@ function rtQuelle_() {
  * dauert Sekunden. frisch = true liest neu und merkt es sich wieder. Passt die Kopie nicht in den Zwischenspeicher, wird jedes Mal gelesen.
  */
 function quelleGemerkt_(src, tab, frisch) {
-  const c = CacheService.getScriptCache(), key = 'rt:' + tab;
-  if (!frisch) {
-    try {
-      const n = Number(c.get(key + ':n'));
-      if (n > 0) {
-        const keys = []; for (let i = 0; i < n; i++) keys.push(key + ':' + i);
-        const teile = c.getAll(keys);
-        if (keys.every(function (k) { return teile[k]; })) {
-          const json = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(keys.map(function (k) { return teile[k]; }).join('')), 'application/x-gzip')).getDataAsString();
-          return JSON.parse(json);
-        }
-      }
-    } catch (e) { /* Kopie unbrauchbar: neu lesen */ }
-  }
+  const key = 'rt:' + tab;
+  if (!frisch) { const alt = gepacktLesen_(key); if (alt) return alt; }
   const rows = leseQuelle_(src.tab(tab), tab);
-  try {
-    const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(rows), 'application/json')).getBytes()), stuecke = {};
-    const n = Math.ceil(b64.length / 90000);
-    if (n <= 40) {
-      for (let i = 0; i < n; i++) stuecke[key + ':' + i] = b64.slice(i * 90000, (i + 1) * 90000);
-      stuecke[key + ':n'] = String(n);
-      c.putAll(stuecke, 600);
-    }
-  } catch (e) { /* ohne Zwischenspeicher */ }
+  gepacktMerken_(key, rows, 600);
   return rows;
+}
+/** Grössere Daten gepackt im Zwischenspeicher (in Stücken zu 90 KB). null, wenn nichts oder nichts Brauchbares da ist. */
+function gepacktLesen_(key) {
+  try {
+    const c = CacheService.getScriptCache(), n = Number(c.get(key + ':n'));
+    if (!(n > 0)) return null;
+    const keys = []; for (let i = 0; i < n; i++) keys.push(key + ':' + i);
+    const teile = c.getAll(keys);
+    if (!keys.every(function (k) { return teile[k]; })) return null;
+    return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(keys.map(function (k) { return teile[k]; }).join('')), 'application/x-gzip')).getDataAsString());
+  } catch (e) { return null; }                                         // Kopie unbrauchbar: neu lesen
+}
+function gepacktMerken_(key, daten, sek) {
+  try {
+    const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(daten), 'application/json')).getBytes()), stuecke = {};
+    const n = Math.ceil(b64.length / 90000);
+    if (n > 40) return;
+    for (let i = 0; i < n; i++) stuecke[key + ':' + i] = b64.slice(i * 90000, (i + 1) * 90000);
+    stuecke[key + ':n'] = String(n);
+    CacheService.getScriptCache().putAll(stuecke, sek);
+  } catch (e) { /* ohne Zwischenspeicher */ }
 }
 
 function matcher_(q) {
@@ -492,7 +493,21 @@ function leseQuelle_(src, tab) {
 /* ------------------------------------------------------------------ */
 
 /** Alle Stücke, die die Analyse für Ricardo vorbereitet hat. Pro PG-ID gilt die letzte Zeile. Fehlt der Tab (noch nie «Auf Ricardo»), ist die Liste leer. */
-function leseAnalyse_() {
+/*
+ * Das ANALYSE TOOL zu öffnen und zu lesen kostet 2 bis 3 s. Für Listen und Suche gilt eine Kopie von höchstens ANALYSE_MERKEN_SEK Sekunden;
+ * wer ein Stück daraus listet, bekommt immer die frischen Angaben (findeAnalyse_). Pro Aufruf wird höchstens einmal frisch gelesen.
+ */
+const ANALYSE_MERKEN_SEK = 60;
+let ANALYSE_FRISCH = null;
+function leseAnalyse_(frisch) {
+  if (ANALYSE_FRISCH) return JSON.parse(JSON.stringify(ANALYSE_FRISCH));    // eigene Kopie: Aufrufer ändern die Objekte
+  const key = 'ana:' + VERSION;
+  if (!frisch) { const alt = gepacktLesen_(key); if (alt) return alt; }
+  ANALYSE_FRISCH = leseAnalyseFrisch_();
+  gepacktMerken_(key, ANALYSE_FRISCH, ANALYSE_MERKEN_SEK);
+  return JSON.parse(JSON.stringify(ANALYSE_FRISCH));
+}
+function leseAnalyseFrisch_() {
   const sh = SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getSheetByName(ANALYSE_TAB);
   if (!sh || sh.getLastRow() < 2) return [];
   const vals = sh.getDataRange().getValues();
@@ -517,7 +532,7 @@ function leseAnalyse_() {
   return Object.keys(je).map(function (k) { return je[k]; });
 }
 
-function findeAnalyse_(id) { return leseAnalyse_().filter(function (r) { return r.id === id; })[0] || null; }
+function findeAnalyse_(id) { return leseAnalyse_(true).filter(function (r) { return r.id === id; })[0] || null; }
 
 /** Versandklasse der Analyse («0-2kg / PostPac B-Post», «0-30 kg / Sperrgut B-Post») als Gewicht bis kg und Sperrgut. Den Preis nimmt das Tool aus dem Tab «Versand». */
 function analyseVersand_(klasse) {
@@ -571,7 +586,7 @@ function findeQuelle_(id, auchAndere) {
 
 function starteListing(id, auchAndere) {
   id = String(id).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const idx = listingsIndex_();
     if (idx[id] && idx[id].teilVon) throw new Error(id + ' ist bereits Teil des Bündels ' + idx[id].teilVon + '.');
@@ -617,6 +632,7 @@ function neuAusRc_(id) {
   ['PG-ID', 'Bezeichnung', 'Neupreis CHF', 'Startpreis CHF', 'Lagerort', 'Spezifikationen', 'Quelle Tab'].forEach(function (k) { rec[k] = alt[k]; });
   rec['Status'] = 'In Arbeit'; rec['Bearbeitet von'] = nutzer_(); rec['Angelegt am'] = new Date();
   sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
+  vergiss_();
   log_('Listing neu', id, rec['Bezeichnung']);
 }
 
@@ -627,7 +643,7 @@ function freiesListing(d) {
   const preis = rappen_(zahl_(d.preis));
   if (name.length < 3) throw new Error('Bitte einen Namen mit mindestens 3 Zeichen eingeben.');
   if (!preis) throw new Error('Bitte einen Startpreis eingeben.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     let max = 0;
@@ -662,7 +678,7 @@ function teil_(id) {
 function buendelHinzu(id, zusatzId) {
   id = String(id).trim(); zusatzId = String(zusatzId).trim().toUpperCase().replace(/^PG-?(?=\d)/, 'PG-');
   if (id === zusatzId) throw new Error('Das ist das Hauptstück dieses Listings.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     const zeile = findeZeile_(sh, id);
@@ -700,7 +716,7 @@ function buendelHinzu(id, zusatzId) {
 /** Löst das Bündel auf: Das Hauptstück bekommt wieder seine eigenen Angaben, die weiteren Stücke sind wieder frei. */
 function buendelLeeren(id) {
   id = String(id).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     const zeile = findeZeile_(sh, id);
@@ -747,7 +763,7 @@ function basis_(rec) {
 function lade(id) { return lade_(String(id).trim()); }
 
 function speichereDetails(id, d) {
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     const zeile = findeZeile_(sh, id);
@@ -812,7 +828,7 @@ function erstelleText(id) {
 
 /** Stellt Titel, Beschrieb, Zustand und Versand wieder her, wie sie die Analyse geschrieben hat. */
 function textAusAnalyse_(id) {
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id), rec = zeileZuRec_(sh, zeile);
     if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist bereits «' + rec['Status'] + '» und kann nicht mehr geändert werden.');
@@ -923,7 +939,7 @@ function laufzeitVon_(wert, standard) { const n = Number(wert); return n >= 1 &&
 function markiereGelistet(id, link, tage) {
   link = String(link || '').trim();
   if (!/^https:\/\/(www\.)?ricardo\.ch\/\S*\d{6,}\S*$/.test(link)) throw new Error('Das ist kein gültiger Ricardo-Angebotslink. Bitte die Adresse des veröffentlichten Angebots einfügen.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     const zeile = findeZeile_(sh, id);
@@ -945,7 +961,7 @@ function markiereGelistet(id, link, tage) {
 function setzeStatus(id, neu) {
   const erlaubt = { 'Abgebrochen': ['In Arbeit', 'Bereit'], 'Unverkauft': ['Gelistet'] };
   if (!erlaubt[neu]) throw new Error('Unbekannter Status.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     const zeile = findeZeile_(sh, id);
@@ -968,7 +984,7 @@ function verwerfbar_(rec) { return OFFEN.indexOf(rec['Status']) !== -1 && String
 function listingVerwerfen(id) {
   id = String(id || '').trim();
   if (!id) return false;
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id);
     if (!zeile) return false;
@@ -982,10 +998,9 @@ function listingVerwerfen(id) {
 }
 /** Sicherheitsnetz, falls der Browser einfach zugemacht wurde: angefangene Listings, die älter als VERWERFEN_NACH_STUNDEN sind, verwerfen. */
 function angefangeneVerwerfen_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
-  if (sh.getLastRow() < 2) return 0;
+  const vals = werte_(TAB_L, L_COLS.length);
+  if (!vals.length) return 0;
   const grenze = Date.now() - VERWERFEN_NACH_STUNDEN * 3600000;
-  const vals = sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues();
   const alt = [];
   vals.forEach(function (row, i) {
     const rec = {}; L_COLS.forEach(function (k, j) { rec[k] = row[j]; });
@@ -993,19 +1008,19 @@ function angefangeneVerwerfen_() {
     if (rec['PG-ID'] && verwerfbar_(rec) && !(am instanceof Date && am.getTime() > grenze)) alt.push(i + 2);
   });
   if (!alt.length) return 0;
-  const sc = col_('Status');
-  alt.forEach(function (z) { sh.getRange(z, sc).setValue('Abgebrochen'); });
+  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), sc = buchstabe_(col_('Status'));
+  sh.getRangeList(alt.map(function (z) { return sc + z; })).setValue('Abgebrochen');      // ein Schreibzugriff für alle
+  vergiss_();
   log_('Angefangene Listings verworfen', '', String(alt.length));
   return alt.length;
 }
 
 function uebersicht() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
   const out = [];
   const laufzeit = Number(cfg_('Laufzeit Tage')) || 6;
   const jetzt = new Date().getTime();
-  if (sh.getLastRow() > 1) {
-    const vals = sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues();
+  {
+    const vals = werte_(TAB_L, L_COLS.length);
     vals.forEach(function (row) {
       const rec = {}; L_COLS.forEach(function (k, i) { rec[k] = row[i]; });
       if (!rec['PG-ID'] || ['In Arbeit', 'Bereit', 'Gelistet'].indexOf(rec['Status']) === -1) return;
@@ -1077,18 +1092,20 @@ function lade_(id) {
 function schreibe_(sh, zeile, rec, statusFix) {
   if (!statusFix && ['In Arbeit', 'Bereit'].indexOf(rec['Status']) !== -1) rec['Status'] = pruefe_(rec).length ? 'In Arbeit' : 'Bereit';
   sh.getRange(zeile, 1, 1, L_COLS.length).setValues([L_COLS.map(function (k) { return rec[k]; })]);
+  vergiss_();
 }
 
 function zeileZuRec_(sh, zeile) {
-  const row = sh.getRange(zeile, 1, 1, L_COLS.length).getValues()[0];
+  const row = !IN_SPERRE && sh.getName() === TAB_L && zeile >= 2 ? werte_(TAB_L, L_COLS.length)[zeile - 2] : sh.getRange(zeile, 1, 1, L_COLS.length).getValues()[0];
   const rec = {}; L_COLS.forEach(function (k, i) { rec[k] = row[i]; });
   return rec;
 }
 
 /** Zeile des Listings mit dieser PG-ID. Nach einem erneuten Listen gibt es mehrere: Es zählt die, die nicht frei ist, sonst die letzte. Unabhängig von der Sortierung im Sheet. */
 function findeZeile_(sh, id) {
-  if (sh.getLastRow() < 2) return 0;
-  const v = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  const ausSpeicher = !IN_SPERRE && sh.getName() === TAB_L;            // ausserhalb einer Sperre: die Listings des Aufrufs, nicht nochmals lesen
+  if (!ausSpeicher && sh.getLastRow() < 2) return 0;
+  const v = ausSpeicher ? werte_(TAB_L, L_COLS.length) : sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
   let letzte = 0;
   for (let i = 0; i < v.length; i++) {
     if (String(v[i][0]).trim() !== id) continue;
@@ -1100,10 +1117,8 @@ function findeZeile_(sh, id) {
 
 /** Alle Stücke, die gerade in einem Listing gebunden sind (auch als Teil eines Bündels). */
 function listingsIndex_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
   const idx = {};
-  if (sh.getLastRow() < 2) return idx;
-  sh.getRange(2, 1, sh.getLastRow() - 1, L_COLS.length).getValues().forEach(function (row) {
+  werte_(TAB_L, L_COLS.length).forEach(function (row) {
     const id = String(row[0]).trim();
     const status = row[col_('Status') - 1];
     if (!id) return;
@@ -1141,13 +1156,58 @@ function versandForm_(rec) {
 }
 
 let CFG = null;
+/** Einstellungen: pro Aufruf einmal, dazu 5 Minuten im Zwischenspeicher. Speichern im Admin, «einrichten» und eine Änderung von Hand (onEdit) löschen ihn. */
+const CFG_SCHLUESSEL = 'cfg:' + VERSION;
 function cfg_(name) {
+  if (!CFG) {
+    try { const alt = CacheService.getScriptCache().get(CFG_SCHLUESSEL); if (alt) CFG = JSON.parse(alt); } catch (err) { CFG = null; }
+  }
   if (!CFG) {
     CFG = {};
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_E);
     sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 1), 2).getValues().forEach(function (r) { CFG[String(r[0]).trim()] = String(r[1]).trim(); });
+    try { CacheService.getScriptCache().put(CFG_SCHLUESSEL, JSON.stringify(CFG), 300); } catch (err) { /* ohne Zwischenspeicher */ }
   }
   return CFG[name] || '';
+}
+function cfgVergessen_() { CFG = null; try { CacheService.getScriptCache().remove(CFG_SCHLUESSEL); } catch (err) { /* läuft nach 5 Minuten ab */ } }
+/** Einfacher Auslöser: Änderung von Hand im Sheet. Geänderte Einstellungen gelten sofort. */
+function onEdit(ev) {
+  try { if (ev.range.getSheet().getName() === TAB_E) cfgVergessen_(); } catch (err) { /* ohne Wirkung */ }
+}
+
+/*
+ * Tempo (19.10.2026): Jeder Lesezugriff aufs Sheet kostet 0.3 bis 1 s. Listings, Verkäufe, Posteingang und Retouren werden darum pro Aufruf
+ * höchstens einmal gelesen (MEMO), statt wie früher von jeder Hilfsfunktion neu. In einer Sperre wird immer frisch gelesen (dort wird geschrieben),
+ * und nach jeder Sperre und jedem Schreiben ausserhalb einer Sperre gilt der Speicher nicht mehr (vergiss_).
+ */
+let MEMO = {}, IN_SPERRE = 0;
+/** Zeilen 2 bis zur letzten eines Tabs, n Spalten breit. Jeder Aufrufer bekommt eigene Zeilen (Änderungen daran bleiben lokal). */
+function werte_(tab, n) {
+  const k = tab + ':' + n;
+  let v = !IN_SPERRE && MEMO[k];
+  if (!v) {
+    const sh = SpreadsheetApp.getActive().getSheetByName(tab), last = sh ? sh.getLastRow() : 0;
+    v = last > 1 ? sh.getRange(2, 1, last - 1, n).getValues() : [];
+    if (!IN_SPERRE) MEMO[k] = v;
+  }
+  return v.map(function (r) { return r.slice(); });
+}
+function vergiss_() { MEMO = {}; }
+/** Ersetzt LockService.getScriptLock() + waitLock: Während der Sperre wird frisch gelesen, danach gilt der Speicher nicht mehr. */
+function sperre_(ms) {
+  const l = LockService.getScriptLock(); l.waitLock(ms);
+  return sperreHalten_(l);
+}
+/** Wie tryLock: null, wenn ein anderer Lauf die Sperre hat. */
+function sperreVersuch_(ms) {
+  const l = LockService.getScriptLock();
+  return l.tryLock(ms) ? sperreHalten_(l) : null;
+}
+function sperreHalten_(l) {
+  IN_SPERRE++; MEMO = {};
+  let frei = false;
+  return { releaseLock: function () { if (frei) return; frei = true; IN_SPERRE = Math.max(0, IN_SPERRE - 1); MEMO = {}; l.releaseLock(); } };
 }
 
 function log_(aktion, id, detail) {
@@ -1156,6 +1216,7 @@ function log_(aktion, id, detail) {
 
 function nutzer_() { return Session.getActiveUser().getEmail() || 'unbekannt'; }
 function col_(name) { return L_COLS.indexOf(name) + 1; }
+function buchstabe_(c) { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + (c - 1) % 26) + s; return s; }
 function liste_(s) { return String(s).split(',').map(function (x) { return x.trim(); }).filter(String); }
 function normEan_(s) { return String(s).replace(/\D/g, '').replace(/^0+/, ''); }
 function rappen_(v) { return Math.round(Number(v) * 20) / 20; }
@@ -1193,7 +1254,7 @@ function importVerkaeufe(text) {
   const daten = zeilen.slice(1).filter(function (z) { return z.length > 1; }).map(function (z) {
     const o = {}; kopf.forEach(function (k, i) { o[k] = String(z[i] == null ? '' : z[i]).trim(); }); return o;
   });
-  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  const lock = sperre_(30000);
   try {
     const ss = SpreadsheetApp.getActive();
     const sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
@@ -1293,9 +1354,8 @@ function abgelaufen_(lv, jetzt, laufzeitTage) {
 
 /** Offene Verkäufe für die Pack- und Zahlungsliste. */
 function verkaeufe() {
-  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
   const offen = [];
-  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+  werte_(TAB_S, V_COLS.length).forEach(function (row) {
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (V_OFFEN.indexOf(v['Status']) === -1) return;
     offen.push(vZeile_(v));
@@ -1345,7 +1405,7 @@ function vZeile_(v) {
 /** aktion: 'gepackt', 'bezahlt' (Zahlung von Hand), 'versendet' (Versenden) oder 'ricardoBezahlt' (Zahlung auf Ricardo gemeldet). */
 function setzeVerkauf(nr, aktion) {
   nr = String(nr).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const ss = SpreadsheetApp.getActive();
     const sv = ss.getSheetByName(TAB_S);
@@ -1453,10 +1513,9 @@ function hauptbilder_(offen) {
   const ids = offen.map(function (o) { return o.pgId; }).filter(String);
   if (!ids.length) return;
   const cache = CacheService.getScriptCache(), da = cache.getAll(ids.map(function (id) { return 'hb:' + id; })), ordner = {};
-  const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L), cO = col_('Foto-Ordner');
-  if (sl && sl.getLastRow() > 1 && cO) {
-    const a = sl.getRange(2, 1, sl.getLastRow() - 1, 1).getValues(), o = sl.getRange(2, cO, sl.getLastRow() - 1, 1).getValues();
-    a.forEach(function (r, i) { const u = String(o[i][0] || '').trim(); if (u) ordner[String(r[0]).trim()] = u; });
+  const cO = col_('Foto-Ordner');
+  if (cO && ids.some(function (id) { return da['hb:' + id] === undefined; })) {          // alle Bilder gemerkt: Listings gar nicht lesen
+    werte_(TAB_L, L_COLS.length).forEach(function (r) { const u = String(r[cO - 1] || '').trim(); if (u) ordner[String(r[0]).trim()] = u; });
   }
   const neu = {};
   offen.forEach(function (x) {
@@ -1692,8 +1751,8 @@ function zurich_(j, mo, t, h, mi) {
 function mailsLesen_() {
   const pr = PropertiesService.getScriptProperties();
   if (!pr.getProperty(MAIL_KONTO)) return { neu: 0 };
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return { neu: 0 };            // ein anderer Lauf ist schon dran
+  const lock = sperreVersuch_(5000);
+  if (!lock) return { neu: 0 };                         // ein anderer Lauf ist schon dran
   try {
     const stand = Number(pr.getProperty(MAIL_STAND)) || Date.now(), ab = stand - MAIL_RUECKBLICK_MS;
     const q = 'from:' + (cfg_('Mail-Absender') || 'care@pretty-good.ch') + ' after:' + Math.floor(ab / 1000);
@@ -1913,7 +1972,7 @@ function posteingangPflegen_(si) {
 function aufgaben() {
   const ss = SpreadsheetApp.getActive(), si = ss.getSheetByName(TAB_I), sv = ss.getSheetByName(TAB_S), pr = PropertiesService.getScriptProperties();
   const jetzt = Date.now(), ii = function (k) { return I_COLS.indexOf(k); }, vi = function (k) { return V_COLS.indexOf(k); };
-  const iRows = si && si.getLastRow() > 1 ? si.getRange(2, 1, si.getLastRow() - 1, I_COLS.length).getValues() : [];
+  const iRows = si ? werte_(TAB_I, I_COLS.length) : [];
   const zeit = function (d) { return d instanceof Date ? Utilities.formatDate(d, TZ, 'dd.MM. HH:mm') : ''; };
   const stunden = function (d) { return d instanceof Date ? Math.floor((jetzt - d.getTime()) / 3600000) : 0; };
   const fragen = [], angebote = [], bewertungen = [], erinnert = {}, bewText = String(cfg_('Bewertungstext') || '');
@@ -1933,7 +1992,7 @@ function aufgaben() {
   });
   /* Zahlung überfällig: Verkauf seit N Tagen offen und noch keine Erinnerung als erledigt markiert */
   const tage = Number(cfg_('Zahlungserinnerung nach Tagen')) || 3, zahlung = [];
-  if (sv && sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (r) {
+  if (sv) werte_(TAB_S, V_COLS.length).forEach(function (r) {
     const am = r[vi('Verkauft am')], nr = String(r[0]);
     if (V_OFFEN.indexOf(r[vi('Status')]) === -1 || r[vi('Bezahlt am')] instanceof Date || !(am instanceof Date) || jetzt - am.getTime() < tage * 86400000 || erinnert[nr]) return;
     const name = String(r[vi('Vorname')] || '').trim() || String(r[vi('Käufer')] || '');
@@ -1960,7 +2019,7 @@ function mailKontrolle_() {
 
 function aufgabeErledigt(id) {
   id = String(id);
-  const si = SpreadsheetApp.getActive().getSheetByName(TAB_I), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const si = SpreadsheetApp.getActive().getSheetByName(TAB_I), lock = sperre_(20000);
   try {
     const ids = si.getLastRow() > 1 ? si.getRange(2, 1, si.getLastRow() - 1, 1).getValues() : [];
     for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === id) {
@@ -1976,7 +2035,7 @@ function aufgabeErledigt(id) {
 /** Zahlungserinnerung auf Ricardo geschickt: Der Verkauf verschwindet aus der Liste «Zahlung überfällig». */
 function erinnerungErledigt(nr) {
   nr = String(nr);
-  const si = SpreadsheetApp.getActive().getSheetByName(TAB_I), lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const si = SpreadsheetApp.getActive().getSheetByName(TAB_I), lock = sperre_(20000);
   try {
     const r = I_COLS.map(function () { return ''; });
     r[0] = 'E-' + nr; r[I_COLS.indexOf('Eingang')] = new Date(); r[I_COLS.indexOf('Art')] = 'Zahlungserinnerung'; r[I_COLS.indexOf('Status')] = 'Erledigt';
@@ -1992,6 +2051,16 @@ function erinnerungErledigt(nr) {
 /* ------------------------------------------------------------------ */
 
 let LANG = 'de';
+const TEMPO_GRENZE_MS = 3000;
+
+/** Zahlen für die Marken auf der Startseite in einem Aufruf (früher drei: verkaeufe, retouren, ablauf). Ohne Bilder, ohne Mails. */
+function zaehler() {
+  const vs = alleVerkaeufe_(), rs = rZeilen_();
+  return { offen: vs.filter(function (v) { return V_OFFEN.indexOf(v['Status']) !== -1; }).length,
+    zuPacken: vs.filter(function (v) { return v['Status'] === 'Zu packen'; }).length,
+    versand: vs.filter(function (v) { return v['Status'] === 'Bereit zum Versand'; }).length,
+    retouren: rs.filter(function (r) { return r['Status'] !== 'Abgeschlossen'; }).length };
+}
 
 function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
@@ -2004,11 +2073,18 @@ function api(lang, name, args) {
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     ablauf: ablauf, listingVerwerfen: listingVerwerfen, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
-    adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
+    adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus,
+    zaehler: zaehler }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
+  const t0 = Date.now();
   try { r = f.apply(null, args || []); }
   catch (e) { throw new Error(LANG === 'en' ? en_(String(e.message || e)) : String(e.message || e)); }
+  finally {
+    /* Langsame Aufrufe festhalten (ein Schreibzugriff): So sieht man im Log, wo das Tool bremst. */
+    const ms = Date.now() - t0;
+    if (ms >= TEMPO_GRENZE_MS) { console.log('Tempo ' + name + ' ' + ms + ' ms'); log_('Tempo', '', name + (name === 'ablauf' && args ? ' ' + args[0] : '') + ' ' + (ms / 1000).toFixed(1) + ' s'); }
+  }
   if (LANG === 'en' && r && typeof r === 'object') {
     if (r.fehlt) r.fehlt = r.fehlt.map(en_);
     if (r.hinweis) r.hinweis = en_(r.hinweis);
@@ -2283,7 +2359,7 @@ function adminSuche(q) {
 /** Löscht die Zeile eines Listings. Das Stück ist danach wieder frei. */
 function adminLoescheListing(zeile, id) {
   pruefeAdmin_();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L);
     zeile = Number(zeile);
@@ -2297,7 +2373,7 @@ function adminLoescheListing(zeile, id) {
 /** Storniert einen Verkauf. Die Zeile bleibt als «Storniert» stehen, damit der Verkauf beim nächsten Import nicht wieder erscheint. Das Stück wird frei. */
 function adminLoescheVerkauf(zeile, nr) {
   pruefeAdmin_();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
     zeile = Number(zeile);
@@ -2339,7 +2415,7 @@ function adminSpeichereEinstellungen(werte) {
     const n = String(r[0]).trim();
     if (n && werte[n] !== undefined) e.getRange(i + 2, 2).setValue(String(werte[n]).trim());
   });
-  CFG = null;
+  cfgVergessen_();
   log_('Admin: Einstellungen', '', Object.keys(werte).join(', '));
   return adminEinstellungen();
 }
@@ -2349,9 +2425,8 @@ function adminSpeichereEinstellungen(werte) {
 /* ------------------------------------------------------------------ */
 
 function rZeilen_() {
-  const rt = SpreadsheetApp.getActive().getSheetByName(TAB_R);
   const out = [];
-  if (rt.getLastRow() > 1) rt.getRange(2, 1, rt.getLastRow() - 1, R_COLS.length).getValues().forEach(function (row, i) {
+  werte_(TAB_R, R_COLS.length).forEach(function (row, i) {
     const r = {}; R_COLS.forEach(function (k, j) { r[k] = row[j]; });
     if (r['Retoure-Nr']) { r._zeile = i + 2; out.push(r); }
   });
@@ -2380,9 +2455,8 @@ function retouren() {
 function retoureSuche(q) {
   const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
   if (!woerter.length) return [];
-  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
   const out = [];
-  if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row) {
+  werte_(TAB_S, V_COLS.length).forEach(function (row) {
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (v['Status'] !== 'Bezahlt und versendet') return;
     const text = [v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Vorname'], v['Nachname']].join(' ').toLowerCase();
@@ -2400,7 +2474,7 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
   iban = iban_(iban);
   adresse = text_(adresse, 200);
   if (!adresse) throw new Error('Bitte Strasse und Hausnummer des Käufers eingeben.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L), rt = ss.getSheetByName(TAB_R);
     const nrn = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues() : [];
@@ -2469,7 +2543,7 @@ function rueckzahlungMail_(r) {
     Sind alle drei erledigt, ist die Retoure abgeschlossen. Entscheid Jonas 19.10.2026: gleiche Auswahl wie bei unverkauften Stücken. */
 function retoureSchritt(rtNr, schritt, wert) {
   rtNr = String(rtNr).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const ss = SpreadsheetApp.getActive(), rt = ss.getSheetByName(TAB_R), sl = ss.getSheetByName(TAB_L);
     const r = rZeilen_().filter(function (x) { return String(x['Retoure-Nr']) === rtNr; })[0];
@@ -2518,16 +2592,12 @@ const RICARDO_LISTEN = 'https://www.ricardo.ch/de/list/', RICARDO_VERKAUFT = 'ht
 function artikelAusLink_(link) { const m = String(link || '').match(/(\d{6,})(?!.*\d{6,})/); return m ? m[1] : ''; }
 
 function alleVerkaeufe_() {
-  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
-  if (!sv || sv.getLastRow() < 2) return [];
-  return sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().map(function (row, i) {
+  return werte_(TAB_S, V_COLS.length).map(function (row, i) {
     const v = { _zeile: i + 2 }; V_COLS.forEach(function (k, j) { v[k] = row[j]; }); return v;
   });
 }
 function alleListings_() {
-  const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L);
-  if (!sl || sl.getLastRow() < 2) return [];
-  return sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues().map(function (row, i) {
+  return werte_(TAB_L, L_COLS.length).map(function (row, i) {
     const r = { _zeile: i + 2 }; L_COLS.forEach(function (k, j) { r[k] = row[j]; }); return r;
   }).filter(function (r) { return String(r['PG-ID']).trim(); });
 }
@@ -2647,7 +2717,7 @@ function bankAbgleichRechnen_(zeilen, vs) {
 /** Bestätigte Zahlungen eintragen. liste = [{ nr, bank: { datum, betrag, auftrag } }]. */
 function bankBestaetigen(liste) {
   if (!Array.isArray(liste) || !liste.length) throw new Error('Keine Zahlung ausgewählt.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S), vs = alleVerkaeufe_(), nachNr = {};
     vs.forEach(function (v) { nachNr[String(v['Verkauf-Nr'])] = v; });
@@ -2672,7 +2742,7 @@ function bankBestaetigen(liste) {
 
 function entscheidUnverkauft(id, entscheid) {
   if (ENTSCHEIDE_UNVERKAUFT.indexOf(entscheid) === -1) throw new Error('Unbekannter Entscheid.');
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id);
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
@@ -2690,7 +2760,7 @@ function entscheidUnverkauft(id, entscheid) {
 
 function verkaufStornieren(nr) {
   nr = String(nr).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
     const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
@@ -2733,7 +2803,7 @@ function etikette(nr, vorschau) {
   anfrage.item.attributes.przl = przl_(klasse);
   const r = postEtiketteAnfrage_(anfrage);
   if (!vorschau) {
-    const lock = LockService.getScriptLock(); lock.waitLock(20000);
+    const lock = sperre_(20000);
     try {
       const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
       sv.getRange(v._zeile, V_COLS.indexOf('Sendungsnummer') + 1, 1, 2).setValues([[r.sendungsnummer, new Date()]]);
@@ -2796,7 +2866,7 @@ function adressePruefen(nr) {
 /** Vorschlag der Post für Strasse, Nr., PLZ und Ort in den Verkauf übernehmen. */
 function adresseUebernehmen(nr, p) {
   nr = String(nr).trim();
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  const lock = sperre_(20000);
   try {
     const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
     if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');

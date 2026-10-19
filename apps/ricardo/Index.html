@@ -1298,7 +1298,7 @@
     if (z) h += '<h3 style="margin:20px 0 0">' + t('ad.verkaeufe') + '</h3>' + tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.status', ''], z);
     $('ad-liste').innerHTML = h || '<p class="still" style="margin-top:12px">' + t('ad.leer') + '</p>';
   }
-  function adminFertig() { melde(t('ad.erledigt'), 'ok'); adminSuchen(); still('startDaten', [], function (s) { S = s; texte(); }); still('verkaeufe', [], function (v) { marke($('z-verkauf'), v.offen.length); }); }
+  function adminFertig() { melde(t('ad.erledigt'), 'ok'); adminSuchen(); still('startDaten', [], function (s) { S = s; texte(); }); zaehlerLaden(); }
   function adminLoesche(art, i) {
     if (art === 'l') { var l = AD.listings[i]; frage(t('ad.f.listing', l.id), function () { ruf('adminLoescheListing', [l.zeile, l.id], adminFertig); }); }
     else { var o = AD.verkaeufe[i]; frage(t('ad.f.verkauf', o.nr), function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr], adminFertig); }); }
@@ -1415,7 +1415,8 @@
     einbauLoesen(); zeige('ablauf'); $('f-schritte').innerHTML = ''; $('f-leiste').innerHTML = ''; ladeAblauf();
     if (art === 'schicht1') ladeAnalyse();
   }
-  function ladeAblauf(danach) { ruf('ablauf', [FA], function (f) { F = f; zeichneAblauf(); if (danach) danach(); }); }
+  function ladeAblauf(danach) { ruf('ablauf', [FA], function (f) { F = f; if (f && f.art === 'taeglich' && f.melden) marke($('z-f-taeglich'), f.melden.length + f.aufgaben.anzahl + f.storno.length); zeichneAblauf(); if (danach) danach(); }); }
+  function zaehlerLaden() { still('zaehler', [], function (z) { if (!z) return; marke($('z-f-schicht2'), z.zuPacken); marke($('z-f-schicht3'), z.versand); marke($('z-retour'), z.retouren); marke($('z-verkauf'), z.offen); }); }
   function ricKnopf(url, text) { return '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(url) + '\')">' + esc(text || t('g.oeffnen')) + '</button>'; }
   /* Was zu tun ist, direkt bei der Aktion: Ricardo (rosa) oder physisch (weiss), mit dem passenden Knopf */
   function tun(ort, text, knopf) {
@@ -1802,10 +1803,9 @@
   google.script.run.withSuccessHandler(function (s) {
     lade(false); S = s; texte(); ablaufStarten('taeglich');
     ladeAnalyse();
-    still('verkaeufe', [], function (v) { if (!v || !v.offen) return; marke($('z-f-schicht2'), v.offen.filter(function (o) { return o.status === 'Zu packen'; }).length); marke($('z-f-schicht3'), v.offen.filter(function (o) { return o.status === 'Bereit zum Versand'; }).length); });
-    still('retouren', [], function (r) { marke($('z-retour'), r.offen.length); });
+    /* Tempo 19.10.2026: die Marken in einem Aufruf (statt verkaeufe, retouren und ein zweites ablauf('taeglich')); «Täglich» setzt seine Marke selbst */
+    zaehlerLaden();
     still('mailsJetzt', [], function (a) { AU = a; marke($('z-aufgaben'), a.anzahl); if (ANSICHT === 'aufgaben') zeichneAufgaben(); });
-    still('ablauf', ['taeglich'], function (f) { if (f && f.melden) marke($('z-f-taeglich'), f.melden.length + f.aufgaben.anzahl + f.storno.length); });
   }).withFailureHandler(function (e) {
     $('lade').hidden = true; melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); $('hinweis').onclick = null;
   }).api(L, 'startDaten', []);

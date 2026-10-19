@@ -86,7 +86,7 @@ const u = c('uebersicht()');
 ok(u.liste.find(x => x.id === 'PG-200').regal === 'Ricardo Online', 'Übersicht zeigt Regal');
 const v = c("analyseVersand_('10-30kg / PostPac B-Post')"), v2 = c("analyseVersand_('PostPac B-Post bis 10 kg')");
 ok(v.gewicht === 30 && !v.sperrgut && v2.gewicht === 10, 'Versandklassen beider Schreibweisen');
-E.d.push(['Regal Online', 'Online-Regal']); vm.runInContext('CFG = null', ctx);
+E.d.push(['Regal Online', 'Online-Regal']); vm.runInContext('cfgVergessen_(); vergiss_()', ctx);   // Änderung von Hand: onEdit
 ok(c("lade('PG-200')").regal === 'Online-Regal' && c('startDaten').toString() && c("regal_('Bereit')") === 'Ricardo Offline', 'Regalname aus den Einstellungen, sonst Vorgabe');
 // Leere Analyse (Tab fehlt) stört nicht
 ext.AT.getSheetByName = () => null;

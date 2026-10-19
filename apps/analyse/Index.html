@@ -1627,8 +1627,9 @@
     if (!id || (RIC && RIC.holt)) return;
     RIC = RIC && RIC.id === id ? RIC : { id: id, st: null };
     RIC.holt = true; RIC.zeit = Date.now();
-    google.script.run.withSuccessHandler(function (st) { if (!RIC || RIC.id !== id) return; RIC.holt = false; var neu = JSON.stringify(st) !== JSON.stringify(RIC.st); RIC.st = st; if (neu) ricNachfuehren(); })
-      .withFailureHandler(function () { if (RIC) RIC.holt = false; }).api(L, 'fotoStand', [id]);
+    /* Mit der Kennung des letzten Stands: Hat sich nichts geändert, schickt der Server nur «gleich» (ohne Vorschaubilder). */
+    google.script.run.withSuccessHandler(function (st) { if (!RIC || RIC.id !== id) return; RIC.holt = false; if (st && st.gleich) return; var neu = JSON.stringify(st) !== JSON.stringify(RIC.st); RIC.st = st; if (neu) ricNachfuehren(); })
+      .withFailureHandler(function () { if (RIC) RIC.holt = false; }).api(L, 'fotoStand', [id, RIC.st && RIC.st.kennung || '']);
   }
   /* Läuft jede Sekunde mit der Uhr: alle 5 Sekunden nachfragen, solange der Ricardo-Teil offen ist. Den QR-Code zeichnen, sobald sein Platz da ist. */
   function ricTakt() {

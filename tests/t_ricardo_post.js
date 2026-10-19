@@ -56,6 +56,7 @@ const ohneAdr = verkauf('6', 'PG-6', 'Zu packen', 'PostPac B-Post bis 2 kg');
 ['Nachname', 'Vorname', 'Strasse', 'Hausnummer', 'PLZ', 'Ort'].forEach(k => { ohneAdr[V_COLS().indexOf(k)] = ''; });
 ohneAdr[V_COLS().indexOf('Quelle')] = 'Mail'; ohneAdr[V_COLS().indexOf('Artikel-Nr')] = '1331';
 S.d().push(ohneAdr);
+vm.runInContext('vergiss_()', ctx);                               // neuer Aufruf
 const r2 = vm.runInContext('postAdressen()', ctx);
 ok(r2.anzahl === 5 && r2.ohne === 1, 'Verkauf ohne Adresse übersprungen und gezählt ' + JSON.stringify([r2.anzahl, r2.ohne]));
 ok(vm.runInContext('verkaeufe()', ctx).offen.find(o => o.nr === '6').ohneAdresse === true, 'Packliste zeigt «Adresse fehlt»');
