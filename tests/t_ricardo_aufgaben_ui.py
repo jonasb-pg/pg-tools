@@ -28,8 +28,8 @@ with sync_playwright() as p:
     b = p.chromium.launch(); s = b.new_page(viewport={'width': 1300, 'height': 1500}); err = []
     s.on('pageerror', lambda e: err.append(str(e)))
     s.set_content(html); s.wait_for_timeout(300)
-    ok(s.text_content('#z-aufgaben') == '4' and s.is_visible('#z-aufgaben'), 'Zähler beim Start (Mails im Hintergrund gelesen)')
-    s.click('#nav-aufgaben'); s.wait_for_timeout(200)
+    ok(s.text_content('#z-aufgaben') == '4', 'Zähler beim Start (Mails im Hintergrund gelesen)')
+    s.evaluate("zeige('aufgaben')"); s.wait_for_timeout(200)  # Reiter ist seit 19.7 ausgeblendet, die Darstellung nutzt der Ablauf «Täglich»
     t = s.text_content('#a-liste')
     ok('Vorschlag CHF 75.00 (Preis CHF 87.00)' in t and 'noch 37 h' in t and 'Annehmen' in t, 'Preisvorschlag mit Frist und Empfehlung')
     ok('Ist das Netzteil dabei?' in t and s.input_value('#ae-0').startswith('Guten Tag'), 'Frage mit Entwurf')
