@@ -69,6 +69,8 @@ const DEFAULTS = [
   ['Hinweis-Tabs', 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden', 'Wird nur durchsucht, wenn in den Such-Tabs nichts gefunden wird'],
   ['Laufzeit Tage', 6, 'Vorschlag für die Laufzeit der Auktion. Beim Listen kann man pro Angebot eine andere Laufzeit eintragen (Spalte «Laufzeit Tage» im Tab «Listings»).'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
+  ['Post Frankierlizenz', '60162228', 'Frankierlizenz Pakete Inland für die Etiketten (Barcode API der Post). Zugang: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET'],
+  ['Post Absender', 'Pretty Good GmbH, Pappelweg 24, 3013, Bern', 'Absender auf der Etikette: Name, Strasse und Nr., PLZ, Ort (mit Komma getrennt)'],
   ['Schlusssatz', SCHLUSSSATZ, 'Steht am Ende jedes Beschriebs. Keine Domain verwenden. Gleicher Satz wie «Ricardo-Schlusssatz» im ANALYSE TOOL'],
   ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
   ['Warnschwelle aktive Angebote', 90, 'Ricardo-Limite ist standardmässig 100'],
@@ -2089,6 +2091,7 @@ function verbindungTest() {
     const n = GmailApp.search('from:' + String(cfg_('Mail-Absender') || '').trim() + ' newer_than:7d', 0, 50).length;
     return n + ' Mails der letzten 7 Tage gefunden';
   });
+  mess('Post (Etiketten)', function () { postToken_(true); return 'Anmeldung ok'; });
   mess('Claude', function () {
     if (!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY')) throw new Error('Schlüssel fehlt (Script-Eigenschaft ANTHROPIC_API_KEY)');
     return 'Schlüssel vorhanden';
@@ -2442,3 +2445,60 @@ function retoureSchritt(rtNr, schritt, wert) {
     return retouren();
   } finally { lock.releaseLock(); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Post: Etiketten über die Barcode API (Digital Commerce API)         */
+/* ------------------------------------------------------------------ */
+/* Entscheid Jonas 19.10.2026: Etikette beim Packen (Schicht 2), Knopf pro Verkauf. Zugang in den Script-Eigenschaften POST_CLIENT_ID und
+   POST_CLIENT_SECRET, nie im Sheet. Token gilt 5 Minuten. Eine Etikette pro Anfrage. printPreview = true liefert eine Muster-Etikette (SPECIMEN, kostenlos). */
+const POST_TOKEN_URL = 'https://api.post.ch/OAuth/token', POST_LABEL_URL = 'https://dcapi.apis.post.ch/barcode/v1/generateAddressLabel';
+function postToken_(neu) {
+  const c = CacheService.getScriptCache();
+  if (!neu) { const t = c.get('post-token'); if (t) return t; }
+  const pr = PropertiesService.getScriptProperties(), id = pr.getProperty('POST_CLIENT_ID'), geheim = pr.getProperty('POST_CLIENT_SECRET');
+  if (!id || !geheim) throw new Error('Post-Zugang fehlt: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET eintragen.');
+  const r = UrlFetchApp.fetch(POST_TOKEN_URL, { method: 'post', muteHttpExceptions: true,
+    payload: { grant_type: 'client_credentials', client_id: String(id).trim(), client_secret: String(geheim).trim(), scope: 'DCAPI_BARCODE_READ' } });
+  if (r.getResponseCode() !== 200) throw new Error('Post-Anmeldung abgelehnt (' + r.getResponseCode() + '): ' + r.getContentText().slice(0, 200));
+  const j = JSON.parse(r.getContentText());
+  c.put('post-token', j.access_token, Math.max(60, (Number(j.expires_in) || 300) - 30));
+  return j.access_token;
+}
+/** Absender aus der Einstellung «Post Absender»: Name, Strasse und Nr., PLZ, Ort. */
+function postAbsender_() {
+  const t = String(cfg_('Post Absender') || 'Pretty Good GmbH, Pappelweg 24, 3013, Bern').split(',').map(function (x) { return x.trim(); });
+  return { name1: t[0], street: t[1], zip: t[2], city: t[3], country: 'CH' };
+}
+/** Anfrage für eine Etikette. e = { id, firma, vorname, nachname, strasse, nr, postfach, plz, ort, przl, gramm }. */
+function postAnfrage_(e, vorschau) {
+  const empf = { name1: e.nachname || e.firma, firstName: e.vorname || undefined, name2: e.firma && e.nachname ? e.firma : undefined,
+    street: e.strasse || undefined, houseNo: e.nr || undefined, pobox: e.postfach || undefined, zip: String(e.plz || ''), city: e.ort, country: 'CH' };
+  Object.keys(empf).forEach(function (k) { if (empf[k] === undefined || empf[k] === '') delete empf[k]; });
+  const attr = { przl: [e.przl || 'ECO'] };
+  if (e.gramm) attr.weight = Math.min(99999, Math.round(Number(e.gramm)));
+  return { language: 'DE', frankingLicense: String(cfg_('Post Frankierlizenz') || '60162228'), ppFranking: false, customer: postAbsender_(),
+    labelDefinition: { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'PDF', imageResolution: 300, printPreview: !!vorschau },
+    item: { itemID: String(e.id || '').slice(0, 35), recipient: empf, attributes: attr } };
+}
+/** Etikette holen: { sendungsnummer, pdf (base64), warnungen }. */
+function postEtikette_(e, vorschau) {
+  const r = UrlFetchApp.fetch(POST_LABEL_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + postToken_() }, payload: JSON.stringify(postAnfrage_(e, vorschau)) });
+  const text = r.getContentText();
+  let j = null; try { j = JSON.parse(text); } catch (err) { /* unten */ }
+  const it = j && j.item;
+  if (r.getResponseCode() !== 200 || !it || !it.label || !it.label.length) {
+    const f = it && it.errors ? JSON.stringify(it.errors) : text;
+    throw new Error('Post hat keine Etikette geliefert (' + r.getResponseCode() + '): ' + String(f).slice(0, 300));
+  }
+  return { sendungsnummer: String(it.identCode || ''), pdf: it.label[0], warnungen: it.warnings ? JSON.stringify(it.warnings) : '' };
+}
+/** Im Editor ausführen: Anmeldung und eine Muster-Etikette (SPECIMEN, kostenlos) an die eigene Adresse. Legt das PDF in «Meine Ablage» nicht ab, zeigt nur das Ergebnis. */
+function postTest() {
+  const a = postAbsender_();
+  const x = postEtikette_({ id: 'TEST-1', firma: a.name1, nachname: 'Test', strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city, przl: 'ECO', gramm: 1000 }, true);
+  const aus = 'Post ok: Sendungsnummer ' + (x.sendungsnummer || '(Muster)') + ', PDF ' + Math.round(x.pdf.length * 3 / 4 / 1024) + ' KB' + (x.warnungen ? ', Hinweise: ' + x.warnungen : '');
+  console.log(aus);
+  return aus;
+}
+
