@@ -1,5 +1,5 @@
 import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))  # Pfade relativ zu tests/
-"""Ricardo Tool: Abläufe Täglich, Schicht 1-3 mit Stub. Erfundene Daten. Lauf: python3 tests/t_ricardo_ablauf_ui.py [bild-prefix]"""
+"""Ricardo Tool: Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle (19.9) mit Stub. Erfundene Daten. Lauf: python3 tests/t_ricardo_ablauf_ui.py [bild-prefix]"""
 import json, pathlib, sys, tempfile
 from playwright.sync_api import sync_playwright
 html = (pathlib.Path(__file__).parent.parent / 'apps/ricardo/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
@@ -20,11 +20,22 @@ SCHICHT2 = {'art': 'schicht2', 'links': LINKS, 'verkaeufe': {'offen': OFFEN, 'zu
             'unverkauft': [{'id': 'PG-010', 'status': 'Unverkauft', 'name': 'Bügeleisen', 'ort': 'R1', 'link': 'https://www.ricardo.ch/de/a/neu-x-1300000010/', 'artikel': '1300000010', 'kopieren': 'https://www.ricardo.ch/de/list/?prefill=1300000010'}],
             'ohneMail': [{'id': 'PG-011', 'name': 'Schläger', 'link': 'https://www.ricardo.ch/de/a/neu-y-1300000011/', 'ende': '18.10.2026'}], 'regale': {}}
 SCHICHT3 = {'art': 'schicht3', 'links': LINKS, 'versand': [dict(OFFEN[0], status='Bereit zum Versand', sendung='99.60.123456.12345678')], 'warten': [dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000009'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000010'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000011')], 'regale': {}}
-SCHICHT1 = {'art': 'schicht1', 'links': LINKS, 'bereit': [{'id': 'PG-010', 'status': 'Bereit', 'name': 'Bügeleisen', 'ort': 'R1', 'regal': 'Ricardo Offline', 'wieder': True}], 'analyse': 4, 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6, 'regale': {}}
-DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': [], 'maengelPflicht': [], 'laufzeit': 6, 'retoureGruende': [], 'kiAktiv': True, 'mailAktiv': True, 'aktiv': 30, 'schwelle': 90},
-         'analyseListe': [], 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
+SCHICHT1 = {'art': 'schicht1', 'links': LINKS, 'bereit': [{'id': 'PG-010', 'status': 'Bereit', 'name': 'Bügeleisen', 'ort': 'R1', 'regal': 'Ricardo Offline', 'wieder': True}], 'analyse': 1, 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6, 'regale': {},
+            'entscheide': ['Neu listen', 'Anderer Kanal', 'Entsorgung'], 'unverkauft': [{'id': 'PG-012', 'status': 'Unverkauft', 'name': 'Lampe', 'ort': 'R2', 'link': 'https://www.ricardo.ch/de/a/neu-x-1300000012/', 'artikel': '1300000012', 'kopieren': ''}],
+            'ohneMail': [{'id': 'PG-011', 'name': 'Schläger', 'ort': 'R3', 'link': 'https://www.ricardo.ch/de/a/neu-y-1300000011/', 'ende': '18.10.2026'}]}
+R = {'id': 'PG-100', 'status': 'In Arbeit', 'ean': '076', 'bezeichnung': 'Toaster X', 'neupreis': 80, 'startpreis': '40.00', 'lagerort': 'H3', 'zustand': 'Gebraucht', 'maengel': '',
+     'frei': False, 'gewicht': 2, 'sperrgut': False, 'klasse': 'PostPac B-Post bis 2 kg', 'versand': '9.00', 'titel': 'Toaster X 2 Schlitze', 'beschrieb': 'Zustand: Gebraucht.',
+     'link': '', 'produktlink': '', 'fehlt': [], 'versandForm': 'Paket, bis 2kg, Economy', 'getestet': True, 'buendelIds': [], 'buendelInhalt': [], 'masse': [],
+     'englisch': '', 'englischAlt': False, 'quelle': 'Analyse', 'analyse': True, 'analyseNr': 'A-0001', 'fotoOrdner': '', 'geaendert': '', 'regal': 'Ricardo Offline'}
+ANA = [{'id': 'PG-100', 'name': 'Toaster X', 'titel': 'Toaster X 2 Schlitze', 'zustand': 'Gebraucht', 'preis': 40, 'fotos': 5, 'ordner': '', 'kuerzel': 'JB', 'erfasst': '14.10.2026'},
+       {'id': 'PG-010', 'name': 'Bügeleisen', 'titel': 'Bügeleisen', 'zustand': 'Gebraucht', 'preis': 20, 'fotos': 3, 'ordner': '', 'kuerzel': 'JB', 'erfasst': '14.10.2026'}]
+DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und originalverpackt', 'Gebraucht'], 'maengelPflicht': ['Gebraucht'], 'laufzeit': 6, 'retoureGruende': [], 'kiAktiv': True, 'mailAktiv': True, 'aktiv': 30, 'schwelle': 90},
+         'analyseListe': ANA, 'starteListing': R, 'lade': dict(R, id='PG-010', bezeichnung='Bügeleisen', analyse=False), 'speichereDetails': R, 'markiereGelistet': {'id': 'PG-100'},
+         'adressePruefen': {'stand': 'vorschlag', 'quality': 'USABLE', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3000', 'ort': 'Bern'}, 'vorschlag': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
+         'adresseUebernehmen': {'stand': 'ok', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
+         'aufgabeErledigt': AU, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
          'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
-         'entscheidUnverkauft': dict(SCHICHT2, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
+         'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
  return function(l,name,args){AUFRUFE.push([name,args]);var D=%s;var key=name==='ablauf'?'ablauf:'+args[0]:name;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[key]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
@@ -40,48 +51,84 @@ with sync_playwright() as p:
     s.on('pageerror', lambda e: err.append(str(e)))
     s.set_content(html); s.wait_for_timeout(400)
     nav = s.inner_text('.nav')
-    ok(all(x in nav.upper() for x in ['TÄGLICH', 'LISTING', 'PACKEN', 'VERSENDEN', 'RETOUREN', 'LAUFENDE ANGEBOTE']) and s.is_hidden('#nav-aufgaben') and s.is_hidden('#nav-verkauf') and s.is_hidden('#nav-listen'), 'Navigation: 4 Abläufe, Verwaltung mit Retouren und Laufende Angebote')
-    ok(s.is_visible('#s-ablauf') and s.locator('#f-leiste button').count() == 3, 'Start im Ablauf Täglich mit 3 Schritten')
-    ok(s.locator('#f-schritte h2').inner_text().upper() == 'ZAHLUNGEN', 'Erster offener Schritt: Zahlungen')
-    ok('Zahlung erhalten' in s.text_content('.f-box.rosa'), 'Kasten «Auf Ricardo»')
-    ok(s.locator('#f-schritte .karte').count() == 1, 'Nur ein Schritt sichtbar')
+    ok(all(x in nav.upper() for x in ['TÄGLICH', 'LISTING', 'PACKEN', 'VERSENDEN', 'RETOUREN', 'LAUFENDE ANGEBOTE']) and s.is_hidden('#nav-aufgaben') and s.is_hidden('#nav-verkauf') and s.is_hidden('#nav-listen'), 'Navigation: 4 Abläufe, Verwaltung')
+    A = lambda: s.evaluate('AUFRUFE')
+    # ---------- Täglich: Liste der Fälle ----------
+    t = s.text_content('#f-schritte')
+    ok('4 offen' in t and 'Neu: Soundkarte' in t and 'Neu: Föhn Z' in t and 'Bewerte kaeufer_x' in t and 'Neu: Lampe' in t, 'Täglich: Liste mit 4 Fällen')
+    ok(s.locator('#f-schritte .f-tun').count() == 0, 'In der Liste keine festen Ricardo-/Physisch-Kästen')
     s.set_input_files('#f-bank', csv.name); s.click('#f-schritte button:has-text("Einlesen")'); s.wait_for_timeout(400)
-    call = [a for a in s.evaluate('AUFRUFE') if a[0] == 'bankAbgleich']
-    ok(call and len(call[0][1][0]) == 2 and call[0][1][0][0] == {'datum': '2026-10-17', 'text': 'GUTSCHRIFT; 1300000002', 'betrag': 91, 'auftrag': 'A2'}, 'CSV: nur Gutschriften gelesen')
+    call = [a for a in A() if a[0] == 'bankAbgleich']
+    ok(call and len(call[0][1][0]) == 2 and call[0][1][0][0] == {'datum': '2026-10-17', 'text': 'GUTSCHRIFT; 1300000002', 'betrag': 91, 'auftrag': 'A2'}, 'Bank-Export nur wenn Zahlungen offen, nur Gutschriften')
     ok(s.is_checked('.bank-wahl[data-i="0"]') and not s.is_checked('.bank-wahl[data-i="1"]'), 'Sicher angehakt, unsicher nicht')
     s.click('#f-schritte button:text-is("Angehakte als bezahlt erfassen")'); s.wait_for_timeout(200)
-    call = [a for a in s.evaluate('AUFRUFE') if a[0] == 'bankBestaetigen']
-    ok(call and call[0][1][0] == [{'nr': '50000002', 'bank': BANK['sicher'][0]['bank']}], 'Nur Angehakte bestätigt')
-    s.click('#f-schritte button:text-is("Gemeldet")'); s.wait_for_timeout(200)
-    ok(['setzeVerkauf', ['50000001', 'ricardoBezahlt']] in s.evaluate('AUFRUFE'), 'Gemeldet')
-    s.click('#f-schritte button:has-text("Auf Ricardo: Zahlung erhalten")'); s.wait_for_timeout(100)
-    ok(any('/selling/order/50000001/' in u for u in s.evaluate('OFFEN')), 'Ricardo-Knopf öffnet den Verkauf')
-    s.click('#f-schritte button:has-text("Weiter")'); s.wait_for_timeout(200)
-    t = s.text_content('#f-schritte')
-    ok('Vorschlag CHF 75.00' in t and 'Bewerte kaeufer_x' in t and s.input_value('#fb-0').startswith('Vielen Dank'), 'Nachrichten mit Preisvorschlag und Bewertung')
+    ok([a for a in A() if a[0] == 'bankBestaetigen'][0][1][0] == [{'nr': '50000002', 'bank': BANK['sicher'][0]['bank']}], 'Nur Angehakte bestätigt')
+    s.click('#f-schritte .f-eintrag >> nth=0 >> button'); s.wait_for_timeout(200)
+    ok(s.locator('#f-schritte .f-tun.rosa').count() == 1 and 'Zahlung erhalten' in s.text_content('.f-tun.rosa') and s.locator('#f-schritte .karte').count() == 1, 'Fall Zahlung melden: ein Bildschirm, Ricardo-Aktion beim Knopf')
+    s.click('.f-tun.rosa button'); s.wait_for_timeout(100)
+    ok(any('/selling/order/50000001/' in u for u in s.evaluate('OFFEN')), 'Knopf öffnet genau diesen Verkauf')
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok(['setzeVerkauf', ['50000001', 'ricardoBezahlt']] in A() and 'Erledigt' in s.text_content('#f-schritte') and 'Weiter mit:' in s.text_content('#f-schritte'), 'Gemeldet, danach «Weiter mit»')
+    s.click('#f-schritte button:has-text("Weiter mit")'); s.wait_for_timeout(200)
+    ok('Preisvorschlag beantworten' in s.text_content('.f-tun.rosa') and 'Annehmen' in s.text_content('.f-tun.rosa'), 'Nächster Fall: Preisvorschlag mit Empfehlung beim Knopf')
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok(['aufgabeErledigt', ['m1']] in A(), 'Preisvorschlag erledigt')
+    s.click('#f-schritte button:has-text("Zur Liste")'); s.wait_for_timeout(200)
+    s.click('#f-schritte .f-eintrag:has-text("Neu: Lampe") button'); s.wait_for_timeout(200)
+    ok('Storno öffnen' in s.text_content('.f-tun.rosa') and s.is_visible('#f-neben'), 'Storno: Ricardo-Link und «Ist bezahlt»')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-taeglich.png', full_page=True)
-    s.click('#f-leiste button >> nth=2'); s.wait_for_timeout(200)
-    ok('seit 15 Tagen' in s.text_content('#f-schritte') and 'Verkauf stornieren' in s.text_content('#f-schritte'), 'Unbezahlte mit Storno')
-    s.click('#nav-f-schicht1'); s.wait_for_timeout(300)
-    ok(s.locator('#f-leiste button').count() == 2 and s.locator('#f-schritte #such-karte').count() == 1 and 'wieder listen' not in s.text_content('#f-schritte').lower() or True, 'Listing Schritt 1 mit Suche')
-    ok(s.locator('#f-schritte #such-karte').count() == 1 and s.is_visible('#q'), 'Suche im Listing eingebaut')
-    s.click('#f-leiste button >> nth=1'); s.wait_for_timeout(200)
-    ok('Zuerst in Schritt 1' in s.text_content('#f-schritte') and 'Angebot erstellen' in s.text_content('.f-box.rosa'), 'Listing Schritt 2 ohne Stück')
+    # ---------- Listing ----------
+    s.click('#nav-f-schicht1'); s.wait_for_timeout(400)
+    t = s.text_content('#f-schritte')
+    zeilen = s.locator('#f-schritte .f-eintrag').all_inner_texts()
+    ok(len(zeilen) == 4 and 'Bügeleisen' in zeilen[0] and 'Toaster X' in zeilen[1] and 'Schläger' in t and 'Lampe' in t, 'Listing: eine Liste, angefangene zuoberst, Analyse ohne Doppel, abgelaufene und unverkaufte')
+    ok('angefangen' not in t.lower() and 'In Arbeit' not in t, 'Kein Sonderstatus «angefangen» / «In Arbeit»')
+    ok(s.locator('#f-schritte #such-karte').count() == 1, 'Anderes Stück: Suche unter der Liste')
+    s.click('#f-schritte .f-eintrag:has-text("Toaster X") button'); s.wait_for_timeout(300)
+    ok(['starteListing', ['PG-100']] in A() and s.locator('#f-schritte #ls-1').count() == 1 and s.locator('#f-schritte #ls-2').count() == 0, 'Stück geladen, Schritt Prüfen allein')
+    ok('Stück holen: H3' in s.text_content('.f-tun') and s.is_hidden('#ls-1 .nur-alt'), 'Physisch beim Schritt, kein doppelter Speichern-Knopf')
+    s.click('#f-aktion'); s.wait_for_timeout(300)
+    ok(s.locator('#f-schritte #ls-2').count() == 1 and s.locator('#f-schritte #ls-1').count() == 0, 'Weiter: Titel und Text')
+    s.click('#f-aktion'); s.wait_for_timeout(300)
+    ok(s.locator('#f-schritte #ls-3').count() == 1 and s.is_visible('#felder') and 'Neues Angebot erstellen' in s.text_content('.f-tun.rosa'), 'Auf Ricardo erfassen: Felder und Ricardo-Knopf')
+    for c in s.locator('#kontrolle input').all(): c.check()
+    s.fill('#r-link', 'https://www.ricardo.ch/de/a/toaster-1300000100/'); s.click('#f-aktion'); s.wait_for_timeout(300)
+    ok([a for a in A() if a[0] == 'markiereGelistet'] and 'Ricardo Online' in s.text_content('.f-tun'), 'Gelistet, dann Regal')
+    s.click('#f-aktion'); s.wait_for_timeout(300)
+    ok('Erledigt' in s.text_content('#f-schritte'), 'Listing fertig')
+    s.click('#f-schritte button:has-text("Zur Liste")'); s.wait_for_timeout(300)
+    s.click('#f-schritte .f-eintrag:has-text("Lampe") button'); s.wait_for_timeout(200)
+    ok(s.locator('.f-wahl button').count() == 3 and 'Stück holen: R2' in s.text_content('#f-schritte'), 'Nicht verkauft: Entscheid mit 3 Knöpfen')
+    s.click('.f-wahl button:text-is("Entsorgung")'); s.wait_for_timeout(300)
+    ok(['entscheidUnverkauft', ['PG-012', 'Entsorgung']] in A() and 'zur Entsorgung' in s.text_content('.f-tun'), 'Entsorgung: physischer Schritt')
+    if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-listing.png', full_page=True)
+    # ---------- Packen ----------
     s.click('#nav-f-schicht2'); s.wait_for_timeout(300)
     t = s.text_content('#f-schritte')
-    ok(s.locator('#f-schritte h2').inner_text().upper() == 'NICHT VERKAUFT' and 'Bügeleisen' in t and 'Schläger' in t, 'Packen startet bei «Nicht verkauft»')
-    s.click('#f-schritte button:text-is("Neu listen")'); s.wait_for_timeout(200)
-    ok(['entscheidUnverkauft', ['PG-010', 'Neu listen']] in s.evaluate('AUFRUFE'), 'Entscheid unverkauft')
-    s.click('#f-leiste button >> nth=2'); s.wait_for_timeout(200)
-    ok(s.locator('#et-50000003 button', has_text='Etikette').count() == 0 and s.locator('#et-50000002 button', has_text='Etikette drucken').count() == 1, 'Etikette nur mit Adresse')
-    s.click('#et-50000002 >> text=Etikette drucken'); s.wait_for_timeout(200)
-    ok(['etikette', ['50000002']] in s.evaluate('AUFRUFE') and any(u.startswith('blob:') for u in s.evaluate('OFFEN')), 'Etikette geholt und geöffnet')
+    ok('Adressen fehlen' in t and '2 offen' in t and 'Bügeleisen' not in t, 'Packen: Bericht nur weil eine Adresse fehlt, kein «Nicht verkauft» mehr')
+    s.click('#f-schritte .f-eintrag:has-text("Neu: Kamera") button'); s.wait_for_timeout(200)
+    ok('Stück holen' in s.text_content('.f-tun'), 'Holen')
+    s.click('#f-aktion'); s.wait_for_timeout(300)
+    ok(['adressePruefen', ['50000002']] in A() and '3005 Bern' in s.text_content('#f-schritte'), 'Adresse bei der Post geprüft, Vorschlag gezeigt')
+    s.click('#f-schritte button:text-is("Vorschlag übernehmen")'); s.wait_for_timeout(200)
+    ok([a for a in A() if a[0] == 'adresseUebernehmen'] and 'bestätigt' in s.text_content('#f-schritte'), 'Vorschlag übernommen')
+    s.click('#f-schritte button:text-is("Etikette drucken")'); s.wait_for_timeout(200)
+    ok(['etikette', ['50000002']] in A() and any(u.startswith('blob:') for u in s.evaluate('OFFEN')) and 'Nochmals drucken' in s.text_content('#f-schritte'), 'Etikette gedruckt')
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok('Matchmaker' in s.text_content('.f-tun'), 'Packen-Schritt')
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok(['setzeVerkauf', ['50000002', 'gepackt']] in A(), 'Gepackt')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-packen.png', full_page=True)
+    # ---------- Versenden ----------
     s.click('#nav-f-schicht3'); s.wait_for_timeout(300)
-    t = s.text_content('#f-schritte')
-    ok('Sendung 99.60.123456.12345678' in t and '3 Pakete warten' in t and 'Versand bestätigen' in t, 'Versenden')
-    s.click('#f-schritte button:text-is("Versendet")'); s.click('#dialog-ja'); s.wait_for_timeout(200)
-    ok(['setzeVerkauf', ['50000002', 'versendet']] in s.evaluate('AUFRUFE'), 'Versendet')
+    ok('3 Pakete warten' in s.text_content('#f-schritte'), 'Versenden: Liste mit Hinweis auf wartende')
+    s.click('#f-schritte .f-eintrag >> nth=0 >> button'); s.wait_for_timeout(200)
+    ok('Postwagen' in s.text_content('.f-tun'), 'Postwagen')
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok('99.60.123456.12345678' in s.text_content('.f-tun.rosa') and 'Versand bestätigen' in s.text_content('.f-tun.rosa'), 'Versand bestätigen mit Nummer')
+    s.click('.f-tun.rosa button'); s.wait_for_timeout(100)
+    s.click('#f-aktion'); s.wait_for_timeout(200)
+    ok(['setzeVerkauf', ['50000002', 'versendet']] in A(), 'Versendet')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-versenden.png', full_page=True)
     s.click('#l-en'); s.wait_for_timeout(200)
     ok('Shipping' in s.text_content('.nav'), 'Englisch')

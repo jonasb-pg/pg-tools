@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.8';
+const VERSION = '2026-10-19.9';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1964,7 +1964,7 @@ function api(lang, name, args) {
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
-    ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
+    ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
@@ -2512,10 +2512,19 @@ function ablauf(art) {
       letzteBank: bank ? Utilities.formatDate(new Date(bank), TZ, 'dd.MM.yyyy HH:mm') : '' };
   }
   if (art === 'schicht1') {
-    const bereit = alleListings_().filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
+    const ls1 = alleListings_(), lz1 = Number(cfg_('Laufzeit Tage')) || 6;
+    const bereit = ls1.filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
       return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], regal: regal_(r['Status']), wieder: r['Entscheid unverkauft'] === 'Neu listen' };
     });
-    return { art: art, links: links, bereit: bereit, analyse: analyseListe().length, aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90,
+    /* Entscheid Jonas 19.10.2026: nicht verkaufte Stücke stehen in der Liste des Listings, dort fällt der Entscheid */
+    const unverkauft = ls1.filter(function (r) { return ['Unverkauft', 'Storniert'].indexOf(r['Status']) !== -1 && !String(r['Entscheid unverkauft'] || '').trim(); }).map(function (r) {
+      const a = artikelAusLink_(r['Ricardo-Link']);
+      return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], artikel: a, kopieren: a ? RICARDO_LISTEN + '?prefill=' + a : '' };
+    });
+    const ohneMail = ls1.filter(function (r) {
+      return r['Status'] === 'Gelistet' && r['Gelistet am'] instanceof Date && r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz1) * 86400000 < jetzt;
+    }).map(function (r) { return { id: String(r['PG-ID']), name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], ende: datum_(new Date(r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz1) * 86400000)) }; });
+    return { art: art, links: links, bereit: bereit, analyse: analyseListe().length, unverkauft: unverkauft, ohneMail: ohneMail, entscheide: ENTSCHEIDE_UNVERKAUFT, aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90,
       laufzeit: Number(cfg_('Laufzeit Tage')) || 6, regale: { offline: regal_('Bereit'), online: regal_('Gelistet') } };
   }
   if (art === 'schicht2') {
@@ -2633,7 +2642,7 @@ function entscheidUnverkauft(id, entscheid) {
     if (entscheid === 'Neu listen') rec['Status'] = 'Bereit';
     schreibe_(sh, zeile, rec, true);
     log_('Unverkauft: ' + entscheid, id, '');
-    return ablauf('schicht2');
+    return ablauf('schicht1');
   } finally { lock.releaseLock(); }
 }
 
@@ -2678,12 +2687,8 @@ function etikette(nr, vorschau) {
   const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
   if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
   if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist «' + v['Status'] + '».');
-  if (!String(v['Nachname'] || v['Firma'] || '').trim() || !String(v['PLZ'] || '').trim() || !String(v['Ort'] || '').trim())
-    throw new Error('Adresse fehlt. Sie kommt mit dem Verkaufsbericht: zuerst den Bericht einlesen.');
   const klasse = String(v['Lieferart'] || '') + ' ' + String(v['Versandklasse'] || '');   // Lieferart aus Ricardo («Paket B-Post»), Sperrgut aus der Versandklasse
-  const e = { id: 'Ricardo ' + nr, firma: String(v['Firma'] || '').trim(), vorname: String(v['Vorname'] || '').trim(), nachname: String(v['Nachname'] || '').trim(),
-    strasse: String(v['Strasse'] || '').trim(), nr: String(v['Hausnummer'] || '').trim(), postfach: String(v['Postfach'] || '').trim(),
-    plz: String(v['PLZ']).trim(), ort: String(v['Ort']).trim(), zusatz: ('Ricardo ' + nr + (v['PG-ID'] ? ' ' + String(v['PG-ID']).trim() : '')) };
+  const e = empfaenger_(v);
   const anfrage = postAnfrage_(e, vorschau);
   anfrage.item.attributes.przl = przl_(klasse);
   const r = postEtiketteAnfrage_(anfrage);
@@ -2698,22 +2703,95 @@ function etikette(nr, vorschau) {
   return { nr: nr, sendung: r.sendungsnummer, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.pdf', warnungen: r.warnungen, produkt: przl_(klasse).join('+') };
 }
 
+/** Empfänger eines Verkaufs für Etikette und Adressprüfung. Fehlt die Adresse, kommt sie mit dem Verkaufsbericht. */
+function empfaenger_(v) {
+  if (!String(v['Nachname'] || v['Firma'] || '').trim() || !String(v['PLZ'] || '').trim() || !String(v['Ort'] || '').trim())
+    throw new Error('Adresse fehlt. Sie kommt mit dem Verkaufsbericht: zuerst den Bericht einlesen.');
+  const nr = String(v['Verkauf-Nr']).trim();
+  return { id: 'Ricardo ' + nr, firma: String(v['Firma'] || '').trim(), vorname: String(v['Vorname'] || '').trim(), nachname: String(v['Nachname'] || '').trim(),
+    strasse: String(v['Strasse'] || '').trim(), nr: String(v['Hausnummer'] || '').trim(), postfach: String(v['Postfach'] || '').trim(),
+    plz: String(v['PLZ']).trim(), ort: String(v['Ort']).trim(), zusatz: ('Ricardo ' + nr + (v['PG-ID'] ? ' ' + String(v['PG-ID']).trim() : '')) };
+}
+
+/* ---------- Adresse prüfen (Post, Address API) ----------
+   Entscheid Jonas 19.10.2026: Subscription Address bei der Post bestätigt. Beim Packen wird die Adresse vor der Etikette geprüft.
+   Gleicher Zugang wie die Etiketten, Scope DCAPI_ADDRESS_VALIDATE. Geprüft wird nur die Adresse, nicht der Name. */
+const POST_ADR_URL = 'https://dcapi.apis.post.ch/address/v1/addresses/validation';
+function adresseAnfrage_(e) {
+  return { addressee: { firstName: e.vorname || '', lastName: e.nachname || e.firma || '' },
+    geographicLocation: { house: { street: e.strasse || '', houseNumber: e.nr || '' }, zip: { zip: String(e.plz || ''), city: e.ort || '' } },
+    logisticLocation: { postBoxNumber: e.postfach || '' }, fullValidation: false };
+}
+/** Antwort der Post auswerten: ok (bestätigt), vorschlag (Post kennt die Adresse anders geschrieben), unbekannt (nicht gefunden). */
+function adresseAuswerten_(code, j, e) {
+  if (code === 400 || code === 404) return { stand: 'unbekannt' };
+  if (code !== 200 || !j) return { stand: 'fehler', text: 'Post-Adressprüfung nicht erreichbar (' + code + ')' };
+  const a = j.address || {}, g = a.geographicLocation || {}, h = g.house || {}, z = g.zip || {}, lg = a.logisticLocation || {};
+  const p = { strasse: String(h.street || ''), nr: String(h.houseNumber || ''), plz: String(z.zip || ''), ort: String(z.city || ''), postfach: String(lg.postBoxNumber || '') };
+  const norm = function (x) { return String(x || '').toLowerCase().replace(/str\./g, 'strasse').replace(/[^a-z0-9äöüéèàç]/g, ''); };
+  const gleich = norm(p.strasse) === norm(e.strasse) && norm(p.nr) === norm(e.nr) && norm(p.plz) === norm(e.plz) && norm(p.ort) === norm(e.ort);
+  const quality = String(j.quality || '');
+  if (!p.plz && !p.strasse) return { stand: 'unbekannt', quality: quality };
+  return { stand: gleich ? 'ok' : 'vorschlag', quality: quality, vorschlag: gleich ? null : p };
+}
+function postAdresse_(e) {
+  const r = UrlFetchApp.fetch(POST_ADR_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + postToken_(false, 'DCAPI_ADDRESS_VALIDATE') }, payload: JSON.stringify(adresseAnfrage_(e)) });
+  let j = null; try { j = JSON.parse(r.getContentText()); } catch (err) { /* bleibt null */ }
+  const aus = adresseAuswerten_(r.getResponseCode(), j, e);
+  if (aus.stand === 'fehler') aus.text += ': ' + r.getContentText().slice(0, 150);
+  return aus;
+}
+/** Packen: Adresse eines Verkaufs bei der Post prüfen. Gibt die Adresse wie im Sheet und das Ergebnis zurück. */
+function adressePruefen(nr) {
+  nr = String(nr).trim();
+  const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
+  if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+  const e = empfaenger_(v);
+  let aus;
+  try { aus = postAdresse_(e); } catch (err) { aus = { stand: 'fehler', text: String(err.message || err) }; }
+  aus.adresse = { strasse: e.strasse, nr: e.nr, postfach: e.postfach, plz: e.plz, ort: e.ort };
+  return aus;
+}
+/** Vorschlag der Post für Strasse, Nr., PLZ und Ort in den Verkauf übernehmen. */
+function adresseUebernehmen(nr, p) {
+  nr = String(nr).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
+    if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    v['Strasse'] = text_(p.strasse, 100); v['Hausnummer'] = text_(p.nr, 20); v['PLZ'] = text_(p.plz, 10); v['Ort'] = text_(p.ort, 60);
+    SpreadsheetApp.getActive().getSheetByName(TAB_S).getRange(v._zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
+    log_('Adresse von der Post übernommen', String(v['PG-ID'] || ''), nr);
+  } finally { lock.releaseLock(); }
+  return adressePruefen(nr);
+}
+/** Im Editor ausführen: prüft die Absenderadresse von Pretty Good (Zugang und Scope). */
+function postAdresseTest() {
+  const a = postAbsender_();
+  const x = postAdresse_({ nachname: a.name1, strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city });
+  const aus = 'Post-Adresse: ' + JSON.stringify(x);
+  console.log(aus);
+  return aus;
+}
+
 /* ------------------------------------------------------------------ */
 /* Post: Etiketten über die Barcode API (Digital Commerce API)         */
 /* ------------------------------------------------------------------ */
 /* Entscheid Jonas 19.10.2026: Etikette beim Packen (Packen), Knopf pro Verkauf. Zugang in den Script-Eigenschaften POST_CLIENT_ID und
    POST_CLIENT_SECRET, nie im Sheet. Token gilt 5 Minuten. Eine Etikette pro Anfrage. printPreview = true liefert eine Muster-Etikette (SPECIMEN, kostenlos). */
 const POST_TOKEN_URL = 'https://api.post.ch/OAuth/token', POST_LABEL_URL = 'https://dcapi.apis.post.ch/barcode/v1/generateAddressLabel';
-function postToken_(neu) {
-  const c = CacheService.getScriptCache();
-  if (!neu) { const t = c.get('post-token'); if (t) return t; }
+function postToken_(neu, scope) {
+  scope = scope || 'DCAPI_BARCODE_READ';
+  const c = CacheService.getScriptCache(), schluessel = 'post-token-' + scope;
+  if (!neu) { const t = c.get(schluessel); if (t) return t; }
   const pr = PropertiesService.getScriptProperties(), id = pr.getProperty('POST_CLIENT_ID'), geheim = pr.getProperty('POST_CLIENT_SECRET');
   if (!id || !geheim) throw new Error('Post-Zugang fehlt: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET eintragen.');
   const r = UrlFetchApp.fetch(POST_TOKEN_URL, { method: 'post', muteHttpExceptions: true,
-    payload: { grant_type: 'client_credentials', client_id: String(id).trim(), client_secret: String(geheim).trim(), scope: 'DCAPI_BARCODE_READ' } });
+    payload: { grant_type: 'client_credentials', client_id: String(id).trim(), client_secret: String(geheim).trim(), scope: scope } });
   if (r.getResponseCode() !== 200) throw new Error('Post-Anmeldung abgelehnt (' + r.getResponseCode() + '): ' + r.getContentText().slice(0, 200));
   const j = JSON.parse(r.getContentText());
-  c.put('post-token', j.access_token, Math.max(60, (Number(j.expires_in) || 300) - 30));
+  c.put(schluessel, j.access_token, Math.max(60, (Number(j.expires_in) || 300) - 30));
   return j.access_token;
 }
 /** Absender aus der Einstellung «Post Absender»: Name, Strasse und Nr., PLZ, Ort. */

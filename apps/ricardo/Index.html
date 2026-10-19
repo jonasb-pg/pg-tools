@@ -115,6 +115,21 @@
   .f-weiter { display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--linie); }
   button.dunkel { background:var(--ink); color:var(--weiss); }
   button.dunkel:hover { background:#333; }
+  .f-tun { display:flex; align-items:center; gap:16px; flex-wrap:wrap; border:2px solid var(--ink); border-radius:4px; padding:14px 18px; margin:14px 0; background:var(--weiss); font-size:17px; }
+  .f-tun.rosa { background:var(--pink); }
+  .f-tun .f-tun-text { flex:1; min-width:240px; }
+  .f-tun .klein { display:block; margin-top:6px; }
+  .f-wahl { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }
+  .f-wahl button { height:56px; padding:0 24px; font-size:17px; }
+  .f-wahl button.an { background:var(--pink); font-weight:900; }
+  .f-fall { margin-bottom:6px; }
+  .f-fall strong { display:block; font-size:15px; }
+  .f-bild { max-width:220px; max-height:220px; border:2px solid var(--ink); border-radius:4px; display:block; margin:10px 0; }
+  .f-leiste button[disabled] { opacity:.55; cursor:default; }
+  .f-leiste button.an[disabled] { opacity:1; }
+  .f-weiter .knoepfe { display:flex; gap:10px; flex-wrap:wrap; }
+  #f-schritte .nur-alt, #f-schritte .schritt > .nr, #f-schritte #a-kopf h2 + .etikett { display:none; }
+  #f-schritte .karte .karte { border:0; box-shadow:none; padding:0; margin:10px 0 0; }
   @media (max-width: 860px) { .f-boxen { grid-template-columns:1fr; } }
   .zeile3 { display:grid; grid-template-columns:110px 1fr; gap:6px 12px; margin:6px 0 10px; font-size:15px; }
   .zeile3 .w { color:var(--muted); font-size:13px; letter-spacing:.7px; text-transform:uppercase; font-weight:600; padding-top:2px; }
@@ -197,7 +212,7 @@
     <div class="nav">
       <div class="sektion gross" data-t="nav.ablaeufe"></div>
       <button id="nav-f-taeglich" class="flow" onclick="ablaufStarten('taeglich')"><span data-t="f.taeglich"></span><span class="zahl" id="z-f-taeglich" hidden></span></button>
-      <button id="nav-f-schicht1" class="flow" onclick="ablaufStarten('schicht1')"><span data-t="f.schicht1"></span></button>
+      <button id="nav-f-schicht1" class="flow" onclick="ablaufStarten('schicht1')"><span data-t="f.schicht1"></span><span class="zahl" id="z-f-schicht1" hidden></span></button>
       <button id="nav-f-schicht2" class="flow" onclick="ablaufStarten('schicht2')"><span data-t="f.schicht2"></span><span class="zahl" id="z-f-schicht2" hidden></span></button>
       <button id="nav-f-schicht3" class="flow" onclick="ablaufStarten('schicht3')"><span data-t="f.schicht3"></span><span class="zahl" id="z-f-schicht3" hidden></span></button>
       <div class="sektion gross" data-t="nav.sektion" hidden></div>
@@ -253,13 +268,13 @@
         </div>
 
         <div id="arbeit" hidden>
-          <div class="karte">
+          <div class="karte" id="a-kopf">
             <div class="kopf"><h2 id="a-titel"></h2><span class="etikett" id="a-status"></span></div>
             <p class="still" id="a-meta"></p>
             <div id="a-fehlt"></div>
           </div>
 
-          <div class="karte schritt">
+          <div class="karte schritt" id="ls-1">
             <div class="nr">1</div>
             <div class="inhalt">
               <h3 data-t="s1.titel"></h3>
@@ -275,7 +290,7 @@
               <p class="still" id="d-masse" style="margin:0 0 8px" hidden></p>
               <div class="wahl" id="d-klasse"></div>
               <label class="haken"><input type="checkbox" id="d-getestet"> <span data-t="s1.geprueft"></span></label>
-              <p style="margin-top:16px"><button class="haupt-knopf" onclick="speichern()" data-t="s1.speichern"></button> <span class="still" id="d-versand"></span></p>
+              <p class="nur-alt" style="margin-top:16px"><button class="haupt-knopf" onclick="speichern()" data-t="s1.speichern"></button> <span class="still" id="d-versand"></span></p>
 
               <details id="buendel">
                 <summary><span data-t="b.titel"></span> <span class="klein" data-t="b.hilfe"></span></summary>
@@ -290,7 +305,7 @@
             </div>
           </div>
 
-          <div class="karte schritt">
+          <div class="karte schritt" id="ls-2">
             <div class="nr">2</div>
             <div class="inhalt">
               <h3 data-t="s2.titel"></h3>
@@ -302,23 +317,23 @@
               <textarea id="t-beschrieb" rows="14"></textarea>
               <div id="t-en" class="meldung" hidden><strong data-t="s2.en"></strong><p class="still" id="t-en-hinweis" style="margin:4px 0 10px"></p><div id="t-en-text" style="white-space:pre-wrap"></div></div>
               <p class="still" style="margin-top:8px" data-t="s2.hilfe"></p>
-              <p><button onclick="textSpeichern()" data-t="s2.speichern"></button></p>
+              <p class="nur-alt"><button onclick="textSpeichern()" data-t="s2.speichern"></button></p>
             </div>
           </div>
 
-          <div class="karte schritt">
+          <div class="karte schritt" id="ls-3">
             <div class="nr">3</div>
             <div class="inhalt">
               <h3 data-t="s3.titel"></h3>
               <div id="karte-zu" class="meldung warn" data-t="s3.zu"></div>
               <div id="karte-auf" hidden>
-                <p><a href="https://www.ricardo.ch/de/list/" data-t="s3.link"></a></p>
+                <p class="nur-alt"><a href="https://www.ricardo.ch/de/list/" data-t="s3.link"></a></p>
                 <div id="felder"></div>
               </div>
             </div>
           </div>
 
-          <div class="karte schritt">
+          <div class="karte schritt" id="ls-4">
             <div class="nr">4</div>
             <div class="inhalt">
               <h3 data-t="s4.titel"></h3>
@@ -328,9 +343,9 @@
               <div class="reihe">
                 <div class="breit"><input type="text" id="r-link" placeholder="https://www.ricardo.ch/de/a/..."></div>
                 <div style="width:130px"><input type="number" id="r-tage" min="1" max="30" step="1" aria-label="Laufzeit Tage" title="Laufzeit in Tagen"></div>
-                <button class="haupt-knopf" onclick="gelistet()" data-t="s4.speichern"></button>
+                <button class="haupt-knopf nur-alt" onclick="gelistet()" data-t="s4.speichern"></button>
               </div>
-              <p class="still" style="margin-top:10px" data-t="s4.regal"></p>
+              <p class="still nur-alt" style="margin-top:10px" data-t="s4.regal"></p>
               <p style="margin:18px 0 0"><button onclick="abbrechen()" data-t="s4.abbrechen"></button></p>
             </div>
           </div>
@@ -815,7 +830,7 @@
 
   /* ---------- Aus der Analyse ---------- */
   var ANA = [];
-  function ladeAnalyse() { still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); }); }
+  function ladeAnalyse() { still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); if (ANSICHT === 'ablauf' && FA === 'schicht1' && !FALL && F) zeichneAblauf(); }); }
   function zeichneAnalyse() {
     $('ana-karte').hidden = false;
     if (!ANA.length) { $('ana-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('ana.leer') + '</p>'; return; }
@@ -834,7 +849,7 @@
     $('r-link').value = ''; $('r-tage').value = S.laufzeit || 6; $('b-id').value = ''; $('t-quelle').textContent = S.kiAktiv ? '' : t('s2.keinki');
     kontrolle();
     fuelle(r); aktualisiere(r);
-    if (ANSICHT === 'ablauf' && FA === 'schicht1') { SCHRITT.schicht1 = 1; zeichneAblauf(); window.scrollTo(0, 0); }
+    if (ANSICHT === 'ablauf' && FA === 'schicht1') listingFall(r);
     else window.scrollTo(0, $('arbeit').offsetTop - 10);
   }
   function fuelle(r) {
@@ -889,11 +904,11 @@
       return '<button type="button" class="' + (k === klasseWahl ? 'an' : '') + '" onclick="klasseKnoepfe(\'' + k + '\');offen()">' + t('k.' + k) + '</button>';
     }).join('');
   }
-  function speichern() {
+  function speichern(danach) {
     if (!R.zustandWahl) { melde(t('s1.zustand.fehlt'), 'stop'); return; }
     if (!klasseWahl) { melde(t('s1.klasse.fehlt'), 'stop'); return; }
     ruf('speichereDetails', [R.id, { zustand: R.zustandWahl, maengel: $('d-maengel-block').hidden ? '' : $('d-maengel').value,
-      gewicht: klasseWahl === 'S' ? '30' : klasseWahl, sperrgut: klasseWahl === 'S', getestet: $('d-getestet').checked }], aktualisiere);
+      gewicht: klasseWahl === 'S' ? '30' : klasseWahl, sperrgut: klasseWahl === 'S', getestet: $('d-getestet').checked }], function (r) { aktualisiere(r); if (typeof danach === 'function') danach(); });
   }
   function buendelPlus() {
     var z = $('b-id').value.trim(); if (!z) return;
@@ -915,7 +930,7 @@
     if (R.analyse) { if (R.geaendert) frage(t('s2.analyse.frage'), los); else los(); }
     else if (R.titel) frage(t('s2.ersetzen'), los); else los();
   }
-  function textSpeichern() { ruf('speichereDetails', [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }], aktualisiere); }
+  function textSpeichern(danach) { ruf('speichereDetails', [R.id, { titel: $('t-titel').value, beschrieb: $('t-beschrieb').value }], function (r) { aktualisiere(r); if (typeof danach === 'function') danach(); }); }
   function zaehle() {
     $('t-zahl').textContent = t('s2.zeichen', $('t-titel').value.length, 60);
     $('b-zahl').textContent = t('s2.zeichen', $('t-beschrieb').value.length, 5000);
@@ -962,11 +977,13 @@
     };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, ersatz); else ersatz();
   }
-  function gelistet() {
+  function gelistet(danach) {
     if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
+    if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
     ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
       melde(t('s4.fertig', r.id), 'ok');
-      schliesse(); still('startDaten', [], function (s) { S = s; texte(); });
+      still('startDaten', [], function (s) { S = s; texte(); });
+      if (typeof danach === 'function') danach(); else schliesse();
     });
   }
   function abbrechen() {
@@ -974,7 +991,7 @@
   }
   function schliesse() {
     R = null; $('arbeit').hidden = true; window.scrollTo(0, 0); ladeAnalyse();
-    if (ANSICHT === 'ablauf' && FA === 'schicht1') { SCHRITT.schicht1 = 0; ladeAblauf(); }
+    if (ANSICHT === 'ablauf' && FA === 'schicht1') zurListe();
   }
 
   /* ---------- Verkäufe ---------- */
@@ -1324,173 +1341,338 @@
   function weiter(id) { ruf('lade', [id], function (r) { if (ANSICHT !== 'ablauf' || FA !== 'schicht1') ablaufStarten('schicht1'); oeffne(r); }); }
 
   /* ---------- Abläufe: Täglich, Listing, Packen, Versenden ----------
-     Entscheid Jonas 19.10.2026: links nur die vier Abläufe, rechts immer EIN Schritt. Pro Schritt: was auf Ricardo zu tun ist und was physisch passiert.
-     Pro Stück eine Zeile mit dem Ricardo-Knopf und einem Knopf fürs Tool. Keine Erklärtexte. */
+     Entscheid Jonas 19.10.2026 (zweite Runde): pro Fall (Stück, Verkauf, Aufgabe) ein geführter Ablauf.
+     Zuerst die Liste der offenen Fälle, nach «Start» ein Bildschirm pro Schritt mit «Weiter».
+     Was auf Ricardo oder physisch zu tun ist, steht direkt bei der Aktion, mit Link, und nur dort, wo es fällig ist. */
   Object.assign(T, {
     'f.taeglich': ['Täglich', 'Daily'], 'f.schicht1': ['Listing', 'Listing'], 'f.schicht2': ['Packen', 'Packing'], 'f.schicht3': ['Versenden', 'Shipping'],
     'nav.ablaeufe': ['Abläufe', 'Routines'], 'nav.sektion2': ['Verwaltung', 'Management'],
-    'g.ricardo': ['Auf Ricardo', 'On Ricardo'], 'g.physisch': ['Physisch', 'Physically'], 'g.nichts': ['Nichts', 'Nothing'], 'g.leer': ['Nichts zu tun.', 'Nothing to do.'],
-    'g.oeffnen': ['Ricardo öffnen', 'Open Ricardo'], 'g.zurueck': ['Zurück', 'Back'], 'g.weiter': ['Weiter: {0}', 'Next: {0}'], 'g.fertig': ['Fertig für heute', 'Done for today'],
-    'g.t1': ['Zahlungen', 'Payments'], 'g.t1.r': ['Pro Verkauf «Zahlung erhalten» klicken.', 'Click «Zahlung erhalten» for each sale.'],
-    'g.t1.bank': ['Bank-Export (xlsx oder CSV) einlesen. Letzter Abgleich: {0}', 'Import bank export (xlsx or CSV). Last match: {0}'],
-    'g.t1.melden': ['Bezahlt, auf Ricardo noch melden', 'Paid, still to report on Ricardo'], 'g.t1.rk': ['Auf Ricardo: Zahlung erhalten', 'On Ricardo: payment received'], 'g.t1.ok': ['Gemeldet', 'Reported'],
-    'g.t1.hand': ['Zahlung von Hand erfassen', 'Record payment by hand'], 'g.t1.hand.k': ['Bezahlt', 'Paid'],
-    'g.t2': ['Nachrichten', 'Messages'], 'g.t2.r': ['Preisvorschlag annehmen oder ablehnen, Frage beantworten, Käufer*in bewerten.', 'Accept or decline the offer, answer the question, rate the buyer.'],
-    'g.t2.bew': ['Bewerten', 'Rate'], 'g.t2.bew.k': ['Text kopieren, Ricardo öffnen', 'Copy text, open Ricardo'],
-    'g.t3': ['Unbezahlte', 'Unpaid'], 'g.t3.r': ['Erinnerung schicken. Nach {0} Tagen: «Verkauf stornieren».', 'Send a reminder. After {0} days: «Verkauf stornieren».'],
-    'g.t3.p': ['Bei Storno: Paket aus «Ricardo Unpaid» holen und auspacken.', 'On cancellation: take the parcel from «Ricardo Unpaid» and unpack it.'],
-    'g.t3.storno': ['Storno: seit {0} Tagen nicht bezahlt', 'Cancel: unpaid for {0} days'], 'g.t3.sk': ['Auf Ricardo: Verkauf stornieren', 'On Ricardo: cancel sale'], 'g.t3.sok': ['Storniert', 'Cancelled'],
-    'g.l1': ['Stück wählen', 'Pick an item'], 'g.l1.p': ['Stück aus dem Regal «Ricardo Offline» holen.', 'Take the item from the shelf «Ricardo Offline».'],
-    'g.l1.wieder': ['Angefangen oder wieder listen', 'Started or relist'],
-    'g.l2': ['Auf Ricardo erfassen', 'Create on Ricardo'], 'g.l2.r': ['Angebot erstellen, Felder unten kopieren, Laufzeit und Versandart wählen.', 'Create the listing, copy the fields below, choose duration and shipping.'],
-    'g.l2.p': ['Nach «Gelistet»: Stück ins Regal «Ricardo Online».', 'After «Listed»: item onto the shelf «Ricardo Online».'], 'g.l2.keins': ['Zuerst in Schritt 1 ein Stück wählen.', 'First pick an item in step 1.'],
-    'g.p1': ['Verkaufsbericht', 'Sales report'], 'g.p1.r': ['Auf «Verkaufsbericht erhalten» klicken (letzte 7 Tage), Datei hier einlesen.', 'Click «Verkaufsbericht erhalten» (last 7 days), import the file here.'],
-    'g.p1.letzter': ['Letzter Bericht: {0}', 'Last report: {0}'],
-    'g.p2': ['Nicht verkauft', 'Not sold'], 'g.p2.r': ['Automatisch reaktiviertes Angebot beenden. Neu listen geht über «Kopieren».', 'End an automatically reactivated listing. Relist via «Copy».'],
-    'g.p2.p': ['Stück aus «Ricardo Online» holen, ins Regal je nach Entscheid.', 'Take the item from «Ricardo Online», onto the shelf of the decision.'],
-    'g.p2.ohne': ['Abgelaufen, Mail «nicht verkauft» fehlt noch', 'Expired, «not sold» email still missing'],
-    'g.p3': ['Packen', 'Pack'], 'g.p3.p': ['Etikette drucken, auf den Karton kleben. Packen mit Matchmaker-Karte und Care-Flyer. Ins Regal «Ricardo Unpaid».', 'Print the label, stick it on the box. Pack with matchmaker card and care flyer. Onto the shelf «Ricardo Unpaid».'],
-    'g.p3.adr': ['Adresse fehlt: zuerst Verkaufsbericht einlesen', 'Address missing: import the sales report first'], 'g.p3.bez': ['bezahlt', 'paid'],
-    'g.v1': ['Versenden', 'Ship'], 'g.v1.r': ['Beim Verkauf «Versand bestätigen» klicken und die Sendungsnummer eintragen. Damit ist der Verkauf abgeschlossen.', 'Click «Versand bestätigen» on the sale and enter the tracking number. That closes the sale.'],
-    'g.v1.p': ['Pakete aus «Ricardo Unpaid» holen, in den Postwagen.', 'Take the parcels from «Ricardo Unpaid» into the postal cart.'],
-    'g.v1.rk': ['Auf Ricardo: Versand bestätigen', 'On Ricardo: confirm shipping'], 'g.v1.ok': ['Versendet', 'Shipped'], 'g.v1.nr': ['Sendungsnummer kopieren', 'Copy tracking number'],
-    'g.v1.warten': ['{0} Pakete warten noch auf Zahlung und bleiben im Regal.', '{0} parcels are still awaiting payment and stay on the shelf.'],
-    'g.v1.frage': ['{0}: im Postwagen und auf Ricardo «Versand bestätigen» geklickt?', '{0}: in the postal cart and «Versand bestätigen» clicked on Ricardo?']
+    'g.ricardo': ['Auf Ricardo', 'On Ricardo'], 'g.physisch': ['Physisch', 'Physically'], 'g.leer': ['Nichts zu tun.', 'Nothing to do.'],
+    'g.oeffnen': ['Ricardo öffnen', 'Open Ricardo'], 'g.zurueck': ['Zurück', 'Back'], 'g.weiter': ['Weiter', 'Next'], 'g.start': ['Start', 'Start'],
+    'g.liste': ['Zur Liste', 'Back to list'], 'g.offen': ['{0} offen', '{0} open'], 'g.fertig': ['Erledigt', 'Done'], 'g.naechstes': ['Weiter mit: {0}', 'Next: {0}'],
+    'g.allesfertig': ['Alles erledigt.', 'All done.'], 'g.verkauf.oeffnen': ['Verkauf öffnen', 'Open sale'], 'g.angebot.oeffnen': ['Angebot öffnen', 'Open listing'],
+    'g.kopieren.oeffnen': ['Text kopieren, Ricardo öffnen', 'Copy text, open Ricardo'],
+    /* Täglich */
+    'g.tz.titel': ['Zahlungen prüfen', 'Check payments'], 'g.tz.text': ['{0} Verkäufe sind noch nicht bezahlt. Bank-Export (xlsx oder CSV) einlesen. Letzter Abgleich: {1}', '{0} sales are unpaid. Import the bank export (xlsx or CSV). Last match: {1}'],
+    'g.tz.hand': ['Zahlung ohne Bank-Export erfassen', 'Record a payment without bank export'], 'g.tz.hand.k': ['Ist bezahlt', 'Is paid'],
+    'g.melden': ['Zahlung melden', 'Report payment'], 'g.melden.r': ['Beim Verkauf auf «Zahlung erhalten» klicken.', 'Click «Zahlung erhalten» on the sale.'], 'g.melden.ok': ['Gemeldet', 'Reported'],
+    'g.vorschlag': ['Preisvorschlag', 'Price offer'], 'g.vorschlag.r': ['Preisvorschlag beantworten: {0}', 'Answer the offer: {0}'], 'g.vorschlag.k': ['Preisvorschlag öffnen', 'Open offer'],
+    'g.frage.r': ['Antwort einfügen und senden.', 'Paste and send the answer.'], 'g.nachricht.r': ['Nachricht lesen, wenn nötig antworten.', 'Read the message, answer if needed.'],
+    'g.bewertung': ['Bewertung', 'Rating'], 'g.bewertung.r': ['Käufer*in positiv bewerten und den Text einfügen.', 'Rate the buyer positively and paste the text.'],
+    'g.erinnerung': ['Zahlungserinnerung', 'Payment reminder'], 'g.erinnerung.r': ['Erinnerung als Nachricht an die Käufer*in senden.', 'Send the reminder as a message to the buyer.'],
+    'g.storno': ['Storno', 'Cancel'], 'g.storno.info': ['Seit {0} Tagen nicht bezahlt.', 'Unpaid for {0} days.'], 'g.storno.r': ['Verkauf stornieren, Grund «nicht bezahlt».', 'Cancel the sale, reason «not paid».'],
+    'g.storno.k': ['Storno öffnen', 'Open cancellation'], 'g.storno.ok': ['Storniert', 'Cancelled'], 'g.storno.p': ['Paket aus «{0}» holen, auspacken, Stück ins Regal «{1}».', 'Take the parcel from «{0}», unpack it, item onto the shelf «{1}».'],
+    'g.auspacken': ['Auspacken', 'Unpack'],
+    /* Listing */
+    'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
+    'g.l.abgelaufen': ['abgelaufen', 'expired'], 'g.l.unverkauft': ['nicht verkauft', 'not sold'],
+    'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Suchen oder ohne Analyse erfassen.', 'Item not in the list? Search or record without analysis.'],
+    'g.l.pruefen': ['Prüfen', 'Check'], 'g.l.holen': ['Stück holen: {0}', 'Take the item: {0}'],
+    'g.l.text': ['Titel und Text', 'Title and text'], 'g.l.erfassen': ['Auf Ricardo erfassen', 'Create on Ricardo'],
+    'g.l.erfassen.r': ['Neues Angebot erstellen und die Felder unten der Reihe nach übernehmen. Danach den Link des Angebots hier einfügen.', 'Create a new listing and copy the fields below in order. Then paste the listing link here.'],
+    'g.l.kopieren.r': ['Schneller: altes Angebot kopieren und nur Preis und Text prüfen.', 'Faster: copy the old listing and check price and text only.'], 'g.l.kopieren.k': ['Altes Angebot kopieren', 'Copy old listing'],
+    'g.l.gelistet': ['Gelistet', 'Listed'], 'g.l.regal': ['Ins Regal', 'Onto the shelf'], 'g.l.regal.p': ['Stück ins Regal «{0}» legen.', 'Put the item onto the shelf «{0}».'],
+    'g.l.ende': ['Prüfen auf Ricardo', 'Check on Ricardo'], 'g.l.ende.r': ['Angebot öffnen: ist es ohne Verkauf beendet (Ende {0})?', 'Open the listing: did it end without a sale (end {0})?'],
+    'g.l.ende.ok': ['Nicht verkauft', 'Not sold'],
+    'g.l.entscheid': ['Entscheid', 'Decision'], 'g.l.entscheid.p': ['Stück holen: {0}', 'Take the item: {0}'],
+    'g.l.reakt.r': ['Hat Ricardo das Angebot automatisch neu gestartet? Dann beenden.', 'Did Ricardo restart the listing automatically? Then end it.'],
+    'g.l.wohin': ['Wohin', 'Where'], 'g.l.wohin.Anderer Kanal': ['Stück ins Regal für andere Kanäle stellen.', 'Put the item onto the shelf for other channels.'],
+    'g.l.wohin.Entsorgung': ['Stück zur Entsorgung stellen.', 'Put the item out for disposal.'],
+    /* Packen */
+    'g.p.bericht': ['Adressen fehlen', 'Addresses missing'], 'g.p.bericht.r': ['Auf «Verkaufsbericht erhalten» klicken (letzte 7 Tage). Die Datei hier einlesen.', 'Click «Verkaufsbericht erhalten» (last 7 days). Import the file here.'],
+    'g.p.bericht.k': ['Verkäufe öffnen', 'Open sales'], 'g.p.bericht.letzter': ['Letzter Bericht: {0}', 'Last report: {0}'],
+    'g.p.holen': ['Holen', 'Fetch'], 'g.p.holen.p': ['Stück holen: {0}', 'Take the item: {0}'],
+    'g.p.etikette': ['Etikette', 'Label'], 'g.p.etikette.p': ['Etikette drucken und auf den Karton kleben.', 'Print the label and stick it on the box.'],
+    'g.p.etikette.k': ['Etikette drucken', 'Print label'], 'g.p.etikette.nochmals': ['Nochmals drucken', 'Print again'], 'g.p.etikette.da': ['Etikette gedruckt, Sendungsnummer {0}', 'Label printed, tracking number {0}'],
+    'g.p.ohne.et': ['Ohne Etikette weiter?', 'Continue without a label?'], 'g.p.adr.fehlt': ['Adresse fehlt. Zuerst den Verkaufsbericht einlesen (Liste).', 'Address missing. Import the sales report first (list).'],
+    'g.p.adr.laeuft': ['Adresse wird bei der Post geprüft …', 'Checking the address with Swiss Post …'], 'g.p.adr.ok': ['Adresse von der Post bestätigt.', 'Address confirmed by Swiss Post.'],
+    'g.p.adr.vorschlag': ['Die Post kennt die Adresse so: {0}', 'Swiss Post knows the address as: {0}'], 'g.p.adr.uebernehmen': ['Vorschlag übernehmen', 'Use suggestion'],
+    'g.p.adr.unbekannt': ['Die Post findet diese Adresse nicht. Adresse auf Ricardo prüfen, bei Bedarf der Käufer*in schreiben.', 'Swiss Post cannot find this address. Check it on Ricardo, contact the buyer if needed.'],
+    'g.p.adr.fehler': ['Adressprüfung nicht möglich: {0}', 'Address check failed: {0}'],
+    'g.p.packen': ['Packen', 'Pack'], 'g.p.packen.p': ['Mit Matchmaker-Karte und Care-Flyer packen. Paket ins Regal «{0}».', 'Pack with matchmaker card and care flyer. Parcel onto the shelf «{0}».'],
+    'g.p.gepackt': ['Gepackt', 'Packed'], 'g.p.post.fehlt': ['Post-Zugang fehlt: Etiketten gehen erst, wenn der Admin ihn einträgt.', 'Swiss Post access missing: labels work once the admin enters it.'],
+    'g.p.bezahlt': ['bezahlt', 'paid'], 'g.p.adresse': ['Adresse fehlt', 'Address missing'],
+    /* Versenden */
+    'g.v.wagen': ['Postwagen', 'Postal cart'], 'g.v.wagen.p': ['Paket {0} aus «{1}» in den Postwagen.', 'Parcel {0} from «{1}» into the postal cart.'],
+    'g.v.bestaetigen': ['Versand bestätigen', 'Confirm shipping'], 'g.v.bestaetigen.r': ['Beim Verkauf «Versand bestätigen» klicken und die Sendungsnummer {0} einfügen. Damit ist der Verkauf abgeschlossen.', 'Click «Versand bestätigen» on the sale and paste tracking number {0}. That closes the sale.'],
+    'g.v.bestaetigen.k': ['Nummer kopieren, Ricardo öffnen', 'Copy number, open Ricardo'], 'g.v.versendet': ['Versendet', 'Shipped'],
+    'g.v.warten': ['{0} Pakete warten noch auf Zahlung und bleiben im Regal.', '{0} parcels are still awaiting payment and stay on the shelf.']
   });
-  var F = null, FA = 'taeglich', BANK = null, SCHRITT = {};
-  /* Das Listing nutzt die bestehenden Teile (Suche, Analyse-Liste, Stück bearbeiten): sie werden in den Schritt verschoben, nicht kopiert */
-  var TEILE = { waehlen: ['ana-karte', 'such-karte'], arbeit: ['arbeit'] };
-  function einbauLoesen() { ['ana-karte', 'such-karte', 'arbeit'].forEach(function (id) { $('s-listen').appendChild($(id)); }); }
+  var F = null, FA = 'taeglich', BANK = null, FALL = null, SCHR = 0, ADR = null, FERTIG = false;
+  /* Teile des bisherigen Listings (Suche, Stück bearbeiten) werden in den Schritt verschoben, nicht kopiert. HEIM merkt sich, wo sie hingehören. */
+  var HEIM = {};
+  function einbauLoesen() { Object.keys(HEIM).forEach(function (id) { HEIM[id].appendChild($(id)); }); }
   function einbauen() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-einbau]'), function (p) {
-      TEILE[p.getAttribute('data-einbau')].forEach(function (id) { p.appendChild($(id)); });
+      p.getAttribute('data-einbau').split(',').forEach(function (id) { if (!HEIM[id]) HEIM[id] = $(id).parentNode; p.appendChild($(id)); });
     });
   }
   function ablaufStarten(art) {
-    FA = art; F = null; BANK = null; einbauLoesen(); zeige('ablauf'); $('f-schritte').innerHTML = ''; $('f-leiste').innerHTML = ''; ladeAblauf();
+    FA = art; F = null; BANK = null; FALL = null; SCHR = 0; ADR = null; FERTIG = false; R = null;
+    einbauLoesen(); zeige('ablauf'); $('f-schritte').innerHTML = ''; $('f-leiste').innerHTML = ''; ladeAblauf();
     if (art === 'schicht1') ladeAnalyse();
   }
-  function ladeAblauf() { ruf('ablauf', [FA], function (f) { F = f; zeichneAblauf(); }); }
-  function geheZu(i) { SCHRITT[FA] = i; zeichneAblauf(); window.scrollTo(0, 0); }
+  function ladeAblauf(danach) { ruf('ablauf', [FA], function (f) { F = f; zeichneAblauf(); if (danach) danach(); }); }
   function ricKnopf(url, text) { return '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(url) + '\')">' + esc(text || t('g.oeffnen')) + '</button>'; }
-  function leer(l) { return l.length ? '' : '<p class="still">' + t('g.leer') + '</p>'; }
-  function zeichneAblauf() {
-    if (!F || F.art !== FA) return;
-    var schritte = { taeglich: schritteTaeglich, schicht1: schritteListing, schicht2: schrittePacken, schicht3: schritteVersenden }[FA]();
-    if (SCHRITT[FA] === undefined || SCHRITT[FA] >= schritte.length) {
-      SCHRITT[FA] = 0;
-      for (var k = 0; k < schritte.length; k++) if (schritte[k].anzahl) { SCHRITT[FA] = k; break; }
-    }
-    var a = SCHRITT[FA], s = schritte[a];
-    $('f-leiste').innerHTML = schritte.map(function (x, i) {
-      var z = x.anzahl === null ? '' : (x.anzahl ? ' <span class="zahl">' + x.anzahl + '</span>' : ' ✓');
-      return '<button class="' + (i === a ? 'an' : '') + '" onclick="geheZu(' + i + ')">' + (i + 1) + ' ' + esc(x.titel) + z + '</button>';
-    }).join('');
-    einbauLoesen();
-    $('f-schritte').innerHTML = '<div class="karte"><h2>' + esc(s.titel) + '</h2>'
-      + '<div class="f-boxen"><div class="f-box rosa"><div class="f-label">' + t('g.ricardo') + '</div><div>' + (s.ricardo ? s.ricardo.text : t('g.nichts')) + '</div>'
-      + (s.ricardo && s.ricardo.url ? '<div style="margin-top:10px">' + ricKnopf(s.ricardo.url) + '</div>' : '') + '</div>'
-      + '<div class="f-box"><div class="f-label">' + t('g.physisch') + '</div><div>' + (s.physisch || t('g.nichts')) + '</div></div></div>'
-      + (s.inhalt || '')
-      + '<div class="f-weiter">' + (a > 0 ? '<button onclick="geheZu(' + (a - 1) + ')">← ' + t('g.zurueck') + '</button>' : '<span></span>')
-      + (a < schritte.length - 1 ? '<button class="dunkel" onclick="geheZu(' + (a + 1) + ')">' + t('g.weiter', esc(schritte[a + 1].titel)) + ' →</button>' : '<span class="still">' + t('g.fertig') + '</span>') + '</div></div>';
-    einbauen();
-    if (FA === 'taeglich') marke($('z-f-taeglich'), F.melden.length + F.aufgaben.anzahl + F.storno.length);
-    if (FA === 'schicht2') marke($('z-f-schicht2'), F.verkaeufe.offen.filter(function (o) { return o.status === 'Zu packen'; }).length);
-    if (FA === 'schicht3') marke($('z-f-schicht3'), F.versand.length);
-  }
-  /* Eine Zeile pro Verkauf: Titel, Nummern, Betrag, rechts die Knöpfe */
-  function zeile(titel, info, knoepfe, extra) {
-    return '<div class="f-zeile"><div class="f-text"><strong>' + esc(titel) + '</strong><span class="still">' + info + '</span>' + (extra || '') + '</div><div class="knoepfe">' + knoepfe + '</div></div>';
+  /* Was zu tun ist, direkt bei der Aktion: Ricardo (rosa) oder physisch (weiss), mit dem passenden Knopf */
+  function tun(ort, text, knopf) {
+    return '<div class="f-tun' + (ort === 'ricardo' ? ' rosa' : '') + '"><div class="f-tun-text"><div class="f-label">' + t(ort === 'ricardo' ? 'g.ricardo' : 'g.physisch') + '</div>' + text + '</div>'
+      + (knopf ? '<div class="knoepfe">' + knopf + '</div>' : '') + '</div>';
   }
   function vInfo(o) { return (o.pgId ? esc(o.pgId) + ' · ' : '') + t('v.nr', esc(o.nr)) + ' · ' + esc(o.name || o.kaeufer) + ' · CHF ' + esc(o.total); }
+  function textfeld(id, wert, rows) { return '<textarea id="' + id + '" rows="' + (rows || 5) + '">' + esc(wert || '') + '</textarea>'; }
 
-  /* Täglich: Zahlungen, Nachrichten, Unbezahlte */
-  function schritteTaeglich() {
-    var au = F.aufgaben;
-    var bank = '<p class="still" style="margin-top:16px">' + t('g.t1.bank', esc(F.letzteBank || t('f.t1.nie'))) + '</p>'
-      + '<div class="reihe"><input type="file" id="f-bank" accept=".xlsx,.xls,.csv,text/csv"> <button class="haupt-knopf" onclick="bankLesen()">' + t('v.einlesen') + '</button></div><div id="f-bank-erg">' + bankHtml() + '</div>';
-    var melden = F.melden.length ? '<h3 style="margin-top:20px">' + t('g.t1.melden') + '</h3>' + F.melden.map(function (o) {
-      return zeile(o.titel, vInfo(o), ricKnopf(o.link, t('g.t1.rk')) + '<button onclick="ricardoGemeldet(\'' + esc(o.nr) + '\')">' + t('g.t1.ok') + '</button>');
-    }).join('') : '';
-    var hand = (F.offen || []).length ? '<details style="margin-top:20px"><summary>' + t('g.t1.hand') + ' (' + F.offen.length + ')</summary>' + F.offen.map(function (o, i) {
-      return zeile(o.titel, vInfo(o), '<button onclick="zahlungHand(' + i + ')">' + t('g.t1.hand.k') + '</button>');
-    }).join('') + '</details>' : '';
-    var bew = (au.bewertungen || []).map(function (o, i) {
-      return '<div class="aufgabe"><strong>' + t('g.t2.bew') + ':</strong> ' + esc(o.titel) + (o.von ? ' <span class="still">' + esc(o.von) + '</span>' : '')
-        + '<textarea id="fb-' + i + '" rows="2">' + esc(o.entwurf) + '</textarea><div class="knoepfe"><button class="haupt-knopf" onclick="kopiereUndOeffne(\'fb-' + i + '\',\'' + esc(o.link) + '\')">' + t('g.t2.bew.k') + '</button>'
-        + '<button onclick="erledigt(\'' + esc(o.id) + '\')">' + t('a.erledigt') + '</button></div></div>';
-    }).join('');
-    var nachrichten = htmlAngebote(au) + htmlFragen(au, 'f') + bew;
-    var storno = F.storno.map(function (o) {
-      return zeile(o.titel, vInfo(o), ricKnopf(o.storno, t('g.t3.sk')) + '<button onclick="stornieren(\'' + esc(o.nr) + '\')">' + t('g.t3.sok') + '</button>', ' <span class="etikett orange">' + t('g.t3.storno', o.tage) + '</span>');
-    }).join('');
+  /* ---------- Fälle pro Ablauf ----------
+     Ein Fall: { key, titel, info, tag, tagKlasse, start (optional: lädt zuerst Daten), schritte(fall) → [{ titel, html, aktion: [Text, Funktion], neben: [Text, Funktion] }] } */
+  function faelle() {
+    if (FA === 'taeglich') return faelleTaeglich();
+    if (FA === 'schicht1') return faelleListing();
+    if (FA === 'schicht2') return faellePacken();
+    return faelleVersenden();
+  }
+  function faelleTaeglich() {
+    var au = F.aufgaben, l = [];
+    F.melden.forEach(function (o) {
+      l.push({ key: 'm' + o.nr, titel: o.titel, info: vInfo(o), tag: t('g.melden'), o: o, schritte: function (f) {
+        return [{ titel: t('g.melden'), html: tun('ricardo', t('g.melden.r'), ricKnopf(f.o.link, t('g.verkauf.oeffnen'))),
+          aktion: [t('g.melden.ok'), function () { ruf('setzeVerkauf', [f.o.nr, 'ricardoBezahlt'], function () { fallFertig(); }); }] }];
+      } });
+    });
+    au.angebote.forEach(function (o) {
+      l.push({ key: 'a' + o.id, titel: o.titel || o.artikel, info: t('a.vorschlag', esc(o.betrag), esc(o.preis)) + (o.frist ? ' · ' + t('a.frist', esc(o.frist), o.restStunden) : ''), tag: t('g.vorschlag'),
+        tagKlasse: o.restStunden !== '' && o.restStunden < 12 ? 'rot' : '', o: o, schritte: function (f) {
+          return [{ titel: t('g.vorschlag'), html: '<p>' + t('a.vorschlag', esc(f.o.betrag), esc(f.o.preis)) + '</p>' + tun('ricardo', t('g.vorschlag.r', '<strong>' + esc(f.o.empfehlung) + '</strong>'), f.o.link ? ricKnopf(f.o.link, t('g.vorschlag.k')) : ''),
+            aktion: [t('a.erledigt'), function () { aufgabeFertig(f.o.id); }] }];
+        } });
+    });
+    au.fragen.forEach(function (o) {
+      l.push({ key: 'f' + o.id, titel: o.titel || o.artikel, info: (o.von ? t('a.von', esc(o.von)) : ''), tag: o.art, o: o, schritte: function (f) {
+        var x = f.o, frage = x.art === 'Frage' && x.entwurf;
+        return [{ titel: x.art, html: (x.text ? '<div class="frage">' + esc(x.text) + '</div>' : '')
+          + (frage ? '<label for="fx-text">' + t('a.entwurf') + '</label>' + textfeld('fx-text', x.entwurf, 5) : '')
+          + tun('ricardo', t(frage ? 'g.frage.r' : 'g.nachricht.r'), frage ? '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(x.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>' : (x.link ? ricKnopf(x.link) : '')),
+          aktion: [t('a.erledigt'), function () { aufgabeFertig(x.id); }] }];
+      } });
+    });
+    (au.bewertungen || []).forEach(function (o) {
+      l.push({ key: 'b' + o.id, titel: o.titel, info: o.von ? esc(o.von) : '', tag: t('g.bewertung'), o: o, schritte: function (f) {
+        return [{ titel: t('g.bewertung'), html: textfeld('fx-text', f.o.entwurf, 3)
+          + tun('ricardo', t('g.bewertung.r'), '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(f.o.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>'),
+          aktion: [t('a.erledigt'), function () { aufgabeFertig(f.o.id); }] }];
+      } });
+    });
+    au.zahlung.forEach(function (o) {
+      l.push({ key: 'z' + o.nr, titel: o.titel, info: (o.pgId ? esc(o.pgId) + ' · ' : '') + esc(o.kaeufer) + ' · CHF ' + esc(o.total), tag: t('a.tage', o.tage), tagKlasse: 'orange', o: o, schritte: function (f) {
+        return [{ titel: t('g.erinnerung'), html: (f.o.meldet ? '<p><span class="etikett hell">' + t('a.meldet', esc(f.o.meldet)) + '</span></p>' : '') + textfeld('fx-text', f.o.entwurf, 6)
+          + tun('ricardo', t('g.erinnerung.r'), '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(f.o.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>'),
+          aktion: [t('a.erinnert'), function () { ruf('erinnerungErledigt', [f.o.nr], function (a) { nachAufgaben(a); fallFertig(); }); }],
+          neben: [t('g.tz.hand.k'), function () { zahlungHandNr(f.o.nr, f.o.pgId || f.o.titel, f.o.total); }] }];
+      } });
+    });
+    F.storno.forEach(function (o) {
+      l.push({ key: 's' + o.nr, titel: o.titel, info: vInfo(o), tag: t('g.storno.info', o.tage), tagKlasse: 'orange', o: o, schritte: function (f) {
+        var s = [{ titel: t('g.storno'), html: '<p>' + t('g.storno.info', f.o.tage) + '</p>' + tun('ricardo', t('g.storno.r'), ricKnopf(f.o.storno, t('g.storno.k'))),
+          aktion: [t('g.storno.ok'), function () {
+            frage(t('f.t6.frage', f.o.nr), function () { ruf('verkaufStornieren', [f.o.nr], function (x) { F = x; if (f.o.status === 'Wartet auf Zahlung') geheSchritt(1); else fallFertig(); }); });
+          }], neben: [t('g.tz.hand.k'), function () { zahlungHandNr(f.o.nr, f.o.pgId || f.o.titel, f.o.total); }] }];
+        if (f.o.status === 'Wartet auf Zahlung') s.push({ titel: t('g.auspacken'), html: tun('physisch', t('g.storno.p', esc(regalName('unpaid')), esc(regalName('offline')))), aktion: [t('g.fertig'), fallFertig] });
+        return s;
+      } });
+    });
+    return l;
+  }
+  function regalName(k) { return (F.regale && F.regale[k]) || ({ offline: 'Ricardo Offline', online: 'Ricardo Online', unpaid: 'Ricardo Unpaid' })[k]; }
+  function aufgabeFertig(id) { ruf('aufgabeErledigt', [id], function (a) { nachAufgaben(a); fallFertig(); }); }
+  function zahlungHandNr(nr, was, total) {
+    frage(t('v.f.bezahlt', was, total), function () { ruf('setzeVerkauf', [nr, 'bezahlt'], function () { fallFertig(); }); });
+  }
+  function zahlungHandIdx(i) { var o = F.offen[i]; zahlungHandNr(o.nr, o.pgId || o.titel, o.total); }
+  function vorherTaeglich() {
+    if (!(F.offen || []).length) return '';
+    return '<div class="karte"><h2>' + t('g.tz.titel') + '</h2><p class="still">' + t('g.tz.text', F.offen.length, esc(F.letzteBank || t('f.t1.nie'))) + '</p>'
+      + '<div class="reihe"><input type="file" id="f-bank" accept=".xlsx,.xls,.csv,text/csv"> <button class="haupt-knopf" onclick="bankLesen()">' + t('v.einlesen') + '</button></div><div id="f-bank-erg">' + bankHtml() + '</div>'
+      + '<details style="margin-top:14px"><summary>' + t('g.tz.hand') + '</summary>' + F.offen.map(function (o, i) {
+        return '<div class="f-zeile"><div class="f-text"><strong>' + esc(o.titel) + '</strong><span class="still">' + vInfo(o) + '</span></div><div class="knoepfe"><button onclick="zahlungHandIdx(' + i + ')">' + t('g.tz.hand.k') + '</button></div></div>';
+      }).join('') + '</details></div>';
+  }
+
+  function faelleListing() {
+    var l = [], schon = {};
+    var neu = function (id, titel, info, tag, laden) {
+      schon[id] = 1;
+      l.push({ key: 'l' + id, titel: titel, info: info, tag: tag, start: laden });
+    };
+    /* Entscheid Jonas 19.10.2026: angefangene und bereite Stücke einfach in derselben Liste, zuoberst, ohne Sonderstatus (sonst bleiben Leichen liegen) */
+    F.bereit.forEach(function (x) { neu(x.id, x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), x.wieder ? t('g.l.wieder') : '', function () { weiter(x.id); }); });
+    (ANA || []).forEach(function (a) {
+      if (schon[a.id]) return;
+      neu(a.id, a.titel || a.name, esc(a.id) + ' · ' + esc(zu(a.zustand)) + (a.preis ? ' · CHF ' + Number(a.preis).toFixed(2) : '') + ' · ' + t('th.fotos') + ' ' + esc(a.fotos || 0), t('g.l.neu'), function () { start(a.id); });
+    });
+    (F.ohneMail || []).forEach(function (x) {
+      l.push({ key: 'e' + x.id, titel: x.name, info: esc(x.id) + ' · ' + t('f.s2.ende', esc(x.ende)), tag: t('g.l.abgelaufen'), tagKlasse: 'orange', o: x, schritte: function (f) {
+        return [{ titel: t('g.l.ende'), html: tun('ricardo', t('g.l.ende.r', esc(f.o.ende)), f.o.link ? ricKnopf(f.o.link, t('g.angebot.oeffnen')) : ''),
+          aktion: [t('g.l.ende.ok'), function () { ruf('setzeStatus', [f.o.id, 'Unverkauft'], function () { f.schritte = entscheidSchritte; f.o.status = 'Unverkauft'; geheSchritt(0); ladeAblauf(); }); }] }];
+      } });
+    });
+    (F.unverkauft || []).forEach(function (x) {
+      l.push({ key: 'u' + x.id, titel: x.name, info: esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), tag: t('g.l.unverkauft'), tagKlasse: 'orange', o: x, schritte: entscheidSchritte });
+    });
+    return l;
+  }
+  function entscheidSchritte(f) {
+    var x = f.o, s = [{ titel: t('g.l.entscheid'), html: (x.link ? tun('ricardo', t('g.l.reakt.r'), ricKnopf(x.link, t('g.angebot.oeffnen'))) : '')
+      + tun('physisch', t('g.l.entscheid.p', esc(x.ort || regalName('online'))), '')
+      + '<div class="f-wahl">' + F.entscheide.map(function (e, j) { return '<button class="' + (x.entscheid === e ? 'an' : '') + '" onclick="entscheidFlow(' + j + ')">' + esc(t('f.e.' + e)) + '</button>'; }).join('') + '</div>' }];
+    if (x.entscheid && x.entscheid !== 'Neu listen') s.push({ titel: t('g.l.wohin'), html: tun('physisch', t('g.l.wohin.' + x.entscheid), ''), aktion: [t('g.fertig'), fallFertig] });
+    return s;
+  }
+  function entscheidFlow(j) {
+    var e = F.entscheide[j], x = FALL.o;
+    ruf('entscheidUnverkauft', [x.id, e], function (f) {
+      F = f; x.entscheid = e;
+      if (e === 'Neu listen') { x.kopieren = x.kopieren || ''; KOPIE[x.id] = x.kopieren; weiter(x.id); } else geheSchritt(1);
+    });
+  }
+  var KOPIE = {};   // Ricardo-Link «Kopieren» für neu gelistete Stücke
+  /* Listing eines Stücks: Prüfen, Text, Ricardo, Regal. Die Felder sind die bisherigen Karten, pro Schritt eine */
+  function listingSchritte() {
+    var kopie = R && KOPIE[R.id];
     return [
-      { titel: t('g.t1'), anzahl: F.melden.length, ricardo: { text: t('g.t1.r') }, inhalt: bank + melden + hand },
-      { titel: t('g.t2'), anzahl: au.angebote.length + au.fragen.length + (au.bewertungen || []).length, ricardo: { text: t('g.t2.r') }, inhalt: nachrichten || leer([]) },
-      { titel: t('g.t3'), anzahl: au.zahlung.length + F.storno.length, ricardo: { text: t('g.t3.r', F.stornoTage) }, physisch: t('g.t3.p'), inhalt: (htmlZahlung(au, 'f') + storno) || leer([]) }
+      { titel: t('g.l.pruefen'), html: tun('physisch', t('g.l.holen', esc((R && R.lagerort) || regalName('offline'))), '') + '<div data-einbau="a-kopf,ls-1"></div>',
+        aktion: [t('g.weiter'), function () { speichern(function () { geheSchritt(1); }); }] },
+      { titel: t('g.l.text'), html: '<div data-einbau="ls-2"></div>', aktion: [t('g.weiter'), function () { textSpeichern(function () { geheSchritt(2); }); }] },
+      { titel: t('g.l.erfassen'), html: (kopie ? tun('ricardo', t('g.l.kopieren.r'), ricKnopf(kopie, t('g.l.kopieren.k'))) : '')
+          + tun('ricardo', t('g.l.erfassen.r'), ricKnopf(F.links.listen)) + '<div data-einbau="ls-3,ls-4"></div>',
+        aktion: [t('g.l.gelistet'), function () { gelistet(function () { geheSchritt(3); }); }] },
+      { titel: t('g.l.regal'), html: tun('physisch', t('g.l.regal.p', esc(regalName('online'))), ''), aktion: [t('g.fertig'), fallFertig] }
     ];
   }
-  function ricardoGemeldet(nr) { ruf('setzeVerkauf', [nr, 'ricardoBezahlt'], function () { ladeAblauf(); }); }
-  function stornieren(nr) { frage(t('f.t6.frage', nr), function () { ruf('verkaufStornieren', [nr], function (f) { F = f; zeichneAblauf(); }); }); }
-  function zahlungHand(i) { var o = F.offen[i]; frage(t('v.f.bezahlt', o.pgId || o.titel, o.total), function () { ruf('setzeVerkauf', [o.nr, 'bezahlt'], function () { ladeAblauf(); }); }); }
-
-  /* Listing: Stück wählen (aus der Analyse, per Suche oder von Hand), dann bearbeiten und auf Ricardo erfassen */
-  function schritteListing() {
-    var liste = F.bereit.map(function (x) {
-      return '<tr><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td>' + esc(st(x.status)) + '</td><td>' + esc(x.ort) + '</td>'
-        + '<td><button onclick="weiter(\'' + esc(x.id) + '\')">' + t('f.s1.listen') + '</button></td></tr>';
-    }).join('');
-    return [
-      { titel: t('g.l1'), anzahl: F.analyse + F.bereit.length, physisch: t('g.l1.p'),
-        inhalt: (liste ? '<h3 style="margin-top:16px">' + t('g.l1.wieder') + '</h3>' + tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], liste) : '') + '<div data-einbau="waehlen" style="margin-top:16px"></div>' },
-      { titel: t('g.l2'), anzahl: null, ricardo: { text: t('g.l2.r'), url: F.links.listen }, physisch: t('g.l2.p'),
-        inhalt: R ? '<div data-einbau="arbeit" style="margin-top:16px"></div>' : '<p class="still" style="margin-top:16px">' + t('g.l2.keins') + '</p>' }
-    ];
+  function vorherListing() { return ''; }
+  function nachherListing() {
+    return '<div class="karte"><h2>' + t('g.l.anderes') + '</h2><p class="still">' + t('g.l.anderes.text') + '</p><div data-einbau="such-karte"></div></div>';
   }
 
-  /* Packen: Verkaufsbericht, nicht Verkauftes, packen mit Etikette */
-  function schrittePacken() {
-    var ohne = F.ohneMail.map(function (x) {
-      return zeile(x.name, esc(x.id) + ' · ' + t('f.s2.ende', esc(x.ende)), (x.link ? ricKnopf(x.link) : '') + '<button onclick="unverkauftFlow(\'' + esc(x.id) + '\')">' + t('u.unverkauft') + '</button>', ' <span class="etikett orange">' + t('g.p2.ohne') + '</span>');
-    }).join('');
-    var nicht = F.unverkauft.map(function (x) {
-      return zeile(x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), (x.link ? ricKnopf(x.link, t('f.s2.angebot')) : '') + (x.kopieren ? '<button onclick="oeffneLink(\'' + esc(x.kopieren) + '\')">' + t('f.s2.kopieren') + '</button>' : '')
-        + F.entscheide.map(function (e, j) { return '<button onclick="entscheid(\'' + esc(x.id) + '\',' + j + ')">' + esc(t('f.e.' + e)) + '</button>'; }).join(''));
-    }).join('');
-    var pack = F.verkaeufe.offen.filter(function (o) { return o.status === 'Zu packen'; });
-    var packen = (F.postBereit ? '' : '<div class="meldung warn">' + t('f.s2.post.fehlt') + '</div><div class="reihe"><button onclick="post(\'f-post\')">' + t('v.post') + '</button> <span id="f-post"></span></div>') + pack.map(function (o) {
-      var i = F.verkaeufe.offen.indexOf(o);
-      return '<div class="f-zeile">' + (o.bild ? '<img class="vbild" src="' + esc(o.bild) + '" alt="">' : '') + '<div class="f-text"><strong>' + esc(o.titel) + '</strong><span class="still">' + (o.pgId ? esc(o.pgId) + ' · ' : '') + t('v.nr', esc(o.nr))
-        + ' · ' + [esc(o.name), esc(o.ort)].filter(String).join(', ') + ' · ' + esc(o.klasse) + (o.lagerort ? ' · ' + esc(o.lagerort) : '') + '</span>'
-        + (o.ohneAdresse ? '<span class="etikett orange">' + t('g.p3.adr') + '</span>' : '') + (o.bezahlt ? ' <span class="etikett hell">' + t('g.p3.bez') + '</span>' : '')
-        + (o.sendung ? '<span class="klein">' + t('f.s2.sendung', esc(o.sendung)) + '</span>' : '') + '</div><div class="knoepfe" id="et-' + esc(o.nr) + '">'
-        + (F.postBereit && !o.ohneAdresse ? '<button class="' + (o.sendung ? '' : 'haupt-knopf') + '" onclick="etikette(\'' + esc(o.nr) + '\')">' + t(o.sendung ? 'f.s2.etikette.neu' : 'f.s2.etikette') + '</button>' : '')
-        + '<button class="' + (o.sendung || !F.postBereit ? 'haupt-knopf' : '') + '" onclick="gepacktFlow(' + i + ')">' + t('v.gepackt') + '</button></div></div>';
-    }).join('');
+  function faellePacken() {
+    return F.verkaeufe.offen.filter(function (o) { return o.status === 'Zu packen'; }).map(function (o) {
+      return { key: 'p' + o.nr, titel: o.titel, info: (o.pgId ? esc(o.pgId) + ' · ' : '') + t('v.nr', esc(o.nr)) + ' · ' + esc(o.lagerort || ''), o: o, bild: o.bild,
+        tag: o.ohneAdresse ? t('g.p.adresse') : (o.bezahlt ? t('g.p.bezahlt') : ''), tagKlasse: o.ohneAdresse ? 'orange' : 'hell', schritte: packSchritte };
+    });
+  }
+  function packSchritte(f) {
+    var o = f.o;
     return [
-      { titel: t('g.p1'), anzahl: null, ricardo: { text: t('g.p1.r'), url: F.links.verkauft },
-        inhalt: '<p class="still" style="margin-top:16px">' + t('g.p1.letzter', esc(F.letzterImport || t('u.keiner'))) + '</p><div class="reihe"><input type="file" id="f-bericht" accept=".csv,text/csv"> <button class="haupt-knopf" onclick="importieren(\'f-bericht\', function () { ladeAblauf(); })">' + t('v.einlesen') + '</button></div><div id="f-bericht-meldung"></div>' },
-      { titel: t('g.p2'), anzahl: F.unverkauft.length + F.ohneMail.length, ricardo: { text: t('g.p2.r') }, physisch: t('g.p2.p'), inhalt: (ohne + nicht) || leer([]) },
-      { titel: t('g.p3'), anzahl: pack.length, physisch: t('g.p3.p'), inhalt: packen || leer([]) }
+      { titel: t('g.p.holen'), html: (o.bild ? '<img class="f-bild" src="' + esc(o.bild) + '" alt="">' : '') + tun('physisch', t('g.p.holen.p', '<strong>' + esc(o.lagerort || '') + '</strong>'), ''),
+        aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
+      { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? '' : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t('g.p.etikette.da', esc(o.sendung)) + '</span>' : ''),
+          F.postBereit ? '<button class="' + (o.sendung ? '' : 'haupt-knopf') + '" onclick="etikette(\'' + esc(o.nr) + '\')">' + t(o.sendung ? 'g.p.etikette.nochmals' : 'g.p.etikette.k') + '</button>' + (o.pdfUrl ? ' <a href="' + o.pdfUrl + '" download="Etikette ' + esc(o.nr) + '.pdf" target="_self">PDF</a>' : '') : '')),
+        start: function () { if (!o.ohneAdresse && F.postBereit && (!ADR || ADR.nr !== o.nr)) adresseLaden(o.nr); },
+        aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
+      { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
+        aktion: [t('g.p.gepackt'), function () { ruf('setzeVerkauf', [o.nr, 'gepackt'], function () { fallFertig(); }); }] }
     ];
   }
-  function unverkauftFlow(id) { frage(t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft'], function () { ladeAblauf(); }); }); }
-  function entscheid(id, j) { ruf('entscheidUnverkauft', [id, F.entscheide[j]], function (f) { F = f; zeichneAblauf(); }); }
-  function gepacktFlow(i) { ruf('setzeVerkauf', [F.verkaeufe.offen[i].nr, 'gepackt'], function () { ladeAblauf(); }); }
+  function adresseHtml(o) {
+    if (o.ohneAdresse) return '<div class="meldung warn">' + t('g.p.adr.fehlt') + '</div>';
+    if (!F.postBereit) return '<div class="meldung warn">' + t('g.p.post.fehlt') + '</div>';
+    var a = ADR && ADR.nr === o.nr ? ADR : null;
+    if (!a || a.laeuft) return '<p class="still">' + t('g.p.adr.laeuft') + '</p>';
+    var adr = function (x) { return esc([[x.strasse, x.nr].join(' ').trim(), x.postfach ? 'Postfach ' + x.postfach : '', [x.plz, x.ort].join(' ').trim()].filter(String).join(', ')); };
+    var kopf = '<p><strong>' + esc(o.name) + '</strong><br>' + adr(a.adresse) + '</p>';
+    if (a.stand === 'ok') return kopf + '<div class="meldung ok">✓ ' + t('g.p.adr.ok') + '</div>';
+    if (a.stand === 'vorschlag') return kopf + '<div class="meldung warn">' + t('g.p.adr.vorschlag', '<strong>' + adr(a.vorschlag) + '</strong>') + ' <button onclick="adresseUebernehmenFlow()">' + t('g.p.adr.uebernehmen') + '</button></div>';
+    if (a.stand === 'unbekannt') return kopf + tun('ricardo', t('g.p.adr.unbekannt'), ricKnopf(o.link, t('g.verkauf.oeffnen')));
+    return kopf + '<div class="meldung warn">' + t('g.p.adr.fehler', esc(a.text || '')) + '</div>';
+  }
+  function adresseLaden(nr) {
+    ADR = { nr: nr, laeuft: true };
+    still('adressePruefen', [nr], function (a) { if (!a || !FALL || FALL.o.nr !== nr) return; a.nr = nr; ADR = a; zeichneAblauf(); });
+  }
+  function adresseUebernehmenFlow() {
+    var nr = FALL.o.nr;
+    ruf('adresseUebernehmen', [nr, ADR.vorschlag], function (a) { a.nr = nr; ADR = a; zeichneAblauf(); });
+  }
+  function vorherPacken() {
+    var h = '';
+    if (!F.postBereit) h += '<div class="meldung warn">' + t('g.p.post.fehlt') + '</div>';
+    if (F.verkaeufe.offen.some(function (o) { return o.status === 'Zu packen' && o.ohneAdresse; })) {
+      h += '<div class="karte"><h2>' + t('g.p.bericht') + '</h2>' + tun('ricardo', t('g.p.bericht.r'), ricKnopf(F.links.verkauft, t('g.p.bericht.k')))
+        + '<p class="still">' + t('g.p.bericht.letzter', esc(F.letzterImport || t('u.keiner'))) + '</p><div class="reihe"><input type="file" id="f-bericht" accept=".csv,text/csv"> <button class="haupt-knopf" onclick="importieren(\'f-bericht\', function () { ladeAblauf(); })">' + t('v.einlesen') + '</button></div><div id="f-bericht-meldung"></div></div>';
+    }
+    return h;
+  }
 
-  /* Versenden: bezahlte Pakete */
-  function schritteVersenden() {
-    var liste = F.versand.map(function (o, i) {
-      return zeile(o.titel, vInfo(o) + (o.sendung ? ' · ' + t('f.s2.sendung', esc(o.sendung)) : ''),
-        (o.sendung ? '<button onclick="kopiereText(\'' + esc(o.sendung) + '\')">' + t('g.v1.nr') + '</button>' : '') + ricKnopf(o.link, t('g.v1.rk')) + '<button onclick="versendetFlow(' + i + ')">' + t('g.v1.ok') + '</button>');
-    }).join('');
-    return [
-      { titel: t('g.v1'), anzahl: F.versand.length, ricardo: { text: t('g.v1.r') }, physisch: t('g.v1.p'),
-        inhalt: (liste || leer([])) + (F.warten.length ? '<p class="still" style="margin-top:16px">' + t('g.v1.warten', F.warten.length) + '</p>' : '') }
-    ];
+  function faelleVersenden() {
+    return F.versand.map(function (o) {
+      return { key: 'v' + o.nr, titel: o.titel, info: vInfo(o), o: o, schritte: function (f) {
+        var x = f.o;
+        return [
+          { titel: t('g.v.wagen'), html: tun('physisch', t('g.v.wagen.p', '<strong>' + esc(x.pgId || x.nr) + '</strong>', esc(regalName('unpaid'))), ''), aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
+          { titel: t('g.v.bestaetigen'), html: tun('ricardo', t('g.v.bestaetigen.r', '<strong class="mono">' + esc(x.sendung || '–') + '</strong>'),
+              '<button class="haupt-knopf" onclick="kopiereText(\'' + esc(x.sendung) + '\');oeffneLink(\'' + esc(x.link) + '\')">' + t(x.sendung ? 'g.v.bestaetigen.k' : 'g.verkauf.oeffnen') + '</button>'),
+            aktion: [t('g.v.versendet'), function () { ruf('setzeVerkauf', [x.nr, 'versendet'], function () { fallFertig(); }); }] }
+        ];
+      } };
+    });
   }
-  function versendetFlow(i) { var o = F.versand[i]; frage(t('g.v1.frage', o.pgId || o.titel), function () { ruf('setzeVerkauf', [o.nr, 'versendet'], function () { ladeAblauf(); }); }); }
+  function nachherVersenden() { return F.warten && F.warten.length ? '<p class="still" style="margin-top:16px">' + t('g.v.warten', F.warten.length) + '</p>' : ''; }
+
+  /* ---------- Darstellung: Liste oder ein Fall, ein Schritt ---------- */
+  function fallStarten(key) {
+    var f = faelle().filter(function (x) { return x.key === key; })[0];
+    if (!f) return;
+    FERTIG = false; ADR = null;
+    if (f.start) { f.start(); return; }   // Listing: lädt das Stück, danach öffnet oeffne() den Fall
+    FALL = f; SCHR = 0; zeichneAblauf(); window.scrollTo(0, 0);
+  }
+  function geheSchritt(i) { SCHR = i; zeichneAblauf(); window.scrollTo(0, 0); }
+  function zurListe() { FALL = null; FERTIG = false; R = null; einbauLoesen(); ladeAblauf(); if (FA === 'schicht1') ladeAnalyse(); window.scrollTo(0, 0); }
+  function fallFertig() { FERTIG = true; R = null; ladeAblauf(function () { if (FA === 'schicht1') ladeAnalyse(); }); window.scrollTo(0, 0); }
+  function schritteVon(f) { return f.listing ? listingSchritte() : f.schritte(f); }
+  function marken(l) { marke($('z-f-' + FA), l.length); }
+  function zeichneAblauf() {
+    if (!F || F.art !== FA) return;
+    einbauLoesen();
+    var l = faelle(); marken(l);
+    var h = '';
+    if (FALL && FERTIG) {
+      var rest = l.filter(function (x) { return x.key !== FALL.key; });
+      h = '<div class="karte f-fertig"><h2>✓ ' + t('g.fertig') + ': ' + esc(FALL.titel) + '</h2>'
+        + (rest.length ? '<p class="still">' + t('g.offen', rest.length) + '</p><div class="f-weiter"><button onclick="zurListe()">' + t('g.liste') + '</button><button class="dunkel" onclick="fallStarten(\'' + esc(rest[0].key) + '\')">' + t('g.naechstes', esc(rest[0].titel)) + ' →</button></div>'
+          : '<p>' + t('g.allesfertig') + '</p><div class="f-weiter"><button onclick="zurListe()">' + t('g.liste') + '</button><span></span></div>') + '</div>';
+      $('f-leiste').innerHTML = ''; $('f-schritte').innerHTML = h; return;
+    }
+    if (FALL) {
+      var s = schritteVon(FALL); if (SCHR >= s.length) SCHR = s.length - 1;
+      var x = s[SCHR];
+      $('f-leiste').innerHTML = '<button onclick="zurListe()">← ' + t('g.liste') + '</button>' + s.map(function (y, i) {
+        return '<button class="' + (i === SCHR ? 'an' : '') + '"' + (i < SCHR ? ' onclick="geheSchritt(' + i + ')"' : ' disabled') + '>' + (i < SCHR ? '✓ ' : (i + 1) + ' ') + esc(y.titel) + '</button>';
+      }).join('');
+      h = '<div class="karte"><div class="f-fall"><strong>' + esc(FALL.titel) + '</strong><span class="still">' + (FALL.info || '') + '</span></div><h2>' + esc(x.titel) + '</h2>' + x.html
+        + '<div class="f-weiter">' + (SCHR > 0 ? '<button onclick="geheSchritt(' + (SCHR - 1) + ')">← ' + t('g.zurueck') + '</button>' : '<span></span>')
+        + '<div class="knoepfe">' + (x.neben ? '<button id="f-neben">' + esc(x.neben[0]) + '</button>' : '') + (x.aktion ? '<button class="dunkel" id="f-aktion">' + esc(x.aktion[0]) + ' →</button>' : '') + '</div></div></div>';
+      $('f-schritte').innerHTML = h;
+      if (x.aktion) $('f-aktion').onclick = x.aktion[1];
+      if (x.neben) $('f-neben').onclick = x.neben[1];
+      einbauen();
+      if (x.start) x.start();
+      return;
+    }
+    $('f-leiste').innerHTML = '';
+    var vorher = { taeglich: vorherTaeglich, schicht1: vorherListing, schicht2: vorherPacken, schicht3: function () { return ''; } }[FA]();
+    var nachher = { schicht1: nachherListing, schicht3: nachherVersenden }[FA];
+    h = vorher + '<div class="karte"><div class="kopf"><h2>' + t('f.' + FA) + '</h2><span class="still">' + t('g.offen', l.length) + '</span></div>'
+      + (l.length ? l.map(function (f) {
+        return '<div class="f-zeile f-eintrag">' + (f.bild ? '<img class="vbild" src="' + esc(f.bild) + '" alt="">' : '') + '<div class="f-text"><strong>' + esc(f.titel) + '</strong><span class="still">' + (f.info || '') + '</span>'
+          + (f.tag ? ' <span class="etikett ' + (f.tagKlasse || '') + '">' + esc(f.tag) + '</span>' : '') + '</div><div class="knoepfe"><button class="haupt-knopf" onclick="fallStarten(\'' + esc(f.key) + '\')">' + t('g.start') + ' →</button></div></div>';
+      }).join('') : '<p class="still">' + t('g.leer') + '</p>') + '</div>' + (nachher ? nachher() : '');
+    $('f-schritte').innerHTML = h;
+    einbauen();
+  }
+  /* Listing: oeffne() meldet ein geladenes Stück hier an, egal ob aus der Liste, der Suche oder «ohne Analyse» */
+  function listingFall(r) {
+    FALL = { key: 'l' + r.id, titel: r.bezeichnung, info: esc(r.id) + (r.lagerort ? ' · ' + esc(r.lagerort) : ''), listing: true };
+    FERTIG = false; SCHR = 0; zeichneAblauf(); window.scrollTo(0, 0);
+  }
 
   /* Bank-Export, Etikette, Kopieren: unverändert */
   function xlsxLaden(ok) {
@@ -1586,10 +1768,11 @@
         var bin = atob(e.pdf), bytes = new Uint8Array(bin.length);
         for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         var u = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-        o.sendung = e.sendung;
-        melde(t('f.s2.etikette.da', e.sendung), 'ok');
+        if (o) { o.sendung = e.sendung; o.pdfUrl = u; }
+        if (FALL && FALL.o && FALL.o.nr === nr) { FALL.o.sendung = e.sendung; FALL.o.pdfUrl = u; }
+        melde(t('g.p.etikette.da', e.sendung), 'ok');
         window.open(u, '_blank');
-        var k = $('et-' + nr); if (k) k.insertAdjacentHTML('afterbegin', '<a href="' + u + '" download="' + esc(e.name) + '" target="_self">' + esc(e.name) + '</a>');
+        zeichneAblauf();
       });
     };
     if (o && o.sendung) frage(t('f.s2.etikette.frage', o.pgId || nr, o.sendung), los); else los();
