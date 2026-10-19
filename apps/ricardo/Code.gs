@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.4';
+const VERSION = '2026-10-19.5';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -13,12 +13,12 @@ const L_COLS = ['PG-ID', 'Status', 'EAN', 'Bezeichnung', 'Kategorie', 'Neupreis 
   'Titel', 'Beschrieb', 'Ricardo-Link', 'Bearbeitet von',
   'Angelegt am', 'Gelistet am', 'Verkauft am', 'Versendet am', 'Spezifikationen', 'Produktlink', 'Quelle Tab',
   'Bündel-IDs', 'Bündel-Inhalt', 'Getestet', 'Erzielter Preis CHF', 'Verkauf-Nr', 'Mängel Text', 'Text Englisch',
-  'Analyse-Nr', 'Foto-Ordner', 'Text geändert', 'Laufzeit Tage'];
+  'Analyse-Nr', 'Foto-Ordner', 'Text geändert', 'Laufzeit Tage', 'Entscheid unverkauft'];
 
 const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW', 'Preis CHF', 'Versand CHF', 'Total CHF',
   'Provision CHF', 'Auszahlung CHF', 'Status', 'Käufer', 'Firma', 'Vorname', 'Nachname', 'Strasse', 'Hausnummer', 'Postfach',
   'PLZ', 'Ort', 'Lieferart', 'Gepackt am', 'Bezahlt und versendet am', 'Storniert am', 'Lagerort', 'Versandklasse',
-  'Quelle', 'Käufer meldet bezahlt am'];
+  'Quelle', 'Käufer meldet bezahlt am', 'Bezahlt am', 'Bank-Zahlung', 'Ricardo bezahlt gemeldet am', 'Sendungsnummer', 'Etikette am'];
 // Posteingang: was aus den Ricardo-Mails zu erledigen ist (Fragen, Nachrichten, Preisvorschläge, Hinweise). ID = Gmail-Nachricht
 const I_COLS = ['ID', 'Eingang', 'Art', 'Status', 'Artikel-Nr', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Von', 'Text', 'Betrag CHF', 'Preis CHF', 'Frist',
   'Empfehlung', 'Entwurf', 'Link', 'Erledigt am', 'Erledigt von'];
@@ -32,7 +32,9 @@ const MONATE = { januar: 0, februar: 1, 'märz': 2, maerz: 2, april: 3, mai: 4, 
 const RICARDO_A = 'https://www.ricardo.ch/de/a/', RICARDO_ORDER = 'https://www.ricardo.ch/de/my-ricardo/selling/order/';
 // Wird ADRESSE_TAGE nach dem Verkauf gelöscht. Der Name bleibt, damit Zahlung und Rückzahlung zugeordnet werden können
 const ADRESSE = ['Strasse', 'Hausnummer', 'Postfach'];
-const V_OFFEN = ['Zu packen', 'Wartet auf Zahlung'];
+const V_OFFEN = ['Zu packen', 'Wartet auf Zahlung', 'Bereit zum Versand'];
+// Entscheid pro unverkauftem Stück (Schicht 2). «Neu listen» setzt das Stück auf «Bereit», es erscheint wieder in Schicht 1
+const ENTSCHEIDE_UNVERKAUFT = ['Neu listen', 'Anderer Kanal', 'Entsorgung'];
 const R_COLS = ['Retoure-Nr', 'Status', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Käufer', 'Name', 'Verkauft am', 'Eröffnet am', 'Grund', 'Notiz',
   'Rückzahlung CHF', 'Rückzahlung am', 'Ricardo storniert am', 'Abgeschlossen am',
   'Preis CHF', 'Versand CHF', 'Provision CHF', 'Eröffnet von', 'IBAN', 'Adresse', 'PLZ', 'Ort'];
@@ -46,7 +48,7 @@ const POST_KOPF = ['Firmenname', 'Firmenzusatz', 'Anrede', 'Nachname', 'Vorname'
 const OFFEN = ['In Arbeit', 'Bereit'];
 // Regal im Lager je Status des Listings bzw. des Verkaufs. Die Namen stehen in den Einstellungen (im Admin-Teil umbenennbar)
 const REGAL_STATUS = { 'In Arbeit': 'Regal Offline', 'Bereit': 'Regal Offline', 'Gelistet': 'Regal Online', 'Verkauft': 'Regal Unpaid',
-  'Zu packen': 'Regal Unpaid', 'Wartet auf Zahlung': 'Regal Unpaid' };
+  'Zu packen': 'Regal Unpaid', 'Wartet auf Zahlung': 'Regal Unpaid', 'Bereit zum Versand': 'Regal Unpaid' };
 const REGAL_VORGABE = { 'Regal Offline': 'Ricardo Offline', 'Regal Online': 'Ricardo Online', 'Regal Unpaid': 'Ricardo Unpaid' };
 const SCHLUSSSATZ = 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.';
 const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM', ANALYSE_TAB = 'Ricardo';
@@ -84,6 +86,7 @@ const DEFAULTS = [
   ['Rückzahlungen an', 'invoice@pretty-good.ch', 'An diese Adresse schickt das Tool bei jeder neuen Retoure eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto. Wer zahlt, klickt danach im Tool «Rückzahlung gemacht»'],
   ['Mail-Absender', 'care@pretty-good.ch', 'Von dieser Adresse kommen die Ricardo-Mails ins Postfach (Google-Gruppe). Das Tool verarbeitet nur Mails, die nachweislich von Ricardo stammen.'],
   ['Preisvorschlag bis Stunden nach Auktionsende', 24, 'Preisvorschläge, die bis so viele Stunden nach dem Ende der Auktion eintreffen, empfiehlt das Tool anzunehmen. Spätere ablehnen. Entscheid Jonas 16.10.2026.'],
+  ['Storno vorschlagen nach Tagen', 10, 'Ist ein Verkauf nach so vielen Tagen nicht bezahlt, erscheint er im Ablauf «Täglich» unter «Storno prüfen». Storniert wird nur von Hand.'],
   ['Zahlungserinnerung nach Tagen', 3, 'Ist ein Verkauf nach so vielen Tagen nicht bezahlt und versendet, erscheint er unter «Zu erledigen» mit einem Text für die Erinnerung.'],
   ['Antwort-Anweisung', 'Kurz und freundlich, höchstens vier Sätze. Antworte in der Anrede der Frage (Du oder Sie), im Zweifel Sie. Schluss: «Liebe Grüsse, Pretty Good».', 'So schreibt Claude die Antwortentwürfe auf Fragen. In normalen Worten änderbar.']
 ];
@@ -254,7 +257,7 @@ const DOKU = [
     'Nummern: PG-… kommt aus dem Return Tool bzw. der Analyse (Spalte «Analyse-Nr»). RC-0001 vergibt das Tool für Stücke ohne Inventar. RT-0001 sind Retouren.'
   ]],
   ['STATUS VERKAUF', [
-    'Zu packen > Wartet auf Zahlung (gepackt) > Bezahlt und versendet. Dazu: Storniert (im Admin-Teil gelöscht), Retourniert.',
+    'Zu packen > Wartet auf Zahlung (gepackt, nicht bezahlt) oder Bereit zum Versand (gepackt und bezahlt) > Bezahlt und versendet. Dazu: Storniert (im Admin-Teil gelöscht), Retourniert.',
     'Zuordnung Verkauf zu Listing: zuerst über die Referenz-Nr. im Ricardo-Angebot (= PG-ID), sonst über die Artikelnummer im gespeicherten Ricardo-Link. Fehlt beides, steht der Verkauf als «nicht zugeordnet» in der Liste.',
     'Ein Verkauf wird nur einmal eingelesen (Schlüssel: Order ID). Denselben Bericht mehrmals einlesen schadet nicht.'
   ]],
@@ -931,7 +934,7 @@ function markiereGelistet(id, link, tage) {
     const n = Number(tage);
     if (tage !== undefined && tage !== '' && !(n >= 1 && n <= 30 && Math.round(n) === n)) throw new Error('Laufzeit: bitte eine ganze Zahl von 1 bis 30 Tagen eintragen.');
     rec['Status'] = 'Gelistet'; rec['Ricardo-Link'] = link; rec['Gelistet am'] = new Date(); rec['Bearbeitet von'] = nutzer_();
-    rec['Laufzeit Tage'] = laufzeitVon_(tage, cfg_('Laufzeit Tage'));
+    rec['Laufzeit Tage'] = laufzeitVon_(tage, cfg_('Laufzeit Tage')); rec['Entscheid unverkauft'] = '';
     schreibe_(sh, zeile, rec, true);
     log_('Gelistet', id, link);
     return lade_(id);
@@ -1258,7 +1261,7 @@ function verkaeufe() {
     offen.push(vZeile_(v));
   });
   hauptbilder_(offen);
-  const rang = { 'Zu packen': 0, 'Wartet auf Zahlung': 1 };
+  const rang = { 'Zu packen': 0, 'Bereit zum Versand': 1, 'Wartet auf Zahlung': 2 };
   // Holliste: zuerst nach Status, dann nach Lagerort
   offen.sort(function (a, b) { return (rang[a.status] - rang[b.status]) || String(a.lagerort).localeCompare(String(b.lagerort)) || a.nr.localeCompare(b.nr); });
   return { offen: offen, zuPacken: offen.filter(function (o) { return o.status === 'Zu packen'; }).length };
@@ -1295,10 +1298,11 @@ function vZeile_(v) {
     total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
     name: [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer']), kaeufer: String(v['Käufer']),
     ort: [v['PLZ'], v['Ort']].join(' ').trim(), lagerort: v['Lagerort'] || regal_(v['Status']), klasse: v['Versandklasse'] || v['Lieferart'],
-    meldet: datum_(v['Käufer meldet bezahlt am']), ohneAdresse: !String(v['Nachname'] || '').trim() || !String(v['PLZ'] || '').trim() };
+    meldet: datum_(v['Käufer meldet bezahlt am']), bezahlt: datum_(v['Bezahlt am']), ricardoGemeldet: datum_(v['Ricardo bezahlt gemeldet am']),
+    sendung: String(v['Sendungsnummer'] || ''), artikel: String(v['Artikel-Nr'] || ''), link: RICARDO_ORDER + String(v['Verkauf-Nr']) + '/', ohneAdresse: !String(v['Nachname'] || '').trim() || !String(v['PLZ'] || '').trim() };
 }
 
-/** aktion: 'gepackt' oder 'bezahlt'. */
+/** aktion: 'gepackt', 'bezahlt' (Zahlung von Hand), 'versendet' (Schicht 3) oder 'ricardoBezahlt' (Zahlung auf Ricardo gemeldet). */
 function setzeVerkauf(nr, aktion) {
   nr = String(nr).trim();
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
@@ -1312,12 +1316,22 @@ function setzeVerkauf(nr, aktion) {
     const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     let listingStatus = '';
+    const bezahlt = v['Bezahlt am'] instanceof Date;
     if (aktion === 'gepackt') {
       if (v['Status'] !== 'Zu packen') throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
-      v['Status'] = 'Wartet auf Zahlung'; v['Gepackt am'] = new Date();
+      v['Status'] = bezahlt ? 'Bereit zum Versand' : 'Wartet auf Zahlung'; v['Gepackt am'] = new Date();
     } else if (aktion === 'bezahlt') {
+      /* Zahlung von Hand erfasst (ohne Bank-Upload). Versendet wird erst in Schicht 3 */
       if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
+      if (bezahlt) throw new Error('Zahlung ist schon erfasst (' + datum_(v['Bezahlt am']) + ').');
+      v['Bezahlt am'] = new Date(); v['Bank-Zahlung'] = 'von Hand: ' + nutzer_();
+      if (v['Status'] === 'Wartet auf Zahlung') v['Status'] = 'Bereit zum Versand';
+    } else if (aktion === 'versendet') {
+      if (v['Status'] !== 'Bereit zum Versand') throw new Error('Versenden geht erst, wenn der Verkauf gepackt und bezahlt ist (Status: «' + v['Status'] + '»).');
       v['Status'] = 'Bezahlt und versendet'; v['Bezahlt und versendet am'] = new Date(); listingStatus = 'Versendet';
+    } else if (aktion === 'ricardoBezahlt') {
+      if (!bezahlt) throw new Error('Die Zahlung ist noch nicht erfasst.');
+      v['Ricardo bezahlt gemeldet am'] = new Date();
     } else throw new Error('Unbekannte Aktion.');
     sv.getRange(zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
     if (listingStatus && v['PG-ID']) {
@@ -1875,7 +1889,7 @@ function aufgaben() {
   const tage = Number(cfg_('Zahlungserinnerung nach Tagen')) || 3, zahlung = [];
   if (sv && sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (r) {
     const am = r[vi('Verkauft am')], nr = String(r[0]);
-    if (V_OFFEN.indexOf(r[vi('Status')]) === -1 || !(am instanceof Date) || jetzt - am.getTime() < tage * 86400000 || erinnert[nr]) return;
+    if (V_OFFEN.indexOf(r[vi('Status')]) === -1 || r[vi('Bezahlt am')] instanceof Date || !(am instanceof Date) || jetzt - am.getTime() < tage * 86400000 || erinnert[nr]) return;
     const name = String(r[vi('Vorname')] || '').trim() || String(r[vi('Käufer')] || '');
     zahlung.push({ nr: nr, pgId: String(r[vi('PG-ID')]), titel: r[vi('Titel')], kaeufer: String(r[vi('Käufer')]), total: Number(r[vi('Total CHF')]).toFixed(2),
       tage: Math.floor((jetzt - am.getTime()) / 86400000), meldet: datum_(r[vi('Käufer meldet bezahlt am')]), link: RICARDO_ORDER + nr,
@@ -1943,6 +1957,7 @@ function api(lang, name, args) {
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
+    ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
@@ -1957,7 +1972,7 @@ function api(lang, name, args) {
 
 const EN_STATUS = { 'In Arbeit': 'In progress', 'Bereit': 'Ready', 'Gelistet': 'Listed', 'Verkauft': 'Sold', 'Versendet': 'Shipped',
   'Storniert': 'Cancelled', 'Unverkauft': 'Unsold', 'Abgebrochen': 'Discarded', 'Zu packen': 'To pack',
-  'Wartet auf Zahlung': 'Awaiting payment', 'Bezahlt und versendet': 'Paid and shipped', 'Retourniert': 'Returned', 'Retour abgeschlossen': 'Return closed' };
+  'Wartet auf Zahlung': 'Awaiting payment', 'Bereit zum Versand': 'Ready to ship', 'Bezahlt und versendet': 'Paid and shipped', 'Retourniert': 'Returned', 'Retour abgeschlossen': 'Return closed' };
 function st_(s) { return EN_STATUS[s] || s; }
 
 /** Meldungen entstehen auf Deutsch und werden hier für die englische Oberfläche übersetzt. Unbekannte Meldungen bleiben deutsch. */
@@ -2113,7 +2128,7 @@ function jetztR_(listings, verkaeufe, jetzt, zahlTage) {
   return {
     gelistet: listings.filter(function (x) { return x['Status'] === 'Gelistet'; }).length,
     zuPacken: verkaeufe.filter(function (x) { return x['Status'] === 'Zu packen'; }).length,
-    zahlungOffen: verkaeufe.filter(function (x) { return V_OFFEN.indexOf(x['Status']) > -1 && x['Verkauft am'] instanceof Date && jetzt - x['Verkauft am'].getTime() >= zahlTage * 86400000; }).length,
+    zahlungOffen: verkaeufe.filter(function (x) { return V_OFFEN.indexOf(x['Status']) > -1 && !(x['Bezahlt am'] instanceof Date) && x['Verkauft am'] instanceof Date && jetzt - x['Verkauft am'].getTime() >= zahlTage * 86400000; }).length,
     zahlTage: zahlTage
   };
 }
@@ -2437,6 +2452,236 @@ function retoureSchritt(rtNr, schritt, wert) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Abläufe: Täglich, Schicht 1 Listen, Schicht 2 Packen, Schicht 3 Versenden */
+/* ------------------------------------------------------------------ */
+/* Entscheid Jonas 19.10.2026: Jeder Ablauf führt Schritt für Schritt durch Tool, Lager und Ricardo, mit direktem Link zur Ricardo-Seite.
+   Zahlungen kommen aus dem Bank-Export (Täglich), die Etikette beim Packen (Schicht 2), versendet wird nur, was gepackt und bezahlt ist (Schicht 3). */
+const RICARDO_LISTEN = 'https://www.ricardo.ch/de/list/', RICARDO_VERKAUFT = 'https://www.ricardo.ch/de/my-ricardo/selling/orders/',
+  RICARDO_AM_VERKAUFEN = 'https://www.ricardo.ch/de/my-ricardo/selling/offers/';
+
+/** Artikelnummer aus einem Ricardo-Link (letzte Zahl mit mindestens 6 Stellen). */
+function artikelAusLink_(link) { const m = String(link || '').match(/(\d{6,})(?!.*\d{6,})/); return m ? m[1] : ''; }
+
+function alleVerkaeufe_() {
+  const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+  if (!sv || sv.getLastRow() < 2) return [];
+  return sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().map(function (row, i) {
+    const v = { _zeile: i + 2 }; V_COLS.forEach(function (k, j) { v[k] = row[j]; }); return v;
+  });
+}
+function alleListings_() {
+  const sl = SpreadsheetApp.getActive().getSheetByName(TAB_L);
+  if (!sl || sl.getLastRow() < 2) return [];
+  return sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues().map(function (row, i) {
+    const r = { _zeile: i + 2 }; L_COLS.forEach(function (k, j) { r[k] = row[j]; }); return r;
+  }).filter(function (r) { return String(r['PG-ID']).trim(); });
+}
+
+/** Daten für einen Ablauf: 'taeglich', 'schicht1', 'schicht2', 'schicht3'. */
+function ablauf(art) {
+  const jetzt = Date.now(), pr = PropertiesService.getScriptProperties();
+  const kurz = function (v) { return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID'] || ''), titel: v['Titel'], kaeufer: String(v['Käufer'] || ''),
+    name: [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer'] || ''), total: Number(v['Total CHF']).toFixed(2),
+    am: datum_(v['Verkauft am']), tage: v['Verkauft am'] instanceof Date ? Math.floor((jetzt - v['Verkauft am'].getTime()) / 86400000) : 0,
+    bezahlt: datum_(v['Bezahlt am']), link: RICARDO_ORDER + String(v['Verkauf-Nr']) + '/' }; };
+  const links = { listen: RICARDO_LISTEN, verkauft: RICARDO_VERKAUFT, amVerkaufen: RICARDO_AM_VERKAUFEN, artikel: RICARDO_A };
+  if (art === 'taeglich') {
+    const vs = alleVerkaeufe_(), stornoTage = Number(cfg_('Storno vorschlagen nach Tagen')) || 10;
+    const melden = vs.filter(function (v) { return v['Bezahlt am'] instanceof Date && !(v['Ricardo bezahlt gemeldet am'] instanceof Date) && ['Storniert', 'Retourniert'].indexOf(v['Status']) === -1; }).map(kurz);
+    const storno = vs.filter(function (v) { return V_OFFEN.indexOf(v['Status']) !== -1 && !(v['Bezahlt am'] instanceof Date) && v['Verkauft am'] instanceof Date && jetzt - v['Verkauft am'].getTime() >= stornoTage * 86400000; })
+      .map(function (v) { const k = kurz(v); k.storno = RICARDO_ORDER + 'cancelation/' + k.nr + '/'; k.status = v['Status']; return k; });
+    const bank = Number(pr.getProperty('BANK_LETZTE')) || 0;
+    return { art: art, links: links, aufgaben: aufgaben(), melden: melden, storno: storno, stornoTage: stornoTage, retouren: retouren().offen.length,
+      letzteBank: bank ? Utilities.formatDate(new Date(bank), TZ, 'dd.MM.yyyy HH:mm') : '' };
+  }
+  if (art === 'schicht1') {
+    const bereit = alleListings_().filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
+      return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], regal: regal_(r['Status']), wieder: r['Entscheid unverkauft'] === 'Neu listen' };
+    });
+    return { art: art, links: links, bereit: bereit, analyse: analyseListe().length, aktiv: zaehleAktive_(), schwelle: Number(cfg_('Warnschwelle aktive Angebote')) || 90,
+      laufzeit: Number(cfg_('Laufzeit Tage')) || 6, regale: { offline: regal_('Bereit'), online: regal_('Gelistet') } };
+  }
+  if (art === 'schicht2') {
+    const ls = alleListings_(), laufzeit = Number(cfg_('Laufzeit Tage')) || 6;
+    const unverkauft = ls.filter(function (r) { return ['Unverkauft', 'Storniert'].indexOf(r['Status']) !== -1 && !String(r['Entscheid unverkauft'] || '').trim(); }).map(function (r) {
+      const a = artikelAusLink_(r['Ricardo-Link']);
+      return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], artikel: a, kopieren: a ? RICARDO_LISTEN + '?prefill=' + a : '' };
+    });
+    const ohneMail = ls.filter(function (r) {
+      return r['Status'] === 'Gelistet' && r['Gelistet am'] instanceof Date && r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], laufzeit) * 86400000 < jetzt;
+    }).map(function (r) { return { id: String(r['PG-ID']), name: r['Bezeichnung'], link: r['Ricardo-Link'], ende: datum_(new Date(r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], laufzeit) * 86400000)) }; });
+    const imp = Number(pr.getProperty('LETZTER_IMPORT')) || 0;
+    return { art: art, links: links, verkaeufe: verkaeufe(), unverkauft: unverkauft, ohneMail: ohneMail, entscheide: ENTSCHEIDE_UNVERKAUFT,
+      letzterImport: imp ? datum_(new Date(imp)) : '', postBereit: !!(pr.getProperty('POST_CLIENT_ID') && pr.getProperty('POST_CLIENT_SECRET')),
+      regale: { offline: regal_('Bereit'), unpaid: regal_('Verkauft') } };
+  }
+  if (art === 'schicht3') {
+    const vs = alleVerkaeufe_();
+    const versand = vs.filter(function (v) { return v['Status'] === 'Bereit zum Versand'; }).map(vZeile_);
+    return { art: art, links: links, versand: versand, warten: vs.filter(function (v) { return v['Status'] === 'Wartet auf Zahlung'; }).length,
+      regale: { unpaid: regal_('Verkauft') } };
+  }
+  throw new Error('Unbekannter Ablauf.');
+}
+
+/* ---------- Bank-Export: Zahlungen zuordnen ---------- */
+
+/** Text für den Vergleich: klein, ohne Akzente und Satzzeichen, ae/oe/ue wie a/o/u (Banken schreiben Umlaute verschieden). */
+function bankNorm_(s) {
+  return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss').replace(/([aou])e/g, '$1').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';   // Hügli = Huegli = Hugli
+}
+
+/**
+ * Ordnet Gutschriften aus dem Bank-Export offenen Verkäufen zu (ohne Zahlung, nicht storniert).
+ * zeilen = [{ datum: 'yyyy-mm-dd', text, betrag, auftrag }]. Gibt Vorschläge zurück, schreibt nichts.
+ * Sicher: Artikel- oder Verkaufsnummer in der Mitteilung und Betrag gleich Total. Unsicher: Nummer mit anderem Betrag, oder Name und Betrag.
+ */
+function bankAbgleich(zeilen) {
+  if (!Array.isArray(zeilen)) throw new Error('Keine Bankdaten erhalten.');
+  return bankAbgleichRechnen_(zeilen, alleVerkaeufe_());
+}
+function bankAbgleichRechnen_(zeilen, vs) {
+  const offen = vs.filter(function (v) { return V_OFFEN.indexOf(v['Status']) !== -1 && !(v['Bezahlt am'] instanceof Date); });
+  const schonBezahlt = {};
+  vs.forEach(function (v) { if (v['Bezahlt am'] instanceof Date) { schonBezahlt[String(v['Verkauf-Nr'])] = 1; schonBezahlt[String(v['Artikel-Nr'])] = 1; } });
+  const cent = function (x) { return Math.round(Number(x) * 100); };
+  const gut = zeilen.map(function (z, i) { return { i: i, datum: String(z.datum || ''), text: String(z.text || ''), betrag: Number(z.betrag) || 0, auftrag: String(z.auftrag || '') }; })
+    .filter(function (z) { return z.betrag > 0 && /^\d{4}-\d{2}-\d{2}$/.test(z.datum); });
+  const vergeben = {}, belegt = {}, sicher = [], unsicher = [];
+  let erfasst = 0;
+  const vorschlag = function (z, v, grund) {
+    vergeben[String(v['Verkauf-Nr'])] = true; belegt[z.i] = true;
+    return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID'] || ''), titel: v['Titel'], kaeufer: String(v['Käufer'] || ''),
+      name: [v['Vorname'], v['Nachname']].join(' ').trim(), total: Number(v['Total CHF']).toFixed(2), status: v['Status'], grund: grund,
+      bank: { datum: z.datum, betrag: z.betrag.toFixed(2), text: z.text.slice(0, 300), auftrag: z.auftrag } };
+  };
+  /* 1. Nummer und Betrag */
+  gut.forEach(function (z) {
+    const nummern = z.text.match(/\d{8,}/g) || [];
+    if (!nummern.length) return;
+    const k = offen.filter(function (v) { return !vergeben[String(v['Verkauf-Nr'])] && (nummern.indexOf(String(v['Artikel-Nr'])) !== -1 || nummern.indexOf(String(v['Verkauf-Nr'])) !== -1); });
+    if (k.length === 1 && cent(k[0]['Total CHF']) === cent(z.betrag)) sicher.push(vorschlag(z, k[0], 'Nummer und Betrag'));
+    else if (k.length === 1) unsicher.push(vorschlag(z, k[0], 'Nummer stimmt, Betrag weicht ab (Total CHF ' + Number(k[0]['Total CHF']).toFixed(2) + ')'));
+    else if (!k.length && nummern.some(function (n) { return schonBezahlt[n]; })) { belegt[z.i] = true; erfasst++; }
+  });
+  /* 2. Name und Betrag */
+  gut.forEach(function (z) {
+    if (belegt[z.i]) return;
+    const t = bankNorm_(z.text);
+    const k = offen.filter(function (v) {
+      if (vergeben[String(v['Verkauf-Nr'])] || cent(v['Total CHF']) !== cent(z.betrag)) return false;
+      const nn = bankNorm_(v['Nachname']).trim();
+      return nn.length >= 3 && t.indexOf(' ' + nn + ' ') !== -1;
+    });
+    if (k.length === 1) unsicher.push(vorschlag(z, k[0], 'Name und Betrag'));
+  });
+  return { sicher: sicher, unsicher: unsicher, gutschriften: gut.length, schonErfasst: erfasst, offen: offen.length };
+}
+
+/** Bestätigte Zahlungen eintragen. liste = [{ nr, bank: { datum, betrag, auftrag } }]. */
+function bankBestaetigen(liste) {
+  if (!Array.isArray(liste) || !liste.length) throw new Error('Keine Zahlung ausgewählt.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S), vs = alleVerkaeufe_(), nachNr = {};
+    vs.forEach(function (v) { nachNr[String(v['Verkauf-Nr'])] = v; });
+    let n = 0;
+    liste.forEach(function (x) {
+      const v = nachNr[String(x.nr)], b = x.bank || {};
+      if (!v || v['Bezahlt am'] instanceof Date || V_OFFEN.indexOf(v['Status']) === -1) return;
+      const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(b.datum || ''));
+      v['Bezahlt am'] = d ? Utilities.parseDate(d[0] + ' 12:00', TZ, 'yyyy-MM-dd HH:mm') : new Date();
+      v['Bank-Zahlung'] = 'Bank ' + (d ? d[3] + '.' + d[2] + '.' + d[1] : '') + ', CHF ' + Number(b.betrag || 0).toFixed(2) + (b.auftrag ? ', Auftrag ' + String(b.auftrag).slice(0, 40) : '');
+      if (v['Status'] === 'Wartet auf Zahlung') v['Status'] = 'Bereit zum Versand';
+      sv.getRange(v._zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
+      n++;
+    });
+    PropertiesService.getScriptProperties().setProperty('BANK_LETZTE', String(Date.now()));
+    log_('Bank-Abgleich', '', n + ' Zahlungen erfasst');
+    return ablauf('taeglich');
+  } finally { lock.releaseLock(); }
+}
+
+/* ---------- Unverkauft: Entscheid pro Stück (Schicht 2) ---------- */
+
+function entscheidUnverkauft(id, entscheid) {
+  if (ENTSCHEIDE_UNVERKAUFT.indexOf(entscheid) === -1) throw new Error('Unbekannter Entscheid.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id);
+    if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
+    const rec = zeileZuRec_(sh, zeile);
+    if (['Unverkauft', 'Storniert'].indexOf(rec['Status']) === -1) throw new Error('Das Stück ist «' + rec['Status'] + '», nicht unverkauft.');
+    rec['Entscheid unverkauft'] = entscheid; rec['Bearbeitet von'] = nutzer_();
+    if (entscheid === 'Neu listen') rec['Status'] = 'Bereit';
+    schreibe_(sh, zeile, rec, true);
+    log_('Unverkauft: ' + entscheid, id, '');
+    return ablauf('schicht2');
+  } finally { lock.releaseLock(); }
+}
+
+/* ---------- Storno eines unbezahlten Verkaufs (Täglich, Entscheid von Hand) ---------- */
+
+function verkaufStornieren(nr) {
+  nr = String(nr).trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActive(), sv = ss.getSheetByName(TAB_S), sl = ss.getSheetByName(TAB_L);
+    const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
+    if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist «' + v['Status'] + '» und kann hier nicht storniert werden.');
+    if (v['Bezahlt am'] instanceof Date) throw new Error('Dieser Verkauf ist bezahlt. Storno nur über eine Retoure.');
+    v['Status'] = 'Storniert'; v['Storniert am'] = new Date();
+    ADRESSE.forEach(function (k) { v[k] = ''; });
+    sv.getRange(v._zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
+    const pg = String(v['PG-ID'] || '').trim(), lz = pg ? findeZeile_(sl, pg) : 0;
+    if (lz) {
+      const rec = zeileZuRec_(sl, lz);
+      if (String(rec['Verkauf-Nr']) === nr) { rec['Status'] = 'Storniert'; rec['Entscheid unverkauft'] = ''; schreibe_(sl, lz, rec, true); }
+    }
+    wochen_();
+    log_('Verkauf storniert (unbezahlt)', pg, nr);
+    return ablauf('taeglich');
+  } finally { lock.releaseLock(); }
+}
+
+/* ---------- Etikette (Schicht 2) ---------- */
+
+/** Post-Produkt aus Lieferart bzw. Versandklasse: A-Post = PRI, sonst ECO. Sperrgut zusätzlich SP. */
+function przl_(klasse) {
+  const k = String(klasse || '');
+  const p = [/A-Post|Priority|PRI\b/i.test(k) ? 'PRI' : 'ECO'];
+  if (/Sperrgut/i.test(k)) p.push('SP');
+  return p;
+}
+
+/** Etikette für einen Verkauf über die Barcode API. vorschau = Muster (SPECIMEN, wird nicht gespeichert). */
+function etikette(nr, vorschau) {
+  nr = String(nr).trim();
+  const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
+  if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+  if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist «' + v['Status'] + '».');
+  if (!String(v['Nachname'] || v['Firma'] || '').trim() || !String(v['PLZ'] || '').trim() || !String(v['Ort'] || '').trim())
+    throw new Error('Adresse fehlt. Sie kommt mit dem Verkaufsbericht: zuerst den Bericht einlesen.');
+  const klasse = String(v['Lieferart'] || '') + ' ' + String(v['Versandklasse'] || '');   // Lieferart aus Ricardo («Paket B-Post»), Sperrgut aus der Versandklasse
+  const e = { id: 'Ricardo ' + nr, firma: String(v['Firma'] || '').trim(), vorname: String(v['Vorname'] || '').trim(), nachname: String(v['Nachname'] || '').trim(),
+    strasse: String(v['Strasse'] || '').trim(), nr: String(v['Hausnummer'] || '').trim(), postfach: String(v['Postfach'] || '').trim(),
+    plz: String(v['PLZ']).trim(), ort: String(v['Ort']).trim() };
+  const anfrage = postAnfrage_(e, vorschau);
+  anfrage.item.attributes.przl = przl_(klasse);
+  const r = postEtiketteAnfrage_(anfrage);
+  if (!vorschau) {
+    const lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+      sv.getRange(v._zeile, V_COLS.indexOf('Sendungsnummer') + 1, 1, 2).setValues([[r.sendungsnummer, new Date()]]);
+    } finally { lock.releaseLock(); }
+    log_('Etikette', String(v['PG-ID'] || ''), nr + ' ' + r.sendungsnummer + ' ' + przl_(klasse).join('+'));
+  }
+  return { nr: nr, sendung: r.sendungsnummer, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.pdf', warnungen: r.warnungen, produkt: przl_(klasse).join('+') };
+}
+
+/* ------------------------------------------------------------------ */
 /* Post: Etiketten über die Barcode API (Digital Commerce API)         */
 /* ------------------------------------------------------------------ */
 /* Entscheid Jonas 19.10.2026: Etikette beim Packen (Schicht 2), Knopf pro Verkauf. Zugang in den Script-Eigenschaften POST_CLIENT_ID und
@@ -2471,9 +2716,10 @@ function postAnfrage_(e, vorschau) {
     item: { itemID: String(e.id || '').slice(0, 35), recipient: empf, attributes: attr } };
 }
 /** Etikette holen: { sendungsnummer, pdf (base64), warnungen }. */
-function postEtikette_(e, vorschau) {
+function postEtikette_(e, vorschau) { return postEtiketteAnfrage_(postAnfrage_(e, vorschau)); }
+function postEtiketteAnfrage_(anfrage) {
   const r = UrlFetchApp.fetch(POST_LABEL_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    headers: { Authorization: 'Bearer ' + postToken_() }, payload: JSON.stringify(postAnfrage_(e, vorschau)) });
+    headers: { Authorization: 'Bearer ' + postToken_() }, payload: JSON.stringify(anfrage) });
   const text = r.getContentText();
   let j = null; try { j = JSON.parse(text); } catch (err) { /* unten */ }
   const it = j && j.item;
