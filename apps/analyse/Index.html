@@ -278,6 +278,7 @@
   #start { position:fixed; inset:0; background:var(--grau); z-index:20; display:flex; align-items:center; justify-content:center; padding:20px; }
   #start .karte { width:100%; max-width:440px; margin:0; }
   #start input { height:64px; font:900 32px/1 var(--sans); text-align:center; text-transform:uppercase; letter-spacing:4px; }
+  #sp-info { position:fixed; left:20px; bottom:20px; background:var(--weiss); color:var(--ink); border:2px solid var(--ink); padding:8px 14px; border-radius:24px; font-weight:600; font-size:13px; z-index:30; }
   #lade { position:fixed; right:20px; bottom:20px; background:var(--ink); color:var(--weiss); padding:10px 16px; border-radius:24px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; font-size:13px; z-index:30; }
   #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); max-width:min(640px, 90vw); padding:12px 18px; border:2px solid var(--ink); border-radius:4px; background:var(--pink); font-weight:600; z-index:40; }
   #toast.stop { background:var(--ink); color:var(--weiss); }
@@ -478,6 +479,7 @@
   <p class="still" data-t="fs.hinweis"></p>
 </div>
 <div id="lade" hidden></div>
+<div id="sp-info" hidden></div>
 <div id="toast" hidden></div>
 
 <div id="fb" hidden><div class="fb-karte karte" role="dialog" aria-modal="true" aria-labelledby="fb-titel">
@@ -631,6 +633,9 @@
     'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
     'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
     'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
+    'sp.laeuft': ['Speichert im Hintergrund: {0}', 'Saving in the background: {0}'], 'sp.speichert': ['Wird gespeichert …', 'Saving …'],
+    'sp.fehler': ['«{0}» konnte nicht gespeichert werden: {1} Die Analyse liegt unter «Pausiert», dort geht es weiter.', '«{0}» could not be saved: {1} The analysis is under «Paused», continue there.'],
+    'sp.offen': ['Es fehlt noch etwas.', 'Something is still missing.'], 'sp.noch': ['Dieses Stück wird gerade gespeichert.', 'This item is being saved right now.'],
     'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
     'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
     'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pausieren', 'Pause'], 'weiter': ['Weiter', 'Resume'],
@@ -734,11 +739,29 @@
   function ruf(name, args, ok, fehler) {
     if (OFFEN[name]) return false;
     OFFEN[name] = true; $('lade').hidden = false;
-    var fertig = function (f, x) { delete OFFEN[name]; $('lade').hidden = !Object.keys(OFFEN).length; f(x); };
+    var t0 = Date.now();
+    var fertig = function (f, x) { delete OFFEN[name]; $('lade').hidden = !Object.keys(OFFEN).length; uiZeit(name, Date.now() - t0, true); f(x); };
     google.script.run.withSuccessHandler(function (x) { fertig(ok, x); })
       .withFailureHandler(function (e) { fertig(fehler || function (m) { melde(m, true); }, String((e && e.message) || e).replace(/^Error:\s*/, '')); })
       .api(L, name, args);
     return true;
+  }
+  /* ---------- Weg A: Messen, was die Person wirklich wartet (Entscheid Jonas 19.10.2026) ----------
+     Jeder Aufruf misst die Zeit bis zur Antwort im Browser. Alle 2 Minuten geht eine Zusammenfassung still ans Log («Tempo UI»). */
+  var UIT = {};
+  function uiZeit(name, ms, wartet) { var k = name + (wartet ? '' : '~'); (UIT[k] = UIT[k] || []).push(ms); }
+  function uiSenden() {
+    var z = Object.keys(UIT).map(function (k) { var l = UIT[k].slice().sort(function (a, b) { return a - b; }); return [k.replace(/~$/, ''), l.length, l[Math.floor(l.length / 2)], l[l.length - 1], !/~$/.test(k)]; });
+    if (!z.length) return;
+    UIT = {};
+    try { google.script.run.withFailureHandler(function () {}).api(L, 'uiTempo', [z, K]); } catch (e) { /* nächstes Mal */ }
+  }
+  setInterval(uiSenden, 120000);
+  /* Ohne Warten im Hintergrund (keine Lade-Anzeige). Misst trotzdem mit. */
+  function leise(name, args, ok, fehler) {
+    var t0 = Date.now();
+    google.script.run.withSuccessHandler(function (x) { uiZeit(name, Date.now() - t0, false); if (ok) ok(x); })
+      .withFailureHandler(function (e) { uiZeit(name, Date.now() - t0, false); if (fehler) fehler(String((e && e.message) || e).replace(/^Error:\s*/, ''), e); }).api(L, name, args);
   }
   /* Aufruf, der bis zu einer Minute dauert: Der Knopf ist solange gesperrt, im Feld steht der Wartetext und danach, wenn nötig, der Fehler. */
   function rufLang(name, args, knopf, feld, text, ok) {
@@ -789,7 +812,7 @@
   function sessionStart() {
     var k = $('kuerzel').value.trim().toUpperCase();
     if (!/^[A-ZÄÖÜ]{2,4}$/.test(k)) { $('start-meldung').innerHTML = box(t('start.fehler'), 'warn'); return; }
-    K = k; merke('at-kuerzel', K); merke('at-kuerzel-tag', heute()); $('wer').textContent = K; $('start').hidden = true; zeichnePausiert();
+    K = k; merke('at-kuerzel', K); merke('at-kuerzel-tag', heute()); $('wer').textContent = K; $('start').hidden = true; zeichnePausiert(); spZeigen(); spWeiter();
     ruf('anmelden', [K], function () {}, function () {});            // beginnt die Schicht (Kennzahlen); ein Fehler stört die Arbeit nicht
     if (!AN) $('q').focus();
   }
@@ -804,7 +827,7 @@
     $('such-meldung').innerHTML = ''; $('treffer').innerHTML = ''; FERTIG = null; zeichneFertig();
     if (!q) return;
     ruf('suche', [q], function (r) {
-      if (r.inSchlange && r.treffer.length === 1) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else analyse(r.treffer[0].id, t0); return; }
+      if (r.inSchlange && r.treffer.length === 1) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else { if (r.treffer[0].d) VORAB[r.treffer[0].id] = { d: r.treffer[0].d, zeit: Date.now() }; analyse(r.treffer[0].id, t0); } return; }
       var mm = r.inSchlange ? [] : r.treffer.filter(function (x) { return x.mm; });
       if (mm.length) {                                                          // im Regal «Matchmaker»: Wiedereinstieg, wenn es dort nicht geklappt hat
         $('such-meldung').innerHTML = mm.map(function (x) { return '<div class="meldung warn"><p><strong>' + esc(x.id) + '</strong> · ' + esc(x.bezeichnung) + '<br>' + tx('mm.liegt', x.mm) + '</p><div class="knoepfe">' + taste('mmZurueck', 'mm.zurueck', 'pink', ' data-v="' + esc(x.id) + '"') + '</div></div>'; }).join('');
@@ -812,6 +835,7 @@
       }
       $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? 'such.mehrere' : 'such.erledigt')), r.inSchlange ? '' : 'warn');
       $('treffer').innerHTML = r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '';
+      if (r.inSchlange) vorabHolen(r.treffer);
     }, function (m) { $('such-meldung').innerHTML = box(m, 'warn'); });
   }
   function tabelle(liste, mitKnopf) {
@@ -843,7 +867,18 @@
   function analyse(id, t0) {
     if (meinePausierten().some(function (x) { return x.d.produkt.id === id; })) { weiterPausiert(id); return; }   // schon pausiert: dort weiter
     if (AN) { melde(t('fuss.laeuft'), true); return; }
+    if (SP.some(function (x) { return x.id === id; })) { melde(t('sp.noch'), true); return; }
+    var v = VORAB[id];
+    delete VORAB[id];
+    if (v && Date.now() - v.zeit < 600000 && v.d && v.d.recherche) { uiZeit('starteAnalyse (vorab)', 0, true); beginne(v.d, t0); return; }   // vorgeladen: sofort
     ruf('starteAnalyse', [id], function (d) { beginne(d, t0); });
+  }
+  /* Weg A: Überblicke der ersten Stücke einer Liste im Hintergrund holen (höchstens 5, nur recherchierte, je 10 Minuten gültig). */
+  var VORAB = {};
+  function vorabHolen(liste) {
+    var ids = (liste || []).filter(function (p) { return p.status !== 'Reparatur' && p.recherche === 'Bereit' && !(VORAB[p.id] && Date.now() - VORAB[p.id].zeit < 600000); }).slice(0, 5).map(function (p) { return p.id; });
+    if (!ids.length) return;
+    leise('vorab', [ids], function (m) { Object.keys(m || {}).forEach(function (id) { VORAB[id] = { d: m[id], zeit: Date.now() }; }); });
   }
   /* Was die Person im Lauf einer Analyse antwortet. Daraus entsteht in daten() das, was der Server beurteilt. Testmittel, die nicht als vorhanden im Inventar stehen, fragt der Schritt «Funktion». */
   function leer(d) {
@@ -917,7 +952,7 @@
     if (!el) return;
     el.innerHTML = !l.length ? '' : '<div class="sektion gross">' + tx('nav.pausiert') + ' (' + l.length + ')</div>' + l.map(function (x) {
       var n = x.d.ablauf.length, min = Math.round((x.aktiv || 0) / 60000);
-      return '<button class="paus" data-a="weiterPausiert" data-v="' + esc(x.d.produkt.id) + '" title="' + esc(t('pz.titel', Math.min(x.i + 1, n), n, min)) + '"><span class="paus-name">' + esc(x.d.produkt.bezeichnung) + '</span><span class="zahl">' + min + '′</span></button>';
+      return '<button class="paus" data-a="weiterPausiert" data-v="' + esc(x.d.produkt.id) + '" title="' + esc(x.fehler || t('pz.titel', Math.min(x.i + 1, n), n, min)) + '"><span class="paus-name">' + (x.fehler ? '⚠ ' : '') + esc(x.d.produkt.bezeichnung) + '</span><span class="zahl">' + min + '′</span></button>';
     }).join('');
   }
   /* Legt die laufende Analyse zur Seite. Nicht, solange ein Aufruf an den Server läuft: dessen Antwort gehört zu dieser Analyse. */
@@ -944,8 +979,10 @@
     l = l.filter(function (y) { if (!x && y.k === K && y.d.produkt.id === id) { x = y; return false; } return true; });
     if (!x) { zeichnePausiert(); return; }
     pausierteSpeichern(l);
-    delete x.k; delete x.pausiertAm;
+    var fehler = x.fehler;
+    delete x.k; delete x.pausiertAm; delete x.fehler;
     AN = x; AN.seit = Date.now(); LAUF = {};
+    if (fehler) melde(fehler, true);
     if (ANSICHT !== 'scan') zeige('scan');
     sichern(); zeichneAnalyse(); zeichnePausiert(); window.scrollTo(0, 0);
   }
@@ -1747,25 +1784,90 @@
     bild = JSON.stringify(x);
     if (LAUF.urteilBild === bild) return;
     LAUF.urteil = null; LAUF.urteilFehler = '';
+    /* Weg A: das Urteil sofort im Browser, mit dem Code des Servers (window.URTEIL). Nur ohne ihn wird gefragt. */
+    var r = urteilLokal(daten());
+    if (r) { LAUF.urteil = r; LAUF.urteilBild = bild; setTimeout(nach, 0); return; }
     ruf('pruefen', [daten()], function (r) { if (da()) { LAUF.urteil = r; LAUF.urteilBild = bild; nach(); } },
       function (m) { if (da()) { LAUF.urteilFehler = m; LAUF.urteilBild = bild; nach(); } });
   }
+  /* Gleiche Antwort wie pruefen() auf dem Server (pruefenAus_). null, wenn der Browser das Urteil nicht rechnen kann: dann fragt er den Server. */
+  function urteilLokal(d) {
+    if (!window.URTEIL || !AN || !AN.d.einst) return null;
+    try {
+      var x = window.URTEIL.urteil(JSON.parse(JSON.stringify(d)), AN.d, AN.d.einst);
+      return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
+        versiegelt: x.versiegelt, ricardoZustand: window.URTEIL.ricardoZustand(x), verkaufsinfo: x.verkaufsinfo };
+    } catch (e) { return null; }
+  }
+  /*
+   * Weg A: Abschliessen wartet nicht mehr auf den Server. Der Browser kennt das Urteil schon; der Fertig-Bildschirm kommt sofort und das nächste Stück kann starten.
+   * Gespeichert wird im Hintergrund, der Reihe nach, auch nach einem Neuladen (at-speichern). Scheitert es, kommt die Analyse mit der Meldung zurück zu «Pausiert».
+   */
   function abschluss() {
-    var p = AN.d.produkt;
-    ruf('abschliessen', [daten()], function (r) {
-      if (!AN || AN.d.produkt.id !== p.id) return;
-      if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
-      r.id = p.id; FERTIG = { titel: p.bezeichnung, r: r }; RIC = null;
-      REP = REP.filter(function (x) { return x.id !== p.id; }); zeichneRep();
-      ende(); zahlen(r.zahlen); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+    var p = AN.d.produkt, d = daten(), r = urteilLokal(d);
+    if (!r) {                                                                 // ohne Urteil im Browser wie bisher: auf den Server warten
+      ruf('abschliessen', [d], function (r) {
+        if (!AN || AN.d.produkt.id !== p.id) return;
+        if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
+        fertigZeigen(p, r);
+      });
+      return;
+    }
+    if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
+    sichern();
+    var an = JSON.parse(JSON.stringify(AN));
+    an.seit = null;
+    SP.push({ k: K, id: p.id, titel: p.bezeichnung, d: d, an: an, versuche: 0 });
+    spMerken();
+    var reg = d.kanal === 'matchmaker' && r.reusable ? 'Matchmaker' : (d.kanal === 'ricardo' && r.reusable ? 'Ricardo Offline' : (r.reusable ? 'Analysiert' : ''));
+    fertigZeigen(p, { reusable: r.reusable, grade: r.grade, regal: reg, befund: r.befund, verkaufsinfo: r.verkaufsinfo, dauerMin: Math.round((Number(d.aktivSek) || 0) / 6) / 10,
+      budget: p.budget, nr: '', speichert: true });
+    spWeiter();
+  }
+  function fertigZeigen(p, r) {
+    r.id = p.id; FERTIG = { titel: p.bezeichnung, r: r }; RIC = null;
+    REP = REP.filter(function (x) { return x.id !== p.id; }); zeichneRep();
+    ende(); if (r.zahlen) zahlen(r.zahlen); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+  }
+  var SP = (function () { try { var l = JSON.parse(localStorage.getItem('at-speichern') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } })(), SP_LAEUFT = false;
+  function spMerken() { try { localStorage.setItem('at-speichern', JSON.stringify(SP)); } catch (e) { /* ohne Speicher: nur bis zum Schliessen */ } spZeigen(); }
+  function spZeigen() { var el = $('sp-info'); if (!el) return; var n = SP.filter(function (x) { return x.k === K; }).length; el.hidden = !n; el.textContent = n ? t('sp.laeuft', n) : ''; }
+  function spWeiter() {
+    if (SP_LAEUFT || !SP.length) return;
+    var x = SP[0];
+    SP_LAEUFT = true;
+    leise('abschliessen', [x.d], function (r) {
+      SP_LAEUFT = false;
+      if (r && r.offen) { spFehler(x, t('sp.offen')); return; }
+      SP.shift(); spMerken();
+      if (r && r.zahlen) zahlen(r.zahlen);
+      if (FERTIG && FERTIG.r && FERTIG.r.id === x.id && FERTIG.r.speichert) { r.id = x.id; FERTIG.r = r; zeichneFertig(); }
+      spWeiter();
+    }, function (m, e) {
+      SP_LAEUFT = false;
+      /* Netz weg oder Google kurz nicht erreichbar: später nochmals. Eine echte Absage des Servers (z.B. Fotos fehlen) geht zurück an die Person. */
+      var netz = !m || /network|netzwerk|timeout|zeitüberschreitung|NetworkError|Failed to fetch|^0$/i.test(m);
+      if (netz && ++x.versuche < 6) { spMerken(); setTimeout(spWeiter, 5000 * x.versuche); return; }
+      if (/bereits analysiert/.test(m)) { SP.shift(); spMerken(); spWeiter(); return; }   // schon gespeichert (z.B. doppelt geschickt)
+      spFehler(x, m);
     });
+  }
+  /* Speichern abgelehnt: Die Analyse kommt mit Stand und Meldung zu «Pausiert». Dort geht es am gleichen Schritt weiter. */
+  function spFehler(x, m) {
+    SP = SP.filter(function (y) { return y !== x; }); spMerken();
+    var l = pausierte().filter(function (y) { return !(y.k === x.k && y.d.produkt.id === x.id); }), a = x.an;
+    a.k = x.k; a.pausiertAm = Date.now(); a.fehler = m; a.i = Math.max(0, a.d.ablauf.indexOf('entscheid'));
+    l.unshift(a); pausierteSpeichern(l); zeichnePausiert();
+    if (FERTIG && FERTIG.r && FERTIG.r.id === x.id) { FERTIG = null; zeichneFertig(); }
+    melde(t('sp.fehler', x.titel, m), true);
+    spWeiter();
   }
   function zeichneFertig() {
     var r = FERTIG && FERTIG.r, zeileF = function (name, id, text) {
       return '<div class="feld"><div class="name">' + tx(name) + '</div><div class="wert" id="' + id + '">' + esc(text) + '</div><div class="seite"><button class="mini" data-a="kopiere" data-v="' + id + '">' + tx('kopieren') + '</button></div></div>'; };
     if (r && r.pause) { $('fertig').innerHTML = '<div class="karte"><div class="urteil ja">' + tx('fertig.reparatur', r.id) + '</div><h2>' + tx('fertig.pausiert', FERTIG.titel) + '</h2>' + (r.teil ? '<p class="still">' + tx('fertig.bestellt') + '</p>' : '') + '</div>'; return; }
     $('fertig').innerHTML = !r ? '' : '<div class="karte"><div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + (r.regal === 'Matchmaker' ? tx('fertig.mm', r.id || '') : r.regal === 'Ricardo Offline' ? tx('fertig.ricardo', r.id || '') : tx(r.regal === 'Analysiert' ? 'fertig.analysiert' : (r.reusable ? 'fertig.regal' : 'fertig.weg'))) + '</div><h2>' + tx('fertig.titel', FERTIG.titel) + '</h2>'
-      + '<p class="still">' + esc(r.nr) + ' · ' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.grade ? ' · ' + tx('zu.grade') + ' ' + esc(r.grade) : '') + ' · ' + tx('fertig.dauer', r.dauerMin, r.budget || '–') + '</p>'
+      + '<p class="still">' + (r.speichert ? esc(t('sp.speichert')) : esc(r.nr)) + ' · ' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.grade ? ' · ' + tx('zu.grade') + ' ' + esc(r.grade) : '') + ' · ' + tx('fertig.dauer', r.dauerMin, r.budget || '–') + '</p>'
       + (r.befund ? zeileF('fertig.befund', 'f-befund', r.befund) : '') + (r.verkaufsinfo ? zeileF('fertig.verkauf', 'f-verkauf', r.verkaufsinfo) : '') + '</div>';
   }
   function kopiere(id, k, el) { kopiereText($(id).textContent, el); }
@@ -2048,6 +2150,7 @@
     /* Das Kürzel gilt nur für heute: Am nächsten Tag meldet man sich neu an, damit die Schicht beginnt. Eine laufende Analyse behält es. */
     K = lies('at-kuerzel-tag') === heute() || lauf ? (lies('at-kuerzel') || '') : '';
     texte(); $('wer').textContent = K; zeichnePausiert();
+    spZeigen(); setTimeout(spWeiter, 1500);                                       // liegengebliebenes Speichern (z.B. nach Neuladen) nachholen
     logo.addEventListener('error', ohneLogo);
     if (logo.complete && !logo.naturalWidth) ohneLogo();
     document.addEventListener('click', function (ev) {

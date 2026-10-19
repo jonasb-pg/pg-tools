@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-19.3';
+const VERSION = '2026-10-19.4';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -253,7 +253,25 @@ const SPALTEN = {
 /* ------------------------------------------------------------------ */
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index').setTitle('Analyse Tool').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return HtmlService.createHtmlOutputFromFile('Index').append('<script>' + urteilQuelle_() + '</script>')
+    .setTitle('Analyse Tool').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+/**
+ * Weg A (Entscheid Jonas 19.10.2026): Das Urteil rechnet der Browser selbst, mit genau diesem Code (kein Warten auf den Server bei «Zustand» und «Entscheid»).
+ * Der Server prüft beim Abschliessen noch einmal und entscheidet verbindlich. Was urteil_ braucht, kommt hier mit; ein neuer Helfer muss in diese Liste.
+ */
+const URTEIL_FUNKTIONEN = [urteil_, ricardoZustand_, kaeuferSaetze_, geprueft_, zustandSatz_, reparatur_, norm_];
+function urteilQuelle_() {
+  const werte = { KO: KO, GRADES: GRADES, VERSIEGELT: VERSIEGELT, NEU_OVP: NEU_OVP };
+  return '(function () { var ' + Object.keys(werte).map(function (k) { return k + ' = ' + JSON.stringify(werte[k]); }).join(', ') + ';\n'
+    + 'var kurzName_ = ' + kurzName_.toString() + ', undListe_ = ' + undListe_.toString() + ';\n'
+    + URTEIL_FUNKTIONEN.map(function (f) { return f.toString(); }).join('\n')
+    + '\nwindow.URTEIL = { urteil: urteil_, ricardoZustand: ricardoZustand_ }; })();';
+}
+/** Wie pruefen(), aber ohne Server: gleiche Antwort aus urteil_. Für die Tests und als Vorlage für die Oberfläche. */
+function pruefenAus_(x) {
+  return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
+    versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x), verkaufsinfo: x.verkaufsinfo };
 }
 
 function onOpen() {
@@ -267,7 +285,7 @@ function api(lang, name, args) {
   LANG = lang === 'en' ? 'en' : 'de';
   const f = { startDaten: startDaten, suche: suche, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen, vorab: vorab, uiTempo: uiTempo }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
   TAKT = t0;
@@ -463,7 +481,7 @@ function apiWerte_(namen) {
 /** Die Tabs, die ein Aufruf braucht, vorab in einer Anfrage holen (ausser denen im Zwischenspeicher). */
 const VORLADEN = {
   startDaten: ['Einstellungen', 'Produkte', 'Bestellliste', 'Listen', 'Stufen'],
-  suche: ['Einstellungen', 'Produkte', 'Stufen'],
+  suche: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
   werkstatt: ['Einstellungen', 'Testkonten', 'Testmittel'],
   adminDaten: ['Einstellungen', 'Produkte', 'Stufen', 'Batches'],
   starteAnalyse: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
@@ -474,7 +492,9 @@ const VORLADEN = {
   ersatzteile: ['Einstellungen', 'Ersatzteile', 'Bestellliste', 'Produkte'],
   bestellliste: ['Einstellungen', 'Bestellliste'],
   feedbackListe: ['Einstellungen', 'Feedback'],
-  warteschlange: ['Einstellungen', 'Produkte', 'Stufen']
+  warteschlange: ['Einstellungen', 'Produkte', 'Stufen'],
+  vorab: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
+  uiTempo: []
 };
 function vorladen_(namen) {
   if (IN_SPERRE || !namen || !namen.length || typeof Sheets === 'undefined') return;
@@ -729,6 +749,8 @@ function suche(q) {
   });
   const offen = treffer.filter(function (r) { return inSchlange_(r) || r['Analyse-Status'] === 'Reparatur'; });
   const liste = (offen.length ? offen : treffer).slice(0, 25).map(function (r) { return kurz_(r, zb); });
+  /* Weg A: ein einziges offenes Stück startet sofort. Der Überblick kommt gleich mit, statt in einem zweiten Aufruf. */
+  if (offen.length === 1 && offen[0]['Analyse-Status'] !== 'Reparatur') try { liste[0].d = ueberblickSpeicher_(offen[0], einst_()); } catch (err) { /* dann wie bisher mit starteAnalyse */ }
   if (!offen.length && liste.length) {                                         // erledigt: Liegt es im Regal «Matchmaker», kann es von dort zurück
     const mm = imMatchmaker_();
     liste.forEach(function (x) { if (mm[x.id]) x.mm = mm[x.id]; });
@@ -1816,7 +1838,8 @@ function ueberblick_(p, e) {
     }) },
     reparatur: { stundenansatz: Number(e['Stundenansatz Reparatur CHF']) || 0, grenze: Number(e['Reparatur lohnt bis Prozent vom VP']) || 0, hinweis: text('Reparierbarkeit') },
     ricardo: { vorschlag: zahl_(p['VP CHF']) >= (Number(e['Ricardo ab VP CHF']) || 0) && zahl_(p['VP CHF']) > 0, versand: ricardoVersand_(e), prozent: startpreisProzent_(e),
-      fotoUrl: (String(e['Web-App-Adresse für Fotos'] || '').trim() || ScriptApp.getService().getUrl()) + '?foto=' + encodeURIComponent(String(p['PG-ID'])) }
+      fotoUrl: (String(e['Web-App-Adresse für Fotos'] || '').trim() || ScriptApp.getService().getUrl()) + '?foto=' + encodeURIComponent(String(p['PG-ID'])) },
+    einst: { 'Garantie Tage': e['Garantie Tage'] }                          // was urteil_ im Browser aus den Einstellungen braucht
   };
 }
 
@@ -1829,6 +1852,18 @@ function scoreGrenzen_() {
   return g;
 }
 function starteAnalyse(id) { return ueberblickSpeicher_(produkt_(id), einst_()); }
+/** Weg A: Überblicke für die nächsten Stücke einer Liste vorab (höchstens 5), damit «Starten» sofort da ist. Fehler einzelner Stücke zählen nicht. */
+function vorab(ids) {
+  const e = einst_(), aus = {};
+  (Array.isArray(ids) ? ids : []).slice(0, 5).forEach(function (id) { try { aus[String(id)] = ueberblickSpeicher_(produkt_(id), e); } catch (err) { /* nächstes */ } });
+  return aus;
+}
+/** Wartezeiten, wie sie die Oberfläche misst (vom Aufruf bis zur Antwort): eine Zeile «Tempo UI» im Log pro Meldung. liste = [[Name, Anzahl, Median ms, Max ms, wartet]]. */
+function uiTempo(liste, kuerzel) {
+  const z = (Array.isArray(liste) ? liste : []).slice(0, 40).map(function (x) { return String(x[0]).slice(0, 30) + (x[4] ? '' : ' (Hintergrund)') + ' ' + Number(x[1]) + '× Median ' + (Number(x[2]) / 1000).toFixed(1) + ' s, max ' + (Number(x[3]) / 1000).toFixed(1) + ' s'; });
+  if (z.length) log_('Tempo UI', txt_(String(kuerzel || '').slice(0, 4)), z.join('; '));
+  return true;
+}
 
 /** Feedback DS 19.10.2026: Fehlt der Preis (VP), wird er in der Identität nachgetragen; der Neupreis (OVP) freiwillig. Schreibt nur in «Produkte», nie ins Return Tool. */
 function preisSetzen(id, vp, ovp) {
@@ -2158,9 +2193,8 @@ function kaeuferSaetze_(x, u, d) {
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
 function pruefen(d) {
   d = d || {};
-  const e = einst_(), x = urteil_(d, ueberblickSpeicher_(produkt_(d.id), e), e);
-  return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
-    versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x) };
+  const e = einst_();
+  return pruefenAus_(urteil_(d, ueberblickSpeicher_(produkt_(d.id), e), e));
 }
 
 /** Die Zeilen fürs Protokoll im Tab «Prüfschritte»: jeder Punkt der Schritte, die erreicht wurden. */
