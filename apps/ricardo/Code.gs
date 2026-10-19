@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.3';
+const VERSION = '2026-10-19.4';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -948,13 +948,7 @@ function setzeStatus(id, neu) {
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
     if (erlaubt[neu].indexOf(rec['Status']) === -1) throw new Error('Wechsel von «' + rec['Status'] + '» zu «' + neu + '» ist nicht möglich.');
-    if (neu === 'Unverkauft') {
-      const g = rec['Gelistet am'];
-      const ende = g instanceof Date ? new Date(g.getTime() + laufzeitVon_(rec['Laufzeit Tage'], cfg_('Laufzeit Tage')) * 86400000) : null;
-      const imp = Number(PropertiesService.getScriptProperties().getProperty('LETZTER_IMPORT')) || 0;
-      if (ende && ende.getTime() > new Date().getTime()) throw new Error('Das Angebot läuft noch bis ' + datum_(ende) + '.');
-      if (ende && imp < ende.getTime()) throw new Error('Bitte zuerst den aktuellen Verkaufsbericht einlesen. Das Angebot endete am ' + datum_(ende) + ', der letzte Import war ' + (imp ? 'am ' + datum_(new Date(imp)) : 'noch nie') + '. Sonst wird ein verkauftes Stück als unverkauft markiert.');
-    }
+    /* Entscheid Jonas 19.10.2026: «Unverkauft» geht auch von Hand, jederzeit (z. B. vorzeitig auf Ricardo beendet). Kommt später doch ein Verkauf, setzt Mail oder Bericht das Stück auf «Verkauft». */
     rec['Status'] = neu; rec['Bearbeitet von'] = nutzer_();
     schreibe_(sh, zeile, rec, true);
     log_('Status ' + neu, id, '');

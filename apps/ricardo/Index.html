@@ -580,9 +580,10 @@
     'ad.einst': ['Einstellungen', 'Settings'], 'ad.einst.speichern': ['Einstellungen speichern', 'Save settings'], 'ad.einst.gespeichert': ['Einstellungen gespeichert.', 'Settings saved.'],
     'ad.einst.text': ['Die Versandtarife stehen im Sheet im Tab «Versand».', 'The shipping rates are in the sheet in the tab «Versand».'],
     'u.titel': ['Laufende Angebote', 'Running listings'], 'u.filter': ['Nach PG-ID oder Name filtern', 'Filter by PG-ID or name'],
-    'u.hinweis': ['Ein Angebot gilt als abgelaufen, wenn seine Laufzeit vorbei ist (eingetragen beim Listen, sonst {0} Tage). Auf «Unverkauft» geht es mit der Ricardo-Mail «nicht verkauft». Letzter Verkaufsbericht: {1}.', 'A listing counts as expired when its duration is over (entered when listing, otherwise {0} days). It goes to «Unsold» with the Ricardo mail «not sold». Last sales report: {1}.'],
+    'u.hinweis': ['Ein Angebot gilt als abgelaufen, wenn seine Laufzeit vorbei ist (eingetragen beim Listen, sonst {0} Tage). Auf «Unverkauft» geht es mit der Ricardo-Mail «nicht verkauft» oder von Hand. Letzter Verkaufsbericht: {1}.', 'A listing counts as expired when its duration is over (entered when listing, otherwise {0} days). It goes to «Unsold» with the Ricardo mail «not sold» or by hand. Last sales report: {1}.'],
     'u.keiner': ['noch keiner', 'none yet'], 'u.leer': ['Keine laufenden Angebote.', 'No running listings.'], 'u.bearbeiten': ['Bearbeiten', 'Edit'], 'u.unverkauft': ['Unverkauft', 'Unsold'],
     'u.abgelaufen': ['Abgelaufen', 'Expired'], 'u.seit': ['seit {0}', 'since {0}'], 'u.angebot': ['Angebot', 'Listing'],
+    'u.laeuft': ['Achtung: Laut Laufzeit läuft das Angebot noch. Zuerst auf Ricardo beenden.', 'Note: according to its duration the listing is still running. End it on Ricardo first.'],
     'u.frage': ['{0} als unverkauft markieren? Das Stück neu triagieren (Caritas, Heilsarmee oder Lagerverkauf) und im Return Tool den neuen Kanal eintragen.', 'Mark {0} as unsold? Re-triage the item (Caritas, Heilsarmee or warehouse sale) and enter the new channel in the Return Tool.']
   };
   var ST = { 'In Arbeit': 'In progress', 'Bereit': 'Ready', 'Gelistet': 'Listed', 'Verkauft': 'Sold', 'Versendet': 'Shipped', 'Storniert': 'Cancelled', 'Unverkauft': 'Unsold', 'Abgebrochen': 'Discarded',
@@ -1191,15 +1192,15 @@
     l.forEach(function (x) {
       var a = '';
       if (x.status === 'In Arbeit' || x.status === 'Bereit') a = '<button onclick="weiter(\'' + esc(x.id) + '\')">' + t('u.bearbeiten') + '</button>';
-      if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '" onclick="unverkauft(\'' + esc(x.id) + '\')">' + t('u.unverkauft') + '</button>';
+      if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '" onclick="unverkauft(\'' + esc(x.id) + '\',' + (x.abgelaufen ? 1 : 0) + ')">' + t('u.unverkauft') + '</button>';
       var m = x.abgelaufen ? '<span class="etikett hell">' + t('u.abgelaufen') + '</span>' : '<span class="etikett">' + esc(st(x.status)) + '</span>';
       z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (x.link ? '<span class="klein"><a href="' + esc(x.link) + '">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
         '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + (x.regal ? '<span class="klein">' + esc(x.regal) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
     });
     $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
   }
-  function unverkauft(id) {
-    frage(t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft'], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); });
+  function unverkauft(id, abgelaufen) {
+    frage((abgelaufen ? '' : t('u.laeuft') + ' ') + t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft'], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); });
   }
   function weiter(id) { ruf('lade', [id], function (r) { zeige('listen'); oeffne(r); }); }
 
