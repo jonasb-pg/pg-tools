@@ -139,3 +139,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Live: Ricardo Bereitstellung Version 24, 21.10.2026 11:35.
 - Ricardo-Karte: Feld Laufzeit zeigt «Donnerstag um 19.00» (Entscheid Jonas 21.10.2026: Auktionen enden immer Donnerstag um 19.00).
 - Listing-Abschluss ohne Kontrollliste zum Abhaken (Abholung aus, Reaktivierung aus, kein Boost), Wunsch Jonas 21.10.2026.
+- Live: Ricardo Bereitstellung Version 25, 21.10.2026 11:49.
