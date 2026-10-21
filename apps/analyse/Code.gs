@@ -2259,7 +2259,8 @@ function abschliessen(d) {
   /* Entscheid Jonas 19.10.2026: Matchmaker ist bei einem Treffer die klare Empfehlung, die Person darf aber anders entscheiden. Das steht im Log. */
   if (x.reusable && d.mmEmpfohlen && d.kanal !== 'matchmaker') log_('Matchmaker-Empfehlung übergangen', pg, txt_(String(d.mmEmpfohlen)) + ' → ' + (d.kanal || 'Regal'));
   const ric = !mm && x.reusable && d.kanal === 'ricardo' ? ricardoPruefen_(d, u, x, e, p) : null;
-  const mmV = mm ? verkaufPruefen_(d, u, x, e, p, 'matchmaker') : null;     // Matchmaker wie Ricardo: Fotos, Text, Versand, Preis (21.10.2026)
+  /* Matchmaker wie Ricardo: Fotos, Text, Versand, Preis (21.10.2026). Eine noch offene Seite von vorher schickt keinen Text: dann wie bisher, ohne Eintrag im Tab «Matchmaker». */
+  const mmV = mm && d.ricardo && String(d.ricardo.titel || '').trim() ? verkaufPruefen_(d, u, x, e, p, 'matchmaker') : null;
   if (ric) blatt_('Ricardo');                                         // legt den Tab beim ersten Mal an, ausserhalb der Sperre
   if (mmV) blatt_('Matchmaker');
   const regal = mm ? 'Matchmaker' : (ric ? 'Ricardo Offline' : (x.reusable ? 'Analysiert' : ''));

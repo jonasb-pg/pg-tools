@@ -605,7 +605,8 @@ function analyseVersand_(klasse) {
 /** Für die Startseite: analysierte Stücke, die noch in keinem Listing stecken. */
 function analyseListe() {
   const idx = listingsIndex_();
-  return leseAnalyse_().filter(function (r) { return !idx[r.id]; })
+  /* Entscheid Jonas 21.10.2026 (Variante A): Was im Regal «Matchmaker» liegt, gehört dem Matchmaker und steht nicht in dieser Liste. Auf Ricardo kommt es nur per Scan oder Suche, mit Nachfrage. */
+  return leseAnalyse_().filter(function (r) { return !idx[r.id] && !(r.mm && r.mmStatus === 'Offen'); })
     .map(function (r) { return { id: r.id, name: r.name, titel: r.titel, zustand: r.zustand, preis: r.vp, fotos: r.fotos, ordner: r.ordner, kuerzel: r.kuerzel, erfasst: r.erfasst, mm: !!r.mm && r.mmStatus === 'Offen', auftrag: r.auftrag || '' }; })
     .sort(function (a, b) { return a.id.localeCompare(b.id); });
 }

@@ -892,6 +892,7 @@
         });
         $('treffer').innerHTML = '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z); return;
       }
+      TREFFER = x.treffer;
       var h = x.treffer.length > 1 ? '<div class="meldung warn">' + t('such.mehrere', x.treffer.length) + '</div>' : '', zl = '';
       x.treffer.forEach(function (r) {
         var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
@@ -899,7 +900,7 @@
         else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="start(\'' + esc(r.id) + '\')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
         else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
         else knopf = '<span class="etikett">' + esc(st(r.status)) + '</span>';
-        zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
+        zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + (r.mm && r.mmStatus === 'Offen' && !r.status ? ' <span class="etikett">' + t('such.immm') + '</span>' : '') + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
       });
       $('treffer').innerHTML = h + tab(['th.id', 'th.produkt', 'th.ort', 'th.erfasst', 'th.preis', ''], zl) + (x.mehr ? '<p class="still">' + t('such.mehr') + '</p>' : '');
     });
@@ -915,11 +916,12 @@
       $('frei').hidden = true; $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; oeffne(r);
     });
   }
+  var TREFFER = [];
   function start(id) {
     var los = function () { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); };
     /* 21.10.2026: Stück aus dem Matchmaker. Mit dem Start gilt es dort als nicht verkauft. */
-    var a = (ANA || []).filter(function (x) { return x.id === id; })[0];
-    if (a && a.mm) frage(t('mm.frage', id, a.auftrag || '–'), los); else los();
+    var a = (TREFFER || []).concat(ANA || []).filter(function (x) { return x.id === id; })[0];
+    if (a && a.mm && (a.mmStatus || 'Offen') === 'Offen' && !a.status) frage(t('mm.frage', id, a.auftrag || '–'), los); else los();
   }
 
   /* ---------- Aus der Analyse ---------- */
@@ -1481,7 +1483,7 @@
     'g.storno.k': ['Storno öffnen', 'Open cancellation'], 'g.storno.ok': ['Storniert', 'Cancelled'], 'g.storno.p': ['Paket aus «{0}» holen, auspacken, Stück ins Regal «{1}».', 'Take the parcel from «{0}», unpack it, item onto the shelf «{1}».'],
     'g.auspacken': ['Auspacken', 'Unpack'],
     /* Listing */
-    'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.mm': ['aus Matchmaker', 'from Matchmaker'],
+    'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.mm': ['aus Matchmaker', 'from Matchmaker'], 'such.immm': ['im Matchmaker', 'in Matchmaker'],
     'mm.frage': ['{0} lag im Matchmaker (Suchauftrag: {1}). Dort nicht verkauft und jetzt auf Ricardo?', '{0} was in Matchmaker (request: {1}). Not sold there and now on Ricardo?'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
     'g.l.abgelaufen': ['abgelaufen', 'expired'], 'g.l.unverkauft': ['nicht verkauft', 'not sold'],
     'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Suchen oder ohne Analyse erfassen.', 'Item not in the list? Search or record without analysis.'],

@@ -9,8 +9,8 @@ R = {'id': 'PG-100', 'status': 'Bereit', 'ean': '076', 'bezeichnung': 'Toaster X
      'englisch': '', 'englischAlt': False, 'quelle': 'Analyse', 'analyse': True, 'analyseNr': 'A-0001', 'fotoOrdner': 'https://drive.google.com/x', 'geaendert': 'geändert von jb am 15.10.2026', 'regal': 'Ricardo Offline'}
 DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und originalverpackt', 'Neu (gemäss Beschreibung)', 'Gebraucht', 'Defekt'], 'maengelPflicht': ['Gebraucht', 'Defekt'],
          'laufzeit': 6, 'retoureGruende': [], 'kiAktiv': True, 'aktiv': 3, 'schwelle': 90},
-         'analyseListe': [{'id': 'PG-100', 'name': 'Toaster X', 'titel': 'Toaster X 2 Schlitze', 'zustand': 'Gebraucht', 'preis': 40, 'fotos': 5, 'ordner': 'https://drive.google.com/x', 'kuerzel': 'JB', 'erfasst': '14.10.2026'},
-                          {'id': 'PG-200', 'name': 'Föhn', 'titel': 'Föhn F', 'zustand': 'Gebraucht', 'preis': 35, 'fotos': 4, 'ordner': '', 'kuerzel': 'JB', 'erfasst': '21.10.2026', 'mm': True, 'auftrag': 'Föhn gesucht'}],
+         'analyseListe': [{'id': 'PG-100', 'name': 'Toaster X', 'titel': 'Toaster X 2 Schlitze', 'zustand': 'Gebraucht', 'preis': 40, 'fotos': 5, 'ordner': 'https://drive.google.com/x', 'kuerzel': 'JB', 'erfasst': '14.10.2026'}],
+         'suche': {'treffer': [{'id': 'PG-200', 'name': 'Föhn', 'ort': '', 'erfasst': '21.10.2026', 'vp': 35, 'status': '', 'teilVon': '', 'mm': True, 'mmStatus': 'Offen', 'auftrag': 'Föhn gesucht'}], 'andere': []},
          'starteListing': R, 'erstelleText': dict(R, geaendert='', textQuelle='Analyse'), 'verkaeufe': {'offen': []}, 'retouren': {'offen': []}}
 stub = """<script>window.AUFRUFE=[];window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
@@ -36,9 +36,11 @@ with sync_playwright() as p:
     ok(s.is_hidden('#t-geaendert') and 'Text aus der Analyse' in s.inner_text('#t-quelle'), 'Text wiederhergestellt')
     # 21.10.2026: Stück aus dem Matchmaker: Etikett, beim Start nachfragen
     s.evaluate("schliesse && schliesse()"); s.evaluate("zeige('listen')"); s.wait_for_timeout(200)
-    ok('aus Matchmaker' in s.text_content('#ana-liste'), 'Etikett «aus Matchmaker»')
+    ok('Föhn' not in s.text_content('#ana-liste'), 'Matchmaker-Stück nicht in der Liste (Variante A)')
     n0 = s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length")
-    s.evaluate("start('PG-200')"); s.wait_for_timeout(100)
+    s.evaluate("$('q').value='PG-200'; suchen()"); s.wait_for_timeout(150)
+    ok('im Matchmaker' in s.text_content('#treffer'), 'Suche: Etikett «im Matchmaker»')
+    s.click('#treffer button.haupt-knopf'); s.wait_for_timeout(100)
     ok(s.is_visible('#dialog') and 'Föhn gesucht' in s.inner_text('#dialog-text') and s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0, 'Nachfrage vor dem Start, noch kein Listing')
     s.click('#dialog-ja'); s.wait_for_timeout(200)
     ok(s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0 + 1, 'nach Ja: Listing startet')
