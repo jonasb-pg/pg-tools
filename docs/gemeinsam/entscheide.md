@@ -137,3 +137,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Listings aus der Analyse: Prüfung «Beschrieb nennt den gewählten Zustand» entfällt (der Analyse-Text formuliert den Zustand selbst, z.B. «Das Produkt ist gebraucht.»). Fall AN-0008.
 - Fotos zu Ricardo: Google Drive für Desktop auf dem Listing-PC (Jonas richtet ein).
 - Live: Ricardo Bereitstellung Version 24, 21.10.2026 11:35.
+- Ricardo-Karte: Feld Laufzeit zeigt «Donnerstag um 19.00» (Entscheid Jonas 21.10.2026: Auktionen enden immer Donnerstag um 19.00).
