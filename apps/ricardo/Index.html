@@ -915,7 +915,12 @@
       $('frei').hidden = true; $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; oeffne(r);
     });
   }
-  function start(id) { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); }
+  function start(id) {
+    var los = function () { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); };
+    /* 21.10.2026: Stück aus dem Matchmaker. Mit dem Start gilt es dort als nicht verkauft. */
+    var a = (ANA || []).filter(function (x) { return x.id === id; })[0];
+    if (a && a.mm) frage(t('mm.frage', id, a.auftrag || '–'), los); else los();
+  }
 
   /* ---------- Aus der Analyse ---------- */
   var ANA = [];
@@ -925,7 +930,7 @@
     if (!ANA.length) { $('ana-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('ana.leer') + '</p>'; return; }
     var z = '';
     ANA.forEach(function (a) {
-      z += '<tr><td class="mono">' + esc(a.id) + '</td><td>' + esc(a.titel || a.name) + '</td><td>' + esc(zu(a.zustand)) + '</td><td>' + (a.preis ? 'CHF ' + Number(a.preis).toFixed(2) : '') + '</td>' +
+      z += '<tr><td class="mono">' + esc(a.id) + '</td><td>' + esc(a.titel || a.name) + (a.mm ? ' <span class="etikett">' + t('g.l.mm') + '</span>' : '') + '</td><td>' + esc(zu(a.zustand)) + '</td><td>' + (a.preis ? 'CHF ' + Number(a.preis).toFixed(2) : '') + '</td>' +
         '<td>' + esc(a.fotos || 0) + (/^https:\/\//.test(a.ordner) ? ' <a href="' + esc(a.ordner) + '">' + t('ana.ordner') + '</a>' : '') + '</td><td class="mono">' + esc(a.erfasst) + (a.kuerzel ? ' ' + esc(a.kuerzel) : '') + '</td>' +
         '<td><button class="haupt-knopf" onclick="start(\'' + esc(a.id) + '\')">' + t('such.listen') + '</button></td></tr>';
     });
@@ -1476,7 +1481,8 @@
     'g.storno.k': ['Storno öffnen', 'Open cancellation'], 'g.storno.ok': ['Storniert', 'Cancelled'], 'g.storno.p': ['Paket aus «{0}» holen, auspacken, Stück ins Regal «{1}».', 'Take the parcel from «{0}», unpack it, item onto the shelf «{1}».'],
     'g.auspacken': ['Auspacken', 'Unpack'],
     /* Listing */
-    'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
+    'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.mm': ['aus Matchmaker', 'from Matchmaker'],
+    'mm.frage': ['{0} lag im Matchmaker (Suchauftrag: {1}). Dort nicht verkauft und jetzt auf Ricardo?', '{0} was in Matchmaker (request: {1}). Not sold there and now on Ricardo?'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
     'g.l.abgelaufen': ['abgelaufen', 'expired'], 'g.l.unverkauft': ['nicht verkauft', 'not sold'],
     'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Suchen oder ohne Analyse erfassen.', 'Item not in the list? Search or record without analysis.'],
     'g.l.pruefen': ['Prüfen', 'Check'], 'g.l.holen': ['Stück holen: {0}', 'Take the item: {0}'],
@@ -1663,7 +1669,7 @@
     F.bereit.filter(function (x) { return x.wieder; }).forEach(function (x) { neu(x.id, x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), t('g.l.wieder'), function () { weiter(x.id); }); });
     (ANA || []).forEach(function (a) {
       if (schon[a.id]) return;
-      neu(a.id, a.titel || a.name, esc(a.id) + ' · ' + esc(zu(a.zustand)) + (a.preis ? ' · CHF ' + Number(a.preis).toFixed(2) : '') + ' · ' + t('th.fotos') + ' ' + esc(a.fotos || 0), t('g.l.neu'), function () { start(a.id); });
+      neu(a.id, a.titel || a.name, esc(a.id) + ' · ' + esc(zu(a.zustand)) + (a.preis ? ' · CHF ' + Number(a.preis).toFixed(2) : '') + ' · ' + t('th.fotos') + ' ' + esc(a.fotos || 0), t(a.mm ? 'g.l.mm' : 'g.l.neu'), function () { start(a.id); });
     });
     (F.ohneMail || []).forEach(function (x) {
       l.push({ key: 'e' + x.id, titel: x.name, info: esc(x.id) + ' · ' + t('f.s2.ende', esc(x.ende)), tag: t('g.l.abgelaufen'), tagKlasse: 'orange', o: x, schritte: function (f) {

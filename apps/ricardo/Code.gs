@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-21.1';
+const VERSION = '2026-10-21.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -508,8 +508,9 @@ function leseAnalyse_(frisch) {
   return JSON.parse(JSON.stringify(ANALYSE_FRISCH));
 }
 function leseAnalyseFrisch_() {
-  const sh = SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getSheetByName(ANALYSE_TAB);
-  if (!sh || sh.getLastRow() < 2) return [];
+  const ss = SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID), sh = ss.getSheetByName(ANALYSE_TAB);
+  const mm = leseMatchmaker_(ss);
+  if (!sh || sh.getLastRow() < 2) return mm;
   const vals = sh.getDataRange().getValues();
   const kopf = vals[0].map(function (x) { return String(x).trim(); });
   const c = function (name) { return kopf.indexOf(name); };
@@ -529,7 +530,68 @@ function leseAnalyseFrisch_() {
       erfasst: dat instanceof Date ? datum_(dat) : String(dat).slice(0, 10), tab: 'Analyse', spez: '', kat: '', link: '', ort: ''
     };
   }
+  mm.forEach(function (m) { if (!je[m.id]) je[m.id] = m; });         // ein Eintrag im Tab «Ricardo» (z.B. nach dem Wiedereinstieg in der Analyse) geht vor
   return Object.keys(je).map(function (k) { return je[k]; });
+}
+
+/**
+ * Entscheid Jonas 21.10.2026: Was beim Matchmaker nicht verkauft wurde, geht direkt hier auf Ricardo. Der Tab «Matchmaker» im ANALYSE TOOL hat dieselben Angaben
+ * wie «Ricardo» (Fotos, Titel, Beschrieb, Versand), aber den Preis VP und keinen Ricardo-Schluss. Darum: Startpreis nach Grade (Prozent vom Neupreis, Einstellungen
+ * des ANALYSE TOOL), Versandsatz und Schlusssatz von hier. Beim Start des Listings setzt das Tool dort den Status «Ricardo», die Analyse räumt danach selbst auf.
+ */
+const MM_TAB = 'Matchmaker', MM_FUER_RICARDO = ['Offen', 'Ricardo', 'Auf Ricardo'];
+function leseMatchmaker_(ss) {
+  const sh = ss.getSheetByName(MM_TAB);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const vals = sh.getDataRange().getValues(), kopf = vals[0].map(function (x) { return String(x).trim(); }), c = function (n) { return kopf.indexOf(n); };
+  if (c('PG-ID') === -1 || c('Titel') === -1 || c('Artikelbeschrieb') === -1 || c('Status') === -1) return [];
+  const g = function (row, n) { return c(n) === -1 ? '' : row[c(n)]; }, pz = mmProzent_(ss), je = {};
+  for (let i = 1; i < vals.length; i++) {
+    const row = vals[i], id = String(g(row, 'PG-ID')).trim(), status = String(g(row, 'Status')).trim();
+    if (!id) continue;
+    if (MM_FUER_RICARDO.indexOf(status) === -1) { delete je[id]; continue; }      // letzte Zeile zählt
+    const ean = String(g(row, 'EAN')).replace(/^'/, '').trim(), dat = g(row, 'Analysiert am'), ovp = zahl_(g(row, 'Neupreis CHF')), grade = String(g(row, 'Grade')).trim();
+    const prozent = grade === 'C' ? pz.c : pz.ab, vp = ovp > 0 ? Math.max(1, Math.round(ovp * prozent / 100)) : zahl_(g(row, 'Preis CHF'));
+    je[id] = {
+      id: id, nr: String(g(row, 'Analyse-Nr')).trim(), name: String(g(row, 'Bezeichnung')).trim(), ean: ean, eanNorm: normEan_(ean),
+      titel: String(g(row, 'Titel')).trim(), beschrieb: mmBeschrieb_(String(g(row, 'Artikelbeschrieb')).replace(/\r/g, '').trim()),
+      zustand: String(g(row, 'Zustand')).trim(), grade: grade, vp: vp, ovp: ovp, klasse: String(g(row, 'Versandklasse')).trim(),
+      ordner: String(g(row, 'Foto-Ordner')).trim(), fotos: zahl_(g(row, 'Fotos')), kuerzel: String(g(row, 'Kürzel')).trim(),
+      erfasst: dat instanceof Date ? datum_(dat) : String(dat).slice(0, 10), tab: 'Analyse', spez: '', kat: '', link: '', ort: '',
+      mm: true, mmStatus: status, mmZeile: i + 1, auftrag: String(g(row, 'Suchauftrag')).trim()
+    };
+  }
+  return Object.keys(je).map(function (k) { return je[k]; });
+}
+/** Startpreis-Prozente aus den Einstellungen des ANALYSE TOOL (gleiche Regel wie dort), sonst 50 / 35. */
+function mmProzent_(ss) {
+  const aus = { ab: 50, c: 35 };
+  try {
+    const sh = ss.getSheetByName('Einstellungen'), v = sh ? sh.getDataRange().getValues() : [];
+    v.forEach(function (z) {
+      const n = Number(String(z[1]).replace(',', '.'));
+      if (!(n > 0 && n <= 100)) return;
+      if (String(z[0]).trim() === 'Startpreis A/B % vom Neupreis') aus.ab = n;
+      if (String(z[0]).trim() === 'Startpreis C % vom Neupreis') aus.c = n;
+    });
+  } catch (err) { /* Vorgaben */ }
+  return aus;
+}
+/** Matchmaker-Text für Ricardo: Versandsatz und Schlusssatz von hier anhängen (fehlen beim Matchmaker). */
+function mmBeschrieb_(b) {
+  [cfg_('Versandsatz'), cfg_('Schlusssatz')].forEach(function (x) { x = String(x || '').trim(); if (x && b.indexOf(x) === -1) b += '\n\n' + x; });
+  return b;
+}
+/** Beim Start des Listings: im ANALYSE TOOL den Matchmaker-Eintrag auf «Ricardo» setzen (nicht verkauft). */
+function mmAufRicardo_(q) {
+  if (!q || !q.mm || q.mmStatus !== 'Offen') return;
+  try {
+    const sh = SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getSheetByName(MM_TAB), kopf = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const cs = kopf.indexOf('Status') + 1, ci = kopf.indexOf('PG-ID') + 1;
+    if (!cs || String(sh.getRange(q.mmZeile, ci).getValue()).trim() !== q.id) throw new Error('Zeile ' + q.mmZeile + ' gehört nicht mehr zu ' + q.id);
+    sh.getRange(q.mmZeile, cs).setValue('Ricardo');
+    log_('Matchmaker nicht verkauft → Ricardo', q.id, q.auftrag || '');
+  } catch (err) { log_('Matchmaker-Status', q.id, err.message); }          // das Listing geht trotzdem; die Analyse sieht das Stück dann noch im Matchmaker
 }
 
 function findeAnalyse_(id) { return leseAnalyse_(true).filter(function (r) { return r.id === id; })[0] || null; }
@@ -544,7 +606,7 @@ function analyseVersand_(klasse) {
 function analyseListe() {
   const idx = listingsIndex_();
   return leseAnalyse_().filter(function (r) { return !idx[r.id]; })
-    .map(function (r) { return { id: r.id, name: r.name, titel: r.titel, zustand: r.zustand, preis: r.vp, fotos: r.fotos, ordner: r.ordner, kuerzel: r.kuerzel, erfasst: r.erfasst }; })
+    .map(function (r) { return { id: r.id, name: r.name, titel: r.titel, zustand: r.zustand, preis: r.vp, fotos: r.fotos, ordner: r.ordner, kuerzel: r.kuerzel, erfasst: r.erfasst, mm: !!r.mm && r.mmStatus === 'Offen', auftrag: r.auftrag || '' }; })
     .sort(function (a, b) { return a.id.localeCompare(b.id); });
 }
 
@@ -598,6 +660,7 @@ function starteListing(id, auchAndere) {
       L_COLS.forEach(function (k) { rec[k] = ''; });
       rec['PG-ID'] = q.id; rec['Status'] = 'In Arbeit'; rec['Lagerort'] = q.ort; rec['Bearbeitet von'] = nutzer_(); rec['Angelegt am'] = new Date();
       ausAnalyse_(rec, q);
+      mmAufRicardo_(q);
       const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
       sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
       schreibe_(sh, sh.getLastRow(), rec);                     // Status Bereit, wenn aus der Analyse schon alles da ist

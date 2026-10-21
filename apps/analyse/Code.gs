@@ -825,6 +825,7 @@ function abgleichen() {
     if (String(e['Automatischer Import']) === 'Ja') schritt(function () { return spiegeln_(e); }, 'spiegeln');
     schritt(abholen_, 'abholen');
     schritt(function () { return starten_(e); }, 'starten');
+    schritt(function () { return mmNachRicardo_(e); }, 'Matchmaker → Ricardo');
     /* Handbücher suchen und lesen dauert pro Stück rund eine Minute und bremst das Tool. Tagsüber nicht, sondern am Abend und in der Nacht. */
     const tag = tagsueber_(e);
     if (!tag) schritt(function () { return handbuecher_(e); }, 'Handbücher');
@@ -2595,6 +2596,35 @@ function verkaufPruefen_(d, u, x, e, p, art) {
     'Grade': x.grade, 'Neupreis CHF': zahl_(p['Neupreis CHF']) || '', 'Versandklasse': v.name, 'Versand CHF': v.preis, 'Foto-Ordner': st.ordner, 'Fotos': st.liste.length };
   if (mm) { z['Zustand'] = ricardoZustand_(x); z['Preis CHF'] = preis; } else { z['Ricardo-Zustand'] = ricardoZustand_(x); z['Startpreis CHF'] = preis; }
   return z;
+}
+/**
+ * Entscheid Jonas 21.10.2026: Was beim Matchmaker nicht verkauft wurde, startet im Ricardo Tool auf Ricardo. Das Ricardo Tool setzt dafür im Tab «Matchmaker» den
+ * Status «Ricardo». Der Abgleich räumt hier nach: Regal «Ricardo Offline» in «Analysen», Vermerk beim Suchauftrag, Status «Auf Ricardo».
+ */
+function mmNachRicardo_(e) {
+  if (!ss_().getSheetByName('Matchmaker')) return {};
+  const offen = lies_('Matchmaker').z.filter(function (r) { return String(r['Status']) === 'Ricardo'; });
+  if (!offen.length) return {};
+  const heute = Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy'), vermerke = [];
+  gesperrt_(function () {
+    const ana = lies_('Analysen').z, letzte = {};
+    ana.forEach(function (r) { letzte[String(r['PG-ID'])] = r; });
+    const regal = {}, auftrag = {}, status = {};
+    offen.forEach(function (m) {
+      const pg = String(m['PG-ID']), r = letzte[pg];
+      if (r && r['Regal'] === 'Matchmaker') {
+        regal[r._r] = 'Ricardo Offline';
+        auftrag[r._r] = txt_(String(r['Matchmaker-Auftrag'] || '') + ' → nicht verkauft, Ricardo ' + heute);
+        try { const mm = (JSON.parse(String(r['Stand'] || '') || 'null') || {}).mm; if (mm) vermerke.push([mm, pg + ' · nicht verkauft, jetzt auf Ricardo · ' + heute]); } catch (err) { /* ohne Vermerk */ }
+      }
+      status[m._r] = 'Auf Ricardo';
+    });
+    if (Object.keys(regal).length) { setz_('Analysen', 'Regal', regal); setz_('Analysen', 'Matchmaker-Auftrag', auftrag); }
+    setz_('Matchmaker', 'Status', status);
+  });
+  vermerke.forEach(function (v) { mmVermerk_(e, v[0], v[1]); });
+  offen.forEach(function (m) { log_('Matchmaker → Ricardo', String(m['PG-ID']), String(m['Suchauftrag'] || '')); });
+  return {};
 }
 /** Wiedereinstieg aus dem Regal «Matchmaker»: offene Einträge im Tab «Matchmaker» für dieses Stück bekommen einen neuen Status. Läuft in der Sperre. */
 function mmStatus_(pg, status) {
