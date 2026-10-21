@@ -1473,7 +1473,7 @@
   function fotoKasten() {
     if (!LAUF.fotosAuf || !AN || (schritt() === 'entscheid' && AN.s.kanal === 'ricardo') || !AN.d.ricardo) return '';
     return '<div class="karte"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h3 class="gruppe" style="margin:0">' + tx('fo.titel') + '</h3><button class="link" data-a="fotosAuf" aria-label="' + tx('fo.titel') + '">×</button></div><p class="still">' + tx('fo.text') + '</p>'
-      + '<div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(AN.d.ricardo.fotoUrl) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
+      + '<div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(fotoLink()) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
       + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>';
   }
   function infosAuf() { LAUF.infosAuf = !LAUF.infosAuf; zeichneSchritt(); if (LAUF.infosAuf) $('infos').scrollIntoView({ block: 'nearest' }); }
@@ -1621,7 +1621,7 @@
   function ricardoTeil(r) {
     var s = AN.s, d = AN.d, vs = ricVorschlag(), fehlt = ricFehlt();
     return '<div class="ric"><div class="leiste"><h3 class="gruppe" style="margin:0">' + tx('ri.titel') + '</h3><button class="link rechts" data-a="kanalZurueck">' + tx('ri.zurueck') + '</button></div>'
-      + '<div class="ric-box"><div class="n">' + tx('ri.n1') + '</div><div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(d.ricardo.fotoUrl) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
+      + '<div class="ric-box"><div class="n">' + tx('ri.n1') + '</div><div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(fotoLink()) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
       + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n2') + '</div>' + (LAUF.ricLaeuft ? '<p class="hb-warte"><span class="dreh"></span>' + tx('ri.schreibt') + '</p>' : '')
       + '<label for="r-titel">' + tx('ri.ftitel') + ' <span class="ric-zahl" id="ric-zahl">' + tx('ri.zeichen', s.ricTitel.length) + '</span></label><input type="text" id="r-titel" data-e="ricTitel" maxlength="60" value="' + esc(s.ricTitel) + '" autocomplete="off">'
@@ -1674,9 +1674,17 @@
     if (!RIC || RIC.id !== AN.d.produkt.id || Date.now() - (RIC.zeit || 0) > 5000) fotoHolen();
     qrZeichnen();
   }
+  /* Adresse der Foto-Seite: aus den Startdaten des Servers (nie /dev). Offene Analysen von vor dem 21.10.2026 tragen evtl. noch die /dev-Adresse in AN.d: die zählt nur als Notlösung. */
+  function fotoLink() {
+    if (!AN || !AN.d || !AN.d.produkt) return '';
+    if (S && S.fotoBasis) return S.fotoBasis + '?foto=' + encodeURIComponent(AN.d.produkt.id);
+    var u = AN.d.ricardo && AN.d.ricardo.fotoUrl || '';
+    return /\/dev\?/.test(u) ? '' : u;
+  }
   function qrZeichnen() {
-    var feld = $('ric-qr'), url = AN && AN.d.ricardo && AN.d.ricardo.fotoUrl;
+    var feld = $('ric-qr'), url = fotoLink();
     if (!feld || !url || feld.getAttribute('data-url') === url) return;
+    var ln = feld.parentNode && feld.parentNode.querySelector('a'); if (ln) ln.href = url;            // Link gleich wie der QR-Code
     var mal = function () { try { var q = window.qrcode(0, 'M'); q.addData(url); q.make(); feld.innerHTML = q.createSvgTag(4, 2); feld.setAttribute('data-url', url); } catch (e) { /* ohne QR bleibt der Link */ } };
     if (window.qrcode) { mal(); return; }
     if (LAUF.qrLaedt) return;

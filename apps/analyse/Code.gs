@@ -719,7 +719,9 @@ function startPaket_() {
 }
 function startVergessen_() { try { CacheService.getScriptCache().remove(START_SCHLUESSEL); } catch (err) { /* läuft ab */ } }
 function startDaten() {
-  return Object.assign({ version: VERSION, admin: istAdmin_() }, startPaket_());
+  let basis = FOTO_URL_STANDARD;
+  try { basis = fotoBasis_(einst_()); } catch (err) { /* feste Adresse */ }
+  return Object.assign({ version: VERSION, admin: istAdmin_(), fotoBasis: basis }, startPaket_());     // fotoBasis: repariert den QR-Code offener Analysen (21.10.2026)
 }
 function zahlen_(p) {
   const z = { offen: 0, bereit: 0, laeuft: 0, fehler: 0 };
@@ -1907,12 +1909,12 @@ function ueberblickSpeicher_(p, e) {
  * Adresse dieses Aufrufs, und /dev nie.
  */
 const FOTO_URL_STANDARD = 'https://script.google.com/a/macros/pretty-good.ch/s/AKfycbwPe8Jk-oFf6nUVd9BqSpytfji_zwWwrHvJC-zeDW36-n1iS7f2pdOSG6McpoyfbvKS/exec';
-function fotoUrl_(p, e) {
+function fotoBasis_(e) {
   let basis = String((e && e['Web-App-Adresse für Fotos']) || '').trim();
   if (!basis) try { basis = String(ScriptApp.getService().getUrl() || ''); } catch (err) { basis = ''; }
-  if (!basis || /\/dev\/?$/.test(basis)) basis = FOTO_URL_STANDARD;
-  return basis + '?foto=' + encodeURIComponent(String(p['PG-ID']));
+  return !basis || /\/dev\/?$/.test(basis) ? FOTO_URL_STANDARD : basis;
 }
+function fotoUrl_(p, e) { return fotoBasis_(e) + '?foto=' + encodeURIComponent(String(p['PG-ID'])); }
 /** Abgleich: den Überblick für die nächsten Stücke der Warteschlange vorberechnen, damit «Analyse starten» sofort da ist. Höchstens n Stück pro Lauf. */
 function vorwaermen_(e, n) {
   const c = CacheService.getScriptCache(), gen = c.get('ueb-gen') || '0';
