@@ -16,7 +16,7 @@
  *  - Schreiben nur in einer Sperre (LockService), damit mehrere Personen gleichzeitig scannen können.
  */
 
-const VERSION = '2026-10-21.3';
+const VERSION = '2026-10-21.4';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)

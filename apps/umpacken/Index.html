@@ -130,9 +130,8 @@
       }).join('') + '</tbody></table>';
     };
     return '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Durchgänge</h2><button class="pink" data-a="neuerDurchgang">Neuer Durchgang</button></div>'
-      + '<p class="still" style="margin-top:10px">Auf dem Handy: Link im Browser öffnen, dann «Teilen» → «Zum Home-Bildschirm». Scannen mit dem Knopf «Kamera».</p>'
-      + '<p class="still" style="margin-top:10px">Ein Durchgang: 1 · Setup (Quelle und Ziel-Gebinde) → 2 · Scan (jedes Stück in sein Gebinde) → 3 · Abschluss (Listen und Änderungen fürs Return Tool).</p></div>'
-      + '<div class="karte"><h3>Offen</h3>' + (offen.length ? tab(offen) : '<p class="still">Keine offenen Durchgänge.</p>') + '</div>'
+      + '</div>'
+      + '<div class="karte"><h3>Offen</h3>' + (offen.length ? tab(offen) : '<p class="still">Keine.</p>') + '</div>'
       + (zu.length ? '<div class="karte"><h3>Abgeschlossen</h3>' + tab(zu) + '</div>' : '');
   }
   function oeffne(id) {
@@ -155,7 +154,7 @@
   function ladeOrte() { ruf('lagerorte', [], function (o) { V.orte = o; if (V.ansicht === 'setup') zeichne(); }); }
   function setupSeite() {
     var s = V.setup, orte = V.orte;
-    var ortListe = !orte ? '<p class="still">Lagerorte werden aus dem Return Tool gelesen …</p>' : '<div class="reihe" style="margin-top:8px"><input type="text" id="s-filter" placeholder="Filter, z.B. KID" value="' + esc(s.filter) + '" style="max-width:240px"><button class="klein" data-a="alleOrte">Alle gefilterten wählen</button><button class="klein" data-a="keineOrte">Keine</button><span class="still" id="s-zahl"></span></div><div class="orte" id="s-orte">' + ortHtml() + '</div>';
+    var ortListe = !orte ? '<p class="still">Lädt …</p>' : '<div class="reihe" style="margin-top:8px"><input type="text" id="s-filter" placeholder="Filter, z.B. KID" value="' + esc(s.filter) + '" style="max-width:240px"><button class="klein" data-a="alleOrte">Alle</button><button class="klein" data-a="keineOrte">Keine</button><span class="still" id="s-zahl"></span></div><div class="orte" id="s-orte">' + ortHtml() + '</div>';
     var geb = s.gebinde.map(function (g, i) {
       return '<div class="geb-zeile" data-i="' + i + '">'
         + '<div><label>Name</label><input type="text" data-g="name" value="' + esc(g.name) + '" placeholder="z.B. Balu 1"></div>'
@@ -169,14 +168,14 @@
     }).join('');
     return '<div class="schritte"><span class="an">1 · Setup</span><span>2 · Scan</span><span>3 · Abschluss</span></div>'
       + '<div class="karte"><h2>Neuer Durchgang</h2><label for="s-name">Name</label><input type="text" id="s-name" value="' + esc(s.name) + '"></div>'
-      + '<div class="karte"><h3>Quelle: welche Stücke kommen in Frage?</h3><div class="reihe">'
-      + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="rt"' + (s.quelle === 'rt' ? ' checked' : '') + '> Lagerorte aus dem Return Tool (nur lesen)</label>'
-      + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="manuell"' + (s.quelle === 'manuell' ? ' checked' : '') + '> Liste von Hand einfügen (ohne Anbindung)</label></div>'
-      + (s.quelle === 'rt' ? ortListe : '<p class="still" style="margin-top:10px">Aus einem Export kopieren und einfügen, mit Kopfzeile. Nötig: <b>ID</b> (oder PG-ID). Dazu, wenn vorhanden: Bezeichnung, Barcode, VP, Lagerort, Kategorie. Tabulator, Semikolon oder Komma als Trenner.</p><textarea id="s-liste" placeholder="ID&#9;Bezeichnung&#9;Barcode&#9;VP&#9;Lagerort">' + esc(s.liste) + '</textarea>')
+      + '<div class="karte"><h3>Quelle</h3><div class="reihe">'
+      + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="rt"' + (s.quelle === 'rt' ? ' checked' : '') + '> Return Tool</label>'
+      + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="manuell"' + (s.quelle === 'manuell' ? ' checked' : '') + '> Liste einfügen</label></div>'
+      + (s.quelle === 'rt' ? ortListe : '<p class="still" style="margin-top:10px">Liste mit Kopfzeile einfügen. Pflicht: <b>ID</b>.</p><textarea id="s-liste" placeholder="ID&#9;Bezeichnung&#9;Barcode&#9;VP&#9;Lagerort">' + esc(s.liste) + '</textarea>')
       + '</div>'
-      + '<div class="karte"><h3>Ziel-Gebinde: wohin kommen die Stücke?</h3><p class="still">Verkauf an Abnehmer: die Stücke gelten danach als verkauft (Liste pro Abnehmer). Neue Palette im Lager: nur der Lagerort ändert sich, das Stück bleibt im Bestand. Entsorgung: Preis 0. Was nicht gescannt wird, bleibt, wo es ist.</p>'
+      + '<div class="karte"><h3>Gebinde</h3>'
       + geb + '<div class="reihe" style="margin-top:12px"><button data-a="gebDazu">Gebinde hinzufügen</button></div></div>'
-      + '<div class="karte"><div class="reihe"><button class="pink" data-a="anlegen">Setup speichern und zum Scan</button><button data-a="zurStart">Abbrechen</button></div></div>';
+      + '<div class="karte"><div class="reihe"><button class="pink" data-a="anlegen">Speichern → Scan</button><button data-a="zurStart">Abbrechen</button></div></div>';
   }
   function ortHtml() {
     var s = V.setup, f = norm(s.filter);
@@ -251,16 +250,16 @@
     var d = V.D, z = d.zuordnung, zugeordnet = Object.keys(z).filter(function (k) { return V.idx[k]; }).length;
     var wahl = d.gebinde.map(function (g) { var s = stand(g.id); return '<button class="' + (g.id === V.aktiv ? 'an' : '') + '" data-a="aktiv" data-v="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><span class="etikett ' + g.art + '">' + (g.art === 'Verkauf' ? 'Verkauf · ' + esc(g.abnehmer) : g.art === 'Lager' ? 'Lager' : 'Entsorgung') + '</span> ' + (g.lagerort ? '<span class="mono">' + esc(g.lagerort) + '</span>' : '') + '<small>' + s.n + ' Stück · ' + chf(s.t) + '</small></button>'; }).join('');
     return '<div class="schritte"><span>1 · Setup</span><span class="an">2 · Scan</span><span>3 · Abschluss</span></div>'
-      + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">In welches Gebinde?</h2><span class="still">' + zugeordnet + ' von ' + d.bestand.length + ' Stücken zugeordnet</span></div>'
+      + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Gebinde</h2><span class="still">' + zugeordnet + ' / ' + d.bestand.length + '</span></div>'
       + '<div class="gebinde-wahl">' + wahl + '</div>'
       + '<div class="scan-reihe"><input type="text" id="scan" placeholder="PG-ID oder Barcode scannen" autocomplete="off" autocapitalize="characters" data-enter="scanne"><button class="pink" id="kamera-knopf" data-a="kamera">' + (KAM.an ? 'Kamera aus' : 'Kamera') + '</button></div>'
       + '<div id="rueck">' + rueckHtml() + '</div></div>'
-      + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt gescannt'], ['gebinde', 'Inhalt der Gebinde'], ['offen', 'Noch nicht zugeordnet'], ['bearbeiten', 'Gebinde bearbeiten']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
-      + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Fertig gescannt: zum Abschluss</button><span class="still">Unterbrechen geht jederzeit, der Stand ist gespeichert.</span></div></div>';
+      + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt'], ['gebinde', 'Inhalt'], ['offen', 'Offen'], ['bearbeiten', 'Gebinde ändern']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
+      + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Zum Abschluss</button></div></div>';
   }
   function rueckHtml() {
     var r = V.rueck;
-    if (!r) return '<p class="still">Gebinde wählen, dann scannen. Das Feld bleibt aktiv.</p>';
+    if (!r) return '';
     return '<div class="meldung ' + r.art + '"><span class="gross">' + esc(r.titel) + '</span>' + esc(r.text || '') + (r.knopf || '') + '</div>';
   }
   function zeile(p, mitAktion) {
@@ -271,13 +270,13 @@
   }
   function reiterHtml() {
     var d = V.D, kopf = function (akt) { return '<table><thead><tr><th>ID</th><th>Bezeichnung</th><th>Lagerort alt</th><th>Gebinde</th><th class="zahl">Preis</th>' + (akt ? '<th></th>' : '') + '</tr></thead><tbody>'; };
-    if (V.reiter === 'letzte') return V.letzte.length ? kopf(true) + V.letzte.slice(0, 30).map(function (id) { return V.idx[id] ? zeile(V.idx[id], true) : ''; }).join('') + '</tbody></table><p class="still">Preis ändern: Zahl eintragen und Enter. 0 = gratis.</p>' : '<p class="still">Noch nichts gescannt.</p>';
+    if (V.reiter === 'letzte') return V.letzte.length ? kopf(true) + V.letzte.slice(0, 30).map(function (id) { return V.idx[id] ? zeile(V.idx[id], true) : ''; }).join('') + '</tbody></table>' : '<p class="still">Noch nichts.</p>';
     if (V.reiter === 'gebinde') return d.gebinde.map(function (g) {
       var l = d.bestand.filter(function (p) { var a = d.zuordnung[norm(p.id)]; return a && a.gebinde === g.id; }), s = stand(g.id);
       return '<h3 style="margin-top:14px">' + esc(g.name) + ' <span class="still" style="text-transform:none">· ' + s.n + ' Stück · ' + chf(s.t) + '</span></h3>' + (l.length ? kopf(true) + l.map(function (p) { return zeile(p, true); }).join('') + '</tbody></table>' : '<p class="still">Leer.</p>');
     }).join('');
-    if (V.reiter === 'offen') { var o = d.bestand.filter(function (p) { return !d.zuordnung[norm(p.id)]; }); return '<p class="still">' + o.length + ' Stücke sind noch in keinem Gebinde. Sie bleiben, wo sie sind, wenn sie nicht gescannt werden.</p>' + (o.length ? kopf(false) + o.map(function (p) { return zeile(p, false); }).join('') + '</tbody></table>' : ''); }
-    if (V.reiter === 'bearbeiten') return '<p class="still">Gebinde ergänzen (z.B. eine dritte Palette) oder ändern. Gebinde mit Stücken lassen sich nicht löschen, ihre Art bleibt.</p>' + bearbeitenHtml();
+    if (V.reiter === 'offen') { var o = d.bestand.filter(function (p) { return !d.zuordnung[norm(p.id)]; }); return '<p class="still">' + o.length + ' Stücke offen</p>' + (o.length ? kopf(false) + o.map(function (p) { return zeile(p, false); }).join('') + '</tbody></table>' : ''); }
+    if (V.reiter === 'bearbeiten') return bearbeitenHtml();
     return '';
   }
   function bearbeitenHtml() {
@@ -323,9 +322,9 @@
     if (!p && V.bar[code]) {
       var l = V.bar[code], frei = l.filter(function (x) { return !z[norm(x.id)]; });
       p = frei[0] || l[0];
-      if (!frei.length) { var a0 = z[norm(p.id)]; V.rueck = { art: 'warn', titel: 'Alle ' + l.length + ' Stücke mit diesem Barcode sind schon zugeordnet', text: ' (z.B. ' + p.id + ' in ' + (V.geb[a0.gebinde] || {}).name + '). Bitte die PG-ID scannen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
+      if (!frei.length) { V.rueck = { art: 'warn', titel: 'Alle ' + l.length + ' Stücke mit diesem Barcode zugeordnet', text: ' PG-ID scannen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
     }
-    if (!p) { V.rueck = { art: 'stop', titel: '❌ ' + code + ' ist nicht in der Quelle', text: ' Das Stück gehört nicht zu diesem Durchgang. Zur Seite legen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
+    if (!p) { V.rueck = { art: 'stop', titel: '❌ ' + code + ' ist nicht in der Quelle', text: ' Zur Seite legen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
     var a = z[norm(p.id)];
     if (a && a.gebinde === g.id) { V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
     if (a) {
@@ -384,7 +383,7 @@
     var d = V.D;
     Array.prototype.forEach.call(document.querySelectorAll('.gebinde-wahl button'), function (b) { var s = stand(b.getAttribute('data-v')); b.querySelector('small').textContent = s.n + ' Stück · ' + chf(s.t); });
     var z = Object.keys(d.zuordnung).filter(function (k) { return V.idx[k]; }).length;
-    var info = document.querySelector('.karte .reihe .still'); if (info) info.textContent = z + ' von ' + d.bestand.length + ' Stücken zugeordnet';
+    var info = document.querySelector('.karte .reihe .still'); if (info) info.textContent = z + ' / ' + d.bestand.length;
     if (!still) $('rueck').innerHTML = rueckHtml();
     kamText();
     if (V.reiter !== 'bearbeiten' && !fokus) $('reiter-inhalt').innerHTML = reiterHtml();
@@ -436,13 +435,13 @@
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (st) {
       KAM.stream = st; KAM.an = true; document.body.classList.add('kam');
       var k = $('kamera'); k.hidden = false;
-      k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Strichcode in den Rahmen halten.</b><button class="klein" data-a="kamera">Kamera aus</button></div>';
+      k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Code in den Rahmen.</b><button class="klein" data-a="kamera">Kamera aus</button></div>';
       var v = k.querySelector('video'); v.srcObject = st; var p = v.play(); if (p && p.catch) p.catch(function () {});
       if ($('kamera-knopf')) $('kamera-knopf').textContent = 'Kamera aus';
       kamText();
       if (detektor()) suchen(v); else zxLaden(function () { suchen(v); }, kameraAus);
     }).catch(function (e) {
-      melde('Die Live-Kamera geht hier nicht (' + ((e && e.name) || e) + '). Es öffnet sich die Foto-Kamera.', true);
+      melde('Live-Kamera gesperrt, Foto-Kamera öffnet.', true);
       fotoScan();
     });
   }
@@ -476,7 +475,7 @@
     var t = $('kam-text'); if (!t) return;
     var g = V.geb && V.geb[V.aktiv], r = V.rueck;
     t.className = r ? r.art : '';
-    t.textContent = (g ? 'In ' + g.name + ': ' : '') + (r && KAM.letzte ? r.titel : 'Strichcode in den Rahmen halten.');
+    t.textContent = (g ? 'In ' + g.name + ': ' : '') + (r && KAM.letzte ? r.titel : 'Code in den Rahmen.');
   }
   function kameraAus() {
     KAM.an = false; clearTimeout(KAM.timer);
@@ -491,7 +490,7 @@
     var fertig = function (code) {
       URL.revokeObjectURL(url); KAM.foto = false;
       if (code) { $('scan').value = code; scanne(); }
-      else { V.rueck = { art: 'warn', titel: 'Kein Strichcode erkannt.', text: ' Nochmals fotografieren: näher, scharf, Strichcode quer und ganz im Bild.' }; $('rueck').innerHTML = rueckHtml(); piep(false); }
+      else { V.rueck = { art: 'warn', titel: 'Kein Strichcode erkannt.', text: ' Näher und scharf nochmals.' }; $('rueck').innerHTML = rueckHtml(); piep(false); }
     };
     img.onload = function () {
       var zx = function () {
@@ -514,26 +513,24 @@
     var zeilen = d.gebinde.map(function (g) { var s = stand(g.id); tot += s.t; return '<tr><td><b>' + esc(g.name) + '</b></td><td><span class="etikett ' + g.art + '">' + esc(g.art === 'Verkauf' ? 'Verkauf · ' + g.abnehmer : g.art === 'Lager' ? 'Neue Palette' : 'Entsorgung') + '</span></td><td class="mono">' + esc(g.lagerort || '–') + '</td><td class="zahl">' + s.n + '</td><td class="zahl">' + chf(s.t) + '</td></tr>'; }).join('');
     var h = '<div class="schritte"><span>1 · Setup</span><span>2 · Scan</span><span class="an">3 · Abschluss</span></div>'
       + '<div class="karte"><h2>' + (fertig ? 'Abgeschlossen' : 'Kontrolle') + '</h2><table><thead><tr><th>Gebinde</th><th>Art</th><th>Lagerort neu</th><th class="zahl">Stück</th><th class="zahl">Total</th></tr></thead><tbody>' + zeilen + '</tbody></table>'
-      + '<p style="margin-top:10px">' + (offen ? '<b>' + offen + ' Stücke</b> aus der Quelle sind in keinem Gebinde. Sie bleiben, wo sie sind (keine Änderung).' : 'Alle Stücke der Quelle sind zugeordnet.') + '</p>';
+      + '<p style="margin-top:10px">' + (offen ? '<b>' + offen + ' nicht gescannt</b> · bleiben am alten Ort' : 'Alles zugeordnet') + '</p>';
     if (!fertig) return h + '<div class="reihe"><button class="pink" data-a="abschliessen"' + (Object.keys(z).length ? '' : ' disabled') + '>Abschliessen</button><button data-a="zurueckScan">Zurück zum Scan</button></div>'
-      + '<p class="still" style="margin-top:10px">Abschliessen erstellt pro Abnehmer ein eigenes Sheet (Liste) und die Änderungsliste fürs Return Tool. Danach lässt sich nichts mehr scannen.</p></div>';
+      + '</div>';
     var listen = d.listen ? d.listen.split('\n').map(function (l) { var i = l.indexOf(': '); return '<li>' + esc(l.slice(0, i)) + ': <a href="' + esc(l.slice(i + 2)) + '">Liste öffnen</a></li>'; }).join('') : '';
     var a = d.aenderungen, erl = a.filter(function (x) { return x.erledigt; }).length;
     var akt = { 'Verkaufen': 'Lagerort auf das Gebinde setzen, dann im Return Tool «Lieferung erstellen» (setzt verkauft)', 'Lagerort ändern': 'Lagerort ändern', 'Entsorgen': 'Entsorgen' };
-    h += (listen ? '<h3 style="margin-top:14px">Listen pro Abnehmer</h3><ul>' + listen + '</ul>' : '') + '</div>'
-      + '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Übertragung ins Return Tool</h2><span class="still">' + erl + ' von ' + a.length + ' erledigt</span></div>'
-      + '<div class="reihe" style="margin:12px 0"><button disabled title="Kommt, sobald Jonas M. einverstanden ist und der Verkaufsablauf des Return Tools nachgebaut ist">Automatisch übertragen (noch gesperrt)</button><button data-a="kopieren">Liste kopieren (für Sheets)</button></div>'
-      + '<div class="meldung"><b>Manuell:</b> Im Return Tool pro Zeile den Lagerort setzen (Spalte «Lagerort»), den Preis anpassen, wo er abweicht, dann hier «erledigt» anhaken. '
-      + '<b>Verkauf:</b> Wenn alle Stücke eines Abnehmers den neuen Lagerort haben, im Tab «' + esc((a[0] || {}).tab || 'Stationär') + '» diese Lagerorte markieren und «Lieferung erstellen». Das Return Tool setzt sie dann auf VERKAUFT.</div>'
+    h += (listen ? '<h3 style="margin-top:14px">Listen</h3><ul>' + listen + '</ul>' : '') + '</div>'
+      + '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Return Tool</h2><span class="still">' + erl + ' von ' + a.length + ' erledigt</span></div>'
+      + '<div class="reihe" style="margin:12px 0"><button data-a="kopieren">Liste kopieren</button><span class="still">Im Return Tool eintragen, dann abhaken. Verkauf: Lagerort setzen → «Lieferung erstellen».</span></div>'
       + '<table><thead><tr><th><input type="checkbox" data-a="alleErledigt"></th><th>ID</th><th>Bezeichnung</th><th>Aktion</th><th>Tab · Zeile</th><th>Lagerort alt → neu</th><th class="zahl">VP alt</th><th class="zahl">Preis</th></tr></thead><tbody>'
       + a.map(function (x) { return '<tr' + (x.erledigt ? ' style="opacity:.5"' : '') + '><td><input type="checkbox" data-erl="' + x.r + '"' + (x.erledigt ? ' checked' : '') + '></td><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td title="' + esc(akt[x.aktion] || '') + '">' + esc(x.aktion) + (x.abnehmer ? ' · ' + esc(x.abnehmer) : '') + '</td><td>' + esc(x.tab) + ' · ' + esc(x.zeile) + '</td><td class="mono">' + esc(x.alt) + ' → <b>' + esc(x.neu || (x.aktion === 'Entsorgen' ? 'Entsorgen' : '')) + '</b></td><td class="zahl">' + chf(x.vp) + '</td><td class="zahl"' + (Math.abs(x.preis - x.vp) > 0.004 ? ' style="background:var(--gelb)"' : '') + '>' + chf(x.preis) + '</td></tr>'; }).join('')
-      + '</tbody></table><p class="still" style="margin-top:8px">Gelb = Preis weicht vom VP ab. «Zeile» ist die Zeile beim Setup; massgebend ist die ID.</p></div>';
+      + '</tbody></table></div>';
     return h;
   }
   function abschliessen() {
     var d = V.D, offen = d.bestand.filter(function (p) { return !d.zuordnung[norm(p.id)]; }).length;
     if (!confirm('Durchgang ' + d.id + ' abschliessen?' + (offen ? '\n\n' + offen + ' Stücke sind in keinem Gebinde und bleiben, wo sie sind.' : '') + '\n\nDanach lässt sich nichts mehr scannen.')) return;
-    ruf('abschliessen', [d.id, K()], function (x) { setzeD(x); zeichne(); melde('Abgeschlossen. Listen und Änderungen sind bereit.'); });
+    ruf('abschliessen', [d.id, K()], function (x) { setzeD(x); zeichne(); melde('Abgeschlossen.'); });
   }
   function zurueckScan() { V.ansicht = 'scan'; zeichne(); }
   function kopieren() {

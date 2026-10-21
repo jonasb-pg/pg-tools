@@ -58,6 +58,7 @@ with sync_playwright() as p:
     a = s.evaluate("CALLS.filter(function(c){return c[0]==='anlegen'})[0][1][0]")
     ok(a['lagerorte'] == ['KID-7', 'KID-12'] and a['gebinde'][0]['lagerort'] == 'BALU-1' and a['gebinde'][2]['art'] == 'Entsorgung' and a['gebinde'][1]['lagerort'] == 'KID-13', 'Setup gesendet: ' + json.dumps(a['gebinde'])[:200])
     ok(s.is_visible('#scan'), 'nach dem Setup: Scan')
+    if len(sys.argv) > 2: s.screenshot(path=sys.argv[2], full_page=True)
     # Scan ohne Kürzel
     s.fill('#scan', 'PG-1'); s.press('#scan', 'Enter'); s.wait_for_timeout(50)
     ok('Kürzel' in s.text_content('#rueck'), 'ohne Kürzel: Hinweis')
@@ -101,7 +102,7 @@ with sync_playwright() as p:
     ok('Kontrolle' in s.text_content('main') and 'CHF 15.00' in s.text_content('main'), 'Kontrolle mit Totalen')
     s.click('button[data-a=abschliessen]'); s.wait_for_timeout(200)
     t = s.text_content('main')
-    ok('Abgeschlossen' in t and 'Liste öffnen' in t and 'BALU-1' in t and 'noch gesperrt' in t, 'Abschluss: Liste, Änderungen, Automatik gesperrt')
+    ok('Abgeschlossen' in t and 'Liste öffnen' in t and 'BALU-1' in t and 'Liste kopieren' in t, 'Abschluss: Liste, Änderungen, kopieren')
     s.click('input[data-erl="2"]'); s.wait_for_timeout(150)
     ok('1 von 1 erledigt' in s.text_content('main'), 'erledigt angehakt')
     ok(not err, 'keine JS-Fehler ' + str(err))

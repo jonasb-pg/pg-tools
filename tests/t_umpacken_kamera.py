@@ -41,7 +41,7 @@ with sync_playwright() as p:
     s.on('dialog', lambda d: d.accept())
     s.route('https://app.test/', lambda r: r.fulfill(body=html, content_type='text/html; charset=utf-8'))
     s.goto('https://app.test/'); s.wait_for_timeout(200)
-    ok('Zum Home-Bildschirm' in s.text_content('main'), 'Hinweis Handy auf der Startseite')
+    ok('Auf dem Handy' not in s.text_content('main'), 'Startseite ohne Erklärtext')
     s.fill('#kuerzel', 'jb')
     s.click('button[data-a=oeffne]'); s.wait_for_timeout(200)
     ok(s.evaluate("document.activeElement.id") != 'scan', 'Handy: Scanfeld nicht automatisch fokussiert (keine Tastatur)')
