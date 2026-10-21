@@ -18,6 +18,7 @@
 const VERSION = '2026-10-21.1';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
+const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
 const ABLAGE_ID = '1S3ErLO9WlDyCK2UfVEwNuBA9XFmuFMSK';                  // Drive-Ordner «00_Claude-Eingang» für die Abnehmer-Listen
 const QUELL_TABS = 'Stationär, Berner Brocki, Caritas, Heilsarmee, Online, Spenden';
 const ARTEN = ['Verkauf', 'Lager', 'Entsorgung'];
@@ -55,11 +56,10 @@ const KATALOG = [
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('Umpack Tool').addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
-function onOpen() { SpreadsheetApp.getUi().createMenu('Umpack Tool').addItem('Einrichten', 'einrichten').addToUi(); }
 
 /** Legt die Tabs mit Kopfzeilen an und bringt das Sheet auf den Pretty-Good-Standard. Ändert keine Daten. */
 function einrichten() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = ss_();
   Object.keys(KOPF).forEach(function (n) {
     let sh = ss.getSheetByName(n);
     if (!sh) {
@@ -85,10 +85,10 @@ function einrichten() {
 /* ------------------------------------------------------------------ */
 
 let MEMO = {};
-function ss_() { return SpreadsheetApp.getActive(); }
+function ss_() { return SpreadsheetApp.openById(DB_ID); }
 function blatt_(n) {
   const sh = ss_().getSheetByName(n);
-  if (!sh) throw new Error('Tab «' + n + '» fehlt. Bitte im Sheet «Umpack Tool → Einrichten» ausführen.');
+  if (!sh) throw new Error('Tab «' + n + '» fehlt. Bitte im Apps-Script-Projekt «einrichten» ausführen.');
   return sh;
 }
 /** Liest einen Tab als Liste von Objekten. _r = Zeilennummer im Sheet. */

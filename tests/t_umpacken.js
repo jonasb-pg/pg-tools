@@ -38,7 +38,7 @@ const RT = datei({
 const erstellt = [];
 let lockFrei = true;
 const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Error, isFinite,
-  SpreadsheetApp: { getActive: () => DB, openById: (id) => RT, flush() {}, create: (t) => { const s = datei({ 'Tabelle1': [] }); s.titel = t; erstellt.push(s); return s; } },
+  SpreadsheetApp: { getActive: () => DB, openById: (id) => id === '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA' ? DB : RT, flush() {}, create: (t) => { const s = datei({ 'Tabelle1': [] }); s.titel = t; erstellt.push(s); return s; } },
   DriveApp: { getFileById: () => ({ moveTo() {} }), getFolderById: () => ({}) },
   LockService: { getScriptLock: () => ({ tryLock: () => lockFrei, releaseLock() {} }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'test@pg' }) },
