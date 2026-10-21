@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-19.5';
+const VERSION = '2026-10-21.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1838,7 +1838,7 @@ function ueberblick_(p, e) {
     }) },
     reparatur: { stundenansatz: Number(e['Stundenansatz Reparatur CHF']) || 0, grenze: Number(e['Reparatur lohnt bis Prozent vom VP']) || 0, hinweis: text('Reparierbarkeit') },
     ricardo: { vorschlag: zahl_(p['VP CHF']) >= (Number(e['Ricardo ab VP CHF']) || 0) && zahl_(p['VP CHF']) > 0, versand: ricardoVersand_(e), prozent: startpreisProzent_(e),
-      fotoUrl: (String(e['Web-App-Adresse für Fotos'] || '').trim() || ScriptApp.getService().getUrl()) + '?foto=' + encodeURIComponent(String(p['PG-ID'])) },
+      fotoUrl: fotoUrl_(p, e) },
     einst: { 'Garantie Tage': e['Garantie Tage'] }                          // was urteil_ im Browser aus den Einstellungen braucht
   };
 }
@@ -1892,11 +1892,26 @@ function uebSchluessel_(p, gen) {
   return 'ueb:' + VERSION + ':' + LANG + ':' + gen + ':' + String(p['PG-ID']) + ':' + h.toString(36);
 }
 function ueberblickSpeicher_(p, e) {
-  let c = null, k = '';
-  try { c = CacheService.getScriptCache(); k = uebSchluessel_(p, c.get('ueb-gen') || '0'); const alt = c.get(k); if (alt) return JSON.parse(alt); } catch (err) { c = null; }
-  const u = ueberblick_(p, e);
-  if (c && u.recherche) try { const s = JSON.stringify(u); if (s.length < 95000) c.put(k, s, UEB_TTL); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
+  let c = null, k = '', u = null;
+  try { c = CacheService.getScriptCache(); k = uebSchluessel_(p, c.get('ueb-gen') || '0'); const alt = c.get(k); if (alt) u = JSON.parse(alt); } catch (err) { c = null; }
+  if (!u) {
+    u = ueberblick_(p, e);
+    if (c && u.recherche) try { const s = JSON.stringify(u); if (s.length < 95000) c.put(k, s, UEB_TTL); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
+  }
+  if (u.ricardo) u.ricardo.fotoUrl = fotoUrl_(p, e);                     // nie aus dem Zwischenspeicher: der Abgleich (Testbereitstellung) kennt nur die /dev-Adresse
   return u;
+}
+/**
+ * Adresse für den QR-Code der Foto-Seite (21.10.2026). Im Abgleich-Trigger liefert ScriptApp.getService().getUrl() die /dev-Adresse der Testbereitstellung,
+ * die nur Bearbeiter des Skripts öffnen können: Auf dem Handy erscheint dann eine Google-Anmeldung statt der Foto-Seite. Darum: Einstellung, sonst die
+ * Adresse dieses Aufrufs, und /dev nie.
+ */
+const FOTO_URL_STANDARD = 'https://script.google.com/a/macros/pretty-good.ch/s/AKfycbwPe8Jk-oFf6nUVd9BqSpytfji_zwWwrHvJC-zeDW36-n1iS7f2pdOSG6McpoyfbvKS/exec';
+function fotoUrl_(p, e) {
+  let basis = String((e && e['Web-App-Adresse für Fotos']) || '').trim();
+  if (!basis) try { basis = String(ScriptApp.getService().getUrl() || ''); } catch (err) { basis = ''; }
+  if (!basis || /\/dev\/?$/.test(basis)) basis = FOTO_URL_STANDARD;
+  return basis + '?foto=' + encodeURIComponent(String(p['PG-ID']));
 }
 /** Abgleich: den Überblick für die nächsten Stücke der Warteschlange vorberechnen, damit «Analyse starten» sofort da ist. Höchstens n Stück pro Lauf. */
 function vorwaermen_(e, n) {
