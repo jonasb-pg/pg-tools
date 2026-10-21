@@ -1,6 +1,6 @@
 # Umpack Tool · Architektur
 
-Stand: Version `2026-10-21.2` (Kamera-Scan fürs Handy, Ausführen als Jonas). Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
+Stand: Version `2026-10-21.3`, live als Bereitstellung Version 3 (21.10.2026 20:19). Link in TOOL LINKS. Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
 
 ## Zweck
 Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst beim Abschluss nachgeführt.
@@ -27,3 +27,8 @@ Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche).
 - Knopf «Kamera»: Live-Bild in einer Leiste unten (bleibt beim Wechsel des Gebindes offen), alle 200 ms Strichcode suchen: BarcodeDetector (Chrome/Android), sonst ZXing (@zxing/library 0.21.3 von jsDelivr, v.a. iPhone). Gleicher Code erst nach 2.5 s wieder, Vibration bei Treffer.
 - Erlaubt der Google-Rahmen die Live-Kamera nicht, öffnet sich die Foto-Kamera des Handys (Datei-Feld mit capture): Foto machen, Code wird gelesen.
 - Test: tests/t_umpacken_kamera.py (Handy-Grösse, Fake-Kamera, simulierter Leser). ZXing echt geprüft in Chrome mit gezeichnetem EAN-13.
+
+## Betrieb und Prüfung (21.10.2026)
+- Einrichten im Editor ausgeführt (Tabs angelegt). `pruefen()` im Editor liest die Lagerorte aus dem Return Tool und schreibt sie ins Protokoll, ändert nichts: 75 Lagerorte, nächste Kids-Palette KID-13.
+- Im Return Tool stehen teils EANs als Lagerort (z.B. KID-4005176984105). Für «nächste Palette» zählen nur Nummern mit 1–4 Stellen.
+- Tab «Tabellenblatt1» in der Datenbank ist leer und stört nicht.

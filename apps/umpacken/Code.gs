@@ -16,7 +16,7 @@
  *  - Schreiben nur in einer Sperre (LockService), damit mehrere Personen gleichzeitig scannen können.
  */
 
-const VERSION = '2026-10-21.2';
+const VERSION = '2026-10-21.3';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -208,11 +208,11 @@ function lagerorte() {
     const o = p.ort || '(ohne Lagerort)';
     je[o] = je[o] || { ort: o, anzahl: 0, tabs: {} };
     je[o].anzahl++; je[o].tabs[p.tab] = true;
-    const m = /^([A-Z]+)-(\d+)$/i.exec(p.ort);
+    const m = /^([A-Z]+)-(\d{1,4})$/i.exec(p.ort);     // nur echte Palettennummern (im Return Tool stehen teils EANs als Lagerort, z.B. KID-4005176984105)
     if (m) { const k = m[1].toUpperCase(); max[k] = Math.max(max[k] || 0, Number(m[2])); }
   });
   /* Auch Lagerorte, die schon in einem offenen Durchgang als neues Gebinde vergeben sind, zählen als belegt. */
-  lies_('Gebinde').z.forEach(function (g) { const m = /^([A-Z]+)-(\d+)$/i.exec(String(g['Lagerort neu'])); if (m) { const k = m[1].toUpperCase(); max[k] = Math.max(max[k] || 0, Number(m[2])); } });
+  lies_('Gebinde').z.forEach(function (g) { const m = /^([A-Z]+)-(\d{1,4})$/i.exec(String(g['Lagerort neu'])); if (m) { const k = m[1].toUpperCase(); max[k] = Math.max(max[k] || 0, Number(m[2])); } });
   const naechste = {};
   Object.keys(max).forEach(function (k) { naechste[k] = k + '-' + (max[k] + 1); });
   return { orte: Object.keys(je).sort(ortSort_).map(function (o) { return { ort: o, anzahl: je[o].anzahl, tabs: Object.keys(je[o].tabs).join(', ') }; }), naechste: naechste };
@@ -539,4 +539,11 @@ function wiederOeffnen(id) {
     log_('Wieder geöffnet', id, '');
     return laden(id);
   });
+}
+
+/** Prüfen im Editor (nicht in der Web-App): Liest die Lagerorte aus dem Return Tool und schreibt das Ergebnis ins Protokoll. Ändert nichts. */
+function pruefen() {
+  const x = lagerorte();
+  console.log('Lagerorte: ' + x.orte.length + ' · nächste: ' + JSON.stringify(x.naechste));
+  console.log(x.orte.map(function (o) { return o.ort + ' (' + o.anzahl + ', ' + o.tabs + ')'; }).join(' | ').slice(0, 6000));
 }

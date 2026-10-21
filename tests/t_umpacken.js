@@ -32,7 +32,8 @@ const RT = datei({
     [false, 'PG-2', '', '', 'Puppe', 1, '222', '', 'Kids', 30, 12.5, 12.5, '', 'KID-7'],
     [false, 'PG-3', '', '', 'Puppe', 1, '222', '', 'Kids', 30, 12.5, 12.5, '', 'KID-12'],
     [false, 'PG-4', '', '', 'Toaster', 1, '444', '', 'Home', 40, 18, 18, '', 'HOM-3'],
-    [false, 'PG-5', '', '', 'Bauklötze', 1, '555', '', 'Kids', 0, 8, 8, '', 'KID-12']],
+    [false, 'PG-5', '', '', 'Bauklötze', 1, '555', '', 'Kids', 0, 8, 8, '', 'KID-12'],
+    [false, 'PG-9', '', '', 'Falsch erfasst', 1, '999', '', 'Kids', 0, 5, 5, '', 'KID-4005176984105']],   // EAN als Lagerort (kommt im Return Tool vor)
   'Berner Brocki': [['X'], ['☑', 'ID', 'Bezeichnung', 'Barcode', 'VP', 'Lagerort'], [false, 'PG-9', 'Stuhl', '', 5, 'BRB-1']]
 });
 const erstellt = [];
@@ -53,7 +54,7 @@ const j = (x) => JSON.parse(JSON.stringify(x));
 
 /* Setup: Lagerorte und nächste Nummer */
 const o = j(c.lagerorte());
-assert.deepStrictEqual(o.orte.map(x => x.ort), ['BRB-1', 'HOM-3', 'KID-7', 'KID-12'], 'Lagerorte sortiert');
+assert.deepStrictEqual(o.orte.map(x => x.ort), ['BRB-1', 'HOM-3', 'KID-7', 'KID-12', 'KID-4005176984105'], 'Lagerorte sortiert');
 assert.strictEqual(o.naechste.KID, 'KID-13', 'nächste freie Kids-Palette');
 assert.strictEqual(o.orte.find(x => x.ort === 'KID-7').anzahl, 2);
 
