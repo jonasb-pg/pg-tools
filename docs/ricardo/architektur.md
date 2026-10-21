@@ -1,6 +1,6 @@
 # Architektur Ricardo Tool
 
-Stand: Version `2026-10-19.13` (Weg A, aufgeräumt). Live: Bereitstellung Version 23 (19.10.2026, 20:14, neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung. Post-Adressprüfung ausgeschaltet (kostenpflichtig, Entscheid Jonas 19.10.2026).
+Stand: Version `2026-10-21.1` (angefangene Listings bleiben bis «Gelistet»). Live: Bereitstellung Version 24 (21.10.2026, 11:35, neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung. Post-Adressprüfung ausgeschaltet (kostenpflichtig, Entscheid Jonas 19.10.2026).
 
 ## Komponenten
 

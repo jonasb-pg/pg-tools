@@ -136,3 +136,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Angefangene Listings bleiben «In Arbeit»/«Bereit», bis sie gelistet sind (Jonas: «Es sollte nur weg gehen, wenn es auf Ricardo gelistet ist»). Ersetzt den Entscheid vom 19.10.: kein Verwerfen beim Verlassen, kein Verwerfen nach 2 Stunden. Weg nur mit «Gelistet» oder «Abbrechen» von Hand.
 - Listings aus der Analyse: Prüfung «Beschrieb nennt den gewählten Zustand» entfällt (der Analyse-Text formuliert den Zustand selbst, z.B. «Das Produkt ist gebraucht.»). Fall AN-0008.
 - Fotos zu Ricardo: Google Drive für Desktop auf dem Listing-PC (Jonas richtet ein).
+- Live: Ricardo Bereitstellung Version 24, 21.10.2026 11:35.
