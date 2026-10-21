@@ -9,13 +9,14 @@
  *   3. Abschluss: Kontrolle, Liste pro Abnehmer als eigenes Sheet, Änderungsliste fürs Return Tool.
  *                 Übertragung ins Return Tool: manuell nach der Änderungsliste. Die automatische Übertragung ist noch gesperrt
  *                 (braucht das Einverständnis von Jonas M. und den nachgebauten Verkaufsablauf des Return Tools).
+ * Betrieb: Web-App «Ausführen als Jonas», Zugriff «Jeder in Pretty Good». Wer scannt, braucht keine eigenen Freigaben; im Log steht die angemeldete Person.
  * Grundregeln
  *  - Alle Entscheide stehen in diesem Sheet. Das Return Tool wird nur gelesen (beim Setup), nie geschrieben.
  *  - Die Oberfläche ruft den Server nur über api(name, argumente) auf. Spalten werden über ihre Kopfzeilen gefunden.
  *  - Schreiben nur in einer Sperre (LockService), damit mehrere Personen gleichzeitig scannen können.
  */
 
-const VERSION = '2026-10-21.1';
+const VERSION = '2026-10-21.2';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -477,6 +478,8 @@ function abnehmerListe_(e, datum, abnehmer, durchgangName, gebinde) {
   const titel = '(' + datum + ') ' + abnehmer + '-Liste ' + durchgangName;
   const ss = SpreadsheetApp.create(titel);
   try { DriveApp.getFileById(ss.getId()).moveTo(DriveApp.getFolderById(e['Ablage-Ordner ID'] || ABLAGE_ID)); } catch (err) { /* bleibt in «Meine Ablage» */ }
+  /* Das Tool läuft als Jonas: Damit alle im Team die Liste öffnen können, ist sie für Pretty Good mit Link lesbar. */
+  try { DriveApp.getFileById(ss.getId()).setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (err) { /* Richtlinie erlaubt es nicht: bleibt privat */ }
   const kopf = ['PG-ID', 'Bezeichnung', 'Barcode', 'Kategorie', 'Gebinde', 'Preis CHF'];
   const total = ss.getSheets()[0].setName('Total');
   const zusammen = [['Abnehmer', abnehmer], ['Durchgang', durchgangName], ['Datum', datum.replace(/\//g, '.')], ['', ''], ['Gebinde', 'Stück', 'Total CHF']];

@@ -1,6 +1,6 @@
 # Umpack Tool · Architektur
 
-Stand: Version `2026-10-21.1` (erste Version). Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: noch nicht bereitgestellt.
+Stand: Version `2026-10-21.2` (Kamera-Scan fürs Handy, Ausführen als Jonas). Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
 
 ## Zweck
 Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst beim Abschluss nachgeführt.
@@ -21,3 +21,9 @@ Durchgänge · Gebinde · Bestand (Kopie der Quelle beim Setup) · Zuordnung (Ve
 - Nicht gescannte Stücke bleiben, wo sie sind (keine Änderung).
 
 Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche).
+
+## Handy und Kamera (21.10.2026)
+- Handy-Ansicht: Gebinde zweispaltig, Tabellen scrollen in der Karte, Scanfeld ohne Autofokus (keine Tastatur). «Teilen → Zum Home-Bildschirm» als App-Ersatz (Apps Script kann keine echte App/PWA).
+- Knopf «Kamera»: Live-Bild in einer Leiste unten (bleibt beim Wechsel des Gebindes offen), alle 200 ms Strichcode suchen: BarcodeDetector (Chrome/Android), sonst ZXing (@zxing/library 0.21.3 von jsDelivr, v.a. iPhone). Gleicher Code erst nach 2.5 s wieder, Vibration bei Treffer.
+- Erlaubt der Google-Rahmen die Live-Kamera nicht, öffnet sich die Foto-Kamera des Handys (Datei-Feld mit capture): Foto machen, Code wird gelesen.
+- Test: tests/t_umpacken_kamera.py (Handy-Grösse, Fake-Kamera, simulierter Leser). ZXing echt geprüft in Chrome mit gezeichnetem EAN-13.
