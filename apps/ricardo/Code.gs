@@ -4,7 +4,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-19.13';
+const VERSION = '2026-10-21.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1057,7 +1057,7 @@ function pruefe_(rec) {
   else {
     if (b.length > 5000) f.push('Beschrieb kürzen (max. 5000 Zeichen)');
     if (DOMAIN.test(b) || DOMAIN.test(t)) f.push('Titel oder Beschrieb enthält einen Link, eine Domain oder eine Kontaktangabe');
-    if (rec['Zustand'] && b.indexOf(rec['Zustand']) === -1) f.push('Beschrieb nennt den gewählten Zustand nicht: neu erstellen');
+    if (!ana && rec['Zustand'] && b.indexOf(rec['Zustand']) === -1) f.push('Beschrieb nennt den gewählten Zustand nicht: neu erstellen');   // Analyse-Text: Zustand steht in eigenen Worten («Das Produkt ist gebraucht.»), 21.10.2026
     if (ana) { /* keine Mängel-Regeln */ }
     else if (rec['Mängel'] && !rec['Mängel Text']) f.push('Mängel geändert: Titel und Beschrieb neu erstellen');
     else if (rec['Mängel'] && !/(^|\n)Mängel: \S/.test(b)) f.push('Beschrieb nennt die Mängel nicht: neu erstellen');
