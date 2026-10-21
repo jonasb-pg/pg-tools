@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-21.1` (QR-Code Foto-Seite ohne /dev). Live: Bereitstellungsversion 14 vom 21.10.2026, 10:54. Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-21.2` (Matchmaker wie Ricardo). Live: Bereitstellungsversion 15 vom 21.10.2026, 15:09. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 

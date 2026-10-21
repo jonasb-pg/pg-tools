@@ -1,6 +1,6 @@
 # Architektur Ricardo Tool
 
-Stand: Version `2026-10-21.1` (angefangene Listings bleiben bis «Gelistet»). Live: Bereitstellung Version 25 (21.10.2026, 11:49, Laufzeit Do 19.00, ohne Kontrollliste; neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung. Post-Adressprüfung ausgeschaltet (kostenpflichtig, Entscheid Jonas 19.10.2026).
+Stand: Version `2026-10-21.2` (Matchmaker-Stücke per Scan auf Ricardo). Live: Bereitstellung Version 26 (21.10.2026, 15:06; neue Version nur mit Go von Jonas). Abläufe Täglich, Listing, Packen, Versenden als geführte Fälle; Retouren unter Verwaltung. Post-Adressprüfung ausgeschaltet (kostenpflichtig, Entscheid Jonas 19.10.2026).
 
 ## Komponenten
 
