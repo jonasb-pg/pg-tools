@@ -111,8 +111,7 @@ with sync_playwright() as p:
     s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
     s.click('#f-schritte .f-eintrag:has-text("Toaster X") button'); s.wait_for_timeout(300)
     s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
-    ok(['listingVerwerfen', ['PG-100']] in A(), 'Listing verlassen ohne «Gelistet»: Stück wird verworfen')
-    ok(len([x for x in A() if x[0] == 'listingVerwerfen']) == 1, 'Abgeschlossenes Listing wird nicht verworfen')
+    ok(not [x for x in A() if x[0] in ('listingVerwerfen', 'setzeStatus')], 'Listing verlassen ohne «Gelistet»: bleibt offen, nichts verworfen (21.10.2026)')
     # ---------- Packen ----------
     s.click('#nav-f-schicht2'); s.wait_for_timeout(300)
     t = s.text_content('#f-schritte')

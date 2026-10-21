@@ -131,3 +131,8 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Ursache (wahrscheinlich): «Web-App-Adresse für Fotos» ist leer, darum nahm der Überblick `ScriptApp.getService().getUrl()`. Im Abgleich-Trigger (Testbereitstellung) ist das die /dev-Adresse, die nur Bearbeiter öffnen können. Seit 19.3 bleiben die vorgewärmten Überblicke bis 6 h im Zwischenspeicher, darum trugen viele Stücke aus der Warteschlange diese Adresse im QR-Code.
 - Lösung 21.10.1: `fotoUrl_` setzt die Adresse bei jedem Lesen neu (nie aus dem Zwischenspeicher), /dev nie, sonst die feste exec-Adresse. Test: tests/t_foto_url.js.
 - Live: Bereitstellungsversion 14, 21.10.2026 10:54 (Go von Jonas).
+
+## 21.10.2026 · Ricardo 21.10.1
+- Angefangene Listings bleiben «In Arbeit»/«Bereit», bis sie gelistet sind (Jonas: «Es sollte nur weg gehen, wenn es auf Ricardo gelistet ist»). Ersetzt den Entscheid vom 19.10.: kein Verwerfen beim Verlassen, kein Verwerfen nach 2 Stunden. Weg nur mit «Gelistet» oder «Abbrechen» von Hand.
+- Listings aus der Analyse: Prüfung «Beschrieb nennt den gewählten Zustand» entfällt (der Analyse-Text formuliert den Zustand selbst, z.B. «Das Produkt ist gebraucht.»). Fall AN-0008.
+- Fotos zu Ricardo: Google Drive für Desktop auf dem Listing-PC (Jonas richtet ein).

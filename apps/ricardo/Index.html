@@ -1847,7 +1847,7 @@
   /* Listing: oeffne() meldet ein geladenes Stück hier an, egal ob aus der Liste, der Suche oder «ohne Analyse» */
   var LISTING_OFFEN = '';
   /* Listing verlassen ohne «Gelistet»: Stück fällt zurück (Server prüft, ob es verworfen werden darf) */
-  function listingVerlassen() { if (LISTING_OFFEN) { var id = LISTING_OFFEN; LISTING_OFFEN = ''; hinter('listingVerwerfen', [id], { text: id }); } }   // in der Schlange: nach einem noch laufenden Speichern
+  function listingVerlassen() { LISTING_OFFEN = ''; }   // 21.10.2026: Verlassen verwirft nichts mehr, das Listing bleibt offen bis «Gelistet»
   function listingFall(r) {
     if (LISTING_OFFEN && LISTING_OFFEN !== r.id) listingVerlassen();
     LISTING_OFFEN = r.id;

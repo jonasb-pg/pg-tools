@@ -53,9 +53,8 @@ run("(function () { const l = sperre_(1000); try { alleListings_(); alleListings
 ok(lesen.Listings === 2, 'in der Sperre immer frisch gelesen');
 run("const l2 = sperre_(1000); l2.releaseLock(); l2.releaseLock();");
 ok(gesperrt === 0 && run('IN_SPERRE') === 0, 'zweimal freigeben schadet nicht');
-/* 4. Angefangene verwerfen: ein Schreibzugriff, danach frisch */
-neu();
-ok(run('angefangeneVerwerfen_()') === 1 && L[2][1] === 'Abgebrochen' && run("alleListings_()[1]['Status']") === 'Abgebrochen', 'angefangenes Listing verworfen, Speicher nachgeführt');
+/* 4. Angefangene bleiben (21.10.2026): kein Verwerfen mehr */
+ok(run("typeof angefangeneVerwerfen_") === 'undefined', 'angefangene Listings werden nicht verworfen');
 /* 5. Verkäufe: aufgaben-artige Mehrfachlesung, zaehler in einem Aufruf */
 neu(); lesen = {};
 const z = run('zaehler()');
