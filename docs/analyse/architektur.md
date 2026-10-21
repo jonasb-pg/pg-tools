@@ -1,6 +1,6 @@
 # Architektur
 
-Stand: Version `2026-10-19.5` (Weg A, aufgeräumt). Live: Bereitstellungsversion 13 vom 19.10.2026, 20:12. Bereitstellen macht Claude nach Bestätigung von Jonas.
+Stand: Version `2026-10-21.1` (QR-Code Foto-Seite ohne /dev). Live: Bereitstellungsversion 14 vom 21.10.2026, 10:54. Bereitstellen macht Claude nach Bestätigung von Jonas.
 
 ## Komponenten
 
