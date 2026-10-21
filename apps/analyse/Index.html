@@ -628,7 +628,10 @@
     'ri.n2': ['2 · Titel und Artikelbeschrieb', '2 · Title and description'], 'ri.schreibt': ['Die KI schreibt einen Entwurf …', 'The AI is writing a draft …'], 'ri.neu': ['Neu schreiben lassen', 'Write again'],
     'ri.ftitel': ['Titel', 'Title'], 'ri.zeichen': ['{0} von 60 Zeichen', '{0} of 60 characters'], 'ri.fbeschrieb': ['Artikelbeschrieb', 'Description'],
     'ri.n3': ['3 · Versand (B-Post)', '3 · Shipping (B-Post)'], 'ri.n4': ['4 · Startpreis und Zustand', '4 · Starting price and condition'], 'ri.preis': ['Startpreis CHF', 'Starting price CHF'], 'ri.vorschlag': ['Vorschlag: CHF {0} ({1})', 'Suggestion: CHF {0} ({1})'], 'ri.vonOvp': ['{0} % vom Neupreis CHF {1}', '{0} % of the new price CHF {1}'], 'ri.vonVp': ['VP, kein Neupreis', 'selling price, no new price'], 'ri.zustand': ['Ricardo-Zustand', 'Ricardo condition'],
-    'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
+    'ri.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Ricardo Offline».', 'Finally: note with {0} on the product, shelf “Ricardo Offline”.'],
+    'mv.titel': ['Matchmaker', 'Matchmaker'], 'mv.zurueck': ['Doch nicht Matchmaker', 'Not Matchmaker after all'], 'mv.n4': ['4 · Preis und Zustand', '4 · Price and condition'], 'mv.preis': ['Preis CHF', 'Price CHF'],
+    'mv.zustand': ['Zustand', 'Condition'], 'mv.vonVp': ['VP aus dem Return Tool', 'selling price from the Return Tool'], 'mv.fPreis': ['Preis', 'price'],
+    'mv.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Matchmaker».', 'Finally: note with {0} on the product, shelf “Matchmaker”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
     'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
     'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
@@ -1309,7 +1312,7 @@
         + befundTeil(r)
         + (r.hinweis ? '<div class="meldung gelb"><h3>' + tx('en.htitel') + '</h3>' + tx('en.hinweis') + '</div>' : '')
         + (!r.reusable ? '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink') + '</div>' : (m = mmTeil()).html + (m.sperrt ? ''
-          : (AN.s.kanal === 'ricardo' ? ricardoTeil(r) : (m.empfehlung ? '' : '<p class="frage">' + tx('ri.wohin') + '</p>') + '<div class="kanal"><div>' + taste('kanal', 'ri.ricardo', m.empfehlung ? '' : 'pink', ' data-v="ricardo"')
+          : (verkauf() ? ricardoTeil(r) : (m.empfehlung ? '' : '<p class="frage">' + tx('ri.wohin') + '</p>') + '<div class="kanal"><div>' + taste('kanal', 'ri.ricardo', m.empfehlung ? '' : 'pink', ' data-v="ricardo"')
             + (AN.d.ricardo && AN.d.ricardo.vorschlag ? '<span class="vorschlag">' + tx('ri.empfohlen') + '</span>' : '') + '</div><div>' + taste('kanal', 'ri.regal', '', ' data-v="regal"') + '</div></div>')));
       return '<div class="karte">' + h + leiste(true) + '</div>';
     }
@@ -1320,7 +1323,7 @@
     if (!LAUF.befundAuf || !bearbeitbar) return (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund)
       + (bearbeitbar ? ' <button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button>' : '') + '</div>'
       : (bearbeitbar ? '<p><button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button></p>' : ''))
-      + (LAUF.befundGeaendert && AN.s.kanal === 'ricardo' ? '<p class="still">' + tx('en.befund.ric') + '</p>' : '');
+      + (LAUF.befundGeaendert && verkauf() ? '<p class="still">' + tx('en.befund.ric') + '</p>' : '');
     return '<div class="meldung"><h3>' + tx('en.befund') + '</h3><label for="maengel-en">' + tx('en.befund.eigen') + '</label><textarea id="maengel-en" data-e="maengel">' + esc(AN.s.maengel) + '</textarea>'
       + (r.befundAuto ? '<p class="still">' + tx('en.befund.auto', r.befundAuto) + '</p>' : '') + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + '</div></div>';
   }
@@ -1345,6 +1348,7 @@
     if (x.laeuft) return { sperrt: true, html: '<p class="hb-warte"><span class="dreh"></span>' + tx('mm.prueft') + '</p>' };
     if (x.fehler) return { sperrt: false, html: '<div class="meldung warn">' + tx('mm.fehler', x.fehler) + '<div class="knoepfe">' + taste('mmNochmal', 'mm.nochmal') + '</div></div>' };
     /* Entscheid Jonas 19.10.2026: Ein Treffer ist die klare Empfehlung (Matchmaker zuerst, pink); Ricardo oder Regal bleiben wählbar. */
+    if (x.passt && x.passt.length && AN.s.kanal === 'matchmaker') return { sperrt: false, empfehlung: true, html: '<div class="meldung ok"><h3>' + tx('mm.titel') + '</h3>' + auftrag(x.passt[0]) + '</div>' };
     if (x.passt && x.passt.length) return { sperrt: false, empfehlung: true, html: '<div class="meldung ok"><h3>' + tx('mm.titel') + '</h3>' + auftrag(x.passt[0]) + '<p><strong>' + tx('mm.empfehlung') + '</strong></p></div><div class="knoepfe">' + taste('kanal', 'mm.knopf', 'pink', ' data-v="matchmaker"') + '</div><p class="frage">' + tx('mm.anders') + '</p>' };
     return { sperrt: false, html: x.aehnlich && x.aehnlich.length ? '<div class="meldung"><h3>' + tx('mm.aehnlich') + '</h3>' + x.aehnlich.map(auftrag).join('') + '</div>' : '' };
   }
@@ -1471,7 +1475,7 @@
   /* Feedback DS 19.10.2026: Fotos nicht erst am Schluss. Der Kasten zeigt QR-Code und Fotos wie im Ricardo-Teil (nicht doppelt, wenn der Ricardo-Teil offen ist). */
   function fotosAuf() { LAUF.fotosAuf = !LAUF.fotosAuf; zeichneSchritt(); if (LAUF.fotosAuf) fotoHolen(); }
   function fotoKasten() {
-    if (!LAUF.fotosAuf || !AN || (schritt() === 'entscheid' && AN.s.kanal === 'ricardo') || !AN.d.ricardo) return '';
+    if (!LAUF.fotosAuf || !AN || (schritt() === 'entscheid' && verkauf()) || !AN.d.ricardo) return '';
     return '<div class="karte"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h3 class="gruppe" style="margin:0">' + tx('fo.titel') + '</h3><button class="link" data-a="fotosAuf" aria-label="' + tx('fo.titel') + '">×</button></div><p class="still">' + tx('fo.text') + '</p>'
       + '<div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(fotoLink()) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
       + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>';
@@ -1587,9 +1591,14 @@
   /* ---------- Ricardo: Wahl im Entscheid, Fotos, Titel und Artikelbeschrieb ---------- */
   /* Die Fotos macht das Handy über den QR-Code (Foto-Seite unten). Der Analyseplatz fragt alle 5 Sekunden nach, was schon da ist, und zeichnet nur den Foto-Teil neu. */
   var RIC = null, QRLIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+  /* Ricardo und Matchmaker: derselbe Ablauf mit Fotos, Titel, Artikelbeschrieb, Versand und Preis (Entscheid Jonas 21.10.2026). Regal: direkt abschliessen. */
+  function verkauf() { return !!AN && (AN.s.kanal === 'ricardo' || AN.s.kanal === 'matchmaker'); }
+  function mmKanal() { return !!AN && AN.s.kanal === 'matchmaker'; }
   function kanal(v) {
-    if (v === 'regal' || v === 'matchmaker') { AN.s.kanal = v; sichern(); abschluss(); return; }
-    AN.s.kanal = 'ricardo';
+    if (v === 'regal') { AN.s.kanal = v; sichern(); abschluss(); return; }
+    AN.s.kanal = v === 'matchmaker' ? 'matchmaker' : 'ricardo';
+    /* Der Text endet je nach Kanal anders (Ricardo: Auktions-Sätze). War er für den anderen Kanal geschrieben, kommt ein neuer Entwurf. */
+    if (AN.s.ricFuer && AN.s.ricFuer !== AN.s.kanal) { AN.s.ricTitel = ''; AN.s.ricBeschrieb = ''; AN.s.ricFuer = ''; }
     /* Vorschlag nach Grade (Prozent vom Neupreis, im Admin änderbar). Hat die Person den Preis selbst geändert, bleibt ihrer. */
     if (!AN.s.ricPreis || AN.s.ricPreis === AN.s.ricVorschlag) { var vs = ricVorschlag(); AN.s.ricPreis = vs.preis ? String(vs.preis) : ''; AN.s.ricVorschlag = AN.s.ricPreis; }
     sichern(); zeichneSchritt();
@@ -1597,6 +1606,7 @@
   }
   function zahlVon(x) { return parseFloat(String(x == null ? '' : x).replace(/['’\s]/g, '').replace(',', '.')) || 0; }
   function ricVorschlag() {
+    if (mmKanal()) { var vp0 = zahlVon(AN.d.produkt.vp); return { preis: vp0, text: vp0 ? t('mv.vonVp') : '' }; }     // Matchmaker: VP
     var d = AN.d, g = AN.s.versiegelt ? 'A' : AN.s.grade, ovp = zahlVon(d.produkt.ovp), pz = (d.ricardo.prozent || {})[g];
     if (ovp > 0 && pz) return { preis: Math.max(1, Math.round(ovp * pz / 100)), text: t('ri.vonOvp', pz, ovp.toFixed(2)) };
     var vp = zahlVon(d.produkt.vp); return { preis: vp, text: vp ? t('ri.vonVp') : '' };
@@ -1615,12 +1625,12 @@
     if (!s.ricTitel.trim() || s.ricTitel.trim().length > 60) f.push(t('ri.fTitel'));
     if (!s.ricBeschrieb.trim()) f.push(t('ri.fBeschrieb'));
     if (!s.ricVersand) f.push(t('ri.fVersand'));
-    if (!(Number(s.ricPreis) > 0)) f.push(t('ri.fPreis'));
+    if (!(Number(s.ricPreis) > 0)) f.push(t(mmKanal() ? 'mv.fPreis' : 'ri.fPreis'));
     return f;
   }
   function ricardoTeil(r) {
-    var s = AN.s, d = AN.d, vs = ricVorschlag(), fehlt = ricFehlt();
-    return '<div class="ric"><div class="leiste"><h3 class="gruppe" style="margin:0">' + tx('ri.titel') + '</h3><button class="link rechts" data-a="kanalZurueck">' + tx('ri.zurueck') + '</button></div>'
+    var s = AN.s, d = AN.d, vs = ricVorschlag(), fehlt = ricFehlt(), mm = mmKanal(), k = function (ri, mv) { return mm ? mv : ri; };
+    return '<div class="ric"><div class="leiste"><h3 class="gruppe" style="margin:0">' + tx(k('ri.titel', 'mv.titel')) + '</h3><button class="link rechts" data-a="kanalZurueck">' + tx(k('ri.zurueck', 'mv.zurueck')) + '</button></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n1') + '</div><div class="ric-fotos"><div class="ric-qr"><div id="ric-qr"></div><span>' + tx('ri.qr') + '</span><a href="' + esc(fotoLink()) + '" target="_blank" rel="noopener noreferrer">' + tx('ri.link') + ' ↗</a></div>'
       + '<div class="ric-slots" id="ric-slots">' + fotoSlots() + '</div></div></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n2') + '</div>' + (LAUF.ricLaeuft ? '<p class="hb-warte"><span class="dreh"></span>' + tx('ri.schreibt') + '</p>' : '')
@@ -1629,9 +1639,9 @@
       + '<div class="knoepfe">' + taste('ricText', 'ri.neu', '', LAUF.ricLaeuft ? ' disabled' : '') + '</div></div>'
       + '<div class="ric-box"><div class="n">' + tx('ri.n3') + '</div><div class="ric-versand">' + d.ricardo.versand.map(function (v, i) {
           return '<button data-a="ricVersand" data-v="' + i + '" class="' + (s.ricVersand === v.name ? 'an' : '') + '" aria-pressed="' + (s.ricVersand === v.name) + '">' + esc(v.name) + ' · CHF ' + esc(v.preis) + '</button>'; }).join('') + '</div></div>'
-      + '<div class="ric-box"><div class="n">' + tx('ri.n4') + '</div><dl class="werte" style="margin:0"><dt>' + tx('ri.preis') + '</dt><dd>' + '<input type="number" min="1" step="any" inputmode="decimal" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">'
-          + (vs.preis ? ' <span class="still">' + tx('ri.vorschlag', Number(vs.preis).toFixed(2), vs.text) + '</span>' : '') + '</dd><dt>' + tx('ri.zustand') + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
-      + '<div class="meldung warn">' + tx('ri.zettel', d.produkt.id) + '</div>'
+      + '<div class="ric-box"><div class="n">' + tx(k('ri.n4', 'mv.n4')) + '</div><dl class="werte" style="margin:0"><dt>' + tx(k('ri.preis', 'mv.preis')) + '</dt><dd>' + '<input type="number" min="1" step="any" inputmode="decimal" data-e="ricPreis" value="' + esc(s.ricPreis) + '" style="max-width:160px">'
+          + (vs.preis ? ' <span class="still">' + tx('ri.vorschlag', Number(vs.preis).toFixed(2), vs.text) + '</span>' : '') + '</dd><dt>' + tx(k('ri.zustand', 'mv.zustand')) + '</dt><dd>' + esc(w(r.ricardoZustand || '')) + '</dd></dl></div>'
+      + '<div class="meldung warn">' + tx(k('ri.zettel', 'mv.zettel'), d.produkt.id) + '</div>'
       + '<p class="still" id="ric-fehlt">' + (fehlt.length ? tx('ri.fehlt', fehlt.join(', ')) : '') + '</p>'
       + '<div class="knoepfe">' + taste('abschluss', 'en.knopf', 'pink', fehlt.length ? ' disabled id="ric-ab"' : ' id="ric-ab"') + '</div></div>';
   }
@@ -1708,7 +1718,7 @@
     LAUF.ricLaeuft = true; zeichneSchritt();
     google.script.run.withSuccessHandler(function (x) {
       if (!AN || AN.d.produkt.id !== id) return;
-      LAUF.ricLaeuft = false;
+      LAUF.ricLaeuft = false; AN.s.ricFuer = AN.s.kanal;
       if (auto !== true || !AN.s.ricTitel) AN.s.ricTitel = x.titel || '';                   // beim Auto-Start nur leere Felder füllen: Getipptes bleibt
       if (auto !== true || !AN.s.ricBeschrieb) AN.s.ricBeschrieb = x.beschrieb || '';
       sichern(); zeichneSchritt();

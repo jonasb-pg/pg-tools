@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-21.1';
+const VERSION = '2026-10-21.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -141,6 +141,9 @@ const HANDBUCH_SUCHE = 'Du suchst die Bedienungsanleitung als PDF für genau die
 /* Ricardo: Die Analyse bereitet das Inserat vor (Fotos, Titel, Artikelbeschrieb, Versand). Das Ricardo Tool liest den Tab «Ricardo» und dient nur noch zum Kopieren. */
 const RICARDO_KOPF = ['PG-ID', 'Analyse-Nr', 'Bezeichnung', 'EAN', 'Titel', 'Artikelbeschrieb', 'Ricardo-Zustand', 'Grade', 'Startpreis CHF', 'Neupreis CHF',
   'Versandklasse', 'Versand CHF', 'Foto-Ordner', 'Fotos', 'Kürzel', 'Analysiert am', 'Status'];
+/* Matchmaker wie Ricardo (Entscheid Jonas 21.10.2026): Fotos, Titel, Artikelbeschrieb, Versand und Preis (VP) aus der Analyse. Die Matchmaker-App übernimmt von hier. */
+const MATCHMAKER_KOPF = ['PG-ID', 'Analyse-Nr', 'Bezeichnung', 'EAN', 'Suchauftrag', 'Titel', 'Artikelbeschrieb', 'Zustand', 'Grade', 'Preis CHF', 'Neupreis CHF',
+  'Versandklasse', 'Versand CHF', 'Foto-Ordner', 'Fotos', 'Kürzel', 'Analysiert am', 'Status'];
 const RICARDO_VERSAND = ['0-2kg / PostPac B-Post | 9', '2-10kg / PostPac B-Post | 12', '10-30kg / PostPac B-Post | 21', '0-30 kg / Sperrgut B-Post | 31'].join('\n');
 const RICARDO_ANWEISUNG = 'Du schreibst ein Inserat für Ricardo für ein Produkt, das Pretty Good geprüft hat. '
   + 'Titel: höchstens 60 Zeichen, Marke, Modell und das Wichtigste (z.B. Farbe, Speicher, Grösse), ohne Werbewörter und ohne Zustand. '
@@ -187,6 +190,7 @@ const NEUE_EINSTELLUNGEN = [
   ['Startpreis C % vom Neupreis', 35, 'Wie oben, für Grade C (gebraucht).'],
   ['Ricardo-Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Artikelbeschrieb.'],
   ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool. Stand 17.10.2026.'],
+  ['Matchmaker-Schlusssatz', '', 'Steht am Ende jedes Artikelbeschriebs für den Matchmaker. Leer = kein Schlusssatz (Entscheid Jonas 21.10.2026).'],
   ['Handbuch-Suche', HANDBUCH_SUCHE, 'So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus.'],
   ['Matchmaker-Sheet ID', MM_SHEET, 'Aus diesem Sheet (Tab «Matchmaker») liest das Tool die offenen Suchaufträge. Beim Auftrag schreibt es in die Spalte «Aus Analyse», wenn ein Stück ins Regal «Matchmaker» kommt.'],
   ['KI-Modell Matchmaker', 'claude-sonnet-5-5', 'Mit diesem Modell prüft das Tool jedes Produkt gegen alle offenen Suchaufträge.'],
@@ -238,6 +242,7 @@ const SPALTEN = {
   'Bestellliste': BESTELL_KOPF,
   'Testkonten': TESTKONTEN_KOPF,
   'Ricardo': RICARDO_KOPF,
+  'Matchmaker': MATCHMAKER_KOPF,
   'Ersatzteile': ['Zeit', 'PG-ID', 'Produkt', 'Gesucht', 'Teil', 'Teilenummer', 'Art', 'Preis CHF', 'Shop', 'Link', 'Lieferbar', 'VP CHF', 'Hinweis', 'Kürzel'],
   'Quellen-Log': ['Zeit', 'Schlüssel', 'Bezeichnung', 'Quelle', 'Gefunden', 'Gelieferte Felder', 'Meldung'],
   'Batches': ['Batch-ID', 'Erstellt am', 'Status', 'Anzahl', 'Abgeholt am'],
@@ -323,6 +328,9 @@ const EN_REGELN = [
   [/^Bitte die Versandklasse wählen\.$/, 'Please choose the shipping class.'],
   [/^Bitte den Startpreis eintragen\.$/, 'Please enter the starting price.'],
   [/^Der Artikelbeschrieb für Ricardo fehlt\.$/, 'The Ricardo description is missing.'],
+  [/^Bitte den Preis eintragen\.$/, 'Please enter the price.'],
+  [/^Der Artikelbeschrieb fehlt\.$/, 'The description is missing.'],
+  [/^Der Titel fehlt oder ist länger als 60 Zeichen\.$/, 'The title is missing or longer than 60 characters.'],
   [/^Der Titel für Ricardo fehlt oder ist länger als 60 Zeichen\.$/, 'The Ricardo title is missing or longer than 60 characters.'],
   [/^Bitte ein Foto wählen\.$/, 'Please choose a photo.'],
   [/^Das Foto ist zu gross\.$/, 'The photo is too large.'],
@@ -358,7 +366,7 @@ function en_(s) {
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function blatt_(n) {
   let s = ss_().getSheetByName(n);
-  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Feedback': FEEDBACK_KOPF, 'Ricardo': RICARDO_KOPF, 'Bestellliste': BESTELL_KOPF, 'Testkonten': TESTKONTEN_KOPF }[n];
+  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Feedback': FEEDBACK_KOPF, 'Ricardo': RICARDO_KOPF, 'Matchmaker': MATCHMAKER_KOPF, 'Bestellliste': BESTELL_KOPF, 'Testkonten': TESTKONTEN_KOPF }[n];
   if (!s && kopfNeu) {                                               // kamen nach der ersten Einrichtung dazu: werden beim ersten Gebrauch angelegt
     s = gesperrt_(function () {
       const neu = ss_().getSheetByName(n) || ss_().insertSheet(n);
@@ -2250,7 +2258,9 @@ function abschliessen(d) {
   /* Entscheid Jonas 19.10.2026: Matchmaker ist bei einem Treffer die klare Empfehlung, die Person darf aber anders entscheiden. Das steht im Log. */
   if (x.reusable && d.mmEmpfohlen && d.kanal !== 'matchmaker') log_('Matchmaker-Empfehlung übergangen', pg, txt_(String(d.mmEmpfohlen)) + ' → ' + (d.kanal || 'Regal'));
   const ric = !mm && x.reusable && d.kanal === 'ricardo' ? ricardoPruefen_(d, u, x, e, p) : null;
+  const mmV = mm ? verkaufPruefen_(d, u, x, e, p, 'matchmaker') : null;     // Matchmaker wie Ricardo: Fotos, Text, Versand, Preis (21.10.2026)
   if (ric) blatt_('Ricardo');                                         // legt den Tab beim ersten Mal an, ausserhalb der Sperre
+  if (mmV) blatt_('Matchmaker');
   const regal = mm ? 'Matchmaker' : (ric ? 'Ricardo Offline' : (x.reusable ? 'Analysiert' : ''));
   const auftrag = mm ? mm.gesucht + (mm.mehr ? ' (' + mm.mehr + ')' : '') : '', heute = Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy');
   /* Für den Wiedereinstieg: der Stand der Analyse und der Auftrag. Nur bei Matchmaker. */
@@ -2270,10 +2280,12 @@ function abschliessen(d) {
       setze('Matchmaker-Auftrag', txt_(String(r['Matchmaker-Auftrag'] || '') + ' → nicht geklappt ' + heute + (mm ? '; neu: ' + auftrag : '')));
       setze('Stand', stand);
       if (ric) schreib_('Ricardo', [Object.assign(ric, { 'Analyse-Nr': r['Analyse-Nr'], 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offline' })]);
+      mmStatus_(pg, 'Nicht geklappt');                                // der alte Matchmaker-Eintrag gilt nicht mehr
+      if (mmV) schreib_('Matchmaker', [Object.assign(mmV, { 'Analyse-Nr': r['Analyse-Nr'], 'Suchauftrag': txt_(auftrag), 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offen' })]);
       return { nr: String(r['Analyse-Nr']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: r['Dauer Min'], budget: u.produkt.budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
     });
     if (alt) mmVermerk_(e, alt, pg + ' · nicht geklappt · ' + heute);
-    if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute);
+    if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute + (mmV && mmV['Foto-Ordner'] ? ' · Fotos: ' + mmV['Foto-Ordner'] : ''));
     log_('Nach Matchmaker', pg, regal);
     return aus;
   }
@@ -2299,6 +2311,7 @@ function abschliessen(d) {
       'Reparaturkosten CHF': x.rep.length ? summe('kosten') : '', 'Garantie Tage': x.garantie, 'Regal': regal, 'Matchmaker-Auftrag': txt_(auftrag), 'Stand': stand
     }]);
     if (ric) schreib_('Ricardo', [Object.assign(ric, { 'Analyse-Nr': nr, 'Kürzel': kuerzel, 'Analysiert am': t, 'Status': 'Offline' })]);
+    if (mmV) schreib_('Matchmaker', [Object.assign(mmV, { 'Analyse-Nr': nr, 'Suchauftrag': txt_(auftrag), 'Kürzel': kuerzel, 'Analysiert am': t, 'Status': 'Offen' })]);
     schreib_('Prüfschritte', schritte_(d, u, bis).map(function (s, n) {
       return Object.assign(s, { 'Analyse-Nr': nr, 'PG-ID': String(p['PG-ID']), 'Nr': n + 1, 'Zeit': t, 'Kürzel': kuerzel });
     }));
@@ -2314,7 +2327,7 @@ function abschliessen(d) {
     return { nr: nr, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm };
   }, ['Produkte', 'Analysen', 'Testmittel']);
   takt_('gespeichert');
-  if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute);
+  if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute + (mmV && mmV['Foto-Ordner'] ? ' · Fotos: ' + mmV['Foto-Ordner'] : ''));
   return fertig;
 }
 
@@ -2519,7 +2532,7 @@ function ricardoText(d) {
   const ohneLiefer = function (y) { return !/lieferumfang|^im paket|^enthalten|^mitgeliefert/i.test(y); };     // falls die KI ihn trotzdem nennt
   const einleitung = String(k.einleitung || '').replace(/ß/g, 'ss').trim();
   const punkte = (k.punkte || []).map(function (y) { return String(y).replace(/ß/g, 'ss').replace(/^[-–•]\s*/, '').trim(); }).filter(function (y) { return y && ohneLiefer(y); }).slice(0, 8);
-  const beschrieb = ricardoBeschrieb_(einleitung, punkte, kaeuferSaetze_(x, u, d), ovp, e);
+  const beschrieb = ricardoBeschrieb_(einleitung, punkte, kaeuferSaetze_(x, u, d), ovp, e, d.kanal === 'matchmaker');
   return { titel: titel, beschrieb: beschrieb, zustand: rz };
 }
 /** Startpreis-Vorschlag in Prozent vom Neupreis pro Grade (Einstellungen, im Admin änderbar). Entscheid Jonas 17.10.2026: A und B 50 %, C 35 %. */
@@ -2556,24 +2569,39 @@ function startpreisSpeichern(ab, c) {
  * Der Artikelbeschrieb in der festen Struktur (Vorlage Jonas 17.10.2026), Absätze durch eine Leerzeile getrennt:
  * Einleitung | Stichpunkte | Zustand und darunter «Wir haben es bei uns getestet:» mit der Liste auf der nächsten Zeile | Paketinhalt | Neupreis | Versandsatz | Schlusssatz.
  */
-function ricardoBeschrieb_(einleitung, punkte, abs, ovp, e) {
+function ricardoBeschrieb_(einleitung, punkte, abs, ovp, e, matchmaker) {
   const test = String(abs[1] || '').replace(/^Wir haben es bei uns getestet: /, 'Wir haben es bei uns getestet:\n');
+  /* Matchmaker (21.10.2026): ohne die Auktions-Sätze von Ricardo, eigener Schlusssatz (Einstellung, im Moment leer) */
+  const schluss = matchmaker ? [e['Matchmaker-Schlusssatz'] || ''] : [e['Ricardo-Versandsatz'] || '', e['Ricardo-Schlusssatz'] || ''];
   return [einleitung, punkte.map(function (y) { return '– ' + y; }).join('\n'), [abs[0], test].filter(Boolean).join('\n'), abs[2] || '',
-    ovp ? 'Neupreis: CHF ' + Number(ovp).toFixed(2) : '', e['Ricardo-Versandsatz'] || '', e['Ricardo-Schlusssatz'] || ''].map(function (y) { return String(y).trim(); }).filter(String).join('\n\n');
+    ovp ? 'Neupreis: CHF ' + Number(ovp).toFixed(2) : ''].concat(schluss).map(function (y) { return String(y).trim(); }).filter(String).join('\n\n');
 }
 /** Was beim Abschluss mit «Auf Ricardo» stimmen muss. Gibt die Zeile für den Tab «Ricardo» zurück. */
-function ricardoPruefen_(d, u, x, e, p) {
-  const r = d.ricardo || {}, titel = String(r.titel || '').trim(), beschrieb = String(r.beschrieb || '').trim();
-  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(r.preis) || startpreis_(p, x.grade, e);                 // Startpreis aus der Analyse (Vorschlag nach Grade, von Hand änderbar)
-  if (!titel || titel.length > 60) throw new Error('Der Titel für Ricardo fehlt oder ist länger als 60 Zeichen.');
-  if (!beschrieb) throw new Error('Der Artikelbeschrieb für Ricardo fehlt.');
+function ricardoPruefen_(d, u, x, e, p) { return verkaufPruefen_(d, u, x, e, p, 'ricardo'); }
+/**
+ * Ricardo und Matchmaker haben denselben Ablauf (Entscheid Jonas 21.10.2026): Fotos, Titel, Artikelbeschrieb, Versandklasse, Preis.
+ * Ricardo: Startpreis (Vorschlag nach Grade). Matchmaker: Preis = VP aus dem Return Tool, von Hand änderbar. Gibt die Zeile für den jeweiligen Tab zurück.
+ */
+function verkaufPruefen_(d, u, x, e, p, art) {
+  const mm = art === 'matchmaker', r = d.ricardo || {}, titel = String(r.titel || '').trim(), beschrieb = String(r.beschrieb || '').trim();
+  const v = u.ricardo.versand.filter(function (y) { return y.name === r.versand; })[0], preis = zahl_(r.preis) || (mm ? zahl_(p['VP CHF']) : startpreis_(p, x.grade, e));
+  if (!titel || titel.length > 60) throw new Error(mm ? 'Der Titel fehlt oder ist länger als 60 Zeichen.' : 'Der Titel für Ricardo fehlt oder ist länger als 60 Zeichen.');
+  if (!beschrieb) throw new Error(mm ? 'Der Artikelbeschrieb fehlt.' : 'Der Artikelbeschrieb für Ricardo fehlt.');
   if (!v) throw new Error('Bitte die Versandklasse wählen.');
-  if (!(preis > 0)) throw new Error('Bitte den Startpreis eintragen.');
+  if (!(preis > 0)) throw new Error(mm ? 'Bitte den Preis eintragen.' : 'Bitte den Startpreis eintragen.');
   const st = fotoStand(String(p['PG-ID'])), fehlt = fotoFehlt_(st, !!String(d.maengel || '').trim());
   if (fehlt.length) throw new Error('Es fehlen noch Fotos: ' + fehlt.join(', ') + '.');
-  return { 'PG-ID': String(p['PG-ID']), 'Bezeichnung': txt_(p['Bezeichnung']), 'EAN': txtFest_(ean_(p['Barcode'])), 'Titel': txt_(titel), 'Artikelbeschrieb': txt_(beschrieb.slice(0, 5000)),
-    'Ricardo-Zustand': ricardoZustand_(x), 'Grade': x.grade, 'Startpreis CHF': preis, 'Neupreis CHF': zahl_(p['Neupreis CHF']) || '', 'Versandklasse': v.name, 'Versand CHF': v.preis,
-    'Foto-Ordner': st.ordner, 'Fotos': st.liste.length };
+  const z = { 'PG-ID': String(p['PG-ID']), 'Bezeichnung': txt_(p['Bezeichnung']), 'EAN': txtFest_(ean_(p['Barcode'])), 'Titel': txt_(titel), 'Artikelbeschrieb': txt_(beschrieb.slice(0, 5000)),
+    'Grade': x.grade, 'Neupreis CHF': zahl_(p['Neupreis CHF']) || '', 'Versandklasse': v.name, 'Versand CHF': v.preis, 'Foto-Ordner': st.ordner, 'Fotos': st.liste.length };
+  if (mm) { z['Zustand'] = ricardoZustand_(x); z['Preis CHF'] = preis; } else { z['Ricardo-Zustand'] = ricardoZustand_(x); z['Startpreis CHF'] = preis; }
+  return z;
+}
+/** Wiedereinstieg aus dem Regal «Matchmaker»: offene Einträge im Tab «Matchmaker» für dieses Stück bekommen einen neuen Status. Läuft in der Sperre. */
+function mmStatus_(pg, status) {
+  if (!ss_().getSheetByName('Matchmaker')) return;
+  const st = {};
+  lies_('Matchmaker').z.forEach(function (r) { if (String(r['PG-ID']) === pg && String(r['Status']) === 'Offen') st[r._r] = status; });
+  if (Object.keys(st).length) setz_('Matchmaker', 'Status', st);
 }
 
 /* ------------------------------------------------------------------ */

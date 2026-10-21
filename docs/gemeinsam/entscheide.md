@@ -140,3 +140,10 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Ricardo-Karte: Feld Laufzeit zeigt «Donnerstag um 19.00» (Entscheid Jonas 21.10.2026: Auktionen enden immer Donnerstag um 19.00).
 - Listing-Abschluss ohne Kontrollliste zum Abhaken (Abholung aus, Reaktivierung aus, kein Boost), Wunsch Jonas 21.10.2026.
 - Live: Ricardo Bereitstellung Version 25, 21.10.2026 11:49.
+
+## 21.10.2026 · Analyse 21.10.2: Matchmaker wie Ricardo
+- Wahl «Regal Matchmaker» öffnet denselben Ablauf wie Ricardo: Fotos per QR-Code, Titel und Artikelbeschrieb (KI-Entwurf), Versandklasse, Preis.
+- Preis = VP aus dem Return Tool, von Hand änderbar. Versandklassen wie Ricardo.
+- Text ohne Ricardo-Auktionssätze; eigene Einstellung «Matchmaker-Schlusssatz», im Moment leer (kein Schlusssatz).
+- Abschluss schreibt eine Zeile in den neuen Tab «Matchmaker» im ANALYSE TOOL (Suchauftrag, Titel, Beschrieb, Zustand, Preis, Versand, Foto-Ordner, Status «Offen»); beim Suchauftrag im Matchmaker Sheet steht der Link zum Foto-Ordner in «Aus Analyse». Wiedereinstieg: alter Eintrag → «Nicht geklappt».
+- Wechsel zwischen Ricardo und Matchmaker: der Text wird neu geschrieben (anderer Schluss).
