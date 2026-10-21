@@ -1,6 +1,6 @@
 # Umpack Tool · Architektur
 
-Stand: Version `2026-10-21.1` (erste Version). Noch nicht bereitgestellt.
+Stand: Version `2026-10-21.1` (erste Version). Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: noch nicht bereitgestellt.
 
 ## Zweck
 Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst beim Abschluss nachgeführt.
