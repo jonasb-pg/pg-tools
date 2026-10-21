@@ -1715,10 +1715,9 @@
       { titel: t('g.l.regal'), html: tun('physisch', t('g.l.regal.p', esc(regalName('online'))), ''), aktion: [t('g.fertig'), fallFertig] }
     ];
   }
-  function vorherListing() { return ''; }
-  function nachherListing() {
-    return '<div class="karte"><h2>' + t('g.l.anderes') + '</h2><p class="still">' + t('g.l.anderes.text') + '</p><div data-einbau="such-karte"></div></div>';
-  }
+  /* 21.10.2026: Suchfeld zuerst, ohne eigene Überschrift. Alles läuft über den Scan (EAN oder PG-ID findet auch die analysierten Stücke). */
+  function vorherListing() { return '<div data-einbau="such-karte"></div>'; }
+  function nachherListing() { return ''; }
 
   function faellePacken() {
     return F.verkaeufe.offen.filter(function (o) { return o.status === 'Zu packen'; }).map(function (o) {
@@ -1843,6 +1842,7 @@
       }).join('') : '<p class="still">' + t('g.leer') + '</p>') + '</div>' + (nachher ? nachher() : '');
     $('f-schritte').innerHTML = h;
     einbauen();
+    if (FA === 'schicht1') try { $('q').focus({ preventScroll: true }); } catch (e) { }
   }
   /* Listing: oeffne() meldet ein geladenes Stück hier an, egal ob aus der Liste, der Suche oder «ohne Analyse» */
   var LISTING_OFFEN = '';
