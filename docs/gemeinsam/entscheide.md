@@ -138,3 +138,4 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Fotos zu Ricardo: Google Drive für Desktop auf dem Listing-PC (Jonas richtet ein).
 - Live: Ricardo Bereitstellung Version 24, 21.10.2026 11:35.
 - Ricardo-Karte: Feld Laufzeit zeigt «Donnerstag um 19.00» (Entscheid Jonas 21.10.2026: Auktionen enden immer Donnerstag um 19.00).
+- Listing-Abschluss ohne Kontrollliste zum Abhaken (Abholung aus, Reaktivierung aus, kein Boost), Wunsch Jonas 21.10.2026.

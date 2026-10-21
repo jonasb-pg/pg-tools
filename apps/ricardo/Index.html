@@ -342,8 +342,6 @@
             <div class="nr">4</div>
             <div class="inhalt">
               <h3 data-t="s4.titel"></h3>
-              <p><strong data-t="s4.pruefen"></strong></p>
-              <div id="kontrolle"></div>
               <label for="r-link" data-t="s4.link"></label>
               <div class="reihe">
                 <div class="breit"><input type="text" id="r-link" placeholder="https://www.ricardo.ch/de/a/..."></div>
@@ -605,11 +603,10 @@
     'f.versand': ['Versand', 'Shipping (Versand)'], 'f.versand.w': ['Einschalten: {0}', 'Switch on: {0}'], 'f.versand.h': ['Versandkosten für den Käufer: CHF {0}. Zeigt Ricardo einen anderen Betrag, mit diesem überschreiben.', 'Shipping cost for the buyer: CHF {0}. If Ricardo shows another amount, overwrite it with this one.'],
     'f.abholung': ['Abholung', 'Pick-up (Abholung)'], 'f.abholung.h': ['Ist bei Ricardo standardmässig eingeschaltet.', 'Is on by default on Ricardo.'],
     'f.boost': ['Boost', 'Boost'], 'f.boost.w': ['Keinen wählen', 'Choose none'],
-    's4.titel': ['Abschliessen', 'Finish'], 's4.pruefen': ['Vor dem Veröffentlichen bei Ricardo prüfen und abhaken:', 'Check and tick before publishing on Ricardo:'],
-    'p.4': ['Abholung ist ausgeschaltet', 'Pick-up is off'], 'p.5': ['Automatische Reaktivierung ist ausgeschaltet', 'Automatic reactivation is off'], 'p.6': ['Kein Boost gewählt', 'No boost chosen'],
+    's4.titel': ['Abschliessen', 'Finish'],
     's4.link': ['Link des veröffentlichten Angebots und Laufzeit in Tagen', 'Link of the published listing and duration in days'], 's4.speichern': ['Als gelistet speichern', 'Save as listed'],
     's4.regal': ['Danach das Stück ins Regal «Ricardo Online» stellen.', 'Then put the item on the shelf «Ricardo Online».'], 's4.abbrechen': ['Dieses Listing abbrechen', 'Discard this listing'],
-    's4.haken': ['Bitte zuerst alle Punkte der Kontrollliste abhaken.', 'Please tick all points of the checklist first.'],
+   
     's4.fertig': ['{0} ist als gelistet gespeichert. Stück ins Regal «Ricardo Online» stellen.', '{0} is saved as listed. Put the item on the shelf «Ricardo Online».'],
     's4.abbr.frage': ['Listing {0} wirklich abbrechen?', 'Really discard listing {0}?'], 'kopie.fehler': ['Kopieren nicht möglich. Bitte von Hand markieren.', 'Copying is not possible. Please select by hand.'],
     'v.import': ['Verkaufsbericht importieren', 'Import sales report'],
@@ -854,7 +851,7 @@
     try { localStorage.setItem('rt-lang', L); } catch (e) { /* ohne Speicher gilt die Wahl bis zum Schliessen */ }
     texte();
     $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; $('v-meldung').innerHTML = ''; $('ad-liste').innerHTML = ''; $('v-post').innerHTML = '';
-    if (R) { var id = R.id; ruf('lade', [id], function (r) { kontrolle(); zustandKnoepfe(R.zustandWahl); klasseKnoepfe(klasseWahl); aktualisiere(r); }); }
+    if (R) { var id = R.id; ruf('lade', [id], function (r) { zustandKnoepfe(R.zustandWahl); klasseKnoepfe(klasseWahl); aktualisiere(r); }); }
     if (VK) zeichneVerkaeufe();
     if (UE) zeichneUebersicht();
     if (AU) zeichneAufgaben();
@@ -939,7 +936,6 @@
   function oeffne(r) {
     R = r; $('arbeit').hidden = false;
     $('r-link').value = ''; $('r-tage').value = S.laufzeit || 6; $('b-id').value = ''; $('t-quelle').textContent = S.kiAktiv ? '' : t('s2.keinki');
-    kontrolle();
     fuelle(r); aktualisiere(r);
     if (ANSICHT === 'ablauf' && FA === 'schicht1') listingFall(r);
     else window.scrollTo(0, $('arbeit').offsetTop - 10);
@@ -1072,10 +1068,6 @@
     }).join('');
     felder.daten = f;
   }
-  function kontrolle() {
-    $('kontrolle').innerHTML = [4, 5, 6].map(function (i) { return '<label class="haken"><input type="checkbox"> <span>' + t('p.' + i) + '</span></label>'; }).join('');
-  }
-  function kontrolleOk() { return Array.prototype.every.call($('kontrolle').querySelectorAll('input'), function (x) { return x.checked; }); }
   function kopiere(i, knopf) {
     var text = String(felder.daten[i][3]);
     var fertig = function () { knopf.textContent = t('kopiert'); setTimeout(function () { knopf.textContent = t('kopieren'); }, 1500); };
@@ -1089,7 +1081,7 @@
   }
   function gelistet(danach) {
     if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); gelistet(danach); }); return; }   // zuerst fertig speichern, dann prüfen
-    if (!kontrolleOk()) { melde(t('s4.haken'), 'stop'); return; }
+    /* 21.10.2026 (Jonas): keine Kontrollliste zum Abhaken mehr vor «Gelistet» */
     if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
     ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
       melde(t('s4.fertig', r.id), 'ok'); LISTING_OFFEN = '';

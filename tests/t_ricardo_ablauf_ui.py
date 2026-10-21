@@ -97,7 +97,7 @@ with sync_playwright() as p:
     ok(s.locator('#f-schritte #ls-2').count() == 1 and s.locator('#f-schritte #ls-1').count() == 0, 'Weiter: Titel und Text')
     s.click('#f-aktion'); s.wait_for_timeout(300)
     ok(s.locator('#f-schritte #ls-3').count() == 1 and s.is_visible('#felder') and 'Neues Angebot erstellen' in s.text_content('.f-tun.rosa'), 'Auf Ricardo erfassen: Felder und Ricardo-Knopf')
-    for c in s.locator('#kontrolle input').all(): c.check()
+    ok(s.locator('#kontrolle').count() == 0, 'keine Kontrollliste zum Abhaken (21.10.2026)')
     s.fill('#r-link', 'https://www.ricardo.ch/de/a/toaster-1300000100/'); s.click('#f-aktion'); s.wait_for_timeout(300)
     ok([a for a in A() if a[0] == 'markiereGelistet'] and 'Ricardo Online' in s.text_content('.f-tun'), 'Gelistet, dann Regal')
     s.click('#f-aktion'); s.wait_for_timeout(300)
