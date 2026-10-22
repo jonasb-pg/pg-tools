@@ -32,3 +32,12 @@ Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche).
 - Einrichten im Editor ausgeführt (Tabs angelegt). `pruefen()` im Editor liest die Lagerorte aus dem Return Tool und schreibt sie ins Protokoll, ändert nichts: 75 Lagerorte, nächste Kids-Palette KID-13.
 - Im Return Tool stehen teils EANs als Lagerort (z.B. KID-4005176984105). Für «nächste Palette» zählen nur Nummern mit 1–4 Stellen.
 - Tab «Tabellenblatt1» in der Datenbank ist leer und stört nicht.
+
+## Geplant: Übertragung ins Return Tool (Entscheid Jonas 22.10.2026)
+Ziel: Nach dem Abschluss ein Knopf «Ins Return Tool übertragen» mit Vorschau. Start mit Option B, später allenfalls C.
+- B: Lagerort (und Preis, wo er vom VP abweicht) pro Stück über die ID setzen. Verkauf der Abnehmer-Gebinde danach im Return Tool mit «Lieferung erstellen».
+- C: zusätzlich Verkauf wie «Lieferung erstellen» (Lief-Nr, Verschieben). Braucht den Code des Return Tools.
+- Sicherungen: Suche über ID (nie Zeile), vorher prüfen, ob «Lagerort alt» noch stimmt (sonst überspringen und melden), jede Änderung mit vorher/nachher ins Log, Zeilen in «Änderungen» bekommen «Erledigt», zweiter Klick schreibt nichts doppelt.
+- Voraussetzung: Ok von Jonas M. für Schreibzugriff des Umpack Tools aufs Return Tool.
+- Die Datenbank hat dafür schon alles (Tab «Änderungen»: PG-ID, Aktion, Lagerort alt/neu, VP alt, Preis, Return-Tool-Tab, Erledigt). Neue Spalten (z.B. «Übertragen am», «Fehler») ergänzt «einrichten» ohne Umbau. Abgeschlossene Durchgänge von vorher lassen sich nachträglich übertragen.
+- Return Tool «Stationär»: Kopfzeile in Zeile 6 (☑, ID, …, Lagerort, Lief-Nr, → VERSCH.), Daten ab Zeile 7.
