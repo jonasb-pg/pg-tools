@@ -140,9 +140,12 @@ function einrichten() {
     e.appendRow(d[0] === 'Admins' ? [d[0], Session.getEffectiveUser().getEmail(), d[2]] : d);
     e.getRange(e.getLastRow(), 2).setNumberFormat('@').setFontColor('#0000FF');
   });
-  // 24.10.2026: alte Vorgabe der Hinweis-Tabs (mit «Spenden», ohne «Analyse» und «Scanner») auf die heutigen Kanal-Tabs umstellen. Von Hand geänderte Werte bleiben
+  // 24.10.2026: alte Vorgabe der Hinweis-Tabs (mit «Spenden», ohne «Analyse» und «Scanner») auf die heutigen Kanal-Tabs umstellen. Von Hand geänderte Werte bleiben, nur «Spenden» fällt weg
   for (let i = 2; i <= e.getLastRow(); i++) {
-    if (String(e.getRange(i, 1).getValue()).trim() === 'Hinweis-Tabs' && String(e.getRange(i, 2).getValue()).trim() === HINWEIS_TABS_ALT) e.getRange(i, 2).setValue(HINWEIS_TABS);
+    if (String(e.getRange(i, 1).getValue()).trim() !== 'Hinweis-Tabs') continue;
+    const wert = String(e.getRange(i, 2).getValue()).trim();
+    if (wert === HINWEIS_TABS_ALT) e.getRange(i, 2).setValue(HINWEIS_TABS);
+    else if (liste_(wert).indexOf('Spenden') !== -1) e.getRange(i, 2).setValue(liste_(wert).filter(function (t) { return t !== 'Spenden'; }).join(', '));   // Tab «Spenden» gibt es nicht mehr
   }
   cfgVergessen_();
 
@@ -386,7 +389,7 @@ function startDaten() {
 function suche(q, frisch) {
   q = String(q || '').trim();
   if (q.length < 3) return { treffer: [], andere: [], archiv: [], eigene: [], hinweis: 'Bitte mindestens 3 Zeichen eingeben oder eine EAN scannen.' };
-  const src = rtQuelle_(), passt = matcher_(q), listings = listingsIndex_(), ana = {}, aktiv = {};
+  const src = rtQuelle_(), passt = matcher_(q), listings = listingsIndex_(), ana = {}, aktiv = {}, lesefehler = [];
   const mitStatus = function (r, quelle) {
     const l = r.id ? listings[idNorm_(r.id)] : null;
     r.status = l ? l.status : ''; r.teilVon = l && l.teilVon ? l.teilVon : ''; r.entscheid = l && l.vergeben ? l.entscheid : ''; r.quelle = quelle;
@@ -395,9 +398,10 @@ function suche(q, frisch) {
   const treffer = [], andere = [], archiv = [], eigene = [];
   leseAnalyse_(frisch).filter(passt).forEach(function (r) { ana[idNorm_(r.id)] = true; treffer.push(mitStatus(r, 'analyse')); });
   const tabs = rtTabs_(src, frisch);
-  [[tabs.such, treffer], [tabs.hinweis, andere]].forEach(function (p) {
+  /* Review 24.10.2026: Beim zweiten Durchgang (nichts gefunden) nur Such-Tabs und Analyse frisch, Hinweis- und Archiv-Tabs aus der Kopie */
+  [[tabs.such, treffer, true], [tabs.hinweis, andere, false]].forEach(function (p) {
     p[0].forEach(function (tab) {
-      quelleGemerkt_(src, tab, frisch).filter(passt).forEach(function (r) {
+      quelleSicher_(src, tab, p[2] && frisch, lesefehler, p[2]).filter(passt).forEach(function (r) {
         if (r.id) aktiv[idNorm_(r.id)] = true;
         if (r.id && ana[idNorm_(r.id)]) return;                      // dasselbe Stück ist analysiert: es zählt die Analyse
         p[1].push(mitStatus(r, 'rt'));
@@ -405,7 +409,7 @@ function suche(q, frisch) {
     });
   });
   tabs.archiv.forEach(function (tab) {
-    quelleGemerkt_(src, tab, frisch).filter(passt).forEach(function (r) { r.archiv = true; archiv.push(mitStatus(r, 'archiv')); });
+    quelleSicher_(src, tab, false, lesefehler, false).filter(passt).forEach(function (r) { r.archiv = true; archiv.push(mitStatus(r, 'archiv')); });
   });
   listingsZeilen_().filter(passt).forEach(function (r) {
     const k = idNorm_(r.id);
@@ -419,7 +423,7 @@ function suche(q, frisch) {
   warnungen_(treffer.concat(andere, archiv, eigene));
   return { treffer: treffer.slice(0, 40), andere: andere.slice(0, 40), archiv: archiv.slice(0, 20), eigene: eigene.slice(0, 20),
     mehr: treffer.length > 40 || andere.length > 40 || archiv.length > 20 || eigene.length > 20,
-    anzahl: treffer.length + andere.length + archiv.length + eigene.length };
+    anzahl: treffer.length + andere.length + archiv.length + eigene.length, lesefehler: lesefehler };
 }
 
 /** Warnungen an den Treffern: dieselbe EAN unter verschiedenen Nummern aus verschiedenen Quellen (S6), dieselbe Nummer aktiv und im Archiv. */
@@ -472,6 +476,19 @@ function rtTabs_(src, frisch) {
     archiv: namen.filter(function (n) { return String(n).indexOf(ARCHIV_PRAEFIX) === 0 && such.indexOf(n) === -1 && hinweis.indexOf(n) === -1; }) };
 }
 /**
+ * Review 24.10.2026: Fehlt ein Hinweis- oder Archiv-Tab (oder seine Kopfzeile), darf das nicht die ganze Suche und den Start lahmlegen.
+ * hart = true (Such-Tabs): Fehler werfen. Sonst eine Meldung «Tab X nicht lesbar» in meldungen und eine leere Liste.
+ */
+function quelleSicher_(src, tab, frisch, meldungen, hart) {
+  if (hart) return quelleGemerkt_(src, tab, frisch);
+  try { return quelleGemerkt_(src, tab, frisch); }
+  catch (err) {
+    const m = 'Tab «' + tab + '» nicht lesbar: ' + String(err.message || err).replace(/^Return Tool: /, '');
+    if (meldungen && meldungen.indexOf(m) === -1) meldungen.push(m);
+    return [];
+  }
+}
+/**
  * Ein Tab des Return Tools, gemerkt für 10 Minuten (gepackt im Zwischenspeicher, in Stücken zu 90 KB). Das Return Tool bei jeder Suche ganz zu lesen,
  * dauert Sekunden. frisch = true liest neu und merkt es sich wieder. Passt die Kopie nicht in den Zwischenspeicher, wird jedes Mal gelesen.
  */
@@ -519,8 +536,9 @@ function matcher_(q) {
   q = String(q || '').trim();
   const gs1 = /^\(01\)\s*(\d{14})/.exec(q), ziffern = gs1 ? gs1[1] : q.replace(/[\s-]/g, '');
   if (/^\d{4,}$/.test(ziffern)) {
-    const ean = normEan_(ziffern), pg = 'PG-' + Number(ziffern);
-    return function (r) { return !!(r.eanNorm && r.eanNorm === ean) || (!!r.id && idNorm_(r.id) === pg); };
+    const ean = normEan_(ziffern), pg = 'PG-' + Number(ziffern), imNamen = ziffern.length <= 7 ? q.toLowerCase() : '';
+    /* Review 24.10.2026: 4 bis 7 Ziffern können auch im Namen stehen (Modellnummer) */
+    return function (r) { return !!(r.eanNorm && r.eanNorm === ean) || (!!r.id && idNorm_(r.id) === pg) || (!!imNamen && String(r.name || '').toLowerCase().indexOf(imNamen) !== -1); };
   }
   const m = ID_MUSTER.exec(q);
   if (m) {
@@ -734,7 +752,7 @@ function findeQuelle_(id, auchAndere, nurFrisch) {
     let q = null;
     tabs.forEach(function (tab) {
       if (q) return;
-      const m = quelleGemerkt_(src, tab, frisch).filter(function (r) { return r.id && idNorm_(r.id) === ziel; });
+      const m = quelleSicher_(src, tab, frisch, null, t.such.indexOf(tab) !== -1).filter(function (r) { return r.id && idNorm_(r.id) === ziel; });
       if (m.length) q = m[0];
     });
     return q;
@@ -746,7 +764,7 @@ function imArchiv_(id) {
   const src = rtQuelle_(), ziel = idNorm_(id);
   let tab = '';
   rtTabs_(src, true).archiv.forEach(function (t) {
-    if (!tab && quelleGemerkt_(src, t, true).some(function (r) { return r.id && idNorm_(r.id) === ziel; })) tab = t;
+    if (!tab && quelleSicher_(src, t, true, null, false).some(function (r) { return r.id && idNorm_(r.id) === ziel; })) tab = t;
   });
   return tab;
 }
@@ -757,11 +775,13 @@ function imArchiv_(id) {
 function vorpruefen_(id, auchAndere) {
   const ana = findeAnalyse_(id), pg = /^PG-\d+$/.test(idNorm_(id));
   if (ana && !pg) return { ana: ana, rt: null, archiv: '' };              // AN-…: steht nicht im Return Tool
-  const rt = findeQuelle_(id, !!ana || auchAndere, true);
-  return { ana: ana, rt: rt, archiv: rt || !pg ? '' : imArchiv_(id) };
+  const rt = findeQuelle_(id, !!ana || auchAndere, true), archiv = pg ? imArchiv_(id) : '';
+  /* Review 24.10.2026: Steht die Nummer aktiv UND im Archiv, nicht still starten (auchArchiv: Bestätigung nötig) */
+  return { ana: ana, rt: rt, archiv: rt ? '' : archiv, auchArchiv: rt ? archiv : '' };
 }
 
-function starteListing(id, auchAndere) {
+/** archivOk: Bestätigung, wenn die Nummer aktiv und zugleich im Archiv steht (Review 24.10.2026). */
+function starteListing(id, auchAndere, archivOk) {
   id = String(id).trim();
   const rc = /^RC-\d+$/.test(id), vor = rc || listingsIndex_()[idNorm_(id)] ? null : vorpruefen_(id, auchAndere === true);
   const lock = sperre_(20000);
@@ -773,6 +793,7 @@ function starteListing(id, auchAndere) {
     if (!l && rc) neuAusRc_(id);
     else if (!l && !vor) throw new Error('Das Listing von ' + id + ' wurde eben geändert. Bitte nochmals versuchen.');
     else if (!l && vor.archiv) throw new Error('Produkt ' + id + ' steht im Return Tool im Tab «' + vor.archiv + '» (nicht mehr an Lager). Nicht listen.');
+    else if (!l && vor.auchArchiv && archivOk !== true) throw new Error('Bitte bestätigen: ' + id + ' steht im Return Tool aktiv im Tab «' + (vor.rt ? vor.rt.tab : 'Analyse') + '» und zugleich im Tab «' + vor.auchArchiv + '». Nur listen, wenn das Stück sicher an Lager ist.');
     else if (!l && vor.ana) {
       const q = vor.ana;
       if (!q.vp) throw new Error('Produkt ' + id + ' hat in der Analyse keinen Startpreis.');
@@ -881,7 +902,7 @@ function freiKandidaten_(d, frisch) {
   };
   leseAnalyse_(frisch).forEach(function (r) { nimm(r, 'Analyse'); });
   const src = rtQuelle_(), t = rtTabs_(src, frisch);
-  t.such.concat(t.hinweis, t.archiv).forEach(function (tab) { quelleGemerkt_(src, tab, frisch).forEach(function (r) { nimm(r, 'Return Tool'); }); });
+  t.such.concat(t.hinweis, t.archiv).forEach(function (tab) { quelleSicher_(src, tab, frisch, null, false).forEach(function (r) { nimm(r, 'Return Tool'); }); });
   listingsZeilen_().forEach(function (r) { nimm(r, 'Listings'); });
   /* Treffer per EAN, Nummer oder Link zuerst, dann nach Name */
   out.sort(function (a, b) { return (a.grund === 'Name' ? 1 : 0) - (b.grund === 'Name' ? 1 : 0); });
@@ -903,6 +924,12 @@ function teil_(id) {
 function buendelHinzu(id, zusatzId) {
   id = String(id).trim(); zusatzId = String(zusatzId).trim().toUpperCase().replace(/^PG-?(?=\d)/, 'PG-');
   if (id === zusatzId) throw new Error('Das ist das Hauptstück dieses Listings.');
+  /* Review 24.10.2026: Bündel-Teil wie beim Start gegen das Archiv prüfen (frisch, ohne Sperre) */
+  if (/^PG-\d+$/.test(idNorm_(zusatzId))) {
+    const vor = vorpruefen_(zusatzId, true);
+    if (vor.archiv) throw new Error('Produkt ' + zusatzId + ' steht im Return Tool im Tab «' + vor.archiv + '» (nicht mehr an Lager). Nicht listen.');
+    if (vor.auchArchiv) throw new Error('Produkt ' + zusatzId + ' steht im Return Tool aktiv und zugleich im Tab «' + vor.auchArchiv + '». Bitte zuerst im Return Tool klären.');
+  }
   const lock = sperre_(20000);
   try {
     const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L);
@@ -2054,7 +2081,14 @@ function listingKarte_(rows) {
  */
 function verkaufZuordnen_(karte, rows, referenz, artikel) {
   artikel = String(artikel || '').trim(); referenz = String(referenz || '').trim();
-  if (artikel && karte.artikel[artikel] !== undefined) return { i: karte.artikel[artikel], sicher: true, warnung: '' };
+  if (artikel && karte.artikel[artikel] !== undefined) {
+    const i = karte.artikel[artikel], neu = karte.id[idNorm_(rows[i][0])];
+    /* Review 24.10.2026: Link einer freien (alten) Zeile, während dasselbe Stück auf einer neueren Zeile offen oder gelistet ist: früheres Angebot */
+    if (neu !== undefined && neu !== i && FREI.indexOf(rows[i][1]) !== -1 && FREI.indexOf(rows[neu][1]) === -1) {
+      return { i: neu, sicher: false, warnung: 'Verkauf über ein früheres Angebot (Artikel-Nr ' + artikel + ') von ' + rows[i][0] + '. Status nicht geändert: prüfen, ob das Stück zweimal verkauft wurde, und das andere Angebot beenden.' };
+    }
+    return { i: i, sicher: true, warnung: '' };
+  }
   if (artikel && karte.alt[artikel] !== undefined) {
     const i = karte.alt[artikel];
     return { i: i, sicher: false, warnung: 'Verkauf über ein früheres Angebot (Artikel-Nr ' + artikel + ') von ' + rows[i][0] + '. Status nicht geändert: prüfen, ob das Stück zweimal verkauft wurde, und das andere Angebot beenden.' };
@@ -2364,6 +2398,7 @@ function api(lang, name, args) {
   if (LANG === 'en' && r && typeof r === 'object') {
     if (r.fehlt) r.fehlt = r.fehlt.map(en_);
     if (r.hinweis) r.hinweis = en_(r.hinweis);
+    if (name === 'suche' && r.lesefehler) r.lesefehler = r.lesefehler.map(en_);
     if (name === 'suche') [r.treffer, r.andere, r.archiv, r.eigene].forEach(function (l) { (l || []).forEach(function (x) { if (x.warnung) x.warnung = x.warnung.split('. ').map(en_).join('. '); }); });
   }
   return r;
@@ -2451,10 +2486,13 @@ const EN_REGELN = [
   [/^Nur Stücke mit PG-ID\. Bitte zuerst im Return Tool erfassen\.$/, 'Only items with a PG-ID. Please record the item in the Return Tool first.'],
   [/^«Unverkauft» ist gesperrt: Verkauf (.+) ist keinem Listing zugeordnet und könnte zu (\S+) gehören\..*$/, '"Unsold" is blocked: sale $1 is not assigned to a listing and could belong to $2. Resolve it first (import the sales report or cancel it in Admin).'],
   [/^Bitte bestätigen: (\d+) Verkäufe sind keinem Listing zugeordnet\..*$/, 'Please confirm: $1 sales are not assigned to a listing. Set "Unsold" only if none of them belongs to this item.'],
-  [/^Preis des Verkaufs unbekannt\..*$/, 'Price of the sale unknown. Please check the refund in the sheet.'],
+  [/^Bitte bestätigen: Der Preis des Verkaufs ist unbekannt\. Rückzahlung CHF (\S+) trotzdem erfassen\?$/, 'Please confirm: the price of the sale is unknown. Record refund CHF $1 anyway?'],
+  [/^Bitte bestätigen: Die Rückzahlung \(CHF (\S+)\) ist mehr als Preis und Porto \(CHF (\S+)\), z\.B\. Rückporto\?$/, 'Please confirm: the refund (CHF $1) is more than price and postage (CHF $2), e.g. return postage?'],
+  [/^Bitte bestätigen: (\S+) steht im Return Tool aktiv im Tab «(.+)» und zugleich im Tab «(.+)»\..*$/, 'Please confirm: $1 is active in the Return Tool tab "$2" and also in the tab "$3". Only list it if the item is surely in stock.'],
+  [/^Produkt (\S+) steht im Return Tool aktiv und zugleich im Tab «(.+)»\..*$/, 'Product $1 is active in the Return Tool and also in the tab "$2". Please clarify in the Return Tool first.'],
+  [/^Tab «(.+)» nicht lesbar: (.*)$/, 'Tab "$1" not readable: $2'],
   [/^Möglicherweise dasselbe Stück wie (.+)$/, 'Possibly the same item as $1'],
   [/^Steht im Return Tool auch im Tab «(.+)»$/, 'Also in the Return Tool tab "$1"'],
-  [/^Die Rückzahlung \(CHF (\S+)\) ist höher als Preis und Porto \(CHF (\S+)\)\. Bitte prüfen\.$/, 'The refund (CHF $1) is higher than price and postage (CHF $2). Please check.']
 ];
 function en_(s) {
   for (let i = 0; i < EN_REGELN.length; i++) if (EN_REGELN[i][0].test(s)) return s.replace(EN_REGELN[i][0], EN_REGELN[i][1]);
@@ -2831,7 +2869,8 @@ function rueckzahlungMail_(r) {
 
 /** schritt: 'rueckzahlung' (wert = Betrag), 'ricardo' oder 'entscheid' (wert = Neu listen, Anderer Kanal, Entsorgung).
     Sind alle drei erledigt, ist die Retoure abgeschlossen. Entscheid Jonas 19.10.2026: gleiche Auswahl wie bei unverkauften Stücken. */
-function retoureSchritt(rtNr, schritt, wert) {
+/** bestaetigt: Review 24.10.2026, Rückzahlung über Preis + Porto (z.B. Rückporto) oder ohne bekannten Preis nur mit Bestätigung. */
+function retoureSchritt(rtNr, schritt, wert, bestaetigt) {
   rtNr = String(rtNr).trim();
   const lock = sperre_(20000);
   try {
@@ -2845,9 +2884,9 @@ function retoureSchritt(rtNr, schritt, wert) {
     if (schritt === 'rueckzahlung') {
       const betrag = runde_(zahl_(wert)), hoechstens = runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0));
       if (!(betrag > 0)) throw new Error('Bitte einen Rückzahlungsbetrag eingeben.');
-      /* 24.10.2026 (K6): höchstens Preis + Porto des Verkaufs (Tippfehler wie 490 statt 49 abfangen) */
-      if (!(hoechstens > 0)) throw new Error('Preis des Verkaufs unbekannt. Rückzahlung bitte im Sheet prüfen.');
-      if (betrag > hoechstens) throw new Error('Die Rückzahlung (CHF ' + betrag.toFixed(2) + ') ist höher als Preis und Porto (CHF ' + hoechstens.toFixed(2) + '). Bitte prüfen.');
+      /* 24.10.2026 (K6, Review): mehr als Preis + Porto des Verkaufs (Tippfehler wie 490 statt 49) oder unbekannter Preis: nur mit Bestätigung */
+      if (!(hoechstens > 0) && bestaetigt !== true) throw new Error('Bitte bestätigen: Der Preis des Verkaufs ist unbekannt. Rückzahlung CHF ' + betrag.toFixed(2) + ' trotzdem erfassen?');
+      if (hoechstens > 0 && betrag > hoechstens && bestaetigt !== true) throw new Error('Bitte bestätigen: Die Rückzahlung (CHF ' + betrag.toFixed(2) + ') ist mehr als Preis und Porto (CHF ' + hoechstens.toFixed(2) + '), z.B. Rückporto?');
       r['Rückzahlung CHF'] = betrag; r[feld] = new Date();
       r['IBAN'] = ''; r['Adresse'] = ''; // nach der Zahlung nicht mehr nötig
     } else if (schritt === 'entscheid') {

@@ -735,12 +735,13 @@
   }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { $('dialog').hidden = true; $('fb').hidden = true; } });
   /* Wartet die Oberfläche auf den Server (Lade-Anzeige, gesperrt). Läuft noch Gespeichertes im Hintergrund, kommt der Aufruf danach: Die Reihenfolge bleibt. */
-  function ruf(name, args, ok) {
-    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); ruf(name, args, ok); }); return; }
+  /* fehler (freiwillig): bekommt die Meldung; gibt sie true zurück, ist sie behandelt (z.B. Bestätigung nachfragen) */
+  function ruf(name, args, ok, fehler) {
+    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); ruf(name, args, ok, fehler); }); return; }
     lade(true);
     var t0 = Date.now();
     google.script.run.withSuccessHandler(function (x) { messe(name, t0, true); lade(false); ok(x); })
-      .withFailureHandler(function (e) { messe(name, t0, true); lade(false); melde(String(e.message || e).replace(/^Error:\s*/, ''), 'stop'); })
+      .withFailureHandler(function (e) { messe(name, t0, true); lade(false); var m = String(e.message || e).replace(/^Error:\s*/, ''); if (fehler && fehler(m)) return; melde(m, 'stop'); })
       .api(L, name, args);
   }
   function still(name, args, ok) {
@@ -880,16 +881,17 @@
     ruf('suche', [q], function (x) {
       if (x.hinweis) { $('such-meldung').innerHTML = '<div class="meldung warn">' + esc(x.hinweis) + '</div>'; return; }
       x.andere = x.andere || []; x.archiv = x.archiv || []; x.eigene = x.eigene || [];
-      if (!x.treffer.length && !x.andere.length && !x.archiv.length && !x.eigene.length) { $('such-meldung').innerHTML = '<div class="meldung stop">' + t('such.keine') + '</div>'; aehnlich(q); return; }
+      if (!x.treffer.length && !x.andere.length && !x.archiv.length && !x.eigene.length) { $('such-meldung').innerHTML = '<div class="meldung stop">' + t('such.keine') + '</div>' + ((x.lesefehler || []).length ? '<div class="meldung warn">' + x.lesefehler.map(esc).join('<br>') + '</div>' : ''); aehnlich(q); return; }
       TREFFER = x.treffer; ANDERE = x.andere; EIGENE = x.eigene;
+      if ((x.lesefehler || []).length) $('such-meldung').innerHTML = '<div class="meldung warn">' + x.lesefehler.map(esc).join('<br>') + '</div>';
       var anzahl = x.anzahl || (x.treffer.length + x.andere.length + x.archiv.length + x.eigene.length), h = anzahl > 1 ? '<div class="meldung warn">' + t('such.mehrfach', anzahl) + '</div>' : '';
       if (x.treffer.length) {
         var zl = '';
-        x.treffer.forEach(function (r) {
+        x.treffer.forEach(function (r, i) {
           var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
           if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
-          else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="start(\'' + esc(r.id) + '\')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
-          else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
+          else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="startAus(\'t\',' + i + ')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="startAus(\'t\',' + i + ')">' + t('such.weiter') + '</button>';
           else knopf = statusHtml(r);
           zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + (r.mm && r.mmStatus === 'Offen' && !r.status ? ' <span class="etikett">' + t('such.immm') + '</span>' : '') + warnHtml(r) + '</td><td>' + esc(r.quelle === 'analyse' ? t('ana.quelle') : r.tab) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
         });
@@ -912,11 +914,11 @@
       }
       if (x.eigene.length) {
         var ze = '';
-        x.eigene.forEach(function (r) {
+        x.eigene.forEach(function (r, i) {
           var k;
           if (r.teilVon) k = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
-          else if (r.status === 'In Arbeit' || r.status === 'Bereit') k = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
-          else if (r.rc && !r.entscheid && ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="start(\'' + esc(r.id) + '\')">' + t('such.neulisten') + '</button>';
+          else if (r.status === 'In Arbeit' || r.status === 'Bereit') k = '<button onclick="startAus(\'e\',' + i + ')">' + t('such.weiter') + '</button>';
+          else if (r.rc && !r.entscheid && ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="startAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';
           else k = statusHtml(r) + (r.rc || r.entscheid ? '' : '<br><span class="still">' + t('such.nichtquelle') + '</span>');
           ze += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + k + '</td></tr>';
         });
@@ -927,7 +929,7 @@
   }
   function trotzdem(i) {
     var r = ANDERE[i];
-    frage(t('such.trotzdem.frage', r.id, r.tab), function () { ruf('starteListing', [r.id, true], function (x) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(x); }); });
+    frage(t('such.trotzdem.frage', r.id, r.tab), function () { listingStarten(r.id, true); });
   }
   /* Entscheid Jonas 24.10.2026: nur Stücke mit PG-ID. Bei «nicht gefunden» ähnliche Stücke als Hilfe zeigen, nichts anlegen. */
   function aehnlich(q) {
@@ -942,8 +944,16 @@
     });
   }
   var TREFFER = [];
+  /* Review 24.10.2026: Meldet der Server «Bitte bestätigen: …», fragt die Oberfläche nach und ruft mit Bestätigung nochmals auf */
+  function bestaetigen(m, nochmals) { if (!/^(Bitte bestätigen|Please confirm):/.test(m)) return false; frage(m, nochmals); return true; }
+  function listingStarten(id, andere) {
+    var fertig = function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); };
+    ruf('starteListing', [id, andere === true], fertig, function (m) { return bestaetigen(m, function () { ruf('starteListing', [id, andere === true, true], fertig); }); });
+  }
+  /* Knöpfe tragen nur Liste und Index, nie die Nummer selbst (Review 24.10.2026) */
+  function startAus(liste, i) { var x = ({ t: TREFFER, e: EIGENE, a: ANA })[liste][i]; if (x) start(x.id); }
   function start(id) {
-    var los = function () { ruf('starteListing', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); };
+    var los = function () { listingStarten(id); };
     /* 21.10.2026: Stück aus dem Matchmaker. Mit dem Start gilt es dort als nicht verkauft. */
     var a = (TREFFER || []).concat(ANA || []).filter(function (x) { return x.id === id; })[0];
     if (a && a.mm && (a.mmStatus || 'Offen') === 'Offen' && !a.status) frage(t('mm.frage', id, a.auftrag || '–'), los); else los();
@@ -956,10 +966,10 @@
     $('ana-karte').hidden = false;
     if (!ANA.length) { $('ana-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('ana.leer') + '</p>'; return; }
     var z = '';
-    ANA.forEach(function (a) {
+    ANA.forEach(function (a, i) {
       z += '<tr><td class="mono">' + esc(a.id) + '</td><td>' + esc(a.titel || a.name) + (a.mm ? ' <span class="etikett">' + t('g.l.mm') + '</span>' : '') + '</td><td>' + esc(zu(a.zustand)) + '</td><td>' + (a.preis ? 'CHF ' + Number(a.preis).toFixed(2) : '') + '</td>' +
         '<td>' + esc(a.fotos || 0) + (/^https:\/\//.test(a.ordner) ? ' <a href="' + esc(a.ordner) + '">' + t('ana.ordner') + '</a>' : '') + '</td><td class="mono">' + esc(a.erfasst) + (a.kuerzel ? ' ' + esc(a.kuerzel) : '') + '</td>' +
-        '<td><button class="haupt-knopf" onclick="start(\'' + esc(a.id) + '\')">' + t('such.listen') + '</button></td></tr>';
+        '<td><button class="haupt-knopf" onclick="startAus(\'a\',' + i + ')">' + t('such.listen') + '</button></td></tr>';
     });
     $('ana-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.zustand', 'th.preis', 'th.fotos', 'th.analysiert', ''], z);
   }
@@ -1310,7 +1320,8 @@
   function retoureSchritt(i, schritt) {
     var o = RT.offen[i];
     var wert = schritt === 'rueckzahlung' ? $('rb-' + i).value : '';
-    var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], function (r) { RT = r; zeichneRetouren(); }); };
+    var fertig = function (r) { RT = r; zeichneRetouren(); };
+    var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], fertig, function (m) { return bestaetigen(m, function () { ruf('retoureSchritt', [o.nr, schritt, wert, true], fertig); }); }); };
     if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
   }
   function retoureEntscheid(i, j) { ruf('retoureSchritt', [RT.offen[i].nr, 'entscheid', RT.entscheide[j]], function (r) { RT = r; zeichneRetouren(); }); }
