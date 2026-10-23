@@ -17,7 +17,17 @@
  *
  * «Geholt» anhaken verschiebt den Suchauftrag in den Tab «Erledigt». Dort holt der Haken
  * «Zurück in die Liste» ihn wieder zurück.
+ *
+ * Datenintegrität (24.10.2026)
+ * - Tagesläufe («heute/gestern erfasst») prüfen nur neue Stücke, behalten aber die bisherigen Treffer: Ergebnis = alle gespeicherten
+ *   Urteile «passt/ähnlich» auf Stücke, die noch im Bestand sind. Treffer auf Stücke, die nicht mehr da sind, fallen weg.
+ * - Ein Produkt = gleiche Bezeichnung, gleicher Preis und gleicher Barcode (sonst Shop-Link). Das Urteil gilt pro Bezeichnung und Barcode/Link.
+ * - Stücke mit Ergebnis im ANALYSE TOOL (Tab «Analysen», letzte Zeile pro PG-ID: Regal Matchmaker oder Ricardo Offline, Reusable Nein)
+ *   werden nicht durchsucht. Ist das ANALYSE TOOL nicht lesbar, steht das rot im Status.
+ * - Prüfen «Sheet verändert?» und Schreiben in einer Dokument-Sperre; der Haken «Geholt» nimmt dieselbe Sperre.
  */
+
+const VERSION = '2026-10-24.1';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -25,6 +35,9 @@ const TAB = 'Matchmaker';
 const TAB_ERLEDIGT = 'Erledigt';
 const TAB_URTEILE = 'Urteile';
 const BESTAND_TABS = ['Scanner', 'Analyse', 'Stationär', 'Online'];   // diese Tabs im Return Tool werden durchsucht
+const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM';    // ANALYSE TOOL, nur lesen
+const ANALYSE_TAB = 'Analysen';
+const ERLEDIGT_REGALE = ['Matchmaker', 'Ricardo Offline'];          // Stücke in diesen Regalen sind vergeben
 const MODELL = 'claude-sonnet-5-5';         // Claude-Modell für Suchprofil und Urteil
 const TZ = 'Europe/Zurich';
 const PAARE_PRO_ANFRAGE = 60;               // Paare pro Anfrage an Claude
@@ -36,7 +49,7 @@ const KOPF = ['Gesucht', 'Mehr Infos (was ist zwingend, was egal)', 'Limit CHF',
   'Passt', 'Ähnlich 1', 'Ähnlich 2', 'Ähnlich 3', 'Geholt'];
 const S = { GESUCHT: 1, INFOS: 2, LIMIT: 3, PROFIL: 4, PASST: 5, GEHOLT: 9 };
 const KOPF_ERLEDIGT = ['Geholt am', 'Gesucht', 'Mehr Infos', 'Limit CHF', 'Suchprofil', 'Gefunden', 'Zurück in die Liste'];
-const KOPF_URTEILE = ['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am'];
+const KOPF_URTEILE = ['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am', 'Produkt-Schlüssel'];
 
 // ---------- Menü ----------
 function onOpen() {
@@ -78,25 +91,41 @@ function bearbeitetMatchmaker_(r, sh) {
   const z1 = Math.max(r.getRow(), hz + 1), z2 = r.getLastRow(), s1 = r.getColumn(), s2 = r.getLastColumn();
   if (z2 <= hz) return;
 
-  // Haken «Geholt»: Suchauftrag nach «Erledigt» verschieben
+  // Haken «Geholt»: Suchauftrag nach «Erledigt» verschieben (in der Dokument-Sperre: nie während die Suche schreibt)
   if (s1 === S.GEHOLT && s2 === S.GEHOLT && z1 === z2) {
     if (r.getValue() !== true) return;
-    const w = sh.getRange(z1, 1, 1, KOPF.length).getValues()[0];
-    if (!String(w[0]).trim()) { r.setValue(false); return; }
-    const ss = sh.getParent();
-    hilfsTabs_(ss);
-    const ziel = ss.getSheetByName(TAB_ERLEDIGT);
-    const gefunden = [w[4], w[5], w[6], w[7]].filter(function (x) { return String(x).trim(); }).join('\n\n');
-    ziel.appendRow([new Date(), w[0], w[1], w[2], w[3], gefunden, false]);
-    const zr = ziel.getLastRow();
-    ziel.getRange(zr, 1).setNumberFormat('dd.MM.yyyy');
-    ziel.getRange(zr, 7).insertCheckboxes();
-    ziel.getRange(zr, 1, 1, KOPF_ERLEDIGT.length).setVerticalAlignment('top').setWrap(true);
-    sh.deleteRow(z1);
+    const l = sperre_();
+    if (!l) { r.setValue(false); sh.getParent().toast('Die Suche schreibt gerade. Bitte «Geholt» gleich nochmals anhaken.', 'Matchmaker', 8); return; }
+    try { geholt_(r, sh, z1); } finally { l.releaseLock(); }
     return;
   }
 
   // Text geändert: veraltetes Suchprofil und alte Treffer dieser Zeilen leeren
+  aufraeumen_(sh, z1, z2, s1, s2);
+}
+
+/** Dokument-Sperre für kurze Schreibvorgänge (Suche schreibt Ergebnis, Haken verschieben Zeilen). null, wenn sie besetzt ist. */
+function sperre_() {
+  const l = LockService.getDocumentLock();
+  return l.tryLock(10000) ? l : null;
+}
+
+function geholt_(r, sh, z1) {
+  const w = sh.getRange(z1, 1, 1, KOPF.length).getValues()[0];
+  if (!String(w[0]).trim()) { r.setValue(false); return; }
+  const ss = sh.getParent();
+  hilfsTabs_(ss);
+  const ziel = ss.getSheetByName(TAB_ERLEDIGT);
+  const gefunden = [w[4], w[5], w[6], w[7]].filter(function (x) { return String(x).trim(); }).join('\n\n');
+  ziel.appendRow([new Date(), w[0], w[1], w[2], w[3], gefunden, false]);
+  const zr = ziel.getLastRow();
+  ziel.getRange(zr, 1).setNumberFormat('dd.MM.yyyy');
+  ziel.getRange(zr, 7).insertCheckboxes();
+  ziel.getRange(zr, 1, 1, KOPF_ERLEDIGT.length).setVerticalAlignment('top').setWrap(true);
+  sh.deleteRow(z1);
+}
+
+function aufraeumen_(sh, z1, z2, s1, s2) {
   const n = z2 - z1 + 1;
   if (s1 <= S.INFOS) {
     sh.getRange(z1, S.PROFIL, n, 5).clearContent().setBackground(null);
@@ -117,6 +146,12 @@ function bearbeitetErledigt_(r, sh) {
   if (!mm) return;
   const hz = kopfZeile_(mm);
   if (!hz || !istNeu_(mm, hz)) return;
+  const l = sperre_();
+  if (!l) { r.setValue(false); ss.toast('Die Suche schreibt gerade. Bitte den Haken gleich nochmals setzen.', 'Matchmaker', 8); return; }
+  try { zurueck_(r, sh, mm, hz); } finally { l.releaseLock(); }
+}
+
+function zurueck_(r, sh, mm, hz) {
   const w = sh.getRange(r.getRow(), 1, 1, KOPF_ERLEDIGT.length).getValues()[0];
   const z = Math.max(mm.getLastRow(), hz) + 1;
   if (z > mm.getMaxRows()) mm.insertRowsAfter(mm.getMaxRows(), 1);
@@ -131,7 +166,7 @@ function suche_(modus) {
   const ui = SpreadsheetApp.getUi();
   const key = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
   if (!key) { ui.alert('Zuerst im Menü Matchmaker → «Claude-Schlüssel setzen» den API-Schlüssel hinterlegen.'); return; }
-  const lock = LockService.getDocumentLock();
+  const lock = LockService.getScriptLock();     // eine Suche zur Zeit; die Dokument-Sperre nur fürs Schreiben (sonst warten die Haken minutenlang)
   if (!lock.tryLock(1000)) { ui.alert('Es läuft bereits eine Suche. Bitte warten, bis sie fertig ist.'); return; }
   let ort = null;
   try {
@@ -173,11 +208,15 @@ function sucheAusfuehren_(ss, sh, hz, modus, key) {
     a.kennung = kennung_(a);
   });
 
-  // 2. Bestand lesen und Kandidaten suchen
+  // 2. Bestand lesen (immer ganz: auch für die bisherigen Treffer), Erledigtes aus dem ANALYSE TOOL weglassen, Kandidaten suchen
   ss.toast('Bestand wird gelesen …', 'Matchmaker', 30);
   const bestand = leseBestand_(rt, rtTz, tag);
+  const erledigt = leseErledigt_();
+  const vorher = bestand.stuecke.length;
+  bestand.stuecke = bestand.stuecke.filter(function (it) { return !erledigt.ids[String(it.id).toUpperCase()]; });
+  const weggelassen = vorher - bestand.stuecke.length;
   const produkte = gruppiere_(bestand.stuecke);
-  const paare = findeKandidaten_(auftraege, produkte);
+  const paare = findeKandidaten_(auftraege, produkte, !!tag);
 
   // 3. Urteile: aus dem Speicher, der Rest von Claude
   hilfsTabs_(ss);
@@ -193,14 +232,9 @@ function sucheAusfuehren_(ss, sh, hz, modus, key) {
   }
   if (modus === 'alles') raeumeUrteileAuf_(ss, auftraege);
 
-  // 4. Ergebnis in die Spalten schreiben. Wurde das Sheet inzwischen verändert, nichts schreiben.
-  const jetzt = leseAuftraege_(sh, hz);
-  const gleich = jetzt.length === auftraege.length && jetzt.every(function (a, i) {
-    return a.zeile === auftraege[i].zeile && a.gesucht === auftraege[i].gesucht && a.infos === auftraege[i].infos;
-  });
-  if (!gleich) throw new Error('Das Sheet wurde während der Suche verändert. Bitte die Suche nochmals starten (das geht jetzt schnell, die Urteile sind gespeichert).');
-
-  const zeilen = ergebnisZeilen_(auftraege, produkte, paare, speicher);
+  // 4. Ergebnis: alle Paare mit gespeichertem Urteil «passt/ähnlich» auf Produkte im Bestand (behält im Tageslauf die bisherigen Treffer)
+  const treffer = trefferPaare_(auftraege, produkte, paare, speicher);
+  const zeilen = ergebnisZeilen_(auftraege, produkte, treffer, speicher);
   const z1 = auftraege[0].zeile, z2 = auftraege[auftraege.length - 1].zeile;
   const werte = [], farben = [];
   for (let z = z1; z <= z2; z++) { werte.push(['', '', '', '']); farben.push([null, null, null, null]); }
@@ -211,16 +245,31 @@ function sucheAusfuehren_(ss, sh, hz, modus, key) {
     farben[a.zeile - z1] = [w[0] ? '#d9ead3' : null, w[1] ? '#fff2cc' : null, w[2] ? '#fff2cc' : null, w[3] ? '#fff2cc' : null];
     if (w[0] || w[1]) mitTreffer++;
   });
-  sh.getRange(z1, S.PASST, werte.length, 4).setValues(werte).setBackgrounds(farben).setVerticalAlignment('top').setWrap(true);
+  /* Prüfen und Schreiben in der Dokument-Sperre: dazwischen kann kein Haken «Geholt» eine Zeile verschieben. Wurde das Sheet verändert, nichts schreiben. */
+  const l = sperre_();
+  if (!l) throw new Error('Das Sheet ist gerade gesperrt. Bitte die Suche nochmals starten (das geht jetzt schnell, die Urteile sind gespeichert).');
+  try {
+    const jetzt = leseAuftraege_(sh, hz);
+    const gleich = jetzt.length === auftraege.length && jetzt.every(function (a, i) {
+      return a.zeile === auftraege[i].zeile && a.gesucht === auftraege[i].gesucht && a.infos === auftraege[i].infos;
+    });
+    if (!gleich) throw new Error('Das Sheet wurde während der Suche verändert. Bitte die Suche nochmals starten (das geht jetzt schnell, die Urteile sind gespeichert).');
+    sh.getRange(z1, S.PASST, werte.length, 4).setValues(werte).setBackgrounds(farben).setVerticalAlignment('top').setWrap(true);
+    SpreadsheetApp.flush();
+  } finally { l.releaseLock(); }
 
-  let text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · ' + bestand.stuecke.length + ' Stück durchsucht · ' +
+  const neuDurchsucht = tag ? bestand.stuecke.filter(function (it) { return it.neu; }).length : bestand.stuecke.length;
+  let text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · ' + neuDurchsucht + ' Stück durchsucht' + (tag ? ' (bisherige Treffer behalten, ' + bestand.stuecke.length + ' Stück im Bestand)' : '') + ' · ' +
     mitTreffer + ' von ' + auftraege.length + ' Suchaufträgen mit Treffer.';
-  if (tag && !bestand.stuecke.length) text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · An diesem Tag wurde nichts erfasst.';
+  if (tag && !neuDurchsucht) text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · An diesem Tag wurde nichts erfasst. Bisherige Treffer geprüft: ' + mitTreffer + ' von ' + auftraege.length + ' Suchaufträgen.';
+  if (weggelassen) text += ' ' + weggelassen + ' Stück mit Ergebnis im ANALYSE TOOL (Matchmaker, Ricardo, nicht reusable) weggelassen.';
+  if (bestand.ohneId) text += ' ' + bestand.ohneId + ' Stück ohne ID (Scanner) sind als «ohne ID» markiert.';
   if (bestand.ausgelassen.length) text += ' Nicht gelesen: ' + bestand.ausgelassen.join(', ') + '.';
+  if (erledigt.fehler) text += ' ACHTUNG: ANALYSE TOOL nicht lesbar (' + erledigt.fehler + '). Stücke im Matchmaker, auf Ricardo oder nicht reusable sind NICHT ausgeschlossen.';
   if (ungeprueft) text += ' ACHTUNG: ' + ungeprueft + ' Paare konnte Claude nicht prüfen, sie fehlen in der Liste. Suche nochmals starten.';
   if (ohneProfil.length) text += ' ACHTUNG: ' + ohneProfil.length + ' Suchaufträge ohne Suchprofil wurden nicht durchsucht (' +
     ohneProfil.slice(0, 5).map(function (a) { return '«' + a.gesucht + '»'; }).join(', ') + (ohneProfil.length > 5 ? ' …' : '') + '). Grund: ' + (DIAGNOSE || 'unbekannt') + ' Suche nochmals starten.';
-  status_(sh, text, ungeprueft > 0 || ohneProfil.length > 0);
+  status_(sh, text, ungeprueft > 0 || ohneProfil.length > 0 || !!erledigt.fehler);
   return text;
 }
 
@@ -292,7 +341,11 @@ function hilfsTabs_(ss) {
     const sh = ss.insertSheet(TAB_URTEILE, ss.getNumSheets());
     sh.getRange(1, 1, 1, KOPF_URTEILE.length).setValues([KOPF_URTEILE]).setFontWeight('bold').setBackground('#333333').setFontColor('#ffffff');
     sh.setFrozenRows(1);
-    [90, 230, 380, 190, 260, 90].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    [90, 230, 380, 190, 260, 90, 260].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+  } else {
+    const sh = ss.getSheetByName(TAB_URTEILE);
+    if (sh.getMaxColumns() < KOPF_URTEILE.length) sh.insertColumnsAfter(sh.getMaxColumns(), KOPF_URTEILE.length - sh.getMaxColumns());
+    if (String(sh.getRange(1, 7).getValue()).trim() !== KOPF_URTEILE[6]) sh.getRange(1, 7).setValue(KOPF_URTEILE[6]).setFontWeight('bold').setBackground('#333333').setFontColor('#ffffff');
   }
 }
 
@@ -449,9 +502,11 @@ function listeAus_(antwort, name) {
 }
 
 // ---------- Bestand ----------
+/** Liest den ganzen Bestand. tag (yyyy-MM-dd): Stücke dieses Tages bekommen neu = true (nur sie werden im Tageslauf neu geprüft). */
 function leseBestand_(rt, rtTz, tag) {
   const stuecke = [];
   const ausgelassen = [];
+  let ohneId = 0;
   BESTAND_TABS.forEach(function (tab) {
     const sh = rt.getSheetByName(tab);
     if (!sh) { ausgelassen.push(tab); return; }
@@ -469,16 +524,20 @@ function leseBestand_(rt, rtTz, tag) {
           else if (n === 'Link') h.link = i;
           else if (n === 'VP') h.vp = i;
           else if (n === 'Lagerort') h.ort = i;
+          else if (n === 'Barcode') h.bc = i;
         });
         return;
       }
       const bez = String(r[h.bez] || '').replace(/\s+/g, ' ').trim();
       if (!bez) return;
       const t = h.tag != null ? tag_(r[h.tag], rtTz) : null;
-      if (tag && t !== tag) return;
       const link = h.link != null ? r[h.link] : '';
+      const id = h.id != null && r[h.id] ? String(r[h.id]).trim() : '';
+      if (!id) ohneId++;
       stuecke.push({
-        id: h.id != null && r[h.id] ? String(r[h.id]).trim() : 'ohne ID',
+        id: id || 'ohne ID (' + tab + ')',
+        neu: !tag || t === tag,
+        bc: h.bc != null ? bcKey_(r[h.bc]) : '',
         bez: bez,
         slug: slug_(link),
         such: suchtext_(link),
@@ -489,7 +548,37 @@ function leseBestand_(rt, rtTz, tag) {
     });
     if (!h && sh.getLastRow() > 1) ausgelassen.push(tab);
   });
-  return { stuecke: stuecke, ausgelassen: ausgelassen };
+  return { stuecke: stuecke, ausgelassen: ausgelassen, ohneId: ohneId };
+}
+
+/** Barcode ohne Apostroph und Leerzeichen, Ziffern ohne führende Nullen. */
+function bcKey_(v) { let b = String(v == null ? '' : v).replace(/^'/, '').replace(/\s+/g, '').toUpperCase(); if (/^\d+$/.test(b)) b = b.replace(/^0+/, ''); return b; }
+
+/**
+ * PG-IDs mit Ergebnis im ANALYSE TOOL (Tab «Analysen», nur lesen; letzte Zeile pro PG-ID gilt): Regal Matchmaker oder Ricardo Offline, oder Reusable Nein.
+ * Gibt { ids: { 'PG-…': Grund }, fehler: '' } zurück; ist das ANALYSE TOOL nicht lesbar, steht der Grund in fehler (nie still).
+ */
+function leseErledigt_() {
+  try {
+    const sh = SpreadsheetApp.openById(ANALYSE_ID).getSheetByName(ANALYSE_TAB);
+    if (!sh) return { ids: {}, fehler: 'Tab «' + ANALYSE_TAB + '» fehlt' };
+    const v = sh.getDataRange().getValues(), kopf = (v[0] || []).map(function (x) { return String(x).trim(); });
+    const c = { id: kopf.indexOf('PG-ID'), regal: kopf.indexOf('Regal'), reusable: kopf.indexOf('Reusable') };
+    if (c.id < 0 || c.regal < 0 || c.reusable < 0) return { ids: {}, fehler: 'Spalten PG-ID, Regal oder Reusable fehlen im Tab «' + ANALYSE_TAB + '»' };
+    const letzte = {}, ids = {};
+    for (let i = 1; i < v.length; i++) {
+      const id = String(v[i][c.id] || '').trim().toUpperCase();
+      if (id) letzte[id] = { regal: String(v[i][c.regal] || '').trim(), reusable: String(v[i][c.reusable] || '').trim() };
+    }
+    Object.keys(letzte).forEach(function (id) {
+      const x = letzte[id];
+      if (ERLEDIGT_REGALE.indexOf(x.regal) > -1) ids[id] = x.regal;
+      else if (x.reusable === 'Nein') ids[id] = 'nicht reusable';
+    });
+    return { ids: ids, fehler: '' };
+  } catch (e) {
+    return { ids: {}, fehler: String(e && e.message || e).slice(0, 120) };
+  }
 }
 
 function ort_(tab, ort) {
@@ -499,16 +588,20 @@ function ort_(tab, ort) {
   return ort && ort !== tab ? tab + ' ' + ort : tab;
 }
 
-/** Gleiche Bezeichnung und gleicher Preis = ein Produkt mit mehreren Stück. */
+/** Woran ein Produkt erkannt wird: Barcode, sonst Shop-Link (Slug). Leer, wenn beides fehlt. */
+function ident_(it) { return it.bc ? 'bc:' + it.bc : (it.slug ? 'link:' + norm_(it.slug) : ''); }
+
+/** Gleiche Bezeichnung, gleicher Preis und gleicher Barcode (sonst Link) = ein Produkt mit mehreren Stück. schl = Schlüssel fürs Urteil (ohne Preis). */
 function gruppiere_(stuecke) {
   const map = {};
   const liste = [];
   stuecke.forEach(function (it) {
-    const k = it.bez.toLowerCase() + '|' + (it.vp == null ? '' : it.vp);
+    const k = it.bez.toLowerCase() + '|' + (it.vp == null ? '' : it.vp) + '|' + ident_(it);
     if (!map[k]) {
-      map[k] = { bez: it.bez, slug: it.slug, vp: it.vp, ids: [], orte: [], tag: '', text: ' ' + norm_(it.bez + ' ' + it.such) + ' ' };
+      map[k] = { bez: it.bez, slug: it.slug, vp: it.vp, ids: [], orte: [], tag: '', neu: false, schl: norm_(it.bez) + '|' + ident_(it), text: ' ' + norm_(it.bez + ' ' + it.such) + ' ' };
       liste.push(map[k]);
     }
+    if (it.neu) map[k].neu = true;
     map[k].ids.push(it.id);
     if (map[k].orte.indexOf(it.ort) < 0) map[k].orte.push(it.ort);
     if (it.tag > map[k].tag) map[k].tag = it.tag;
@@ -533,10 +626,12 @@ function trifft_(text, wort) {
   return text.indexOf(b) >= 0;
 }
 
-function findeKandidaten_(auftraege, produkte) {
+/** nurNeu: im Tageslauf nur Produkte mit einem Stück von diesem Tag (die übrigen haben ihr Urteil schon). */
+function findeKandidaten_(auftraege, produkte, nurNeu) {
   const paare = [];
   auftraege.forEach(function (a, ai) {
     produkte.forEach(function (p, pi) {
+      if (nurNeu && !p.neu) return;
       for (let k = 0; k < a.woerter.length; k++) {
         if (trifft_(p.text, a.woerter[k])) { paare.push({ a: ai, p: pi }); break; }
       }
@@ -716,16 +811,19 @@ function kennung_(a) {
   return b.slice(0, 5).map(function (x) { return ('0' + ((x + 256) % 256).toString(16)).slice(-2); }).join('');
 }
 
-function schluessel_(a, p) { return a.kennung + '|' + norm_(p.bez); }
+/** Urteil pro Suchauftrag (Kennung) und Produkt (Bezeichnung und Barcode/Link, nicht nur die Bezeichnung). */
+function schluessel_(a, p) { return a.kennung + '|' + p.schl; }
 
 function ladeUrteile_(ss) {
   const sh = ss.getSheetByName(TAB_URTEILE);
   const map = {};
   if (!sh || sh.getLastRow() < 2) return map;
-  sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().forEach(function (r) {
+  /* Spalte 7 = Produkt-Schlüssel. Alte Zeilen ohne Schlüssel gelten nur für Produkte ohne Barcode und Link (sonst wird neu geprüft). */
+  sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function (r) {
     const art = normUrteil_(r[3]);
     if (!r[0] || !art) return;
-    map[String(r[0]).trim() + '|' + norm_(r[2])] = { urteil: art, hinweis: String(r[4] || '').trim() };
+    const schl = String(r[6] || '').trim() || norm_(r[2]) + '|';
+    map[String(r[0]).trim() + '|' + schl] = { urteil: art, hinweis: String(r[4] || '').trim() };
   });
   return map;
 }
@@ -735,11 +833,11 @@ function speichereUrteile_(ss, auftraege, produkte, neu) {
   const sh = ss.getSheetByName(TAB_URTEILE);
   const heute = Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy');
   const rows = neu.map(function (u) {
-    return [auftraege[u.a].kennung, auftraege[u.a].gesucht, produkte[u.p].bez, u.urteil, u.hinweis, heute];
+    return [auftraege[u.a].kennung, auftraege[u.a].gesucht, produkte[u.p].bez, u.urteil, u.hinweis, heute, produkte[u.p].schl];
   });
   const z = sh.getLastRow() + 1;
   if (z + rows.length - 1 > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), z + rows.length - 1 - sh.getMaxRows());
-  sh.getRange(z, 1, rows.length, 6).setNumberFormat('@').setValues(rows);
+  sh.getRange(z, 1, rows.length, 7).setNumberFormat('@').setValues(rows);
 }
 
 /** Entfernt Urteile zu Suchaufträgen, die es nicht mehr gibt oder deren Text geändert wurde. */
@@ -749,14 +847,32 @@ function raeumeUrteileAuf_(ss, auftraege) {
   const gueltig = {};
   auftraege.forEach(function (a) { gueltig[a.kennung] = true; });
   const n = sh.getLastRow() - 1;
-  const alle = sh.getRange(2, 1, n, 6).getDisplayValues();
+  const alle = sh.getRange(2, 1, n, 7).getDisplayValues();
   const bleibt = alle.filter(function (r) { return gueltig[String(r[0]).trim()]; });
   if (bleibt.length === alle.length) return;
-  sh.getRange(2, 1, n, 6).clearContent();
-  if (bleibt.length) sh.getRange(2, 1, bleibt.length, 6).setNumberFormat('@').setValues(bleibt);
+  sh.getRange(2, 1, n, 7).clearContent();
+  if (bleibt.length) sh.getRange(2, 1, bleibt.length, 7).setNumberFormat('@').setValues(bleibt);
 }
 
 // ---------- Ergebnis ----------
+/**
+ * Alle Treffer: Kandidaten dieses Laufs und jedes gespeicherte Urteil «passt/ähnlich» auf ein Produkt, das noch im Bestand ist. Dedupliziert.
+ * So behält ein Tageslauf die Treffer früherer Läufe, und Treffer auf verschwundene Stücke fallen weg.
+ */
+function trefferPaare_(auftraege, produkte, paare, speicher) {
+  const nachKennung = {}, nachSchl = {}, gesehen = {}, aus = [];
+  auftraege.forEach(function (a, ai) { (nachKennung[a.kennung] = nachKennung[a.kennung] || []).push(ai); });
+  produkte.forEach(function (p, pi) { (nachSchl[p.schl] = nachSchl[p.schl] || []).push(pi); });
+  const dazu = function (ai, pi) { const k = ai + '|' + pi; if (!gesehen[k]) { gesehen[k] = true; aus.push({ a: ai, p: pi }); } };
+  paare.forEach(function (x) { dazu(x.a, x.p); });
+  Object.keys(speicher).forEach(function (k) {
+    if (speicher[k].urteil === 'nein') return;
+    const i = k.indexOf('|'), kennung = k.slice(0, i), schl = k.slice(i + 1);
+    (nachKennung[kennung] || []).forEach(function (ai) { (nachSchl[schl] || []).forEach(function (pi) { dazu(ai, pi); }); });
+  });
+  return aus;
+}
+
 function produktText_(p, hinweis) {
   const stueck = p.ids.length > 1 ? p.ids.length + ' Stück: ' + p.ids.join(', ') : p.ids[0];
   const l = [p.bez, stueck + ' · ' + p.orte.join(', ') + (p.vp == null ? '' : ' · CHF ' + p.vp)];

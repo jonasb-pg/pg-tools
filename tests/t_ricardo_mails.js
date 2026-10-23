@@ -194,7 +194,7 @@ ok(pe[1][I_COLS.indexOf('PG-ID')] === 'PG-3003' && pe[1][I_COLS.indexOf('Text')]
 // Empfehlung: innerhalb der Frist annehmen, schon verkauft ablehnen
 ok(c.empfehlung_(blaetter['Listings'][2], new Date()) === 'Annehmen', 'während Auktion annehmen');
 ok(/^Ablehnen: Stück ist schon verkauft/.test(c.empfehlung_(blaetter['Listings'][0], new Date())), 'verkauft: ablehnen');
-ok(/^Annehmen \(Angebot nicht im Tool/.test(c.empfehlung_(null, new Date())), 'unbekannt: annehmen');
+ok(/^Prüfen \(Angebot nicht im Tool/.test(c.empfehlung_(null, new Date())), 'unbekannt: prüfen statt annehmen (24.10.2026, S5)');
 // Ein Verkauf zum Artikel mit offenem Preisvorschlag schliesst ihn automatisch
 const ANGEBOT2 = ANGEBOT.replace('1332215532', '1331877810');
 k = c.karten_(sv, sl, si);

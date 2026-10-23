@@ -258,7 +258,7 @@
     gruppen.forEach(function (g) {
       var l = r[g[0]] || []; if (!l.length) return; n += l.length;
       h += '<p class="still" style="margin-top:8px"><b>' + g[1] + '</b> · ' + l.length + '</p><ul class="liste">' + l.map(function (t) {
-        return '<li><span class="txt"><b>' + esc(t.teil) + (t.menge > 1 ? ' × ' + t.menge : '') + '</b><small>' + esc([t.marke, t.modell, t.produktart].filter(String).join(' · ')) + ' · ' + esc(t.id) + '</small></span>'
+        return '<li><span class="txt"><b>' + esc(t.teil) + (t.menge > 1 ? ' × ' + t.menge : '') + '</b><small>' + esc([t.marke, t.modell, t.produktart].filter(String).join(' · ')) + ' · ' + esc(t.id) + (t.hinweis ? ' · <b class="hinweis">' + esc(t.hinweis) + '</b>' : '') + '</small></span>'
           + '<span class="etikett ' + (g[0] === 'passend' ? 'pink' : '') + '">' + esc(t.box) + '</span><button class="link" data-a="weg" data-v="' + esc(t.id) + '">Genommen</button></li>'; }).join('') + '</ul>';
     });
     $('treffer').innerHTML = n ? h : box('Nichts im Lager.', 'warn');

@@ -18,7 +18,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
   if(name==='start')r={version:'t',durchgaenge:[{id:'U-0001',name:'Kids → Balu',status:'Scan',quelle:'Return Tool',lagerorte:'KID-7',erstellt:'22.10.2026'}]};
   if(name==='lagerorte')r={orte:[{ort:'KID-7',anzahl:2},{ort:'KID-12',anzahl:1},{ort:'HOM-3',anzahl:5}],naechste:{KID:'KID-13',HOM:'HOM-4'}};
   if(name==='laden'||name==='anlegen'){r=JSON.parse(JSON.stringify(D));r.zuordnung=JSON.parse(JSON.stringify(ZU));}
-  if(name==='zuordnen'){var konf=[];args[1].forEach(function(o){if(o.id==='PG-2'&&window.KONFLIKT){konf.push({id:o.id,grund:'inzwischen von jemand anderem in Weg gelegt'});return;} if(o.gebinde)ZU[o.id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[o.id];});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf};}
+  if(name==='zuordnen'){var konf=[];args[1].forEach(function(o){if(!o.id&&o.code)o=Object.assign({},o,{id:o.wunsch}); if(o.id==='PG-2'&&window.KONFLIKT){konf.push({id:o.id,grund:'inzwischen von jemand anderem in Weg gelegt'});return;} if(o.gebinde)ZU[o.id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[o.id];});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf};}
   if(name==='abschliessen'){r=JSON.parse(JSON.stringify(D));r.status='Abgeschlossen';r.zuordnung=ZU;r.listen='Balu: https://docs.google.com/x';r.aenderungen=[{r:2,id:'PG-1',name:'Lego Zug',aktion:'Verkaufen',gebinde:'Balu 1',abnehmer:'Balu',alt:'KID-7',neu:'BALU-1',vp:20,preis:20,tab:'Stationär',zeile:'7',erledigt:''}];}
   if(name==='erledigt'){r=[{r:2,id:'PG-1',name:'Lego Zug',aktion:'Verkaufen',gebinde:'Balu 1',abnehmer:'Balu',alt:'KID-7',neu:'BALU-1',vp:20,preis:20,tab:'Stationär',zeile:'7',erledigt:args[2]?'x':''}];}
   ok&&ok(r);},5)}}})})()}};</script>""" % json.dumps(D)
@@ -57,7 +57,7 @@ with sync_playwright() as p:
     ok(s.evaluate("UMK.KAM.an") and s.is_visible('#kamera video'), 'Gebinde wechseln: Kamera bleibt an')
     s.evaluate("SIEHT.push('222')"); s.wait_for_timeout(500)
     ok(s.evaluate("ZU['PG-2'] && ZU['PG-2'].gebinde") == 'U-0001-G2' and 'Kids neu' in s.text_content('#kam-text'), 'Barcode 222 → erstes freies Stück in Kids neu')
-    if len(sys.argv) > 1: s.screenshot(path=sys.argv[1])
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.png'): s.screenshot(path=sys.argv[1])   # nur Bildpfade (python3 a.py b.py übergibt sonst b.py)
     s.evaluate("SIEHT.push('999')"); s.wait_for_timeout(500)
     ok('nicht in der Quelle' in s.text_content('#kam-text') and 'stop' in s.get_attribute('#kam-text', 'class'), 'Unbekannter Code: rote Meldung in der Kamera-Leiste')
     s.click('#kamera button[data-a=kamera]'); s.wait_for_timeout(200)

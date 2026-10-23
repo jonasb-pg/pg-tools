@@ -11,7 +11,7 @@
  * Schlüssel: ANTHROPIC_API_KEY in den Script-Eigenschaften, nie im Sheet.
  */
 
-const VERSION = '2026-10-17.1';
+const VERSION = '2026-10-24.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -187,16 +187,24 @@ function key_() { return PropertiesService.getScriptProperties().getProperty('AN
 function txt_(s) { s = String(s == null ? '' : s).trim(); return /^[=+\-@]/.test(s) ? "'" + s : s; }
 /** Immer als Text speichern (Sheets macht sonst aus «0815» die Zahl 815): für Modell und Teilenummer. */
 function txtFest_(s) { s = String(s == null ? '' : s).trim(); return s ? "'" + s : ''; }
+/** Zahl aus Text: «1'299.00», «1,299.00», «1.299,00», «12,50», «12.-». Das hintere Trennzeichen trennt die Rappen; «1,299» = 1299. Leer = ''. */
 function zahl_(v) {
   if (typeof v === 'number') return v;
-  const s = String(v == null ? '' : v).replace(/[^0-9,.\-]/g, '');
+  let s = String(v == null ? '' : v).replace(/[.,]-$/, '').replace(/[^0-9,.\-]/g, '');
   if (!s) return '';
-  const n = s.indexOf(',') > -1 ? Number(s.replace(/\./g, '').replace(',', '.')) : Number(s);
+  const p = s.lastIndexOf('.'), k = s.lastIndexOf(',');
+  if (p > -1 && k > -1) s = p > k ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+  else if (k > -1) s = /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
+  const n = Number(s);
   return isNaN(n) ? '' : n;
 }
 function norm_(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9äöüéèàç]+/g, ' ').trim(); }
 /** Modellnummern ohne Trennzeichen vergleichen: «HD7462/20», «HD 7462-20» und «hd746220» sind dasselbe. */
 function modellKern_(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+/** Marken ohne Leer- und Sonderzeichen und Akzente vergleichen: «De'Longhi», «DeLonghi» und «Delonghi» sind dasselbe. */
+function markeKern_(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ''); }
+const MODELL_MIN = 5;      // Teilstück einer Modellnummer gilt erst ab 5 Zeichen als Treffer («HD» passt nicht auf jedes Philips-Gerät)
 function host_(url) { return ((/^https?:\/\/([^\/?#]+)/i.exec(String(url || '')) || [])[1] || '').toLowerCase().replace(/^www\./, ''); }
 function log_(aktion, id, detail) {
   try { gesperrt_(function () { schreib_('Log', [{ 'Zeit': zeit_(), 'Bearbeiter': ich_(), 'Aktion': aktion, 'ID': id || '', 'Details': txt_(String(detail || '').slice(0, 1500)) }]); }); }
@@ -235,7 +243,7 @@ function startDaten() {
 function neueId_() {
   let max = 0;
   lies_('Teile').z.forEach(function (r) { const m = /^ET-(\d+)$/.exec(String(r['ID'] || '').trim()); if (m) max = Math.max(max, Number(m[1])); });
-  return 'ET-' + ('0000' + (max + 1)).slice(-4);
+  return 'ET-' + String(max + 1).padStart(4, '0');     // ab ET-10000 fünfstellig, nie abgeschnitten
 }
 
 /** Ein Teil einlagern. t = { marke, modell, produktart, teil, teilart, menge, box, quelle, bemerkung }. Gibt die neue ID zurück. */
@@ -263,18 +271,22 @@ function einlagern(t) {
 /**
  * Suche im Lager. s = { marke, modell, produktart, text }. Mit Marke oder Modell (vom Typenschild) kommen drei Gruppen: passend (Marke und Modell gleich),
  * serie (Marke gleich, Modellnummer beginnt gleich), marke (nur Marke gleich). Mit Freitext zählt jedes Wort gegen alle Felder.
+ * Marken ohne Leer- und Sonderzeichen verglichen. Modell: gleich, oder eines beginnt mit dem anderen ab 5 Zeichen. Passt ein Modell ab 5 Zeichen,
+ * die Marke aber nicht (oder fehlt beim Teil), ist es trotzdem «passend», mit hinweis «Marke prüfen».
  */
 function suchen(s) {
   s = s || {};
-  const marke = norm_(s.marke), modell = modellKern_(s.modell), produktart = norm_(s.produktart), text = norm_(s.text);
+  const marke = markeKern_(s.marke), modell = modellKern_(s.modell), produktart = norm_(s.produktart), text = norm_(s.text);
   const alle = lies_('Teile').z.map(zeile_).filter(function (t) { return t.status === STATUS_LAGER; });
   const aus = { passend: [], serie: [], marke: [], produktart: [], text: [] };
   if (marke || modell) {
     alle.forEach(function (t) {
-      const tm = norm_(t.marke), tk = modellKern_(t.modell), markeGleich = !!marke && tm === marke;
-      const modellGleich = !!modell && !!tk && (tk === modell || tk.indexOf(modell) === 0 || modell.indexOf(tk) === 0);
+      const tm = markeKern_(t.marke), tk = modellKern_(t.modell), markeGleich = !!marke && tm === marke;
+      const kurz = Math.min(tk.length, modell.length);
+      const modellGleich = !!modell && !!tk && (tk === modell || (kurz >= MODELL_MIN && (tk.indexOf(modell) === 0 || modell.indexOf(tk) === 0)));
       const serie = !!modell && !!tk && tk.slice(0, 4) === modell.slice(0, 4) && !modellGleich;
       if (modellGleich && (markeGleich || !marke)) aus.passend.push(t);
+      else if (modellGleich && kurz >= MODELL_MIN) aus.passend.push(Object.assign({}, t, { hinweis: 'Marke prüfen (' + (t.marke || 'ohne Marke') + ')' }));
       else if (markeGleich && serie) aus.serie.push(t);
       else if (markeGleich) aus.marke.push(t);
       else if (produktart && norm_(t.produktart) === produktart) aus.produktart.push(t);
@@ -290,14 +302,15 @@ function suchen(s) {
   return aus;
 }
 
-/** Ein Teil als verbraucht markieren. Bei Menge über 1 geht eine Einheit weg, der Rest bleibt im Lager. */
+/** Ein Teil als verbraucht markieren. Bei Menge über 1 geht eine Einheit weg, der Rest bleibt im Lager. Lesen und Rechnen in der Sperre (zwei gleichzeitig = zwei Einheiten). */
 function verbraucht(id) {
   id = String(id || '').trim();
-  const r = lies_('Teile').z.filter(function (x) { return String(x['ID']).trim() === id; })[0];
-  if (!r) throw new Error('Teil ' + id + ' nicht gefunden.');
-  if (r['Status'] !== STATUS_LAGER) throw new Error('Teil ' + id + ' ist schon verbraucht.');
-  const menge = Number(r['Menge']) || 1, rest = menge - 1;
+  let r, rest;
   gesperrt_(function () {
+    r = lies_('Teile').z.filter(function (x) { return String(x['ID']).trim() === id; })[0];
+    if (!r) throw new Error('Teil ' + id + ' nicht gefunden.');
+    if (r['Status'] !== STATUS_LAGER) throw new Error('Teil ' + id + ' ist schon verbraucht.');
+    rest = (Number(r['Menge']) || 1) - 1;
     if (rest > 0) {
       const w = {}; w[r._r] = rest; setz_('Teile', 'Menge', w);
     } else {
@@ -316,7 +329,7 @@ function boxNeu(produktart, ort) {
   const box = gesperrt_(function () {
     let max = 0;
     boxen_().forEach(function (b) { const m = /^B(\d+)$/i.exec(b.box); if (m) max = Math.max(max, Number(m[1])); });
-    const neu = 'B' + ('00' + (max + 1)).slice(-2);
+    const neu = 'B' + String(max + 1).padStart(2, '0');     // B99 → B100, nie abgeschnitten
     schreib_('Boxen', [{ 'Box': neu, 'Produktart': txt_(produktart), 'Status': 'offen', 'Ort': txt_(String(ort || '').slice(0, 60)), 'Angelegt am': zeit_(), 'Angelegt von': ich_(), 'Bemerkung': '' }]);
     return neu;
   });
@@ -374,7 +387,12 @@ function claude_(body, aktion, id) {
       body = Object.assign({}, body, { messages: body.messages.concat([{ role: 'assistant', content: j.content }]) });
     }
   } finally {
-    if (antworten.length) { const zeile = kostenzeile_(aktion, id, antworten); try { gesperrt_(function () { schreib_('Kosten', [zeile]); }); } catch (e) { /* die Kostenzeile darf nie stören */ } }
+    if (antworten.length) {
+      const zeile = kostenzeile_(aktion, id, antworten);
+      /* Die Kostenzeile darf den Aufruf nicht stören, aber nie still fehlen: sie ist die Grundlage des KI-Budgets */
+      try { gesperrt_(function () { schreib_('Kosten', [zeile]); }); }
+      catch (e) { console.error('Kostenzeile fehlt: ' + e.message); log_('Kosten-Fehler', id, 'Kostenzeile nicht geschrieben (' + zeile['Aktion'] + ', ' + zeile['USD'] + ' USD): ' + e.message); }
+    }
   }
   if (j.stop_reason !== 'end_turn') throw new Error('Claude hat die Antwort nicht abgeschlossen (' + j.stop_reason + ')');
   return j;

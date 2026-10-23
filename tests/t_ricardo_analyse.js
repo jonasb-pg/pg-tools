@@ -28,20 +28,22 @@ const ANA = blatt('Ricardo', [ANA_KOPF,
   ['PG-200', 'A-0002', 'Mixer', '', 'Mixer Y', 'Mixer.\n\nZustand: Neu und originalverpackt.', 'Neu und originalverpackt', 'A', 60, 120, '0-30 kg / Sperrgut B-Post', 31, '', 3, 'AB', new Date(2026, 9, 14), 'Offline']]);
 const RT = blatt('Online', [['ID', 'Bezeichnung', 'Barcode', 'VP', 'OVP', 'Lagerort', 'Spezifikationen'],
   ['PG-100', 'Toaster X (RT)', '', 35, 80, 'A1', ''], ['PG-300', 'Kabel', '', 10, 20, 'B2', 'Länge: 2 m']]);
-const ext = { AT: { getName: () => 'ANALYSE TOOL', getSheetByName: n => n === 'Ricardo' ? ANA : null }, RT: { getName: () => 'RT', getSheetByName: n => n === 'Online' ? RT : null } };
+const STA = blatt('Stationär', [['ID', 'Bezeichnung', 'Barcode', 'VP', 'OVP', 'Lagerort'], ['PG-900', 'Vitrine Glas', '', 50, 200, 'HOM-1']]);   // 24.10.2026: Hinweis-Tabs müssen existieren (M2)
+const RT_TABS = { Online: RT, 'Stationär': STA };
+const ext = { AT: { getName: () => 'ANALYSE TOOL', getSheetByName: n => n === 'Ricardo' ? ANA : null }, RT: { getName: () => 'RT', getSheetByName: n => RT_TABS[n] || null, getSheets: () => Object.keys(RT_TABS).map(n => RT_TABS[n]) } };
 const ctx = {
   console, Date, Math, JSON, Object, String, Number, Array, RegExp, Error, isNaN, parseFloat,
   SpreadsheetApp: { getActive: () => ({ getSheetByName: n => ({ Listings: Lsh, Einstellungen: E, Versand: V, Log: LOG })[n] }), openById: id => ext[id] },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'test@pretty-good.ch' }) },
-  PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
+  PropertiesService: { getScriptProperties: () => ({ getProperty: k => PROPS[k] ?? null, setProperty: (k, v) => { PROPS[k] = v; } }) },
   Utilities: { formatDate: d => d.toISOString().slice(0, 10),
     newBlob: (x) => ({ x, getBytes: () => Buffer.isBuffer(x) ? x : Buffer.from(String(x)), getDataAsString: () => Buffer.from(x).toString() }),
     gzip: b => ({ getBytes: () => require('zlib').gzipSync(b.getBytes()) }), ungzip: b => ({ getDataAsString: () => require('zlib').gunzipSync(Buffer.from(b.x)).toString() }),
     base64Encode: b => Buffer.from(b).toString('base64'), base64Decode: s => Buffer.from(s, 'base64') },
   CacheService: { getScriptCache: () => ({ get: k => CACHE[k] ?? null, getAll: ks => { const o = {}; ks.forEach(k => { if (k in CACHE) o[k] = CACHE[k]; }); return o; }, putAll: o => Object.assign(CACHE, o), put: (k, v) => { CACHE[k] = v; }, remove: k => { delete CACHE[k]; } }) }
 };
-const CACHE = {};
+const CACHE = {}, PROPS = {};
 vm.createContext(ctx); vm.runInContext(src, ctx);
 Lsh = blatt('Listings', [vm.runInContext('L_COLS', ctx)]);
 const c = n => vm.runInContext(n, ctx);
@@ -61,13 +63,18 @@ r = c("speichereDetails('PG-100', { titel: 'Toaster X neu', beschrieb: " + JSON.
 ok(/^geändert von test@pretty-good.ch am /.test(r.geaendert) && r.status === 'Bereit', 'Vermerk «geändert»: ' + r.geaendert);
 r = c("erstelleText('PG-100')");
 ok(r.titel === 'Toaster X 2 Schlitze' && !r.geaendert && r.textQuelle === 'Analyse', 'Text aus der Analyse wiederhergestellt');
-let rc = c("freiesListing({ name: 'Vase blau', preis: '15', neupreis: '30' })");
-ok(rc.id === 'RC-0001', 'RC angelegt');
+/* 24.10.2026: neue RC-Nummern gibt es nicht mehr (nur Stücke mit PG-ID); bestehende RC-Listings bleiben gültig */
+let fehlerRc = ''; try { c("freiesListing({ name: 'Vase blau', preis: '15', neupreis: '30' })"); } catch (e) { fehlerRc = e.message; }
+ok(/^Nur Stücke mit PG-ID\. Bitte zuerst im Return Tool erfassen\.$/.test(fehlerRc), 'kein neues Listing ohne PG-ID: ' + fehlerRc);
+const rcZeile = (id, name, vp, ovp) => { const L = c('L_COLS'); Lsh.d.push(L.map(k => ({ 'PG-ID': id, 'Status': 'In Arbeit', 'Bezeichnung': name, 'Startpreis CHF': vp, 'Neupreis CHF': ovp, 'Quelle Tab': 'Frei' })[k] ?? '')); vm.runInContext('vergiss_()', ctx); };
+rcZeile('RC-0001', 'Vase blau', 15, 30);
+let rc = c("lade('RC-0001')");
+ok(rc.id === 'RC-0001', 'bestehendes RC-Listing');
 r = c("buendelHinzu('PG-100', 'RC-0001')"); r = c("buendelHinzu('PG-100', 'pg-300')");
 ok(r.startpreis === '65.00' && Number(r.neupreis) === 130 && !r.analyse && !r.getestet && !r.titel && r.buendelIds.join() === 'RC-0001, PG-300'.split(', ').join(), 'gemischtes Bündel: ' + r.startpreis + ' ' + r.neupreis);
 ok(zeile('RC-0001')['Status'] === 'Abgebrochen', 'offenes RC-Listing geht im Bündel auf');
 ok(r.fehlt.indexOf('Produkt prüfen und «geprüft» bestätigen') !== -1, 'Bündel braucht neue Prüfung');
-let fehlerText = ''; c("freiesListing({ name: 'Teller', preis: '5' })"); try { c("buendelHinzu('RC-0002', 'RC-0001')"); } catch (e) { fehlerText = e.message; }
+let fehlerText = ''; rcZeile('RC-0002', 'Teller', 5, ''); try { c("buendelHinzu('RC-0002', 'RC-0001')"); } catch (e) { fehlerText = e.message; }
 ok(/bereits in einem Listing \(Bündel PG-100\)/.test(fehlerText), 'RC nicht doppelt bündeln: ' + fehlerText);
 r = c("buendelLeeren('PG-100')");
 ok(r.analyse && r.startpreis === '40.00' && Number(r.neupreis) === 80 && r.status === 'Bereit' && r.titel === 'Toaster X 2 Schlitze', 'Bündel aufgelöst, Analyse wieder da');

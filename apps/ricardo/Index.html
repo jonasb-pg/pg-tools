@@ -256,20 +256,7 @@
           <p class="still" style="margin:10px 0 0" data-t="such.hilfe"></p>
           <div id="such-meldung"></div>
           <div id="treffer"></div>
-          <p style="margin:12px 0 0"><a href="#" target="_self" onclick="freiZeigen();return false" data-t="frei.link"></a></p>
-          <div id="frei" hidden>
-            <p class="still" style="margin-top:10px" data-t="frei.text"></p>
-            <label for="fr-name" data-t="frei.name"></label>
-            <input type="text" id="fr-name" data-tp="frei.name.platz">
-            <div class="reihe" style="align-items:flex-end">
-              <div class="breit"><label for="fr-preis" data-t="frei.preis"></label><input type="text" id="fr-preis" inputmode="decimal"></div>
-              <div class="breit"><label for="fr-neu"><span data-t="frei.neu"></span> <small data-t="frei.frei"></small></label><input type="text" id="fr-neu" inputmode="decimal"></div>
-              <div class="breit"><label for="fr-ort"><span data-t="frei.ort"></span> <small data-t="frei.frei"></small></label><input type="text" id="fr-ort"></div>
-            </div>
-            <label for="fr-stich"><span data-t="frei.stich"></span> <small data-t="frei.frei"></small></label>
-            <input type="text" id="fr-stich" data-tp="frei.stich.platz">
-            <p style="margin:16px 0 0"><button class="haupt-knopf" onclick="freiAnlegen()" data-t="frei.anlegen"></button></p>
-          </div>
+          <div id="aehnlich" hidden></div>
         </div>
 
         <div id="arbeit" hidden>
@@ -538,7 +525,7 @@
     'lade': ['Einen Moment', 'One moment'], 'ja': ['Ja', 'Yes'], 'nein': ['Abbrechen', 'Cancel'], 'aktualisieren': ['Aktualisieren', 'Refresh'], 'suchen': ['Suchen', 'Search'], 'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'],
     'such.platz': ['EAN scannen oder Produktname eingeben', 'Scan EAN or type product name'],
     'such.hilfe': ['Stück aus dem Regal «Ricardo Offline» nehmen.', 'Take the item from the shelf «Ricardo Offline».'],
-    'such.keine': ['<strong>Nicht im Return Tool gefunden.</strong> Retouren zuerst im Erfassungstool erfassen. Für Reuse-Stücke «Stück ohne Inventar listen» verwenden.', '<strong>Not found in the Return Tool.</strong> Record returns in the intake tool first. For Reuse items use «List an item without inventory».'],
+    'such.keine': ['<strong>Nicht gefunden.</strong> Nur Stücke mit PG-ID kommen auf Ricardo: Das Stück zuerst im Return Tool erfassen.', '<strong>Not found.</strong> Only items with a PG-ID go on Ricardo: record the item in the Return Tool first.'],
     'such.anders': ['<strong>Nicht für Ricardo vorgesehen.</strong> Das Produkt liegt in einem anderen Kanal:', '<strong>Not meant for Ricardo.</strong> The product is in another channel:'],
     'such.trotzdem': ['Trotzdem listen', 'List anyway'], 'such.trotzdem.frage': ['{0} liegt im Kanal «{1}». Trotzdem auf Ricardo listen? Danach im Return Tool den Kanal auf «Online» umstellen.', '{0} is in the channel «{1}». List it on Ricardo anyway? Afterwards change the channel to «Online» in the Return Tool.'],
     'ana.titel': ['Aus der Analyse, bereit zum Listen', 'From the analysis, ready to list'],
@@ -551,14 +538,18 @@
     's2.geaendert': ['Text der Analyse wurde {0}.', 'The analysis text was changed ({0}).'],
     'f.fotos.ana': ['Fotos aus dem Drive-Ordner der Analyse laden', 'Upload the photos from the Drive folder of the analysis'], 'f.fotos.link': ['Foto-Ordner öffnen', 'Open photo folder'],
     'a.regal': [', Regal «{0}»', ', shelf «{0}»'], 'a.analyse': [', Analyse {0}', ', analysis {0}'],
-    'frei.link': ['Stück ohne Inventar listen (z.B. Reuse)', 'List an item without inventory (e.g. Reuse)'],
-    'frei.text': ['Für Stücke, die nicht im Return Tool stehen. Das Tool vergibt eine eigene Nummer (RC-0001), die als Referenz-Nr. zu Ricardo geht.', 'For items that are not in the Return Tool. The tool assigns its own number (RC-0001), which goes to Ricardo as reference no.'],
-    'frei.name': ['Bezeichnung', 'Name'], 'frei.name.platz': ['Marke, Modell, Produkt', 'Brand, model, product'], 'frei.preis': ['Startpreis CHF', 'Starting price CHF'], 'frei.neu': ['Neupreis CHF', 'New price CHF'], 'frei.frei': ['freiwillig', 'optional'],
-    'frei.stich': ['Stichworte für den Text', 'Keywords for the text'], 'frei.stich.platz': ['z.B. Farbe, Masse, Material, Besonderheiten', 'e.g. colour, size, material, special features'], 'frei.ort': ['Lagerort', 'Location'], 'frei.anlegen': ['Listing anlegen', 'Create listing'],
     'such.mehrere': ['<strong>{0} Stücke gefunden.</strong> Das richtige Stück anhand von Lagerort und Erfassungsdatum wählen.', '<strong>{0} items found.</strong> Pick the right one by storage location and intake date.'],
     'such.mehr': ['Mehr als 40 Treffer. Bitte genauer suchen.', 'More than 40 results. Please narrow the search.'],
     'th.id': ['ID', 'ID'], 'th.produkt': ['Produkt', 'Product'], 'th.kanal': ['Kanal', 'Channel'], 'th.ort': ['Lagerort', 'Location'], 'th.erfasst': ['Erfasst', 'Recorded'], 'th.preis': ['Preis', 'Price'],
     'th.status': ['Status', 'Status'], 'th.verkauf': ['Verkauf', 'Sale'], 'th.stueck': ['Stück', 'Item'], 'th.kaeufer': ['Käufer', 'Buyer'], 'th.zahlbetrag': ['Zahlbetrag', 'Amount due'], 'th.betrag': ['Betrag', 'Amount'],
+    /* 24.10.2026: Suche über alle Kanäle, Archiv und eigene Listings; ähnliche Stücke als Hilfe bei «nicht gefunden» */
+    'such.aehnlich': ['<strong>Ähnliche Stücke</strong> (gleiche EAN, ähnlicher Name oder gleicher Galaxus-Link). Ist es eines davon, mit seiner Nummer suchen:', '<strong>Similar items</strong> (same EAN, similar name or same Galaxus link). If it is one of them, search with its number:'],
+    'such.archiv': ['<strong>Im Archiv des Return Tools.</strong> Nicht mehr an Lager, nicht listen:', '<strong>In the Return Tool archive.</strong> No longer in stock, do not list:'],
+    'such.eigene': ['<strong>In den Listings dieses Tools</strong> (nicht mehr im Return Tool oder in der Analyse):', '<strong>In this tool\'s listings</strong> (no longer in the Return Tool or the analysis):'],
+    'such.gesperrt': ['gesperrt', 'blocked'], 'such.ohneid': ['ohne ID: zuerst im Return Tool erfassen', 'no ID: record it in the Return Tool first'],
+    'such.neulisten': ['Neu listen', 'Relist'], 'such.nichtquelle': ['nicht mehr in der Quelle', 'no longer in the source'],
+    'such.mehrfach': ['<strong>{0} Treffer.</strong> Das richtige Stück anhand von Kanal und Lagerort wählen. Nichts wird automatisch gewählt.', '<strong>{0} results.</strong> Pick the right item by channel and location. Nothing is selected automatically.'],
+    'th.quelle': ['Quelle', 'Source'], 'th.grund': ['Treffer über', 'Match by'],
     'such.listen': ['Listen', 'List'], 'such.weiter': ['Weiter bearbeiten', 'Continue'], 'such.keinpreis': ['kein Preis im Return Tool', 'no price in Return Tool'],
     'such.imbuendel': ['im Bündel {0}', 'in bundle {0}'],
     'a.weitere': [' + {0} weitere', ' + {0} more'],
@@ -576,7 +567,7 @@
     's1.zustand.fehlt': ['Bitte den Zustand wählen.', 'Please choose the condition.'], 's1.klasse.fehlt': ['Bitte die Versandklasse wählen.', 'Please choose the shipping class.'],
     'b.titel': ['Bündel bilden', 'Build a bundle'], 'b.hilfe': ['(freiwillig, z.B. mehrere Filamente als Set)', '(optional, e.g. several filaments as a set)'],
     'b.platz': ['PG-ID oder RC-Nummer des weiteren Stücks, z.B. PG-4571', 'PG-ID or RC number of the additional item, e.g. PG-4571'], 'b.plus': ['Hinzufügen', 'Add'], 'b.weg': ['Bündel auflösen', 'Dissolve bundle'],
-    'b.text': ['Analysierte Stücke, Stücke aus dem Return Tool und Stücke ohne Inventar (RC-…) lassen sich mischen. Startpreis und Neupreis werden zusammengezählt, Titel und Beschrieb müssen danach neu erstellt und das Bündel geprüft werden.', 'Analysed items, items from the Return Tool and items without inventory (RC-…) can be mixed. Starting price and new price are added up; title and description must be created again and the bundle checked afterwards.'],
+    'b.text': ['Analysierte Stücke, Stücke aus dem Return Tool und bestehende Stücke ohne Inventar (RC-…) lassen sich mischen. Startpreis und Neupreis werden zusammengezählt, Titel und Beschrieb müssen danach neu erstellt und das Bündel geprüft werden.', 'Analysed items, items from the Return Tool and items without inventory (RC-…) can be mixed. Starting price and new price are added up; title and description must be created again and the bundle checked afterwards.'],
     'b.leer': ['Noch kein Bündel.', 'No bundle yet.'], 'b.frage': ['Bündel auflösen? Die weiteren Stücke werden wieder frei.', 'Dissolve the bundle? The additional items become available again.'],
     's2.titel': ['Titel und Beschrieb', 'Title and description'], 's2.erstellen': ['Titel und Beschrieb erstellen', 'Create title and description'], 's2.titelfeld': ['Titel', 'Title'], 's2.beschrieb': ['Beschrieb', 'Description'],
     's1.masse': ['Laut Return Tool (Produkt ohne Verpackung): {0}', 'According to the Return Tool (product without packaging): {0}'],
@@ -611,7 +602,8 @@
     's4.abbr.frage': ['Listing {0} wirklich abbrechen?', 'Really discard listing {0}?'], 'kopie.fehler': ['Kopieren nicht möglich. Bitte von Hand markieren.', 'Copying is not possible. Please select by hand.'],
     'v.import': ['Verkaufsbericht importieren', 'Import sales report'],
     'v.import.text': ['Bei Ricardo unter «Mein Verkaufen, Verkauft» auf «Verkaufsbericht erhalten» klicken, als Zeitraum die letzten 7 Tage wählen und die Datei hier einlesen. Bereits bekannte Verkäufe werden übersprungen.', 'On Ricardo under «Mein Verkaufen, Verkauft» click «Verkaufsbericht erhalten», choose the last 7 days and load the file here. Sales that are already known are skipped.'],
-    'v.import.link': ['Ricardo «Verkauft» öffnen', 'Open Ricardo «Verkauft»'], 'v.einlesen': ['Einlesen', 'Import'],
+    'v.import.link': ['Ricardo «Verkauft» öffnen', 'Open Ricardo «Verkauft»'],
+    'v.warnungen': ['{0} Verkäufe passen nicht sicher zu einem Listing (früheres Angebot, andere Artikel-Nr oder Stück schon verkauft). Status nicht geändert, Hinweise unter «Täglich».', '{0} sales do not match a listing for sure (earlier listing, other article no. or item already sold). Status unchanged, notes under «Daily».'], 'v.einlesen': ['Einlesen', 'Import'],
     'v.datei.fehlt': ['Bitte zuerst die Datei des Verkaufsberichts wählen.', 'Please choose the sales report file first.'], 'v.datei.fehler': ['Die Datei konnte nicht gelesen werden.', 'The file could not be read.'],
     'v.neu': ['<strong>{0} neue Verkäufe eingelesen</strong>, {1} waren schon bekannt.', '<strong>{0} new sales imported</strong>, {1} were already known.'],
     'v.ohne': [' {0} davon ohne Zuordnung zu einem Stück (Angebot ohne Referenz-Nr. erstellt).', ' {0} of them could not be linked to an item (listing created without reference no.).'],
@@ -702,6 +694,7 @@
     'ad.einst.text': ['Die Versandtarife stehen im Sheet im Tab «Versand».', 'The shipping rates are in the sheet in the tab «Versand».'],
     'u.titel': ['Laufende Angebote', 'Running listings'], 'u.filter': ['Nach PG-ID oder Name filtern', 'Filter by PG-ID or name'],
     'u.hinweis': ['Ein Angebot gilt als abgelaufen, wenn seine Laufzeit vorbei ist (eingetragen beim Listen, sonst {0} Tage). Auf «Unverkauft» geht es mit der Ricardo-Mail «nicht verkauft» oder von Hand. Letzter Verkaufsbericht: {1}.', 'A listing counts as expired when its duration is over (entered when listing, otherwise {0} days). It goes to «Unsold» with the Ricardo mail «not sold» or by hand. Last sales report: {1}.'],
+    'u.unzug': ['Achtung: {0} Verkäufe sind keinem Listing zugeordnet ({1}). Gehört einer davon zu diesem Stück, nicht «Unverkauft» setzen.', 'Caution: {0} sales are not assigned to a listing ({1}). If one of them belongs to this item, do not set «Unsold».'],
     'u.keiner': ['noch keiner', 'none yet'], 'u.leer': ['Keine laufenden Angebote.', 'No running listings.'], 'u.bearbeiten': ['Bearbeiten', 'Edit'], 'u.unverkauft': ['Unverkauft', 'Unsold'],
     'u.abgelaufen': ['Abgelaufen', 'Expired'], 'u.seit': ['seit {0}', 'since {0}'], 'u.angebot': ['Angebot', 'Listing'],
     'u.laeuft': ['Achtung: Laut Laufzeit läuft das Angebot noch. Zuerst auf Ricardo beenden.', 'Note: according to its duration the listing is still running. End it on Ricardo first.'],
@@ -877,43 +870,75 @@
   /* ---------- Suche ---------- */
   $('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); suchen(); } });
 
+  /* 24.10.2026: Alle Treffer zeigen (Audit S1, S3, M1). Listbar nur aus Such-Tabs und Analyse; andere Kanäle nach Bestätigung; Archiv gesperrt. */
+  var ANDERE = [], EIGENE = [];
+  function warnHtml(r) { return r.warnung ? '<br><span class="etikett orange">' + esc(r.warnung) + '</span>' : ''; }
+  function statusHtml(r) { return '<span class="etikett">' + esc(st(r.status)) + (r.entscheid ? ' · ' + esc(t('f.e.' + r.entscheid)) : '') + '</span>'; }
   function suchen() {
     var q = $('q').value.trim();
-    $('treffer').innerHTML = ''; $('such-meldung').innerHTML = '';
+    $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; $('aehnlich').hidden = true; $('aehnlich').innerHTML = '';
     ruf('suche', [q], function (x) {
       if (x.hinweis) { $('such-meldung').innerHTML = '<div class="meldung warn">' + esc(x.hinweis) + '</div>'; return; }
-      if (!x.treffer.length && !x.andere.length) { $('such-meldung').innerHTML = '<div class="meldung stop">' + t('such.keine') + '</div>'; return; }
-      if (!x.treffer.length) {
-        var z = '';
-        ANDERE = x.andere;
-        x.andere.forEach(function (r, i) {
-          var k = r.status ? '<span class="etikett">' + esc(st(r.status)) + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
-          z += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td>' + (r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '') + '</td><td>' + k + '</td></tr>';
+      x.andere = x.andere || []; x.archiv = x.archiv || []; x.eigene = x.eigene || [];
+      if (!x.treffer.length && !x.andere.length && !x.archiv.length && !x.eigene.length) { $('such-meldung').innerHTML = '<div class="meldung stop">' + t('such.keine') + '</div>'; aehnlich(q); return; }
+      TREFFER = x.treffer; ANDERE = x.andere; EIGENE = x.eigene;
+      var anzahl = x.anzahl || (x.treffer.length + x.andere.length + x.archiv.length + x.eigene.length), h = anzahl > 1 ? '<div class="meldung warn">' + t('such.mehrfach', anzahl) + '</div>' : '';
+      if (x.treffer.length) {
+        var zl = '';
+        x.treffer.forEach(function (r) {
+          var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
+          if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
+          else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="start(\'' + esc(r.id) + '\')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
+          else knopf = statusHtml(r);
+          zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + (r.mm && r.mmStatus === 'Offen' && !r.status ? ' <span class="etikett">' + t('such.immm') + '</span>' : '') + warnHtml(r) + '</td><td>' + esc(r.quelle === 'analyse' ? t('ana.quelle') : r.tab) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
         });
-        $('treffer').innerHTML = '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z); return;
+        h += tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.erfasst', 'th.preis', ''], zl);
       }
-      TREFFER = x.treffer;
-      var h = x.treffer.length > 1 ? '<div class="meldung warn">' + t('such.mehrere', x.treffer.length) + '</div>' : '', zl = '';
-      x.treffer.forEach(function (r) {
-        var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
-        if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
-        else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="start(\'' + esc(r.id) + '\')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
-        else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
-        else knopf = '<span class="etikett">' + esc(st(r.status)) + '</span>';
-        zl += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + (r.mm && r.mmStatus === 'Offen' && !r.status ? ' <span class="etikett">' + t('such.immm') + '</span>' : '') + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + preis + '</td><td>' + knopf + '</td></tr>';
-      });
-      $('treffer').innerHTML = h + tab(['th.id', 'th.produkt', 'th.ort', 'th.erfasst', 'th.preis', ''], zl) + (x.mehr ? '<p class="still">' + t('such.mehr') + '</p>' : '');
+      if (x.andere.length) {
+        var z = '';
+        x.andere.forEach(function (r, i) {
+          var k = r.teilVon ? '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' : r.status ? statusHtml(r) : !r.id ? '<span class="still">' + t('such.ohneid') + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          z += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td>' + (r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '') + '</td><td>' + k + '</td></tr>';
+        });
+        h += '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z);
+      }
+      if (x.archiv.length) {
+        var za = '';
+        x.archiv.forEach(function (r) {
+          za += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td><span class="etikett rot">' + t('such.gesperrt') + '</span></td></tr>';
+        });
+        h += '<div class="meldung stop">' + t('such.archiv') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', ''], za);
+      }
+      if (x.eigene.length) {
+        var ze = '';
+        x.eigene.forEach(function (r) {
+          var k;
+          if (r.teilVon) k = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
+          else if (r.status === 'In Arbeit' || r.status === 'Bereit') k = '<button onclick="start(\'' + esc(r.id) + '\')">' + t('such.weiter') + '</button>';
+          else if (r.rc && !r.entscheid && ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="start(\'' + esc(r.id) + '\')">' + t('such.neulisten') + '</button>';
+          else k = statusHtml(r) + (r.rc || r.entscheid ? '' : '<br><span class="still">' + t('such.nichtquelle') + '</span>');
+          ze += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + k + '</td></tr>';
+        });
+        h += '<div class="meldung warn">' + t('such.eigene') + '</div>' + tab(['th.id', 'th.produkt', 'th.ort', 'th.erfasst', ''], ze);
+      }
+      $('treffer').innerHTML = h + (x.mehr ? '<p class="still">' + t('such.mehr') + '</p>' : '');
     });
   }
   function trotzdem(i) {
     var r = ANDERE[i];
     frage(t('such.trotzdem.frage', r.id, r.tab), function () { ruf('starteListing', [r.id, true], function (x) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(x); }); });
   }
-  function freiZeigen() { $('frei').hidden = !$('frei').hidden; if (!$('frei').hidden) $('fr-name').focus(); }
-  function freiAnlegen() {
-    ruf('freiesListing', [{ name: $('fr-name').value, preis: $('fr-preis').value, neupreis: $('fr-neu').value, stichworte: $('fr-stich').value, lagerort: $('fr-ort').value }], function (r) {
-      ['fr-name', 'fr-preis', 'fr-neu', 'fr-stich', 'fr-ort'].forEach(function (i) { $(i).value = ''; });
-      $('frei').hidden = true; $('treffer').innerHTML = ''; $('such-meldung').innerHTML = ''; oeffne(r);
+  /* Entscheid Jonas 24.10.2026: nur Stücke mit PG-ID. Bei «nicht gefunden» ähnliche Stücke als Hilfe zeigen, nichts anlegen. */
+  function aehnlich(q) {
+    still('aehnlicheStuecke', [q], function (x) {
+      var l = (x && x.kandidaten) || [];
+      if (!l.length || $('q').value.trim() !== q) return;
+      var z = l.map(function (k) {
+        return '<tr><td class="mono">' + esc(k.id || '–') + '</td><td>' + esc(k.name) + '</td><td>' + esc(k.quelle) + (k.tab && k.tab !== k.quelle ? ' · ' + esc(k.tab) : '') + (k.archiv ? ' <span class="etikett rot">' + t('such.gesperrt') + '</span>' : '') + '</td><td>' + esc(k.ort) + '</td><td>' + esc(k.status ? st(k.status) : '') + '</td><td>' + esc(k.grund) + '</td></tr>';
+      }).join('');
+      $('aehnlich').innerHTML = '<div class="meldung warn">' + t('such.aehnlich') + '</div>' + tab(['th.id', 'th.produkt', 'th.quelle', 'th.ort', 'th.status', 'th.grund'], z);
+      $('aehnlich').hidden = false;
     });
   }
   var TREFFER = [];
@@ -1114,7 +1139,8 @@
       ruf('importVerkaeufe', [String(leser.result)], function (v) {
         var i = v.import;
         $(feld === 'v-datei' ? 'v-meldung' : 'f-bericht-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + (i.ergaenzt ? t('v.ergaenzt', i.ergaenzt) : '') + '</div>'
-          + (i.fehlten ? '<div class="meldung warn">' + t('v.fehlten', i.fehlten) + '</div>' : '');
+          + (i.fehlten ? '<div class="meldung warn">' + t('v.fehlten', i.fehlten) + '</div>' : '')
+          + (i.warnungen ? '<div class="meldung warn">' + t('v.warnungen', i.warnungen) + '</div>' : '');
         $(feld).value = ''; VK = v; zeichneVerkaeufe(); if (danach) danach(v);
       });
     };
@@ -1454,8 +1480,11 @@
     });
     $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
   }
+  /* 24.10.2026 (M4): Verkäufe ohne Zuordnung offen: Warnung im Dialog, der Server verlangt die Bestätigung (oder sperrt, wenn einer passt) */
+  function unzugText(l) { return l && l.length ? t('u.unzug', l.length, l.slice(0, 5).map(function (v) { return v.nr + ' «' + v.titel + '»'; }).join(', ')) + ' ' : ''; }
   function unverkauft(id, abgelaufen) {
-    frage((abgelaufen ? '' : t('u.laeuft') + ' ') + t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft'], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); });
+    var uz = (UE && UE.unzugeordnet) || [];
+    frage(unzugText(uz) + (abgelaufen ? '' : t('u.laeuft') + ' ') + t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft', uz.length > 0], function (u) { UE = u; zaehler(u.aktiv, u.schwelle); zeichneUebersicht(); }); });
   }
   function weiter(id) { ruf('lade', [id], function (r) { if (ANSICHT !== 'ablauf' || FA !== 'schicht1') ablaufStarten('schicht1'); oeffne(r); }); }
 
@@ -1482,11 +1511,12 @@
     'g.storno': ['Storno', 'Cancel'], 'g.storno.info': ['Seit {0} Tagen nicht bezahlt.', 'Unpaid for {0} days.'], 'g.storno.r': ['Verkauf stornieren, Grund «nicht bezahlt».', 'Cancel the sale, reason «not paid».'],
     'g.storno.k': ['Storno öffnen', 'Open cancellation'], 'g.storno.ok': ['Storniert', 'Cancelled'], 'g.storno.p': ['Paket aus «{0}» holen, auspacken, Stück ins Regal «{1}».', 'Take the parcel from «{0}», unpack it, item onto the shelf «{1}».'],
     'g.auspacken': ['Auspacken', 'Unpack'],
+    'g.doppelt': ['Zweiter Verkauf auf ein schon verkauftes Stück. Prüfen und einen der Verkäufe stornieren (Ricardo und Admin-Teil):', 'Second sale of an item that was already sold. Check and cancel one of the sales (Ricardo and Admin):'],
     /* Listing */
     'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.mm': ['aus Matchmaker', 'from Matchmaker'], 'such.immm': ['im Matchmaker', 'in Matchmaker'],
     'mm.frage': ['{0} lag im Matchmaker (Suchauftrag: {1}). Dort nicht verkauft und jetzt auf Ricardo?', '{0} was in Matchmaker (request: {1}). Not sold there and now on Ricardo?'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
     'g.l.abgelaufen': ['abgelaufen', 'expired'], 'g.l.unverkauft': ['nicht verkauft', 'not sold'],
-    'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Suchen oder ohne Analyse erfassen.', 'Item not in the list? Search or record without analysis.'],
+    'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Mit PG-ID, EAN oder Name suchen.', 'Item not in the list? Search by PG-ID, EAN or name.'],
     'g.l.pruefen': ['Prüfen', 'Check'], 'g.l.holen': ['Stück holen: {0}', 'Take the item: {0}'],
     'g.l.text': ['Titel und Text', 'Title and text'], 'g.l.erfassen': ['Auf Ricardo erfassen', 'Create on Ricardo'],
     'g.l.erfassen.r': ['Neues Angebot erstellen und die Felder unten der Reihe nach übernehmen. Danach den Link des Angebots hier einfügen.', 'Create a new listing and copy the fields below in order. Then paste the listing link here.'],
@@ -1651,9 +1681,16 @@
     });
   }
   function zahlungHandIdx(i) { var o = F.offen[i]; zahlungHandNr(o.nr, o.pgId || o.titel, o.total); }
+  /* 24.10.2026 (M3): Stück mit mehr als einem gültigen Verkauf */
+  function doppeltHtml() {
+    if (!(F.doppelt || []).length) return '';
+    return '<div class="meldung stop" id="f-doppelt"><strong>' + t('g.doppelt') + '</strong><ul>' + F.doppelt.map(function (d) {
+      return '<li>' + esc(d.pgId) + ': ' + d.verkaeufe.map(function (v) { return t('v.nr', esc(v.nr)) + ' (' + esc(v.am) + ', ' + esc(v.name) + ', CHF ' + esc(v.total) + ')'; }).join(' · ') + '</li>';
+    }).join('') + '</ul></div>';
+  }
   function vorherTaeglich() {
-    if (!(F.offen || []).length) return '';
-    return '<div class="karte"><h2>' + t('g.tz.titel') + '</h2><p class="still">' + t('g.tz.text', F.offen.length, esc(F.letzteBank || t('f.t1.nie'))) + '</p>'
+    if (!(F.offen || []).length) return doppeltHtml();
+    return doppeltHtml() + '<div class="karte"><h2>' + t('g.tz.titel') + '</h2><p class="still">' + t('g.tz.text', F.offen.length, esc(F.letzteBank || t('f.t1.nie'))) + '</p>'
       + '<div class="reihe"><input type="file" id="f-bank" accept=".xlsx,.xls,.csv,text/csv"> <button class="haupt-knopf" onclick="bankLesen()">' + t('v.einlesen') + '</button></div><div id="f-bank-erg">' + bankHtml() + '</div>'
       + '<details style="margin-top:14px"><summary>' + t('g.tz.hand') + '</summary>' + F.offen.map(function (o, i) {
         return '<div class="f-zeile"><div class="f-text"><strong>' + esc(o.titel) + '</strong><span class="still">' + vInfo(o) + '</span></div><div class="knoepfe"><button onclick="zahlungHandIdx(' + i + ')">' + t('g.tz.hand.k') + '</button></div></div>';
@@ -1676,7 +1713,10 @@
     (F.ohneMail || []).forEach(function (x) {
       l.push({ key: 'e' + x.id, titel: x.name, info: esc(x.id) + ' · ' + t('f.s2.ende', esc(x.ende)), tag: t('g.l.abgelaufen'), tagKlasse: 'orange', o: x, schritte: function (f) {
         return [{ titel: t('g.l.ende'), html: tun('ricardo', t('g.l.ende.r', esc(f.o.ende)), f.o.link ? ricKnopf(f.o.link, t('g.angebot.oeffnen')) : ''),
-          aktion: [t('g.l.ende.ok'), function () { hinter('setzeStatus', [f.o.id, 'Unverkauft'], { text: t('g.l.ende.ok') + ' ' + f.o.id, fehler: function () { if (FALL === f) zurListe(); } }); f.schritte = entscheidSchritte; f.o.status = 'Unverkauft'; geheSchritt(0); NEU_LADEN.schicht1 = 1; }] }];
+          aktion: [t('g.l.ende.ok'), function () {
+            var uz = F.unzugeordnet || [], los = function () { hinter('setzeStatus', [f.o.id, 'Unverkauft', uz.length > 0], { text: t('g.l.ende.ok') + ' ' + f.o.id, fehler: function () { if (FALL === f) zurListe(); } }); f.schritte = entscheidSchritte; f.o.status = 'Unverkauft'; geheSchritt(0); NEU_LADEN.schicht1 = 1; };
+            if (uz.length) frage(unzugText(uz) + t('u.frage', f.o.id), los); else los();
+          }] }];
       } });
     });
     (F.unverkauft || []).forEach(function (x) {

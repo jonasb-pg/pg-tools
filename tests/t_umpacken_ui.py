@@ -18,7 +18,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
   if(name==='start')r={version:'t',durchgaenge:[{id:'U-0001',name:'Kids → Balu',status:'Scan',quelle:'Return Tool',lagerorte:'KID-7',erstellt:'22.10.2026'}]};
   if(name==='lagerorte')r={orte:[{ort:'KID-7',anzahl:2},{ort:'KID-12',anzahl:1},{ort:'HOM-3',anzahl:5}],naechste:{KID:'KID-13',HOM:'HOM-4'}};
   if(name==='laden'||name==='anlegen'){r=JSON.parse(JSON.stringify(D));r.zuordnung=JSON.parse(JSON.stringify(ZU));}
-  if(name==='zuordnen'){var konf=[];args[1].forEach(function(o){if(o.id==='PG-2'&&window.KONFLIKT){konf.push({id:o.id,grund:'inzwischen von jemand anderem in Weg gelegt'});return;} if(o.gebinde)ZU[o.id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[o.id];});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf};}
+  if(name==='zuordnen'){var konf=[];args[1].forEach(function(o){if(!o.id&&o.code)o=Object.assign({},o,{id:o.wunsch}); if(o.id==='PG-2'&&window.KONFLIKT){konf.push({id:o.id,grund:'inzwischen von jemand anderem in Weg gelegt'});return;} if(o.gebinde)ZU[o.id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[o.id];});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf};}
   if(name==='abschliessen'){r=JSON.parse(JSON.stringify(D));r.status='Abgeschlossen';r.zuordnung=ZU;r.listen='Balu: https://docs.google.com/x';r.aenderungen=[{r:2,id:'PG-1',name:'Lego Zug',aktion:'Verkaufen',gebinde:'Balu 1',abnehmer:'Balu',alt:'KID-7',neu:'BALU-1',vp:20,preis:20,tab:'Stationär',zeile:'7',erledigt:''}];}
   if(name==='erledigt'){r=[{r:2,id:'PG-1',name:'Lego Zug',aktion:'Verkaufen',gebinde:'Balu 1',abnehmer:'Balu',alt:'KID-7',neu:'BALU-1',vp:20,preis:20,tab:'Stationär',zeile:'7',erledigt:args[2]?'x':''}];}
   ok&&ok(r);},5)}}})})()}};</script>""" % json.dumps(D)
@@ -58,7 +58,7 @@ with sync_playwright() as p:
     a = s.evaluate("CALLS.filter(function(c){return c[0]==='anlegen'})[0][1][0]")
     ok(a['lagerorte'] == ['KID-7', 'KID-12'] and a['gebinde'][0]['lagerort'] == 'BALU-1' and a['gebinde'][2]['art'] == 'Entsorgung' and a['gebinde'][1]['lagerort'] == 'KID-13', 'Setup gesendet: ' + json.dumps(a['gebinde'])[:200])
     ok(s.is_visible('#scan'), 'nach dem Setup: Scan')
-    if len(sys.argv) > 2: s.screenshot(path=sys.argv[2], full_page=True)
+    if len(sys.argv) > 2 and sys.argv[2].endswith('.png'): s.screenshot(path=sys.argv[2], full_page=True)
     # Scan ohne Kürzel
     s.fill('#scan', 'PG-1'); s.press('#scan', 'Enter'); s.wait_for_timeout(50)
     ok('Kürzel' in s.text_content('#rueck'), 'ohne Kürzel: Hinweis')
@@ -106,6 +106,6 @@ with sync_playwright() as p:
     s.click('input[data-erl="2"]'); s.wait_for_timeout(150)
     ok('1 von 1 erledigt' in s.text_content('main'), 'erledigt angehakt')
     ok(not err, 'keine JS-Fehler ' + str(err))
-    if len(sys.argv) > 1: s.screenshot(path=sys.argv[1], full_page=True)
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.png'): s.screenshot(path=sys.argv[1], full_page=True)   # nur Bildpfade
     b.close()
 print('t_umpacken_ui ok' if not fehler else '%d Fehler' % fehler); raise SystemExit(1 if fehler else 0)

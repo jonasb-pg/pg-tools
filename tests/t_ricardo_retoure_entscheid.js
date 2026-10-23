@@ -6,7 +6,7 @@ const R = vm.runInContext('R_COLS', c);
 let rzeile, listing, geschrieben = 0;
 const neu = function (pg) {
   rzeile = {}; R.forEach(function (k) { rzeile[k] = ''; });
-  Object.assign(rzeile, { 'Retoure-Nr': 'RT-0001', 'Status': 'Offen', 'PG-ID': pg, 'IBAN': 'CH00 TEST', 'Adresse': 'Testweg 1', _zeile: 2 });
+  Object.assign(rzeile, { 'Retoure-Nr': 'RT-0001', 'Status': 'Offen', 'PG-ID': pg, 'IBAN': 'CH00 TEST', 'Adresse': 'Testweg 1', 'Preis CHF': 40, 'Versand CHF': 9, _zeile: 2 });
   listing = { 'PG-ID': pg, 'Status': 'Retourniert', 'Entscheid unverkauft': '' };
 };
 c.SpreadsheetApp = { getActive: function () { return { getSheetByName: function () { return { getRange: function () { return { setValues: function (v) { geschrieben++; R.forEach(function (k, j) { rzeile[k] = v[0][j]; }); } }; } }; } }; } };

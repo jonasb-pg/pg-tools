@@ -1,6 +1,6 @@
 # Umpack Tool · Architektur
 
-Stand: Version `2026-10-21.4`, live als Bereitstellung Version 4 (21.10.2026 20:34). Oberfläche schlank: keine Erklärtexte, kurze Meldungen (Wunsch Jonas). Link in TOOL LINKS. Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
+Stand: Version `2026-10-24.1` (Code, noch nicht eingespielt; nach dem Einspielen «einrichten» ausführen, ergänzt die Spalte «Prüfung» im Tab «Änderungen»). Live: Bereitstellung Version 4 (21.10.2026 20:34). Oberfläche schlank: keine Erklärtexte, kurze Meldungen (Wunsch Jonas). Link in TOOL LINKS. Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
 
 ## Zweck
 Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst beim Abschluss nachgeführt.
@@ -20,7 +20,24 @@ Durchgänge · Gebinde · Bestand (Kopie der Quelle beim Setup) · Zuordnung (Ve
 - Neue Lagerorte dürfen keine Quell-Lagerorte sein; zwei Gebinde nie mit gleichem Lagerort; doppelte IDs in der Quelle brechen das Setup ab.
 - Nicht gescannte Stücke bleiben, wo sie sind (keine Änderung).
 
-Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche).
+Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche), tests/t_umpacken_daten.js und tests/t_umpacken_daten_ui.py (Datenintegrität).
+
+## Datenintegrität (24.10.2026, nach Audit)
+| Punkt | Regel |
+|---|---|
+| Belegte Lagerorte | `rtLesen_` liest alle Tabs des Return Tools mit Spalte «Lagerort» (auch Scanner ohne ID, Analyse, alle «Archiv …»). Dazu die «Lagerort neu» offener Durchgänge: Status nicht abgeschlossen, oder abgeschlossen mit Änderungen ohne «Erledigt». Vergleich gross, ohne Leerzeichen (`ortKey_`). |
+| Neuer Lagerort | Kommt er irgendwo vor, lehnt das Setup ab (auch «Gebinde ändern»), mit Ort und Tab in der Meldung. Gilt auch für Abnehmer-Lagerorte (BALU-1 ist nach dem Verkauf im Archiv belegt: nächste Liste BALU-2). Ähnliche Schreibweise (KIDS-8 / KID-8, KID-08 / KID-8) nur als Hinweis. |
+| Nächste Palette | Höchste Nummer pro Präfix über alle belegten Orte + 1, überspringt ähnliche Schreibweisen. Stand Momentaufnahme 24.10.: HOM-46, KID-15 (vorher HOM-4 bzw. KID-13, beide belegt). |
+| Quell-Tabs | Fehlt ein Quell-Tab oder hat er keine Kopfzeile mit «ID» und «Lagerort», zeigt das Setup ihn an (nicht mehr still). Einstellung enthält «Spenden», das es im Return Tool nicht gibt. |
+| Offene Durchgänge | Ein Stück darf nur in einem offenen Durchgang sein (in der Sperre geprüft). Auch Stücke mit noch nicht eingetragener Änderung eines abgeschlossenen Durchgangs sperren das Setup. |
+| Return Tool nicht lesbar | Setup, «Gebinde ändern» und Abschluss brechen ab (auch bei einer Liste von Hand, weil die Lagerorte sonst ungeprüft wären). |
+| Barcode-Scan | Der Browser schickt den Code (`code`, angezeigtes Stück als `wunsch`). Der Server wählt in der Sperre ein freies Stück dieser EAN aus der Quelle. Freie Stücke mit verschiedenem VP: PG-ID scannen. Barcodes ohne führende Nullen verglichen (UPC-A / EAN-13). |
+| Doppelscan | `vorher: ''` auf ein schon zugeordnetes Stück ist immer ein Konflikt (`gleich` = schon so gespeichert vom gleichen Kürzel, ohne rote Meldung). |
+| Ungespeicherte Scans | Ist der Durchgang inzwischen abgeschlossen, bleibt die Schlange im Browser und steht oben rot (auch nach Neuladen), bis sie nach dem Wiederöffnen nachgespeichert oder bewusst verworfen wird. |
+| Abschluss | Warnt, wenn in den letzten 2 Minuten andere Kürzel noch zugeordnet haben (zweiter Aufruf mit `bestaetigt`). Liest das Return Tool neu, prüft pro ID «Lagerort alt», Tab, doppelte IDs und ob «Lagerort neu» inzwischen belegt ist: Spalte «Prüfung» («ok» / «ABWEICHUNG: …»). Tab und Zeile aus dem neuen Stand, Zeile nur als Hinweis. |
+| Abnehmer-Liste | Verschieben in den Ordner und Freigabe: Fehler kommen als Hinweis zurück. Wiederöffnen setzt «UNGÜLTIG – » vor den Titel der alten Liste. |
+| Liste von Hand | CSV mit Anführungszeichen (`"Tisch, rund"`, `""`) wird richtig getrennt. Zahlen: «1'234.50», «1,234.50», «1.234,50», «1234,50». |
+| Stücke ohne Barcode | Hinweis beim Setup und im Reiter «Offen»: nur per PG-ID-Etikett. |
 
 ## Handy und Kamera (21.10.2026)
 - Handy-Ansicht: Gebinde zweispaltig, Tabellen scrollen in der Karte, Scanfeld ohne Autofokus (keine Tastatur). «Teilen → Zum Home-Bildschirm» als App-Ersatz (Apps Script kann keine echte App/PWA).
@@ -30,7 +47,7 @@ Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche).
 
 ## Betrieb und Prüfung (21.10.2026)
 - Einrichten im Editor ausgeführt (Tabs angelegt). `pruefen()` im Editor liest die Lagerorte aus dem Return Tool und schreibt sie ins Protokoll, ändert nichts: 75 Lagerorte, nächste Kids-Palette KID-13.
-- Im Return Tool stehen teils EANs als Lagerort (z.B. KID-4005176984105). Für «nächste Palette» zählen nur Nummern mit 1–4 Stellen.
+- Im Return Tool stehen teils EANs als Lagerort (z.B. KID-4005176984105). Für «nächste Palette» zählen nur Nummern mit 1–4 Stellen; als belegt gelten sie trotzdem.
 - Tab «Tabellenblatt1» in der Datenbank ist leer und stört nicht.
 
 ## Geplant: Übertragung ins Return Tool (Entscheid Jonas 22.10.2026)

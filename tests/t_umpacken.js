@@ -98,7 +98,9 @@ assert.strictEqual(j(c.gebindeAendern('U-0001', neuG)).gebinde.length, 5);
 assert.throws(() => c.gebindeAendern('U-0001', neuG.slice(1)), /hat schon Stücke/);
 
 /* Abschluss */
-const fertig = j(c.abschliessen('U-0001', 'JB'));
+const warn = j(c.abschliessen('U-0001', 'JB'));
+assert.ok(/XX \(1\)/.test(warn.warnung) && !warn.status, 'Abschluss warnt: XX hat eben noch zugeordnet');
+const fertig = j(c.abschliessen('U-0001', 'JB', true));
 assert.strictEqual(fertig.status, 'Abgeschlossen');
 const a = fertig.aenderungen, nach = (id) => a.find(x => x.id === id);
 assert.strictEqual(a.length, 4, 'vier Änderungen');
