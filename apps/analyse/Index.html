@@ -371,8 +371,8 @@
             <label for="o-name" data-t="ohne.name"></label><input type="text" id="o-name" data-tp="ohne.name.platz" autocomplete="off">
             <label for="o-link" data-t="ohne.link2"></label><input type="text" id="o-link" placeholder="https://www.galaxus.ch/..." autocomplete="off">
             <div class="reihe">
-              <div class="breit"><label for="o-vp" data-t="ohne.vp"></label><input type="number" id="o-vp" min="0" step="1"></div>
-              <div class="breit"><label for="o-ovp"><span data-t="ohne.ovp"></span> <small data-t="frei"></small></label><input type="number" id="o-ovp" min="0" step="any"></div>
+              <div class="breit"><label for="o-ovp" data-t="ohne.ovp"></label><input type="number" id="o-ovp" min="0" step="any"></div>
+              <div class="breit"><label for="o-vp"><span data-t="ohne.vp"></span> <small data-t="vp.auto"></small></label><input type="number" id="o-vp" min="0" step="1"></div>
               <div class="breit"><label data-t="ohne.kat"></label><div class="wahl" id="o-kat"></div></div>
             </div>
             <label for="o-grund" data-t="ohne.grund"></label><input type="text" id="o-grund" data-tp="ohne.grund.platz" autocomplete="off">
@@ -521,7 +521,7 @@
     'pz.voll': ['Schon {0} Analysen pausiert. Zuerst eine davon abschliessen.', 'Already {0} analyses paused. Finish one of them first.'],
     'pz.speicher': ['Pausieren hat nicht geklappt (Speicher des Browsers voll). Die Analyse bleibt offen.', 'Pausing failed (browser storage full). The analysis stays open.'],
     'pz.titel': ['Pausiert, Schritt {0} von {1}, {2} Min.', 'Paused, step {0} of {1}, {2} min'],
-    'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'],
+    'lade': ['Einen Moment', 'One moment'], 'frei': ['freiwillig', 'optional'], 'vp.auto': ['leer = 50% vom OVP', 'empty = 50% of RRP'],
     'start.titel': ['Session starten', 'Start session'],
     'start.platz': ['z.B. SW', 'e.g. SW'], 'start.knopf': ['Los', 'Go'], 'start.fehler': ['Bitte 2 bis 4 Buchstaben eingeben.', 'Please enter 2 to 4 letters.'],
     'such.platz': ['Barcode scannen, PG-ID oder Produktname eingeben', 'Scan barcode, enter PG-ID or product name'],
@@ -564,14 +564,14 @@
     'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'],
     'id.neuovp': ['Ja, neu und unbenutzt (Verpackung offen)', 'Yes, new and unused (box opened)'],
     'id.neuovp.hilfe': ['Neu und unbenutzt, auch wenn die Verpackung geöffnet ist: Hygiene und Zurücksetzen entfallen, Grade A ist vorgewählt.', 'New and unused, even if the box is opened: hygiene and reset are skipped, grade A is preselected.'],
-    'id.vp': ['Verkaufspreis (VP) CHF', 'Sales price (VP) CHF'], 'id.ovp': ['Neupreis (OVP) CHF, freiwillig', 'New price (RRP) CHF, optional'],
+    'id.vp': ['Verkaufspreis (VP) CHF, leer = 50% vom OVP', 'Sales price (VP) CHF, empty = 50% of RRP'], 'id.ovp': ['Neupreis (OVP) CHF', 'New price (RRP) CHF'],
     'id.preisfehlt': ['Für dieses Stück fehlt der Preis. Bitte hier eintragen.', 'The price is missing for this item. Please enter it here.'],
-    'id.vpfehlt': ['Bitte zuerst den Verkaufspreis (VP) eintragen.', 'Please enter the sales price (VP) first.'],
+    'id.vpfehlt': ['Bitte zuerst den Neupreis (OVP) eintragen.', 'Please enter the new price (RRP) first.'],
     'en.bearbeiten': ['Befund bearbeiten', 'Edit finding'], 'en.befund.eigen': ['Deine Angaben (Mängel, Hinweise)', 'Your notes (defects, remarks)'],
     'en.befund.auto': ['Vom Tool: {0}', 'From the tool: {0}'], 'en.befund.ok': ['Übernehmen', 'Apply'],
     'en.befund.ric': ['Befund geändert: Den Ricardo-Text bei Bedarf mit «Neu schreiben» anpassen.', 'Finding changed: update the Ricardo text with «Rewrite» if needed.'],
     'ri.empfohlen': ['Vorschlag', 'Suggested'], 'mm.empfehlung': ['Empfehlung: Regal Matchmaker', 'Recommended: shelf “Matchmaker”'], 'mm.anders': ['Oder anders entscheiden:', 'Or decide differently:'],
-    'fo.titel': ['Fotos', 'Photos'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
+    'fo.titel': ['Fotos', 'Photos'], 'fo.gross': ['In voller Grösse öffnen', 'Open full size'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
     'fs.galerie': ['Aus Galerie', 'From gallery'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
     'id.welches': ['Welches Modell ist es?', 'Which model is it?'], 'id.platz': ['Modell, wie es auf dem Gerät steht', 'Model as written on the device'], 'id.neu': ['Neu recherchieren', 'Research again'], 'id.doch': ['Doch richtig', 'It is correct after all'],
     'id.rueckruf': ['Rückruf', 'Recall'], 'id.rfrage': ['Betrifft der Rückruf dieses Gerät?', 'Does the recall affect this device?'], 'id.rnein': ['Nein, nicht betroffen', 'No, not affected'], 'id.rja': ['Ja, betroffen', 'Yes, affected'],
@@ -606,6 +606,7 @@
     'rs.nein': ['Zurücksetzen geht nicht', 'Reset is not possible'],
     'zu.frage': ['Schreib auf, was Käuferinnen und Käufer wissen müssen: jeden Mangel und alles, was du nicht prüfen konntest.', 'Write down what buyers need to know: every defect and everything you could not test.'],
     'zu.platz': ['z.B. Kratzer auf dem Deckel, linke Taste klemmt leicht, Bluetooth nicht geprüft', 'e.g. scratch on the lid, left button sticks slightly, Bluetooth not tested'], 'zu.schon': ['Steht schon im Befund', 'Already in the finding'],
+    'doch.titel': ['Doch getestet?', 'Tested after all?'], 'doch.text': ['Antippen, was du trotzdem geprüft hast und was funktioniert.', 'Tap what you checked anyway and what works.'],
     'zu.grade': ['Grade', 'Grade'],
     'en.ja': ['Reusable', 'Reusable'], 'en.nein': ['Nicht reusable', 'Not reusable'], 'en.stufe': ['Stufe', 'Level'], 'en.preise': ['Preise', 'Prices'], 'en.preiswert': ['OVP {0} · VP {1}', 'RRP {0} · price {1}'], 'en.dauer': ['Dauer', 'Duration'], 'en.dauerwert': ['{0} Min von {1} Min Budget', '{0} min of {1} min budget'],
     'en.rep': ['Reparatur', 'Repair'], 'en.repwert': ['{0} ({1} Min, Kosten CHF {2})', '{0} ({1} min, cost CHF {2})'], 'en.befund': ['Befund', 'Finding'],
@@ -639,7 +640,7 @@
     'mv.zustand': ['Zustand', 'Condition'], 'mv.vonVp': ['VP aus dem Return Tool', 'selling price from the Return Tool'], 'mv.fPreis': ['Preis', 'price'],
     'mv.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Matchmaker».', 'Finally: note with {0} on the product, shelf “Matchmaker”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
-    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['Wird hochgeladen …', 'Uploading …'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
+    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['{0} wird hochgeladen … Du kannst weiter fotografieren.', '{0} uploading … You can keep taking photos.'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
     'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
     'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
     'sp.laeuft': ['Speichert im Hintergrund: {0}', 'Saving in the background: {0}'], 'sp.speichert': ['Wird gespeichert …', 'Saving …'],
@@ -970,6 +971,10 @@
     $('uhr-zeit').textContent = z(Math.floor(s / 60)) + ':' + z(s % 60) + (b ? ' / ' + b + ':00' : '');
     $('uhr-zeit').className = 'zeit' + (!AN.seit ? ' pause' : (b && s > b * 60 ? ' ueber' : ''));
     $('uhr-knopf').textContent = t(AN.seit ? 'pause' : 'weiter');
+    /* Feedback SW 21.10.2026: Die Zeit für Fotos, Titel und Beschrieb (Verkaufsteil, Foto-Kasten) wird zusätzlich für sich gezählt. */
+    var jetzt = Date.now();
+    if (AN.seit && ((schritt() === 'entscheid' && verkauf()) || LAUF.fotosAuf)) AN.vk = (AN.vk || 0) + Math.min(5000, Math.max(0, jetzt - (AN.vkT || jetzt)));
+    AN.vkT = jetzt;
     if (AN.seit && Date.now() - AN.seit > 5000) sichern();
     hbChip(); hbWarten(); ricTakt();
   }
@@ -1240,8 +1245,9 @@
       if (LAUF.modellFrage) h += '<label for="modell-neu">' + tx('id.welches') + '</label><input type="text" id="modell-neu" maxlength="80" data-enter="modellNeu" placeholder="' + tx('id.platz') + '" autocomplete="off"' + (LAUF.sucht ? ' disabled' : '') + '>'
         + '<div class="knoepfe">' + taste('modellNeu', 'id.neu', 'pink', LAUF.sucht ? ' disabled' : '') + taste('modellFrage', 'id.doch', '', LAUF.sucht ? ' disabled' : '') + '</div>';
       else {
-        if (preisFehlt()) h += '<div class="meldung warn">' + tx('id.preisfehlt') + '</div><label for="id-vp">' + tx('id.vp') + '</label><input type="number" id="id-vp" min="1" step="any" inputmode="decimal" style="max-width:200px">'
-          + (zahlVon(d.produkt.ovp) > 0 ? '' : '<label for="id-ovp">' + tx('id.ovp') + '</label><input type="number" id="id-ovp" min="1" step="any" inputmode="decimal" style="max-width:200px">');
+        if (preisFehlt()) h += '<div class="meldung warn">' + tx('id.preisfehlt') + '</div>'
+          + (zahlVon(d.produkt.ovp) > 0 ? '' : '<label for="id-ovp">' + tx('id.ovp') + '</label><input type="number" id="id-ovp" min="1" step="any" inputmode="decimal" style="max-width:200px">')
+          + '<label for="id-vp">' + tx('id.vp') + '</label><input type="number" id="id-vp" min="1" step="any" inputmode="decimal" style="max-width:200px">';
         h += '<div class="knoepfe">' + taste('identJa', 'id.ja', 'pink') + taste('neuOvp', 'id.neuovp') + taste('versiegelt', 'id.versiegelt') + taste('modellFrage', 'id.nein') + '</div>'
           + '<p class="still">' + tx('id.neuovp.hilfe') + '</p>';
       }
@@ -1355,7 +1361,7 @@
       : (bearbeitbar ? '<p><button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button></p>' : ''))
       + (LAUF.befundGeaendert && verkauf() ? '<p class="still">' + tx('en.befund.ric') + '</p>' : '');
     return '<div class="meldung"><h3>' + tx('en.befund') + '</h3><label for="maengel-en">' + tx('en.befund.eigen') + '</label><textarea id="maengel-en" data-e="maengel">' + esc(AN.s.maengel) + '</textarea>'
-      + (r.befundAuto ? '<p class="still">' + tx('en.befund.auto', r.befundAuto) + '</p>' : '') + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + '</div></div>';
+      + (r.befundAuto ? '<p class="still">' + tx('en.befund.auto', r.befundAuto) + '</p>' : '') + dochWahl(r) + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + '</div></div>';
   }
   function befundAuf() { LAUF.befundAuf = true; zeichneSchritt(); if ($('maengel-en')) $('maengel-en').focus(); }
   function befundOk() { LAUF.befundAuf = false; LAUF.befundGeaendert = true; stand(); }
@@ -1400,7 +1406,21 @@
   /* Was schon im Befund steht. Kommt vom Server und wird nachgetragen, ohne den Schritt neu zu zeichnen: Das Feld darüber behält den Cursor. */
   function befundAuto() {
     var r = LAUF.urteil;
-    return r && r.befundAuto ? '<div class="meldung"><h3>' + tx('zu.schon') + '</h3>' + esc(r.befundAuto) + '</div>' : '';
+    return (r && r.befundAuto ? '<div class="meldung"><h3>' + tx('zu.schon') + '</h3>' + esc(r.befundAuto) + '</div>' : '') + dochWahl(r);
+  }
+  /* Feedback DS/SW: «nicht geprüft» ist falsch, wenn die Person es doch getestet hat. Antippen nimmt es aus dem Befund und zählt es als getestet. */
+  function dochWahl(r) {
+    var l = r && r.wahl || [], an = AN.s.doch || {};
+    if (!l.length) return '';
+    return '<div id="doch"><h3 class="gruppe">' + tx('doch.titel') + '</h3><p class="still">' + tx('doch.text') + '</p><div class="wahl">' + l.map(function (n) {
+      return '<button data-a="doch" data-v="' + esc(n) + '" class="' + (an[n] ? 'an' : '') + '" aria-pressed="' + (!!an[n]) + '">' + (an[n] ? '✓ ' : '') + esc(n) + '</button>'; }).join('') + '</div></div>';
+  }
+  function doch(n) {
+    var s = AN.s; s.doch = s.doch || {};
+    if (s.doch[n]) delete s.doch[n]; else s.doch[n] = true;
+    LAUF.befundGeaendert = true; sichern();
+    if ($('doch') && LAUF.urteil) $('doch').outerHTML = dochWahl(LAUF.urteil);
+    urteilHolen();
   }
   function wlan() {
     var x = AN.d.funktion.wlan;
@@ -1466,7 +1486,7 @@
   function mitPreis(danach) {
     if (!preisFehlt()) { danach(); return; }
     var vp = $('id-vp') ? zahlVon($('id-vp').value) : 0, ovp = $('id-ovp') ? zahlVon($('id-ovp').value) : 0, id = AN.d.produkt.id;
-    if (!(vp > 0)) { melde(t('id.vpfehlt'), true); if ($('id-vp')) $('id-vp').focus(); return; }
+    if (!(ovp > 0) && !(zahlVon(AN.d.produkt.ovp) > 0)) { melde(t('id.vpfehlt'), true); if ($('id-ovp')) $('id-ovp').focus(); return; }
     ruf('preisSetzen', [id, vp, ovp || ''], function (d) { if (!AN || AN.d.produkt.id !== id) return; AN.d = d; sichern(); danach(); });
   }
   function identJa() { mitPreis(function () { AN.s.neuOvp = false; weiter(); }); }
@@ -1681,7 +1701,7 @@
     var st = RIC && AN && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = AN && !!AN.s.maengel.trim();
     var art = function (a, titel, soll, extra) {
       var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length;
-      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt="' + esc(x.name) + '"><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
+      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><a href="https://drive.google.com/file/d/' + encodeURIComponent(x.id) + '/view" target="_blank" rel="noopener noreferrer" title="' + tx('fo.gross') + '"><img src="' + esc(fotoSrc(x)) + '" alt="' + esc(x.name) + '"></a><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
         + '</div><strong>' + tx(titel) + '</strong>' + (extra || '') + (soll === null ? '' : '<span class="etikett ' + (n >= soll ? 'gruen' : '') + '" style="align-self:flex-start">' + (n >= soll ? tx('fs.da', n) : tx('fs.fehlt')) + '</span>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fotoOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
@@ -1758,7 +1778,7 @@
   /* ---------- Foto-Seite auf dem Handy (Adresse mit ?foto=PG-ID aus dem QR-Code) ---------- */
   var FS = null;
   function fotoModus(id) {
-    FS = { id: id, st: null, art: '', laedt: '' };
+    FS = { id: id, st: null, art: '', laedt: {}, warte: [], laeuft: false };
     document.querySelector('.app').hidden = true; $('start').hidden = true; $('foto-seite').hidden = false;
     $('fs-id').textContent = id; fsZeichnen();
     ruf('fotoStand', [id], function (st) { FS.st = st; fsZeichnen(); });
@@ -1771,7 +1791,7 @@
       return '<div class="fs-zeile' + (offen ? ' offen' : '') + '"><div class="fs-titel"><div><strong>' + tx(titel) + '</strong><span class="still">' + tx(hilfe) + '</span></div>'
         + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx('fs.fehlt') : tx('fs.da', n)) + '</span>') + '</div>'
         + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
-        + (extra || '') + (FS.laedt === a ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt') + '</p>' : '<div class="knoepfe"><button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button><button class="knopf" data-a="fsGalerie" data-v="' + a + '">' + tx('fs.galerie') + '</button></div>') + '</div>';
+        + (extra || '') + (FS.laedt[a] ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt', FS.laedt[a]) + '</p>' : '') + ('<div class="knoepfe"><button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button><button class="knopf" data-a="fsGalerie" data-v="' + a + '">' + tx('fs.galerie') + '</button></div>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fsOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
     $('fs-liste').innerHTML = zeile('hauptbild', 'ri.haupt', 'fs.haupt', 1) + zeile('weitere', 'ri.weitere', 'fs.weitere', 2)
@@ -1781,7 +1801,7 @@
   function fsFoto(art) { FS.art = art; $('fs-datei').value = ''; $('fs-datei').click(); }
   /* Feedback DS 19.10.2026: Fotos auch aus der Galerie, mehrere auf einmal; sie werden nacheinander hochgeladen. */
   function fsGalerie(art) { FS.art = art; $('fs-galerie').value = ''; $('fs-galerie').click(); }
-  function fsMehrere(liste) { var l = Array.prototype.slice.call(liste || []); var naechste = function () { var f = l.shift(); if (f) fsHoch(f, naechste); }; naechste(); }
+  function fsMehrere(liste) { Array.prototype.slice.call(liste || []).forEach(function (f) { fsHoch(f); }); }
   /* Fotos werden vor dem Hochladen auf höchstens 1600 Pixel verkleinert: schneller und für Ricardo mehr als genug. */
   function verkleinern(datei, fertig) {
     var r = new FileReader();
@@ -1798,14 +1818,23 @@
     };
     r.readAsDataURL(datei);
   }
-  function fsHoch(datei, danach) {
+  /* Feedback SW 21.10.2026: weiter fotografieren, während hochgeladen wird. Jedes Foto kommt in eine Warteschlange und wird nacheinander hochgeladen. */
+  function fsHoch(datei) {
     var art = FS.art;
     if (!datei || !art) return;
-    FS.laedt = art; fsZeichnen();
-    verkleinern(datei, function (daten) {
-      if (!daten) { FS.laedt = ''; fsZeichnen(); melde(t('fs.keinbild'), true); return; }
-      google.script.run.withSuccessHandler(function (st) { FS.laedt = ''; FS.st = st; fsZeichnen(); if (danach) danach(); })
-        .withFailureHandler(function (e) { FS.laedt = ''; fsZeichnen(); melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); }).api(L, 'fotoHochladen', [FS.id, art, daten]);
+    FS.warte.push({ datei: datei, art: art }); FS.laedt[art] = (FS.laedt[art] || 0) + 1;
+    fsZeichnen(); fsNaechstes();
+  }
+  function fsNaechstes() {
+    if (FS.laeuft) return;
+    var x = FS.warte.shift();
+    if (!x) return;
+    FS.laeuft = true;
+    var fertig = function () { FS.laedt[x.art]--; if (FS.laedt[x.art] <= 0) delete FS.laedt[x.art]; FS.laeuft = false; fsZeichnen(); fsNaechstes(); };
+    verkleinern(x.datei, function (daten) {
+      if (!daten) { melde(t('fs.keinbild'), true); fertig(); return; }
+      google.script.run.withSuccessHandler(function (st) { FS.st = st; fertig(); })
+        .withFailureHandler(function (e) { melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); fertig(); }).api(L, 'fotoHochladen', [FS.id, x.art, daten]);
     });
   }
   function fsWeg(fileId) { ruf('fotoLoeschen', [FS.id, fileId], function (st) { FS.st = st; fsZeichnen(); }); }
@@ -1815,10 +1844,10 @@
   /* Alles, was der Server zum Urteilen braucht (urteil_ in Code.gs). */
   function daten() {
     var s = AN.s, d = AN.d;
-    return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), versiegelt: s.versiegelt, neuOvp: !!s.neuOvp, rueckrufFrei: s.rueckrufFrei,
+    return { id: d.produkt.id, kuerzel: K, start: AN.start, aktivSek: Math.round(aktivMs() / 1000), verkaufSek: Math.round((AN.vk || 0) / 1000), versiegelt: s.versiegelt, neuOvp: !!s.neuOvp, rueckrufFrei: s.rueckrufFrei,
       mmEmpfohlen: AN.mm && AN.mm.passt && AN.mm.passt.length ? AN.mm.passt[0].gesucht : '', unbenutzt: s.unbenutzt, sicher: s.sicher,
       sicherNok: Object.keys(s.sicherWahl).map(function (n) { return d.sicher[n]; }), fehlt: Object.keys(s.fehlt).map(function (n) { return d.liefer.teile[n]; }).concat(s.fehltText.trim() ? [s.fehltText.trim()] : []),
-      sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
+      sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), doch: Object.keys(s.doch || {}), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
       rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
       mm: s.kanal === 'matchmaker' && AN.mm && AN.mm.passt ? AN.mm.passt[0] : null, nachMm: !!AN.nachMm,
       stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null };
@@ -1828,7 +1857,7 @@
     var x = daten(), id = x.id, bild, da = function () { return AN && AN.d.produkt.id === id; };
     /* Im Schritt «Zustand» wird nur nachgetragen, was schon im Befund steht. Ist inzwischen etwas anders, holt der zweite Aufruf es noch einmal. */
     var nach = function () { if (!AN.gate && schritt() === 'zustand' && $('befund-auto')) { $('befund-auto').innerHTML = befundAuto(); urteilHolen(); } else zeichneSchritt(); };
-    delete x.aktivSek; delete x.mmEmpfohlen; delete x.rueckmeldung; delete x.kanal; delete x.ricardo; delete x.mm; delete x.nachMm; delete x.stand;
+    delete x.aktivSek; delete x.verkaufSek; delete x.mmEmpfohlen; delete x.rueckmeldung; delete x.kanal; delete x.ricardo; delete x.mm; delete x.nachMm; delete x.stand;
     bild = JSON.stringify(x);
     if (LAUF.urteilBild === bild) return;
     LAUF.urteil = null; LAUF.urteilFehler = '';
@@ -2184,7 +2213,7 @@
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: uebernehmen,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
-    versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
+    versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
     kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz };
 

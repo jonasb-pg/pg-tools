@@ -150,3 +150,14 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
 - Matchmaker nicht verkauft → Ricardo (Jonas 21.10.2026: «direkt im Ricardo Tool beim Start des Verkaufs»): Das Ricardo Tool zeigt offene Einträge aus dem Tab «Matchmaker» mit Etikett «aus Matchmaker». Beim Start fragt es nach («dort nicht verkauft und jetzt auf Ricardo?») und setzt den Status «Ricardo». Startpreis nach Grade (Prozent vom Neupreis aus den Einstellungen des ANALYSE TOOL), Versand- und Schlusssatz von Ricardo werden angehängt. Der Abgleich der Analyse setzt danach Regal «Ricardo Offline», vermerkt es beim Suchauftrag und setzt «Auf Ricardo». Analyse 21.10.2 + Ricardo 21.10.2.
 - Live: Analyse Version 15 (15:09), Ricardo Version 26 (15:06). Einstellung «Matchmaker-Schlusssatz» (leer) im Tab Einstellungen angelegt. Matchmaker-Stücke nur per Scan/Suche ins Ricardo Tool (Variante A).
 - **21.10.2026, Korrektur Betrieb:** Das Analyse Tool läuft als «Nutzer, der auf die Web-App zugreift» (Zugriff «Jeder in Pretty Good»), nicht als Jonas. Jede Person braucht darum eigene Bearbeiter-Rechte auf: ANALYSE TOOL, HANDBÜCHER (Sheet), Ordner HANDBÜCHER PDF, Ordner RICARDO FOTOS, Matchmaker Sheet; Return Tool (alle mit Link). Simon fehlte das Matchmaker Sheet, nachdem der Matchmaker-Schritt live ging. Ricardo Tool läuft als Jonas.
+- **23.10.2026, PG-ID als einzige Nummer (Jonas: «muss sofort behoben werden»).** Ursache der AN-Doppel: Stücke mit Lagerort «Analyse» in anderen Tabs (v.a. Stationär) kamen nie in die Warteschlange; Stücke ohne Barcode im Return Tool fand der EAN-Scan nicht. Neu (Analyse 23.10.1):
+  - Abgleich nimmt zusätzlich alle Zeilen mit Lagerort «Analyse» aus allen Kanal-Tabs (nicht Archiv). Stücke, deren Name zu einem bestehenden AN passt, kommen nicht nochmals rein (Hinweis im Log).
+  - Suche ohne Treffer im Analyse Tool sucht im ganzen Return Tool (PG-ID, Barcode, Name); «Übernehmen und analysieren» holt das Stück mit seiner PG-ID. Archiv-Stücke nur angezeigt.
+  - «Stück ohne Inventar» zeigt zuerst Treffer im Return Tool; Anlegen trotzdem nur mit Grund.
+  - Analyse-Nr (A-…) nicht mehr angezeigt (Analyse, Ricardo). Bestehende AN-Doppel: Bereinigung offen (braucht Prüfung am Produkt).
+- **23.10.2026, Feedbacks DS/SW umgesetzt (Analyse 23.10.2):**
+  - «Doch getestet?» in Zustand und Befund bearbeiten: Nicht geprüfte Funktionen antippen → zählen als getestet (Befund, Text, Protokoll «nachträglich getestet»).
+  - Neupreis (OVP) Pflicht bei «ohne Inventar» und fehlendem Preis; VP leer = 50% vom OVP.
+  - Foto-Seite: weiter fotografieren während des Hochladens (Warteschlange, nacheinander).
+  - Fotos im Analyse Tool anklicken → in voller Grösse in Drive (gespeichert sind max. 1600 px).
+  - Tab «Analysen»: neue Spalten «Dauer Analyse Min» und «Dauer Verkauf Min» (Zeit im Verkaufsteil und Foto-Kasten). «Dauer Min» bleibt die Summe.

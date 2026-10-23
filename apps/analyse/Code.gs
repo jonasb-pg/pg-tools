@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-23.1';
+const VERSION = '2026-10-23.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -84,7 +84,7 @@ const SICHER_START = [
 ];
 const ANALYSEN_KOPF = ['Analyse-Nr', 'PG-ID', 'Bezeichnung', 'Barcode', 'Kategorie', 'Herkunft', 'Kürzel', 'Start', 'Ende', 'Dauer Min', 'Zeitbudget Min', 'Über Budget Min',
   'Marke', 'Modell', 'Stufe', 'Reusable', 'Grade', 'Versiegelt', 'Grund', 'K.-o.-Schritt', 'Fehlendes Zubehör', 'Nicht geprüfte Funktionen', 'Befund', 'Verkaufsinfo',
-  'CH-Stecker', 'Firmware-Version', 'Reparatur (Beschrieb)', 'Reparatur Min', 'Ersatzteil CHF', 'Reparaturkosten CHF', 'Garantie Tage', 'Regal', 'Matchmaker-Auftrag', 'Stand'];
+  'CH-Stecker', 'Firmware-Version', 'Reparatur (Beschrieb)', 'Reparatur Min', 'Ersatzteil CHF', 'Reparaturkosten CHF', 'Garantie Tage', 'Regal', 'Matchmaker-Auftrag', 'Stand', 'Dauer Analyse Min', 'Dauer Verkauf Min'];
 
 const HAUSREGELN = 'Kein Wasser und keine anderen Flüssigkeiten einfüllen. '
   + 'Keine Lebensmittel und kein Verbrauchsmaterial verwenden (Kapseln, Filter, Papier, Tinte). '
@@ -275,8 +275,8 @@ function urteilQuelle_() {
 }
 /** Die Antwort von pruefen() aus dem Urteil. Läuft auf dem Server und (über urteilQuelle_) im Browser: eine einzige Stelle. */
 function pruefenAus_(x) {
-  return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '' } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
-    versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x), verkaufsinfo: x.verkaufsinfo };
+  return x.offen ? { offen: x.offen, befundAuto: x.befundAuto || '', wahl: x.wahl || [], doch: x.doch || [] } : { reusable: x.reusable, grade: x.grade, grund: x.grund, befundAuto: x.befundAuto, befund: x.befund, hinweis: x.hinweis, rep: x.rep,
+    versiegelt: x.versiegelt, ricardoZustand: ricardoZustand_(x), verkaufsinfo: x.verkaufsinfo, wahl: x.wahl || [], doch: x.doch || [] };
 }
 
 function onOpen() {
@@ -809,6 +809,8 @@ function ohneInventar(name, link, vp, kategorie, ovp, grund, trotzdem) {
     if (k.length) return { kandidaten: k.slice(0, 15) };
   }
   if (grund.length < 5) throw new Error('Bitte angeben, warum das Stück nicht im Return Tool steht.');
+  if (!(zahl_(ovp) > 0)) throw new Error('Bitte den Neupreis (OVP) eingeben.');
+  if (!(zahl_(vp) > 0)) vp = vpAusOvp_(zahl_(ovp));
   const id = gesperrt_(function () {
     let max = 0;
     lies_('Produkte').z.forEach(function (r) { const m = /^AN-(\d+)$/.exec(String(r['PG-ID'])); if (m) max = Math.max(max, Number(m[1])); });
@@ -2029,10 +2031,16 @@ function uiTempo(liste, kuerzel) {
   return true;
 }
 
-/** Feedback DS 19.10.2026: Fehlt der Preis (VP), wird er in der Identität nachgetragen; der Neupreis (OVP) freiwillig. Schreibt nur in «Produkte», nie ins Return Tool. */
+/**
+ * Feedback DS 19.10.2026: Fehlt der Preis (VP), wird er in der Identität nachgetragen. Schreibt nur in «Produkte», nie ins Return Tool.
+ * Feedback SW 22.10.2026: Der Neupreis (OVP) ist Pflicht, der VP ist ohne Eingabe 50% vom OVP.
+ */
+function vpAusOvp_(o) { return Math.round((Number(o) || 0) * 0.5); }
 function preisSetzen(id, vp, ovp) {
-  const v = zahl_(vp), o = zahl_(ovp);
-  if (!(v > 0)) throw new Error('Bitte einen Verkaufspreis (VP) eingeben.');
+  let v = zahl_(vp);
+  const o = zahl_(ovp), alt = zahl_(produkt_(id)['Neupreis CHF']), ovpDa = o > 0 ? o : (alt > 0 ? alt : 0);
+  if (!(ovpDa > 0)) throw new Error('Bitte den Neupreis (OVP) eingeben.');
+  if (!(v > 0)) v = vpAusOvp_(ovpDa);
   gesperrt_(function () {
     const p = produkt_(id), r = {}; r[p._r] = v;
     setz_('Produkte', 'VP CHF', r);
@@ -2250,7 +2258,11 @@ function reparatur_(min, teil, u) {
 function urteil_(d, u, e) {
   const satz = function (x) { x = String(x).trim(); return /[.!?]$/.test(x) ? x : x + '.'; };
   const liste = function (x) { return (Array.isArray(x) ? x : []).map(function (y) { return String(y == null ? '' : y).trim(); }).filter(String); };
-  const ko = d.ko && KO[d.ko.art] !== undefined ? d.ko : null, versiegelt = !ko && d.versiegelt === true, ja = !ko, fn = Array.isArray(d.fn) ? d.fn : [], offen = [];
+  const ko = d.ko && KO[d.ko.art] !== undefined ? d.ko : null, versiegelt = !ko && d.versiegelt === true, ja = !ko, offen = [];
+  /* Feedback DS/SW 19.+21.10.2026: Was die Person trotz «nicht geprüft» getestet hat (d.doch, Namen), zählt als geprüft: im Befund, im Text und im Protokoll. */
+  const doch = liste(d.doch), roh = Array.isArray(d.fn) ? d.fn : [];
+  const fn = roh.map(function (v, i) { return v === 'np' && u.funktion.liste[i] && doch.indexOf(String(u.funktion.liste[i].n).trim()) > -1 ? 'ok' : v; });
+  const ohneDoch = function (l) { return (l || []).filter(function (x) { x = String(x); return !doch.some(function (n) { return x === n || x.indexOf(n + ' (') === 0; }); }); };
   /* Entscheid Jonas 19.10.2026 (Feedback DS, SW): neu und unbenutzt, Verpackung geöffnet. Hygiene gilt als erfüllt, Zurücksetzen entfällt (keine Daten der Vorbesitzerin). */
   const neuOvp = !ko && !versiegelt && d.neuOvp === true;
   let grund = '';
@@ -2265,7 +2277,11 @@ function urteil_(d, u, e) {
   /* Was das Tool selbst weiss, wird wörtlich zusammengesetzt. Das steht schon im Schritt «Zustand» da, bevor die Person ihre Mängel dazuschreibt. */
   const fehlt = versiegelt ? [] : liste(d.fehlt);
   const np = u.funktion.liste.filter(function (x, i) { return fn[i] === 'np'; }).map(function (x) { return x.n; }), mit = function (l) { return ja && !versiegelt ? l.concat(np) : []; };
-  const nichtGeprueft = mit(u.funktion.ungeprueft), nichtGeprueftKurz = mit(u.funktion.ungeprueftKurz);     // lang fürs Protokoll, kurz für Befund und Verkaufsinfo
+  const nichtGeprueft = mit(ohneDoch(u.funktion.ungeprueft)), nichtGeprueftKurz = mit(ohneDoch(u.funktion.ungeprueftKurz));     // lang fürs Protokoll, kurz für Befund und Verkaufsinfo
+  /* Zur Auswahl «doch getestet»: alles, was ohne die Auswahl als nicht geprüft gälte */
+  const wahl = ja && !versiegelt ? (u.funktion.ungeprueftKurz || []).concat(u.funktion.liste.filter(function (x, i) { return roh[i] === 'np'; }).map(function (x) { return x.n; }))
+    .map(function (x) { return String(x).trim(); }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }) : [];
+  const dochGeprueft = doch.filter(function (n) { return wahl.indexOf(n) > -1; });
   const rep = (Array.isArray(d.rep) ? d.rep : []).map(function (r) {
     return { was: String(r.was || '').trim(), text: String(r.text || '').trim(), min: Number(r.min) || 0, teil: Number(r.teil) || 0, kosten: reparatur_(r.min, r.teil, u).kosten };
   });
@@ -2296,7 +2312,7 @@ function urteil_(d, u, e) {
       if (s === 'reset' && !neuOvp && !(Number(d.reset) >= u.reset.length)) offen.push(['o.reset']);
       if (s === 'zustand' && GRADES.indexOf(d.grade) < 0) offen.push(['o.zustand']);
     });
-    if (offen.length) return { offen: offen, befundAuto: befundAuto };
+    if (offen.length) return { offen: offen, befundAuto: befundAuto, wahl: wahl, doch: dochGeprueft };
   }
 
   const grade = versiegelt ? 'A' : (ja ? d.grade : ''), g = u.zustand.grade.filter(function (x) { return x[0] === grade; })[0];
@@ -2305,11 +2321,11 @@ function urteil_(d, u, e) {
   const maengel = ja && !versiegelt ? String(d.maengel || '').trim() : '';
   const befund = (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
-    kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel }).filter(String).forEach(function (y) { verkauf.push(y); });
+    kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel, doch: dochGeprueft }).filter(String).forEach(function (y) { verkauf.push(y); });
     if (garantie) verkauf.push(satz(garantie + ' Tage Garantie'));
   }
   return { reusable: ja, versiegelt: versiegelt, grade: grade, grund: grund, fehlt: fehlt, nichtGeprueft: nichtGeprueft, nichtGeprueftKurz: nichtGeprueftKurz, rep: rep, firmware: firmware, garantie: ja ? garantie : '',
-    befundAuto: befundAuto, befund: befund, verkaufsinfo: verkauf.join(' '), hinweis: ja && fehlt.length > 0 };
+    befundAuto: befundAuto, befund: befund, verkaufsinfo: verkauf.join(' '), hinweis: ja && fehlt.length > 0, wahl: wahl, doch: dochGeprueft };
 }
 
 /**
@@ -2332,7 +2348,8 @@ function geprueft_(u, d) {
   /* Produkte ohne Strom (Taschen, Zubehör, Toner): Eine Liste von Handgriffen liest sich komisch. Entscheid Jonas 17.10.2026. */
   if (u.funktion.ersatz || (Array.isArray(u.strom) && !u.strom.length)) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
   const fn = d && Array.isArray(d.fn) ? d.fn : [];
-  const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return kurzName_(x.n || x.t); }).filter(function (x) { return x && x.length <= 50; });
+  const ok = u.funktion.liste.filter(function (x, i) { return fn[i] === 'ok'; }).map(function (x) { return kurzName_(x.n || x.t); })
+    .concat((d && Array.isArray(d.doch) ? d.doch : []).map(kurzName_)).filter(function (x, i, a) { return x && x.length <= 50 && a.indexOf(x) === i; });
   /* Bei Produkten ohne Technik heisst die einzige «Funktion» oft «Unbeschädigt und benutzbar»: dann der Satz zur Vollständigkeit */
   if (ok.length && ok.every(function (x) { return /unbeschädigt|benutzbar|zustand der teile/i.test(x); })) return 'Wir haben alle Teile auf Vollständigkeit und Zustand geprüft.';
   if (!ok.length) return 'Wir haben es bei uns getestet, es funktioniert einwandfrei.';
@@ -2379,6 +2396,7 @@ function pruefen(d) {
 /** Die Zeilen fürs Protokoll im Tab «Prüfschritte»: jeder Punkt der Schritte, die erreicht wurden. */
 function schritte_(d, u, bis) {
   const z = [], fehlt = Array.isArray(d.fehlt) ? d.fehlt : [], nok = Array.isArray(d.sicherNok) ? d.sicherNok : [], fn = Array.isArray(d.fn) ? d.fn : [];
+  const doch = (Array.isArray(d.doch) ? d.doch : []).map(function (x) { return String(x).trim(); });
   const ko = d.ko ? d.ko.art : '';                                           // wer erst «unbenutzt» und nach «Zurück» «benutzt» antwortet: es gilt das K.-o.
   const zeile = function (s, punkt, herkunft, ergebnis) { z.push({ 'Block': SCHRITTE[s], 'Schritt': txt_(punkt), 'Herkunft Schritt': herkunft, 'Ergebnis': ergebnis }); };
   u.ablauf.slice(0, bis + 1).forEach(function (s) {
@@ -2386,9 +2404,13 @@ function schritte_(d, u, bis) {
     if (s === 'sicher') u.sicher.forEach(function (x) { zeile(s, x, 'Sicherheitspunkte', d.sicher === true || nok.indexOf(x) < 0 ? 'ok' : 'nicht ok'); });
     if (s === 'voll') u.liefer.teile.forEach(function (x) { zeile(s, x, 'Recherche', fehlt.indexOf(x) > -1 ? 'fehlt' : 'ok'); });
     if (s === 'sperre') zeile(s, 'Gerät ist mit keinem Konto verbunden', 'Ablauf', d.sperreFrei === true && ko !== 'sperre' ? 'ok' : 'nicht ok');
-    if (s === 'funktion') u.funktion.liste.forEach(function (x, i) {
-      if (['ok', 'nok', 'np'].indexOf(fn[i]) > -1) zeile(s, x.t, x.g === 'Kern' ? 'Kernfunktion' : 'Weitere Funktion', { ok: 'ok', nok: 'nicht ok', np: 'nicht prüfbar' }[fn[i]]);
-    });
+    if (s === 'funktion') {
+      u.funktion.liste.forEach(function (x, i) {
+        const nachher = fn[i] === 'np' && doch.indexOf(String(x.n).trim()) > -1;
+        if (['ok', 'nok', 'np'].indexOf(fn[i]) > -1) zeile(s, x.t, x.g === 'Kern' ? 'Kernfunktion' : 'Weitere Funktion', nachher ? 'ok (nachträglich getestet)' : { ok: 'ok', nok: 'nicht ok', np: 'nicht prüfbar' }[fn[i]]);
+      });
+      (u.funktion.ungeprueftKurz || []).forEach(function (n) { if (doch.indexOf(String(n).trim()) > -1) zeile(s, n, 'Nachträglich getestet', 'ok'); });
+    }
     if (s === 'reset' && d.neuOvp === true && !ko) zeile(s, 'Zurücksetzen', 'Ablauf', 'entfällt (neu, unbenutzt)');
     else if (s === 'reset') u.reset.forEach(function (x, i) { if (i < Number(d.reset)) zeile(s, x[0], 'Ablauf', 'ok'); });
   });
@@ -2445,7 +2467,7 @@ function abschliessen(d) {
     return aus;
   }
 
-  const min = Math.round((Number(d.aktivSek) || 0) / 6) / 10, summe = function (feld) { return Math.round(x.rep.reduce(function (s, r) { return s + r[feld]; }, 0) * 100) / 100; };
+  const min = Math.round((Number(d.aktivSek) || 0) / 6) / 10, vkMin = Math.min(min, Math.round((Number(d.verkaufSek) || 0) / 6) / 10), summe = function (feld) { return Math.round(x.rep.reduce(function (s, r) { return s + r[feld]; }, 0) * 100) / 100; };
   /* Protokolliert wird bis zum Schritt, an dem die Analyse geendet hat: beim K.-o. bis dorthin, bei einem versiegelten Stück nichts, sonst alles. */
   const bis = x.versiegelt ? -1 : (d.ko ? u.ablauf.indexOf(String(d.ko.schritt)) : u.ablauf.length - 1);
   takt_('vorbereitet');
@@ -2463,7 +2485,8 @@ function abschliessen(d) {
       'Grund': txt_(x.grund), 'K.-o.-Schritt': x.reusable ? '' : (SCHRITTE[String(d.ko.schritt)] || ''), 'Fehlendes Zubehör': txt_(x.fehlt.join(', ')), 'Nicht geprüfte Funktionen': txt_(x.nichtGeprueft.join(', ')),
       'Befund': txt_(x.befund), 'Verkaufsinfo': txt_(x.verkaufsinfo), 'CH-Stecker': x.reusable && !x.versiegelt && u.sicher.indexOf(CH_PUNKT) > -1 ? 'Ja' : '', 'Firmware-Version': txt_(x.firmware),
       'Reparatur (Beschrieb)': txt_(x.rep.map(function (r) { return r.text || r.was; }).join('; ')), 'Reparatur Min': x.rep.length ? summe('min') : '', 'Ersatzteil CHF': x.rep.length ? summe('teil') : '',
-      'Reparaturkosten CHF': x.rep.length ? summe('kosten') : '', 'Garantie Tage': x.garantie, 'Regal': regal, 'Matchmaker-Auftrag': txt_(auftrag), 'Stand': stand
+      'Reparaturkosten CHF': x.rep.length ? summe('kosten') : '', 'Garantie Tage': x.garantie, 'Regal': regal, 'Matchmaker-Auftrag': txt_(auftrag), 'Stand': stand,
+      'Dauer Analyse Min': Math.round((min - vkMin) * 10) / 10, 'Dauer Verkauf Min': vkMin
     }]);
     if (ric) schreib_('Ricardo', [Object.assign(ric, { 'Analyse-Nr': nr, 'Kürzel': kuerzel, 'Analysiert am': t, 'Status': 'Offline' })]);
     if (mmV) schreib_('Matchmaker', [Object.assign(mmV, { 'Analyse-Nr': nr, 'Suchauftrag': txt_(auftrag), 'Kürzel': kuerzel, 'Analysiert am': t, 'Status': 'Offen' })]);
