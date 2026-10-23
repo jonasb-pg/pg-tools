@@ -258,7 +258,7 @@
   .chip.rot { background:var(--rot); }
   .gruppe { margin:18px 0 8px; }
   .wlan { display:inline-block; margin:0 0 12px; padding:6px 10px; border-radius:4px; background:var(--grau); font:400 15px/1.3 var(--mono); overflow-wrap:anywhere; }   /* ohne Grossschreibung: das Passwort steht da, wie es ist */
-  .etikett.gruen { background:var(--gruen); } .etikett.gelb { background:var(--gelb); }
+  .etikett.gruen { background:var(--gruen); } .etikett.gelb { background:var(--gelb); } .etikett.warnung { background:var(--gelb); white-space:normal; margin-top:4px; }
   .meldung h3 { margin:0 0 6px; font-size:14px; }
   .meldung.gelb { background:var(--gelb); }
   #a-unter { gap:8px 10px; }
@@ -527,7 +527,13 @@
     'such.platz': ['Barcode scannen, PG-ID oder Produktname eingeben', 'Scan barcode, enter PG-ID or product name'],
     'such.keine': ['Weder im Analyse Tool noch im Return Tool gefunden. Bitte zuerst im Return Tool erfassen.', 'Found neither in the Analyse Tool nor in the Return Tool. Please record it in the Return Tool first.'],
     'such.rt': ['Nicht in der Warteschlange, aber im Return Tool. Stimmt die PG-ID auf dem Stück? Dann übernehmen.', 'Not in the queue, but in the Return Tool. Does the PG-ID on the item match? Then take it over.'],
-    'rt.los': ['Übernehmen und analysieren', 'Take over and analyse'], 'rt.archiv': ['Archiv, nicht übernehmbar', 'Archive, cannot be taken over'], 'th.tab': ['Tab / Lagerort', 'Tab / location'], 'th.ean': ['Barcode', 'Barcode'],
+    'rt.los': ['Übernehmen und analysieren', 'Take over and analyse'], 'rt.archiv': ['Archiv, nicht übernehmbar', 'Archive, cannot be taken over'],
+    'rt.erledigt': ['Schon analysiert', 'Already analysed'], 'rt.ohneId': ['Ohne PG-ID: zuerst im Return Tool verbuchen', 'No PG-ID: book it in the Return Tool first'],
+    'rt.zwilling': ['{0} ist vielleicht schon als Stück ohne Inventar analysiert: {1}. Bitte am Produkt prüfen, dann nicht doppelt analysieren.', '{0} may already be analysed as an item without inventory: {1}. Please check the item to avoid a double analysis.'],
+    'rt.trotzdem': ['Ist ein anderes Stück, trotzdem analysieren', 'It is a different item, analyse anyway'],
+    'such.imTool': ['Im Analyse Tool', 'In the Analyse Tool'], 'such.imRt': ['Im Return Tool', 'In the Return Tool'],
+    'such.mehrdeutig': ['Mehrere Stücke haben diesen Barcode. Bitte die PG-ID auf dem Etikett scannen oder unten wählen.', 'Several items share this barcode. Please scan the PG-ID label or choose below.'],
+    'such.an': ['Vielleicht schon analysiert als {0}', 'Maybe already analysed as {0}'], 'such.anzahl': ['{0} Stück', '{0} pcs'], 'th.tab': ['Tab / Lagerort', 'Tab / location'], 'th.ean': ['Barcode', 'Barcode'],
     'ohne.grund': ['Warum steht es nicht im Return Tool?', 'Why is it not in the Return Tool?'], 'ohne.grund.platz': ['z.B. Reuse-Spende, kein Etikett', 'e.g. reuse donation, no label'],
     'ohne.kand': ['Dieses Produkt steht schon im Return Tool. Bitte die PG-ID auf dem Stück vergleichen und das richtige übernehmen. Nicht doppelt anlegen.', 'This product is already in the Return Tool. Compare the PG-ID on the item and take over the right one. Do not create it twice.'],
     'ohne.trotzdem': ['Keines davon, trotzdem ohne Inventar anlegen', 'None of these, create without inventory anyway'],
@@ -837,14 +843,19 @@
     $('such-meldung').innerHTML = ''; $('treffer').innerHTML = ''; FERTIG = null; zeichneFertig();
     if (!q) return;
     ruf('suche', [q], function (r) {
-      if (r.inSchlange && r.treffer.length === 1) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else { if (r.treffer[0].d) VORAB[r.treffer[0].id] = { d: r.treffer[0].d, zeit: Date.now() }; analyse(r.treffer[0].id, t0); } return; }
+      /* Sofort starten nur, wenn eindeutig: eine gescannte PG-ID oder ein Barcode, der nur zu diesem Stück gehört, und kein möglicher AN-Doppel */
+      if (r.inSchlange && r.treffer.length === 1 && !r.mehrdeutig && !r.treffer[0].an) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else { if (r.treffer[0].d) VORAB[r.treffer[0].id] = { d: r.treffer[0].d, zeit: Date.now() }; analyse(r.treffer[0].id, t0); } return; }
       var mm = r.inSchlange ? [] : r.treffer.filter(function (x) { return x.mm; });
       if (mm.length) {                                                          // im Regal «Matchmaker»: Wiedereinstieg, wenn es dort nicht geklappt hat
         $('such-meldung').innerHTML = mm.map(function (x) { return '<div class="meldung warn"><p><strong>' + esc(x.id) + '</strong> · ' + esc(x.bezeichnung) + '<br>' + tx('mm.liegt', x.mm) + '</p><div class="knoepfe">' + taste('mmZurueck', 'mm.zurueck', 'pink', ' data-v="' + esc(x.id) + '"') + '</div></div>'; }).join('');
         return;
       }
-      if (!r.treffer.length && r.rt && r.rt.length) { $('such-meldung').innerHTML = box(t('such.rt'), 'warn'); $('treffer').innerHTML = rtTabelle(r.rt); return; }
-      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? 'such.mehrere' : 'such.erledigt')), r.inSchlange ? '' : 'warn');
+      if (!r.inSchlange && (r.rt && r.rt.length || r.rtFehler)) {                 // nicht in der Warteschlange: was im Return Tool steht, mit PG-ID übernehmen
+        $('such-meldung').innerHTML = (r.rtFehler ? box(r.rtFehler, 'stop') : '') + (r.rt && r.rt.length ? box(t('such.rt'), 'warn') : '');
+        $('treffer').innerHTML = (r.treffer.length ? '<h3 class="gruppe">' + tx('such.imTool') + '</h3>' + tabelle(r.treffer, false) : '') + (r.rt && r.rt.length ? '<h3 class="gruppe">' + tx('such.imRt') + '</h3>' + rtTabelle(r.rt) : '');
+        return;
+      }
+      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? (r.mehrdeutig ? 'such.mehrdeutig' : 'such.mehrere') : 'such.erledigt')), r.inSchlange ? '' : 'warn');
       $('treffer').innerHTML = r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '';
       if (r.inSchlange) vorabHolen(r.treffer);
     }, function (m) { $('such-meldung').innerHTML = box(m, 'warn'); });
@@ -852,7 +863,7 @@
   function tabelle(liste, mitKnopf) {
     return '<div class="tabelle"><table><thead><tr><th>' + tx('th.id') + '</th><th>' + tx('th.produkt') + '</th><th>' + tx('th.kat') + '</th><th>' + tx('th.ovp') + '</th><th>' + tx('th.rech') + '</th><th>' + tx('th.budget') + '</th><th></th></tr></thead><tbody>'
       + liste.map(function (p) {
-        return '<tr><td><span class="pgid klein">' + esc(p.id) + '</span></td><td>' + esc(p.bezeichnung) + '</td><td>' + esc(p.kategorie) + '</td><td>' + esc(p.ovp) + '</td><td><span class="etikett' + (p.recherche === 'Bereit' ? ' hell' : '') + '">' + esc(w(p.recherche)) + '</span></td><td>'
+        return '<tr><td><span class="pgid klein">' + esc(p.id) + '</span></td><td>' + esc(p.bezeichnung) + (p.anzahl > 1 ? ' <span class="etikett">' + tx('such.anzahl', p.anzahl) + '</span>' : '') + (p.an ? '<br><span class="etikett warnung">' + tx('such.an', p.an) + '</span>' : '') + '</td><td>' + esc(p.kategorie) + '</td><td>' + esc(p.ovp) + '</td><td><span class="etikett' + (p.recherche === 'Bereit' ? ' hell' : '') + '">' + esc(w(p.recherche)) + '</span></td><td>'
           + (p.budget ? esc(p.budget) + ' ' + tx('min') : '') + '</td><td>' + (mitKnopf ? (p.status === 'Reparatur' ? '<button class="mini" data-a="repWeiter" data-v="' + esc(p.id) + '">' + tx('rp.weiter') + '</button>' : '<button class="mini" data-a="starten" data-v="' + esc(p.id) + '">' + tx('such.start') + '</button>') : '<span class="etikett">' + esc(w(p.status)) + '</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
@@ -861,14 +872,27 @@
     return '<div class="tabelle"><table><thead><tr><th>' + tx('th.id') + '</th><th>' + tx('th.produkt') + '</th><th>' + tx('th.ean') + '</th><th>' + tx('th.tab') + '</th><th></th></tr></thead><tbody>'
       + liste.map(function (p) {
         return '<tr><td><span class="pgid klein">' + esc(p.id) + '</span></td><td>' + esc(p.bezeichnung) + '</td><td>' + esc(p.barcode) + '</td><td>' + esc(p.tab) + (p.lagerort ? ' · ' + esc(p.lagerort) : '') + '</td><td>'
-          + (p.archiv ? '<span class="etikett">' + tx('rt.archiv') + '</span>' : '<button class="mini" data-a="uebernehmen" data-v="' + esc(p.id) + '">' + tx('rt.los') + '</button>') + '</td></tr>';
+          + rtAktion(p) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
-  function uebernehmen(id) {
+  function rtAktion(p) {
+    if (p.ohneId) return '<span class="etikett">' + tx('rt.ohneId') + '</span>';
+    if (p.archiv) return '<span class="etikett">' + tx('rt.archiv') + '</span>';
+    if (p.status === 'Erledigt') return '<span class="etikett">' + tx('rt.erledigt') + '</span>';
+    if (p.status === 'Reparatur') return '<button class="mini" data-a="repWeiter" data-v="' + esc(p.id) + '">' + tx('rp.weiter') + '</button>';
+    if (p.status === 'Offen') return '<button class="mini" data-a="starten" data-v="' + esc(p.id) + '">' + tx('such.start') + '</button>';
+    return '<button class="mini" data-a="uebernehmen" data-v="' + esc(p.id) + '">' + tx('rt.los') + '</button>';
+  }
+  function uebernehmenTrotzdem(id) { uebernehmen(id, true); }
+  function uebernehmen(id, bestaetigt) {
     var t0 = Date.now();
     if (AN) { melde(t('fuss.laeuft'), true); return; }
     $('such-meldung').innerHTML = box(t('re.laeuft'), 'warn');
-    ruf('uebernehmen', [id], function (r) {
+    ruf('uebernehmen', [id, bestaetigt === true], function (r) {
+      if (r.zwilling) {                                                           // könnte schon als Stück ohne Inventar analysiert sein
+        $('such-meldung').innerHTML = '<div class="meldung stop"><p>' + esc(t('rt.zwilling', r.id, r.zwilling)) + '</p><div class="knoepfe"><button class="mini" data-a="uebernehmenTrotzdem" data-v="' + esc(r.id) + '">' + tx('rt.trotzdem') + '</button></div></div>';
+        return;
+      }
       var los = function (d, fehler) { $('such-meldung').innerHTML = ''; $('treffer').innerHTML = ''; $('ohne-meldung').innerHTML = ''; $('ohne').hidden = true; $('q').value = ''; beginne(d, t0, fehler); };
       var ohne = function (m) { ruf('starteAnalyse', [r.id], function (d) { los(d, m); }, function (m2) { $('such-meldung').innerHTML = box(m2, 'stop'); }); };
       if (!ruf('rechercheJetzt', [r.id], los, ohne)) ohne('');
@@ -2211,7 +2235,7 @@
   }
   var SEITEN = { scan: null, teile: ['bestellliste', zeichneBestell], werkstatt: ['werkstatt', zeichneWerkstatt], admin: ['adminDaten', zeichneAdmin] };
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
-  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: uebernehmen,
+  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: uebernehmen, uebernehmenTrotzdem: uebernehmenTrotzdem,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,

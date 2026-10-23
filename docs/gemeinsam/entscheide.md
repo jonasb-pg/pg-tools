@@ -161,3 +161,13 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
   - Foto-Seite: weiter fotografieren während des Hochladens (Warteschlange, nacheinander).
   - Fotos im Analyse Tool anklicken → in voller Grösse in Drive (gespeichert sind max. 1600 px).
   - Tab «Analysen»: neue Spalten «Dauer Analyse Min» und «Dauer Verkauf Min» (Zeit im Verkaufsteil und Foto-Kasten). «Dauer Min» bleibt die Summe.
+- **24.10.2026, PG-ID Runde 2 (Analyse 24.10.1), nach unabhängiger Prüfung.** Runde 1 erkannte AN-Doppel nur über den Namen (9 von 67). Neu:
+  - Schlüssel 1: Galaxus-/Digitec-Artikelnummer aus dem Link (RT-Spalte «Link» gegen AN-Link). Verschiedene Galaxus-Nummern = andere Variante, kein Doppel.
+  - Schlüssel 2: Name in beide Richtungen (Marke muss passen, ≥60% der Wörter; kurzer RT-Name ganz enthalten), Modellnummern nur exakt (Z1 ≠ Z7, evolve2 ≠ evolve), Masse (4g, 54mm) zählen nicht.
+  - Realdaten 23.10.: 53 von 67 AN haben Kandidaten im Return Tool (34 über Galaxus-Nummer); die übrigen 14 stehen nachweislich nicht im Return Tool. Suche per ID 238/238, per Barcode 220/220.
+  - Suche im ganzen Return Tool immer, wenn kein offenes Stück passt (auch wenn ein erledigtes Schwesterstück dieselbe EAN hat). PG-ID vereinheitlicht («pg 862» = «PG-0862»), Barcode ohne führende Nullen verglichen, Barcode in «Produkte» als Text mit gültiger Prüfziffer.
+  - Sofortstart nur bei eindeutiger Nummer und ohne möglichen AN-Doppel; sonst Liste mit Warnung «Vielleicht schon analysiert als AN-…».
+  - Übernehmen: Erledigt/Reparatur abgelehnt, möglicher AN-Doppel erst nach Bestätigung. Markierung neu in der Spalte «Übernommen am» (statt Script-Eigenschaft, die nach ~280 Stücken voll gewesen wäre).
+  - Abgleich: feste Kanal-Tabs (Analyse, Stationär, Online, Berner Brocki, Caritas, Heilsarmee; Einstellung «Return Tool Kanal-Tabs» überschreibt). Ist ein Tab nicht lesbar, fällt in diesem Lauf nichts heraus. Hinweise einmal pro Tag statt alle 10 Minuten.
+  - AN-Nummer: Maximum über «Produkte» und «Analysen».
+  - Vorfall 24.10. 00:02–00:07: Runde 1 stand 5 Minuten gespeichert im Editor; der Trigger (läuft mit dem gespeicherten Code, nicht mit der Bereitstellung) holte 28 Stücke. Editor zurückgesetzt. **Lehre: Code erst speichern, wenn er online gehen darf; Trigger nutzen immer den gespeicherten Stand.**

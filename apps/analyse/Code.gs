@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-23.2';
+const VERSION = '2026-10-24.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -230,7 +230,7 @@ const REP_STAND = 'REPARATUR_';                                     // Script-Pr
 /* Spalten, die der Code braucht. einrichten() prüft, ob das Sheet dazu passt. */
 const SPALTEN = {
   'Produkte': ['PG-ID', 'Herkunft', 'Bezeichnung', 'Anzahl', 'Barcode', 'Link', 'Kategorie', 'Neupreis CHF', 'VP CHF',
-    'Importiert am', 'Recherche-Schlüssel', 'Recherche-Status', 'Recherche-Batch', 'Analyse-Status'],
+    'Importiert am', 'Recherche-Schlüssel', 'Recherche-Status', 'Recherche-Batch', 'Analyse-Status', 'Übernommen am'],
   'Recherche': ['Schlüssel', 'Bezeichnung', 'Feld', 'Inhalt', 'Quelle (Link)', 'Quellentyp', 'Modelltreffer', 'Zweitquelle bestätigt', 'Variantenrisiko',
     'Von uns bestätigt (Anzahl)', 'Von uns korrigiert (Anzahl)', 'Recherchiert am', 'Punkte Quelle', 'Punkte Modell', 'Punkte Zweitquelle', 'Punkte bestätigt',
     'Abzug Variante', 'Summe', 'Score'],
@@ -742,33 +742,49 @@ function zahlen_(p) {
 }
 function kurz_(r, zb) {
   return { id: String(r['PG-ID']), bezeichnung: String(r['Bezeichnung']), kategorie: String(r['Kategorie'] || ''), vp: r['VP CHF'], ovp: r['Neupreis CHF'],
-    recherche: String(r['Recherche-Status'] || ''), status: String(r['Analyse-Status'] || ''), budget: budget_(zb, r['Herkunft'], r['VP CHF']) };
+    recherche: String(r['Recherche-Status'] || ''), status: String(r['Analyse-Status'] || ''), budget: budget_(zb, r['Herkunft'], r['VP CHF']), anzahl: Number(r['Anzahl']) || 1 };
 }
 
-/** Suche per Barcode, PG-ID oder Name. Stücke ausserhalb der Warteschlange kommen nur, wenn sonst nichts passt. Stücke im Regal «Reparatur» zählen wie offene: Die Oberfläche setzt sie fort. */
+/**
+ * Suche per Barcode, PG-ID oder Name. Stücke im Regal «Reparatur» zählen wie offene: Die Oberfläche setzt sie fort.
+ * Entscheid Jonas 23.10.2026 (PG-ID als einzige Nummer): Gibt es kein offenes Stück, wird immer auch das ganze Return Tool durchsucht.
+ * PG-IDs und Barcodes werden vereinheitlicht verglichen («pg 862» = «PG-0862», Barcode mit oder ohne führende Nullen).
+ */
 function suche(q) {
   q = String(q || '').trim();
   if (q.length < 3) throw new Error('Bitte mindestens 3 Zeichen eingeben oder einen Barcode scannen.');
-  const p = lies_('Produkte').z, zb = lies_('Stufen').z, ziffern = q.replace(/\D/g, ''), woerter = norm_(q).split(' ');
-  const nurZiffern = /^\d{6,14}$/.test(q), alsId = q.toUpperCase();
+  const p = lies_('Produkte').z, zb = lies_('Stufen').z, woerter = norm_(q).split(' ');
+  const pid = pgNorm_(q), bc = /^\d{6,14}$/.test(q.replace(/\s/g, '')) ? bcNorm_(q) : '';
   const treffer = p.filter(function (r) {
-    if (String(r['PG-ID']).toUpperCase() === alsId) return true;
-    if (nurZiffern) return String(r['Barcode']).replace(/\D/g, '') === ziffern;
+    if (pid) return pgNorm_(r['PG-ID']) === pid;
+    if (bc) return bcNorm_(r['Barcode']) === bc;
+    if (String(r['PG-ID']).toUpperCase() === q.toUpperCase()) return true;
     const n = norm_(r['Bezeichnung']);
     return woerter.every(function (w) { return n.indexOf(w) > -1; });
   });
   const offen = treffer.filter(function (r) { return inSchlange_(r) || r['Analyse-Status'] === 'Reparatur'; });
-  const liste = (offen.length ? offen : treffer).slice(0, 25).map(function (r) { return kurz_(r, zb); });
-  /* Weg A: ein einziges offenes Stück startet sofort. Der Überblick kommt gleich mit, statt in einem zweiten Aufruf. */
-  if (offen.length === 1 && offen[0]['Analyse-Status'] !== 'Reparatur') try { liste[0].d = ueberblickSpeicher_(offen[0], einst_()); } catch (err) { /* dann wie bisher mit starteAnalyse */ }
+  const zw = anZwillinge_(p), liste = (offen.length ? offen : treffer).slice(0, 25).map(function (r) {
+    const x = kurz_(r, zb), z = zw(r);
+    if (z.length) x.an = z.map(function (a) { return a.id + ' (' + a.status + ')'; }).join(', ');
+    return x;
+  });
+  /* Weg A: ein einziges offenes Stück startet sofort, aber nur, wenn die Nummer eindeutig ist
+     (PG-ID gescannt, oder der Barcode gehört zu genau einem Stück) und es nicht schon als AN analysiert sein könnte. */
+  const eindeutig = pid || (bc && treffer.length === 1);
+  if (offen.length === 1 && eindeutig && !liste[0].an && offen[0]['Analyse-Status'] !== 'Reparatur') try { liste[0].d = ueberblickSpeicher_(offen[0], einst_()); } catch (err) { /* dann wie bisher mit starteAnalyse */ }
   if (!offen.length && liste.length) {                                         // erledigt: Liegt es im Regal «Matchmaker», kann es von dort zurück
     const mm = imMatchmaker_();
     liste.forEach(function (x) { if (mm[x.id]) x.mm = mm[x.id]; });
   }
-  /* Nichts im Analyse Tool: im ganzen Return Tool suchen (alle Tabs, auch Archive). So wird kein Stück mit PG-ID neu angelegt. */
-  let rt = [];
-  if (!liste.length) try { rt = rtSuche_(q).slice(0, 15); } catch (err) { log_('Return-Tool-Suche', q, err.message); }
-  return { treffer: liste, inSchlange: offen.length > 0, rt: rt };
+  let rt = [], rtFehler = '';
+  if (!offen.length) {
+    try {
+      const status = {};
+      p.forEach(function (r) { status[pgNorm_(r['PG-ID']) || String(r['PG-ID'])] = String(r['Analyse-Status'] || ''); });
+      rt = rtSuche_(q).slice(0, 15).map(function (x) { x.status = status[pgNorm_(x.id)] || ''; return x; });
+    } catch (err) { rtFehler = 'Das Return Tool konnte nicht durchsucht werden: ' + err.message; log_('Return-Tool-Suche', q, err.message); }
+  }
+  return { treffer: liste, inSchlange: offen.length > 0, mehrdeutig: offen.length === 1 && !eindeutig, rt: rt, rtFehler: rtFehler };
 }
 
 function warteschlange() {
@@ -791,8 +807,8 @@ function aktualisieren(mitFehlern) {
 
 /**
  * Stück, das nachweislich nicht im Return Tool steht. Bekommt eine eigene Nummer (AN-0001).
- * Schutz gegen Doppel: Zuerst wird das ganze Return Tool nach dem Namen durchsucht. Gibt es Treffer, kommt die Liste zurück
- * (das Stück wird dann mit seiner PG-ID übernommen). Anlegen trotz Treffern oder ohne Treffer nur mit Grund.
+ * Schutz gegen Doppel: Zuerst wird das ganze Return Tool durchsucht, über die Galaxus-Nummer im Link und über den Namen.
+ * Gibt es Treffer, kommt die Liste zurück (das Stück wird dann mit seiner PG-ID übernommen). Anlegen trotz Treffern oder ohne Treffer nur mit Grund.
  */
 function ohneInventar(name, link, vp, kategorie, ovp, grund, trotzdem) {
   name = String(name || '').trim(); link = String(link || '').trim();
@@ -805,20 +821,26 @@ function ohneInventar(name, link, vp, kategorie, ovp, grund, trotzdem) {
   grund = String(grund || '').trim();
   if (!trotzdem) {
     let k = [];
-    try { k = rtSuche_(name); } catch (err) { throw new Error('Das Return Tool konnte nicht durchsucht werden. Bitte später nochmals versuchen.'); }
-    if (k.length) return { kandidaten: k.slice(0, 15) };
+    try { k = rtSuche_(name, { link: link }); } catch (err) { throw new Error('Das Return Tool konnte nicht durchsucht werden. Bitte später nochmals versuchen.'); }
+    if (k.length) {
+      const status = {};
+      lies_('Produkte').z.forEach(function (r) { status[pgNorm_(r['PG-ID']) || String(r['PG-ID'])] = String(r['Analyse-Status'] || ''); });
+      return { kandidaten: k.slice(0, 15).map(function (x) { x.status = status[pgNorm_(x.id)] || ''; return x; }) };
+    }
   }
   if (grund.length < 5) throw new Error('Bitte angeben, warum das Stück nicht im Return Tool steht.');
   if (!(zahl_(ovp) > 0)) throw new Error('Bitte den Neupreis (OVP) eingeben.');
   if (!(zahl_(vp) > 0)) vp = vpAusOvp_(zahl_(ovp));
   const id = gesperrt_(function () {
     let max = 0;
-    lies_('Produkte').z.forEach(function (r) { const m = /^AN-(\d+)$/.exec(String(r['PG-ID'])); if (m) max = Math.max(max, Number(m[1])); });
+    const zaehle = function (r) { const m = /^AN-(\d+)$/.exec(String(r['PG-ID'])); if (m) max = Math.max(max, Number(m[1])); };
+    lies_('Produkte').z.forEach(zaehle);
+    lies_('Analysen').z.forEach(zaehle);                                    // gelöschte Zeilen in «Produkte» dürfen keine Nummer zweimal vergeben
     const neu = 'AN-' + ('000' + (max + 1)).slice(-4);
     schreib_('Produkte', [{ 'PG-ID': neu, 'Herkunft': 'Ohne Inventar', 'Bezeichnung': txt_(name), 'Anzahl': 1, 'Link': txt_(link), 'Kategorie': txt_(kategorie),
       'Neupreis CHF': zahl_(ovp), 'VP CHF': zahl_(vp), 'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_('', name), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' }]);
     return neu;
-  }, ['Produkte']);
+  }, ['Produkte', 'Analysen']);
   log_('Ohne Inventar angelegt', id, name + ' · Grund: ' + grund);
   return { id: id };
 }
@@ -863,194 +885,284 @@ function tagsueber_(e) {
 }
 
 /**
- * Gleicht die Warteschlange mit dem Tab «Analyse» im Return Tool ab, dazu alle Stücke mit Lagerort «Analyse» in den anderen Kanal-Tabs. Das Return Tool wird nur gelesen.
- * - Neue Stücke kommen in die Warteschlange.
- * - Was dort nicht mehr im Tab steht oder schon einen Eintrag bei «Reusable» hat, fällt heraus («Entfällt») und kommt zurück, wenn es wieder auftaucht.
+ * Gleicht die Warteschlange mit dem Return Tool ab (nur lesen): Tab «Analyse» plus alle Stücke mit Lagerort «Analyse» in den anderen Kanal-Tabs
+ * (Entscheid Jonas 23.10.2026). Die Kanal-Tabs stehen fest (RT_KANAL_TABS), Archive nie.
+ * - Neue Stücke kommen in die Warteschlange. Stücke, die vermutlich schon als «Stück ohne Inventar» (AN-…) analysiert sind, nicht (Hinweis im Log).
+ * - Was nicht mehr dort steht oder schon einen Eintrag bei «Reusable» hat, fällt heraus («Entfällt») und kommt zurück, wenn es wieder auftaucht.
+ *   Ausnahmen: über die Suche übernommene Stücke (Spalte «Übernommen am»), und nichts fällt heraus, wenn ein Kanal-Tab nicht lesbar war.
  */
 function spiegeln_(e) {
   const id = String(e['Return Tool ID'] || '').trim(), tab = String(e['Return Tool Tab'] || '').trim();
   if (!id || !tab) throw new Error('Die Einstellungen «Return Tool ID» und «Return Tool Tab» müssen ausgefüllt sein.');
-  const ssRt = SpreadsheetApp.openById(id), quelle = ssRt.getSheetByName(tab);
-  const v = quelle ? quelle.getDataRange().getValues() : [];
-  let k = -1;                                                               // Kopfzeile suchen: die Zeile mit «ID» und «Bezeichnung»
-  for (let i = 0; i < Math.min(v.length, 15) && k < 0; i++) {
-    const zeile = v[i].map(function (x) { return String(x).trim(); });
-    if (zeile.indexOf('ID') > -1 && zeile.indexOf('Bezeichnung') > -1) k = i;
-  }
-  const kopf = k < 0 ? [] : v[k].map(function (x) { return String(x).trim(); }), dort = [], offenDort = {};
-  for (let i = k + 1; k > -1 && i < v.length; i++) {
-    const o = {};
-    kopf.forEach(function (name, j) { if (name) o[name] = v[i][j]; });
-    const pid = String(o['ID'] || '').trim();
-    if (!pid || !String(o['Bezeichnung'] || '').trim()) continue;
-    dort.push(o);
-    if (!String(o['Reusable'] || '').trim()) offenDort[pid] = 1;
-  }
-  /* Schutz: Ein falscher oder leerer Tab darf die Warteschlange nicht leeren. */
-  if (!dort.length) throw new Error('Im Return Tool wurde der Tab «' + tab + '» nicht gefunden oder er ist leer.');
-  /* Stücke mit Lagerort «Analyse» in den anderen Kanal-Tabs (z.B. Stationär) gehören auch in die Warteschlange. Archive nicht. */
-  const imTab = {};
-  dort.forEach(function (x) { imTab[String(x['ID']).trim()] = 1; });
-  rtLagerortAnalyse_(ssRt, tab).forEach(function (o) {
-    const pid = String(o['ID']).trim();
-    if (imTab[pid]) return;
-    imTab[pid] = 1;
-    o._anderer = 1;
-    dort.push(o);
-    if (!String(o['Reusable'] || '').trim()) offenDort[pid] = 1;
+  const ss = SpreadsheetApp.openById(id), tabs = rtKanalTabs_(e, tab), gelesen = rtLesen_(ss, tabs);
+  const dort = [], offenDort = {}, anderer = {}, drin = {};
+  gelesen.zeilen.forEach(function (z) {
+    if (!z.id || !z.bez) return;
+    const imTab = z.tab === tab;
+    if (!imTab && norm_(z.ort) !== 'analyse') return;
+    if (drin[z.idN]) return;
+    drin[z.idN] = 1;
+    dort.push(z);
+    if (!imTab) anderer[z.idN] = 1;
+    if (!String(z.o['Reusable'] || '').trim()) offenDort[z.idN] = 1;
   });
-  const uebernommen = uebernommen_(), anderer = {};
-  dort.forEach(function (x) { if (x._anderer) anderer[String(x['ID']).trim()] = 1; });
+  /* Schutz: Ein falscher oder leerer Tab darf die Warteschlange nicht leeren. */
+  if (!dort.some(function (z) { return z.tab === tab; })) throw new Error('Im Return Tool wurde der Tab «' + tab + '» nicht gefunden oder er ist leer.');
+  const unvollstaendig = gelesen.fehlt.length > 0;
 
-  return gesperrt_(function () {
-    const da = {}, neu = [], status = {}, anNamen = [], verdacht = [];
+  const aus = gesperrt_(function () {
+    const da = {}, neu = [], status = {}, verdacht = [], alle = lies_('Produkte').z, zw = anZwillinge_(alle);
     let entfaellt = 0;
-    const alle = lies_('Produkte').z;
     alle.forEach(function (p) {
-      const pid = String(p['PG-ID']);
-      if (/^AN-/.test(pid)) { const w = norm_(p['Bezeichnung']).split(' ').filter(function (x) { return x.length >= 3; }); if (w.length >= 2) anNamen.push({ id: pid, w: w }); }
-    });
-    const schonAn = function (bez) { const b = norm_(bez); return anNamen.filter(function (x) { return x.w.every(function (w) { return b.indexOf(w) > -1; }); })[0]; };
-    alle.forEach(function (p) {
-      const pid = String(p['PG-ID']);
+      const pid = pgNorm_(p['PG-ID']) || String(p['PG-ID']);
       da[pid] = 1;
       if (p['Herkunft'] !== 'Retoure') return;
-      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid] && !uebernommen[pid]) { status[p._r] = 'Entfällt'; entfaellt++; }
+      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid] && !unvollstaendig && !String(p['Übernommen am'] || '').trim()) { status[p._r] = 'Entfällt'; entfaellt++; }
       if (p['Analyse-Status'] === 'Entfällt' && offenDort[pid]) {
-        const an = anderer[pid] ? schonAn(p['Bezeichnung']) : null;
-        if (an) verdacht.push(pid + ' ~ ' + an.id); else status[p._r] = 'Offen';
+        const an = anderer[pid] ? zw(p) : [];
+        if (an.length) verdacht.push(pid + ' ~ ' + an[0].id); else status[p._r] = 'Offen';
       }
     });
-    dort.forEach(function (r) {
-      const pid = String(r['ID']).trim();
-      if (da[pid] || !offenDort[pid]) return;
-      da[pid] = 1;
+    dort.forEach(function (z) {
+      if (da[z.idN] || !offenDort[z.idN]) return;
+      da[z.idN] = 1;
       /* Aus einem anderen Tab und schon als Stück ohne Inventar (AN-…) analysiert? Dann nicht ein zweites Mal in die Warteschlange. */
-      if (r._anderer) { const an = schonAn(r['Bezeichnung']); if (an) { verdacht.push(pid + ' ~ ' + an.id); return; } }
-      neu.push(rtProdukt_(r));
+      if (anderer[z.idN]) { const an = zw({ 'PG-ID': z.id, 'Bezeichnung': z.bez, 'Link': z.link }); if (an.length) { verdacht.push(z.idN + ' ~ ' + an[0].id); return; } }
+      neu.push(rtProdukt_(z.o));
     });
     setz_('Produkte', 'Analyse-Status', status);
     schreib_('Produkte', neu);
-    if (verdacht.length) log_('Abgleich-Hinweis', '', 'Nicht übernommen, vermutlich schon als AN analysiert: ' + verdacht.join(', '));
-    return { neu: neu.length, entfaellt: entfaellt };
+    return { neu: neu.length, entfaellt: entfaellt, verdacht: verdacht };
   });
+  /* Hinweise höchstens einmal pro Tag und Stück ins Log, sonst alle 10 Minuten dasselbe */
+  const melden = einmalProTag_('verdacht', aus.verdacht);
+  if (melden.length) log_('Abgleich-Hinweis', '', 'Nicht in die Warteschlange, vermutlich schon als AN analysiert: ' + melden.join(', '));
+  const fehltNeu = einmalProTag_('rt-tab', gelesen.fehlt);
+  if (fehltNeu.length) log_('Abgleich-Hinweis', '', 'Return Tool: nicht lesbar, darum fällt in diesem Lauf nichts heraus: ' + fehltNeu.join(', '));
+  const r = { neu: aus.neu, entfaellt: aus.entfaellt };
+  if (unvollstaendig) r.hinweis = 'Return Tool: Tab ' + gelesen.fehlt.join(', ') + ' nicht lesbar.';
+  return r;
 }
 
 /* ------------------------------------------------------------------ */
 /* Return Tool: Die PG-ID ist die einzige Nummer eines Stücks            */
+/* (Entscheid Jonas 23.10.2026). Das Return Tool wird nur gelesen.      */
 /* ------------------------------------------------------------------ */
 
-/** Zeile des Return Tools → Zeile im Tab «Produkte». */
-function rtProdukt_(r) {
-  const ean = ean_(r['Barcode']), bez = String(r['Bezeichnung']).trim();
-  return { 'PG-ID': String(r['ID']).trim(), 'Herkunft': 'Retoure', 'Bezeichnung': txt_(bez), 'Anzahl': Number(r['#']) || 1, 'Barcode': ean || txt_(r['Barcode']), 'Link': txt_(r['Link']),
-    'Kategorie': txt_(r['Kategorie']), 'Neupreis CHF': zahl_(r['OVP']), 'VP CHF': zahl_(r['VP']),
-    'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_(ean, bez), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' };
+/** Kanal-Tabs des Return Tools mit Stücken, die verfügbar sind. Archive («Archiv …») nie. Scanner hat keine PG-IDs. Überschreibbar mit der Einstellung «Return Tool Kanal-Tabs». */
+const RT_KANAL_TABS = ['Analyse', 'Stationär', 'Online', 'Berner Brocki', 'Caritas', 'Heilsarmee'];
+const NAME_SCHWELLE = 0.6;
+const NAME_STOPP = ['mit', 'und', 'fur', 'für', 'der', 'die', 'das', 'den', 'von', 'vom', 'inkl', 'neu', 'set', 'the', 'and', 'for', 'with', 'cm', 'mm', 'min', 'stk', 'stück', 'farbe', 'grösse', 'grosse'];
+
+/** «PG-862», «pg 0862», «PG'862» → «PG-862». Sonst ''. */
+function pgNorm_(s) { const m = /^\s*PG[\s'\-_]?0*(\d+)\s*$/i.exec(String(s == null ? '' : s)); return m ? 'PG-' + Number(m[1]) : ''; }
+/** Barcode zum Vergleichen: nur Ziffern, ohne führende Nullen (im Sheet gehen sie bei Zahlen verloren). */
+function bcNorm_(s) { return String(s == null ? '' : s).replace(/\D/g, '').replace(/^0+/, ''); }
+function gtinOk_(d) {
+  let s = 0;
+  for (let i = d.length - 2, f = 3; i >= 0; i--, f = 4 - f) s += Number(d.charAt(i)) * f;
+  return (10 - s % 10) % 10 === Number(d.charAt(d.length - 1));
 }
-/** Kopfzeile eines Return-Tool-Tabs: die Zeile mit «ID» und «Bezeichnung» in den ersten 15 Zeilen. -1, wenn es keine gibt. */
+/** Barcode zum Speichern: gültige GTIN mit den führenden Nullen, die das Sheet verschluckt hat. Sonst wie ean_. */
+function bcVoll_(v) {
+  const d = String(v == null ? '' : v).replace(/\D/g, '');
+  if ([8, 12, 13, 14].indexOf(d.length) > -1) return d;
+  const k = [8, 12, 13, 14].filter(function (n) { return n > d.length; }).map(function (n) { return ('00000000000000' + d).slice(-n); }).filter(gtinOk_)[0];
+  return d.length >= 6 && k ? k : '';
+}
+/** Galaxus- oder Digitec-Artikelnummer aus einem Link (die Zahl am Ende des Pfads). Der zuverlässigste Schlüssel für ein Produkt. */
+function galaxusNr_(link) {
+  const m = /(?:galaxus|digitec)\.[a-z]+\/[^?#\s]*?(\d{5,10})(?:[\/?#]|$)/i.exec(String(link || ''));
+  return m ? m[1] : '';
+}
+function nameTokens_(s) {
+  return norm_(s).split(' ').filter(function (w, i, a) { return w && a.indexOf(w) === i && NAME_STOPP.indexOf(w) < 0 && (w.length >= 3 || (/\d/.test(w) && w.length >= 2)); });
+}
+/** Wie gut ein Name zu den Suchwörtern passt (0 bis 1). Die Marke (erstes Wort) muss vorkommen; ein passendes Modell (Wort mit Ziffern) zählt extra. */
+function nameTreffer_(tok, name) {
+  if (!tok.length) return 0;
+  const b = norm_(name).split(' ').filter(String);
+  /* Modellnummern (Wörter mit Ziffern) nur genau gleich: «evolve2» ist nicht «evolve», «z7» nicht «z1» */
+  const passt = function (w) { return b.some(function (t) { return t === w || (!/\d/.test(w + t) && ((w.length >= 4 && t.indexOf(w) === 0) || (t.length >= 4 && w.indexOf(t) === 0))); }); };
+  if (!passt(tok[0])) return 0;
+  const treffer = tok.filter(passt), modell = treffer.some(function (w) { return modellWort_(w) && w !== tok[0]; });
+  return Math.min(1, treffer.length / tok.length + (modell ? 0.2 : 0));
+}
+/** Modellnummer: Buchstaben mit Ziffern (z7, rp5, 390a) oder mindestens drei Ziffern; keine Masse wie 4g, 54mm, 120w. */
+function modellWort_(w) { return /\d/.test(w) && !/^\d+(g|gb|tb|mb|mm|cm|m|w|kw|v|l|ml|h|kg|mah|hz|p|k|x)$/.test(w) && (/[a-z]/.test(w) || w.length >= 3); }
+/** In beide Richtungen: Suchwörter im Namen, oder der (kurze) Name des Return Tools ganz in den Suchwörtern (z.B. «Denver MCR 50»). */
+function nameAehnlich_(tok, name) {
+  const b = nameTokens_(name);
+  return Math.max(nameTreffer_(tok, name), b.length >= 2 ? nameTreffer_(b, tok.join(' ')) : 0);
+}
+function rtKanalTabs_(e, tab) {
+  const eig = String((e && e['Return Tool Kanal-Tabs']) || '').split(',').map(function (s) { return s.trim(); }).filter(String);
+  const l = eig.length ? eig : RT_KANAL_TABS.slice();
+  if (tab && l.indexOf(tab) < 0) l.unshift(tab);
+  return l;
+}
+function rtArchiv_(name) { return /^archiv/i.test(String(name).trim()); }
+/** Tabs für die Suche: Kanal-Tabs, Scanner und alle Archive (Archiv-Treffer werden nur angezeigt). */
+function rtSuchTabs_(ss, e) {
+  const k = rtKanalTabs_(e, String((e && e['Return Tool Tab']) || '')).concat(['Scanner']);
+  return ss.getSheets().map(function (s) { return s.getName(); }).filter(function (n) { return k.indexOf(n) > -1 || rtArchiv_(n); });
+}
+/** Kopfzeile eines Return-Tool-Tabs: die Zeile mit «Bezeichnung» und «ID» oder «Barcode» in den ersten 15 Zeilen. -1, wenn es keine gibt. */
 function rtKopf_(v) {
   for (let i = 0; i < Math.min(v.length, 15); i++) {
     const z = v[i].map(function (x) { return String(x).trim(); });
-    if (z.indexOf('ID') > -1 && z.indexOf('Bezeichnung') > -1) return i;
+    if (z.indexOf('Bezeichnung') > -1 && (z.indexOf('ID') > -1 || z.indexOf('Barcode') > -1)) return i;
   }
   return -1;
 }
-function rtObjekt_(kopf, zeile) { const o = {}; kopf.forEach(function (n, j) { if (n) o[n] = zeile[j]; }); return o; }
-function rtArchiv_(name) { return /^archiv/i.test(String(name).trim()); }
-
-/** Alle Zeilen mit Lagerort «Analyse» aus den Kanal-Tabs ausser dem Tab «Analyse» selbst und den Archiven. Ein Tab, der nicht lesbar ist, wird übersprungen. */
-function rtLagerortAnalyse_(ss, ohneTab) {
-  const aus = [];
-  ss.getSheets().forEach(function (sh) {
-    const name = sh.getName();
-    if (name === ohneTab || rtArchiv_(name)) return;
-    try {
-      const sp = sh.getLastColumn(), zeilen = sh.getLastRow();
-      if (sp < 2 || zeilen < 2) return;
-      const v = sh.getRange(1, 1, zeilen, sp).getValues(), k = rtKopf_(v);
-      if (k < 0) return;
-      const kopf = v[k].map(function (x) { return String(x).trim(); }), cL = kopf.indexOf('Lagerort');
-      if (cL < 0) return;
-      for (let i = k + 1; i < v.length; i++) {
-        if (String(v[i][cL]).trim().toLowerCase() !== 'analyse') continue;
-        const o = rtObjekt_(kopf, v[i]);
-        if (String(o['ID'] || '').trim() && String(o['Bezeichnung'] || '').trim()) aus.push(o);
-      }
-    } catch (err) { log_('Abgleich-Hinweis', name, 'Tab nicht lesbar: ' + err.message); }
-  });
-  return aus;
+function rtZeile_(tab, kopf, zeile, nr) {
+  const o = {}; kopf.forEach(function (n, j) { if (n) o[n] = zeile[j]; });
+  const id = String(o['ID'] || '').trim(), link = String(o['Link'] || '').trim();
+  return { tab: tab, archiv: rtArchiv_(tab), zeile: nr, id: id, idN: pgNorm_(id) || id.toUpperCase(), bez: String(o['Bezeichnung'] || '').trim(), bc: String(o['Barcode'] == null ? '' : o['Barcode']).trim(),
+    bcN: bcNorm_(o['Barcode']), link: link, gx: galaxusNr_(link), ort: String(o['Lagerort'] || '').trim(), o: o };
 }
-
-/**
- * Sucht im ganzen Return Tool (alle Tabs, auch Archive): PG-ID, Barcode (nur Ziffern) oder Name (alle Wörter ab 3 Zeichen).
- * Liefert [{ id, bezeichnung, barcode, tab, lagerort, archiv }], Stücke ausserhalb der Archive zuerst.
- */
-function rtSuche_(q) {
-  q = String(q || '').trim();
-  const e = einst_(), rid = String(e['Return Tool ID'] || '').trim();
-  if (!rid || q.length < 3) return [];
-  const ss = SpreadsheetApp.openById(rid), alsId = /^PG-\d+$/i.test(q), nurZiffern = /^\d{6,14}$/.test(q);
-  const woerter = norm_(q).split(' ').filter(function (w) { return w.length >= 3; });
-  let such = q;
-  if (alsId) such = q.toUpperCase();
-  else if (!nurZiffern) { if (!woerter.length) return []; such = woerter.slice().sort(function (a, b) { return b.length - a.length; })[0]; }
-  const zellen = ss.createTextFinder(such).matchEntireCell(alsId || nurZiffern).findAll();
+/** Liest Tabs ganz. fehlt: Tabs, die es nicht gibt, ohne Kopfzeile oder nicht lesbar (wer davon abhängt, muss vorsichtig sein). */
+function rtLesen_(ss, tabs) {
+  const zeilen = [], fehlt = [];
+  tabs.forEach(function (name) {
+    try {
+      const sh = ss.getSheetByName(name);
+      if (!sh) { fehlt.push(name); return; }
+      const v = sh.getDataRange().getValues(), k = rtKopf_(v);
+      if (k < 0) { fehlt.push(name); return; }
+      const kopf = v[k].map(function (x) { return String(x).trim(); });
+      for (let i = k + 1; i < v.length; i++) zeilen.push(rtZeile_(name, kopf, v[i], i + 1));
+    } catch (err) { fehlt.push(name); }
+  });
+  return { zeilen: zeilen, fehlt: fehlt };
+}
+/** Schnell: TextFinder (regulärer Ausdruck, ganze Zelle) übers ganze Sheet, dann nur Treffer in der Spalte «spalte» der Such-Tabs. */
+function rtFinde_(ss, muster, spalte, tabs) {
   const proTab = {};
-  zellen.slice(0, 400).forEach(function (z) { const sh = z.getSheet(), n = sh.getName(); (proTab[n] = proTab[n] || { sh: sh, zeilen: {} }).zeilen[z.getRow()] = 1; });
-  const aus = [], gesehen = {};
+  ss.createTextFinder(muster).useRegularExpression(true).matchEntireCell(true).findAll().forEach(function (z) {
+    const sh = z.getSheet(), n = sh.getName();
+    if (tabs.indexOf(n) < 0) return;
+    (proTab[n] = proTab[n] || { sh: sh, z: [] }).z.push({ r: z.getRow(), c: z.getColumn() });
+  });
+  const aus = [];
   Object.keys(proTab).forEach(function (n) {
     const sh = proTab[n].sh, sp = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(15, sh.getLastRow()), sp).getValues(), k = rtKopf_(kv);
     if (k < 0) return;
-    const kopf = kv[k].map(function (x) { return String(x).trim(); }), nr = Object.keys(proTab[n].zeilen).map(Number).filter(function (r) { return r > k + 1; });
-    let zeilen;
-    if (nr.length > 15) { const alle = sh.getRange(1, 1, sh.getLastRow(), sp).getValues(); zeilen = nr.map(function (r) { return alle[r - 1]; }); }
-    else zeilen = nr.map(function (r) { return sh.getRange(r, 1, 1, sp).getValues()[0]; });
-    zeilen.forEach(function (z) {
-      const o = rtObjekt_(kopf, z), id = String(o['ID'] || '').trim(), bez = String(o['Bezeichnung'] || '').trim();
-      if (!id || !bez) return;
-      if (alsId && id.toUpperCase() !== such) return;
-      if (nurZiffern && String(o['Barcode'] || '').replace(/\D/g, '') !== q) return;
-      if (!alsId && !nurZiffern) { const b = norm_(bez); if (!woerter.every(function (w) { return b.indexOf(w) > -1; })) return; }
-      const key = id + '|' + n;
-      if (gesehen[key]) return;
-      gesehen[key] = 1;
-      aus.push({ id: id, bezeichnung: bez, barcode: String(o['Barcode'] || ''), tab: n, lagerort: String(o['Lagerort'] || ''), archiv: rtArchiv_(n), o: o });
+    const kopf = kv[k].map(function (x) { return String(x).trim(); }), c = kopf.indexOf(spalte) + 1;
+    proTab[n].z.filter(function (x) { return x.c === c && x.r > k + 1; }).slice(0, 50).forEach(function (x) {
+      aus.push(rtZeile_(n, kopf, sh.getRange(x.r, 1, 1, sp).getValues()[0], x.r));
     });
   });
-  aus.sort(function (a, b) { return (a.archiv - b.archiv) || (Number(b.id.replace(/\D/g, '')) - Number(a.id.replace(/\D/g, ''))); });
-  return aus.map(function (x) { const y = Object.assign({}, x); delete y.o; return y; });
+  return aus;
 }
-
-/** PG-IDs, die über die Suche ins Analyse Tool übernommen wurden: Der Abgleich nimmt sie nicht wieder heraus. */
-function uebernommen_() {
-  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('UEBERNOMMEN') || '{}'); } catch (err) { return {}; }
+function rtSortiert_(l) {
+  return l.sort(function (a, b) { return (a.archiv - b.archiv) || ((b.score || 0) - (a.score || 0)) || (Number(String(b.id).replace(/\D/g, '')) - Number(String(a.id).replace(/\D/g, ''))); });
 }
-
-/** Übernimmt ein Stück mit seiner PG-ID aus dem Return Tool in die Warteschlange (wenn es nicht im Tab «Analyse» steht). Das Return Tool wird nur gelesen. */
-function uebernehmen(pid) {
-  pid = String(pid || '').trim().toUpperCase();
-  if (!/^PG-\d+$/.test(pid)) throw new Error('Ungültige PG-ID.');
-  const e = einst_(), ss = SpreadsheetApp.openById(String(e['Return Tool ID']));
-  let o = null, tab = '';
-  ss.createTextFinder(pid).matchEntireCell(true).findAll().some(function (z) {
-    const sh = z.getSheet();
-    if (rtArchiv_(sh.getName())) return false;
-    const sp = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(15, sh.getLastRow()), sp).getValues(), k = rtKopf_(kv);
-    if (k < 0 || z.getRow() <= k + 1) return false;
-    const x = rtObjekt_(kv[k].map(function (v) { return String(v).trim(); }), sh.getRange(z.getRow(), 1, 1, sp).getValues()[0]);
-    if (String(x['ID'] || '').trim().toUpperCase() !== pid) return false;
-    o = x; tab = sh.getName(); return true;
+/**
+ * Sucht im ganzen Return Tool (Kanal-Tabs, Scanner, Archive): PG-ID, Barcode oder Name; opt.link: zusätzlich über die Galaxus-Nummer.
+ * Liefert [{ id, bezeichnung, barcode, tab, lagerort, archiv, ohneId }], verfügbare Stücke zuerst. Findet der schnelle Weg nichts, werden die Tabs ganz gelesen.
+ */
+function rtSuche_(q, opt) {
+  opt = opt || {};
+  q = String(q || '').trim();
+  const e = einst_(), rid = String(e['Return Tool ID'] || '').trim();
+  if (!rid) return [];
+  const ss = SpreadsheetApp.openById(rid), tabs = rtSuchTabs_(ss, e), ziffern = q.replace(/\s/g, '');
+  const pid = pgNorm_(q) || (/^\d{3,5}$/.test(ziffern) ? 'PG-' + Number(ziffern) : ''), bc = /^\d{6,14}$/.test(ziffern) ? bcNorm_(ziffern) : '';
+  const gx = galaxusNr_(opt.link) || galaxusNr_(q), tok = pid || bc ? [] : nameTokens_(q);
+  let l = [];
+  if (pid || bc) {
+    if (pid) l = rtFinde_(ss, '^\\s*[Pp][Gg][-\\s]?0*' + pid.slice(3) + '\\s*$', 'ID', tabs).filter(function (z) { return z.idN === pid; });
+    if (bc) l = l.concat(rtFinde_(ss, '^0*' + bc + '$', 'Barcode', tabs).filter(function (z) { return z.bcN === bc; }));
+    if (!l.length) l = rtLesen_(ss, tabs).zeilen.filter(function (z) { return (pid && z.idN === pid) || (bc && z.bcN === bc); });
+  } else if (tok.length || gx) {
+    rtLesen_(ss, tabs).zeilen.forEach(function (z) {
+      if (!z.bez) return;
+      const s = gx && z.gx === gx ? 2 : nameAehnlich_(tok, z.bez);
+      if (s >= NAME_SCHWELLE) { z.score = s; l.push(z); }
+    });
+  }
+  const gesehen = {};
+  return rtSortiert_(l).filter(function (z) { const k = z.tab + '|' + z.zeile; if (gesehen[k] || (!z.id && !z.bez)) return false; gesehen[k] = 1; return true; }).slice(0, 30).map(function (z) {
+    return { id: z.id, bezeichnung: z.bez, barcode: z.bc, tab: z.tab, lagerort: z.ort, archiv: z.archiv, ohneId: !z.id, galaxus: !!(gx && z.gx === gx) };
   });
-  if (!o) throw new Error(pid + ' steht in keinem aktiven Tab des Return Tools (nur im Archiv oder gar nicht).');
-  gesperrt_(function () {
-    const p = lies_('Produkte').z.filter(function (r) { return String(r['PG-ID']).toUpperCase() === pid; })[0];
-    if (p) { if (p['Analyse-Status'] === 'Entfällt') { const st = {}; st[p._r] = 'Offen'; setz_('Produkte', 'Analyse-Status', st); } }
-    else schreib_('Produkte', [rtProdukt_(o)]);
-    const u = uebernommen_(); u[pid] = zeit_();
-    PropertiesService.getScriptProperties().setProperty('UEBERNOMMEN', JSON.stringify(u));
+}
+
+/** Zeile des Return Tools → Zeile im Tab «Produkte». Der Barcode wird als Text gespeichert, damit führende Nullen bleiben. */
+function rtProdukt_(r) {
+  const ean = bcVoll_(r['Barcode']), bez = String(r['Bezeichnung']).trim();
+  return { 'PG-ID': String(r['ID']).trim(), 'Herkunft': 'Retoure', 'Bezeichnung': txt_(bez), 'Anzahl': Number(r['#']) || 1, 'Barcode': ean ? txtFest_(ean) : txt_(r['Barcode']), 'Link': txt_(r['Link']),
+    'Kategorie': txt_(r['Kategorie']), 'Neupreis CHF': zahl_(r['OVP']), 'VP CHF': zahl_(r['VP']),
+    'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_(ean, bez), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' };
+}
+
+/**
+ * Stücke ohne Inventar (AN-…), die dasselbe Produkt sein könnten wie ein Stück mit PG-ID: gleiche Galaxus-Nummer oder sehr ähnlicher Name.
+ * Gibt eine Funktion zurück: (Produktzeile) → [{ id, status }]. Nur für PG-IDs, sonst leer.
+ */
+function anZwillinge_(produkte) {
+  const an = produkte.filter(function (r) { return /^AN-\d+$/.test(String(r['PG-ID'])); }).map(function (r) {
+    return { id: String(r['PG-ID']), status: String(r['Analyse-Status'] || ''), gx: galaxusNr_(r['Link']), tok: nameTokens_(r['Bezeichnung']), bez: String(r['Bezeichnung'] || '') };
+  });
+  return function (p) {
+    if (!pgNorm_(p['PG-ID']) || !an.length) return [];
+    const gx = galaxusNr_(p['Link']), bez = String(p['Bezeichnung'] || ''), tok = nameTokens_(bez);
+    /* Strenger als die Suche, weil der Abgleich damit Stücke zurückhält: gleiche Galaxus-Nummer, oder die Namen decken sich fast ganz */
+    return an.filter(function (a) {
+      if (gx && a.gx === gx) return true;
+      if (gx && a.gx) return false;                                         // beide mit Galaxus-Nummer, aber verschieden: andere Variante
+      const ma = a.tok.filter(modellWort_), mp = tok.filter(modellWort_);
+      if (ma.length && mp.length && !ma.some(function (w) { return mp.indexOf(w) > -1; })) return false;     // verschiedene Modelle (z.B. Z1 und Z7)
+      const hin = nameTreffer_(a.tok, bez), her = tok.length >= 2 ? nameTreffer_(tok, a.bez) : 0;
+      return hin >= 0.7 || (her >= 0.9 && hin >= 0.3);
+    })
+      .map(function (a) { return { id: a.id, status: a.status }; });
+  };
+}
+
+/** Gibt nur die Einträge zurück, die heute noch nicht gemeldet wurden, und merkt sie sich für 24 Stunden. */
+function einmalProTag_(art, liste) {
+  if (!liste.length) return [];
+  try {
+    const c = CacheService.getScriptCache(), keys = liste.map(function (x) { return art + ':' + hash_(String(x)); }), da = c.getAll(keys) || {}, neu = {};
+    const aus = liste.filter(function (x, i) { if (da[keys[i]]) return false; neu[keys[i]] = '1'; return true; });
+    c.putAll(neu, 86400);
+    return aus;
+  } catch (err) { return liste; }
+}
+
+/**
+ * Übernimmt ein Stück mit seiner PG-ID aus einem Kanal-Tab des Return Tools in die Warteschlange. Spalte «Übernommen am»: Der Abgleich nimmt es dann nicht wieder heraus.
+ * Erledigt oder in Reparatur: Fehler. Könnte es schon als AN analysiert sein, kommt zuerst { zwilling } zurück; mit bestaetigt = true geht es trotzdem.
+ */
+function uebernehmen(pid, bestaetigt) {
+  const n = pgNorm_(pid);
+  if (!n) throw new Error('Ungültige PG-ID.');
+  const e = einst_(), ss = SpreadsheetApp.openById(String(e['Return Tool ID'])), kanal = rtKanalTabs_(e, String(e['Return Tool Tab'] || ''));
+  let t = rtFinde_(ss, '^\\s*[Pp][Gg][-\\s]?0*' + n.slice(3) + '\\s*$', 'ID', rtSuchTabs_(ss, e)).filter(function (z) { return z.idN === n; });
+  if (!t.some(function (z) { return kanal.indexOf(z.tab) > -1; })) t = t.concat(rtLesen_(ss, kanal).zeilen.filter(function (z) { return z.idN === n; }));
+  const z = t.filter(function (x) { return kanal.indexOf(x.tab) > -1; })[0];
+  if (!z) throw new Error(n + (t.length ? ' steht nur im Archiv des Return Tools (' + t[0].tab + ') und lässt sich nicht analysieren.' : ' steht nicht im Return Tool.'));
+  const alle = lies_('Produkte').z, p = alle.filter(function (r) { return pgNorm_(r['PG-ID']) === n; })[0];
+  if (p && p['Analyse-Status'] === 'Erledigt') throw new Error(n + ' ist schon analysiert (Erledigt).');
+  if (p && p['Analyse-Status'] === 'Reparatur') throw new Error(n + ' liegt im Regal «Reparatur». Bitte dort fortsetzen.');
+  if (!bestaetigt) {
+    const an = anZwillinge_(alle)({ 'PG-ID': z.id, 'Bezeichnung': z.bez, 'Link': z.link });
+    if (an.length) return { zwilling: an.map(function (a) { return a.id + ' (' + a.status + ')'; }).join(', '), id: z.id };
+  }
+  const id = gesperrt_(function () {
+    const q = lies_('Produkte').z.filter(function (r) { return pgNorm_(r['PG-ID']) === n; })[0], jetzt = zeit_();
+    if (q) {
+      const st = {}, ue = {};
+      if (q['Analyse-Status'] === 'Entfällt') { st[q._r] = 'Offen'; setz_('Produkte', 'Analyse-Status', st); }
+      ue[q._r] = jetzt; setz_('Produkte', 'Übernommen am', ue);
+      return String(q['PG-ID']);
+    }
+    schreib_('Produkte', [Object.assign(rtProdukt_(z.o), { 'Übernommen am': jetzt })]);
+    return z.id;
   }, ['Produkte']);
-  log_('Aus Return Tool übernommen', pid, tab + ' · Lagerort ' + String(o['Lagerort'] || '–'));
-  return { id: pid };
+  log_('Aus Return Tool übernommen', id, z.tab + ' · Lagerort ' + (z.ort || '–') + (bestaetigt ? ' · trotz möglichem AN-Doppel bestätigt' : ''));
+  return { id: id };
 }
 
 function kopfzeilen_() { return { 'x-api-key': key_(), 'anthropic-version': API_VERSION }; }
@@ -3254,7 +3366,7 @@ function einrichten() {
   const ss = ss_(), fehler = [];
   vergissAlle_();
   gesperrt_(function () { umbau_(ss); });
-  ['Kosten', 'Feedback', 'Ricardo', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
+  ['Kosten', 'Feedback', 'Ricardo', 'Matchmaker', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
   Object.keys(SPALTEN).forEach(function (n) {
     const s = ss.getSheetByName(n);
     if (!s) { fehler.push('Tab «' + n + '» fehlt'); return; }
@@ -3352,6 +3464,8 @@ function umbau_(ss) {
   /* Produkte: Spalten aus dem Import, die niemand mehr liest */
   const pr = ss.getSheetByName('Produkte');
   if (pr) { const pk = kopf_(pr); for (let c = pk.length; c > 0; c--) if (PRODUKTE_WEG.indexOf(pk[c - 1]) > -1) pr.deleteColumn(c); }
+  /* Produkte: neue Spalten hinten anhängen (z.B. «Übernommen am», 24.10.2026) */
+  if (pr) { const pk = kopf_(pr).filter(String), fehlt = SPALTEN['Produkte'].filter(function (c) { return pk.indexOf(c) < 0; }); if (fehlt.length) kopfzeile(pr, pk.concat(fehlt)); }
 
   /* Einstellungen: umbenennen, entfernen, nachtragen */
   const es = ss.getSheetByName('Einstellungen');
