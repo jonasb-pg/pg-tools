@@ -28,6 +28,8 @@ const RT = { getSheets: () => Object.keys(BL).map(n => BL[n]), getSheetByName: n
     return out; } }; return f; } };
 const c = { console, JSON, Math, Date, RegExp, Utilities: { formatDate: () => '' }, SpreadsheetApp: { openById: () => RT } };
 vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8'), c);
+assert.throws(() => c.ohneInventar('X', '', 1, '', 2, 'Grund lang', true), /Nur Stücke mit PG-ID/, 'ohne Inventar abgeschaltet (Entscheid 24.10.2026)');
+vm.runInContext('OHNE_INVENTAR = true;', c);
 let PRODUKTE = [], LOG = [];
 c.einst_ = () => ({ 'Return Tool ID': 'RT', 'Return Tool Tab': 'Analyse' });
 let PK = ['PG-ID', 'Herkunft', 'Bezeichnung', 'Barcode', 'Link', 'Analyse-Status', 'Übernommen am'];

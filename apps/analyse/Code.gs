@@ -811,7 +811,11 @@ function aktualisieren(mitFehlern) {
  * Schutz gegen Doppel: Zuerst wird das ganze Return Tool durchsucht, über die Galaxus-Nummer im Link und über den Namen.
  * Gibt es Treffer, kommt die Liste zurück (das Stück wird dann mit seiner PG-ID übernommen). Anlegen trotz Treffern oder ohne Treffer nur mit Grund.
  */
+/* Entscheid Jonas 24.10.2026: «Alle, die reinkommen, müssen eine PG-ID haben, sonst kommen sie nicht rein.» Neue Stücke ohne Inventar sind abgeschaltet;
+   bestehende AN-Stücke lassen sich weiter analysieren. Der Code bleibt für den Fall, dass es wieder erlaubt wird (OHNE_INVENTAR = true). */
+let OHNE_INVENTAR = false;
 function ohneInventar(name, link, vp, kategorie, ovp, grund, trotzdem) {
+  if (!OHNE_INVENTAR) throw new Error('Nur Stücke mit PG-ID. Bitte das Stück zuerst im Return Tool erfassen, dann hier scannen.');
   name = String(name || '').trim(); link = String(link || '').trim();
   if (!name && link) {                                                      // Name aus dem letzten Teil des Links
     name = link.split('?')[0].replace(/\/+$/, '').split('/').pop() || '';

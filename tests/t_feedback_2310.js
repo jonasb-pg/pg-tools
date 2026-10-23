@@ -2,6 +2,8 @@
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const c = { console, JSON, Math, Date, Utilities: { formatDate: () => '' } };
 vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8'), c);
+assert.throws(() => c.ohneInventar('X', '', 1, '', 2, 'Grund lang', true), /Nur Stücke mit PG-ID/, 'ohne Inventar abgeschaltet (Entscheid 24.10.2026)');
+vm.runInContext('OHNE_INVENTAR = true;', c);
 const u = { ablauf: ['ident', 'funktion', 'zustand', 'entscheid'], rueckruf: null, firmware: false, strom: ['230 V'],
   funktion: { liste: [{ n: 'Einschalten', t: 'Einschalten', g: 'Kern' }, { n: 'Timer', t: 'Timer stellen', g: 'Weitere' }], ungeprueft: ['Bluetooth (App nötig)', 'Fernbedienung (Stufe: nur die wichtigsten 3)'], ungeprueftKurz: ['Bluetooth', 'Fernbedienung'] },
   reset: [], liefer: { teile: ['Kabel'], unsicher: false }, sicher: [], zustand: { grade: [['A', 'Neu', ''], ['B', 'Neu', ''], ['C', 'Gebraucht', '']] }, produkt: { umfang: 'Kern' } };

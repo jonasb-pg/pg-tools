@@ -22,6 +22,7 @@ with sync_playwright() as p:
     pg.on('pageerror', lambda e: err.append(str(e.stack)[:400]))
     pg.route('http://app.test/', lambda r: r.fulfill(body=html, content_type='text/html; charset=utf-8'))
     pg.goto('http://app.test/'); pg.evaluate("localStorage.clear(); localStorage.setItem('at-kuerzel','XX'); localStorage.setItem('at-kuerzel-tag', heute())"); pg.reload(); pg.wait_for_timeout(300)
+    assert pg.locator('[data-a="ohneZeigen"]').count() == 0, 'kein Weg mehr zu «Stück ohne Inventar» (Entscheid 24.10.2026)'
     pg.fill('#q', 'toniebox'); pg.press('#q', 'Enter'); pg.wait_for_timeout(150)
     assert 'im Return Tool' in pg.text_content('#such-meldung'), pg.text_content('#such-meldung')
     assert pg.is_visible('#treffer button[data-v="PG-201"]') and pg.locator('#treffer button[data-v="PG-300"]').count() == 0
