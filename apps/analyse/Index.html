@@ -533,7 +533,8 @@
     'rt.trotzdem': ['Ist ein anderes Stück, trotzdem analysieren', 'It is a different item, analyse anyway'],
     'such.imTool': ['Im Analyse Tool', 'In the Analyse Tool'], 'such.imRt': ['Im Return Tool', 'In the Return Tool'],
     'such.mehrdeutig': ['Mehrere Stücke haben diesen Barcode. Bitte die PG-ID auf dem Etikett scannen oder unten wählen.', 'Several items share this barcode. Please scan the PG-ID label or choose below.'],
-    'such.an': ['Vielleicht schon analysiert als {0}', 'Maybe already analysed as {0}'], 'such.anzahl': ['{0} Stück', '{0} pcs'], 'th.tab': ['Tab / Lagerort', 'Tab / location'], 'th.ean': ['Barcode', 'Barcode'],
+    'such.an': ['Vielleicht schon analysiert als {0}', 'Maybe already analysed as {0}'],
+    'such.anWarn': ['Dieses Stück ist vielleicht schon als Stück ohne Inventar analysiert. Bitte am Produkt prüfen, dann erst starten.', 'This item may already be analysed as an item without inventory. Please check the item before starting.'], 'such.anzahl': ['{0} Stück', '{0} pcs'], 'th.tab': ['Tab / Lagerort', 'Tab / location'], 'th.ean': ['Barcode', 'Barcode'],
     'ohne.grund': ['Warum steht es nicht im Return Tool?', 'Why is it not in the Return Tool?'], 'ohne.grund.platz': ['z.B. Reuse-Spende, kein Etikett', 'e.g. reuse donation, no label'],
     'ohne.kand': ['Dieses Produkt steht schon im Return Tool. Bitte die PG-ID auf dem Stück vergleichen und das richtige übernehmen. Nicht doppelt anlegen.', 'This product is already in the Return Tool. Compare the PG-ID on the item and take over the right one. Do not create it twice.'],
     'ohne.trotzdem': ['Keines davon, trotzdem ohne Inventar anlegen', 'None of these, create without inventory anyway'],
@@ -855,7 +856,7 @@
         $('treffer').innerHTML = (r.treffer.length ? '<h3 class="gruppe">' + tx('such.imTool') + '</h3>' + tabelle(r.treffer, false) : '') + (r.rt && r.rt.length ? '<h3 class="gruppe">' + tx('such.imRt') + '</h3>' + rtTabelle(r.rt) : '');
         return;
       }
-      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? (r.mehrdeutig ? 'such.mehrdeutig' : 'such.mehrere') : 'such.erledigt')), r.inSchlange ? '' : 'warn');
+      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? (r.mehrdeutig ? 'such.mehrdeutig' : (r.anWarnung ? 'such.anWarn' : 'such.mehrere')) : 'such.erledigt')), r.inSchlange ? '' : 'warn');
       $('treffer').innerHTML = r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '';
       if (r.inSchlange) vorabHolen(r.treffer);
     }, function (m) { $('such-meldung').innerHTML = box(m, 'warn'); });

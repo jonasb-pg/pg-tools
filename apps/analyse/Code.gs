@@ -770,7 +770,7 @@ function suche(q) {
   });
   /* Weg A: ein einziges offenes Stück startet sofort, aber nur, wenn die Nummer eindeutig ist
      (PG-ID gescannt, oder der Barcode gehört zu genau einem Stück) und es nicht schon als AN analysiert sein könnte. */
-  const eindeutig = pid || (bc && treffer.length === 1);
+  const eindeutig = pid || !bc || treffer.length === 1;
   if (offen.length === 1 && eindeutig && !liste[0].an && offen[0]['Analyse-Status'] !== 'Reparatur') try { liste[0].d = ueberblickSpeicher_(offen[0], einst_()); } catch (err) { /* dann wie bisher mit starteAnalyse */ }
   if (!offen.length && liste.length) {                                         // erledigt: Liegt es im Regal «Matchmaker», kann es von dort zurück
     const mm = imMatchmaker_();
@@ -784,12 +784,13 @@ function suche(q) {
       rt = rtSuche_(q).slice(0, 15).map(function (x) { x.status = status[pgNorm_(x.id)] || ''; return x; });
     } catch (err) { rtFehler = 'Das Return Tool konnte nicht durchsucht werden: ' + err.message; log_('Return-Tool-Suche', q, err.message); }
   }
-  return { treffer: liste, inSchlange: offen.length > 0, mehrdeutig: offen.length === 1 && !eindeutig, rt: rt, rtFehler: rtFehler };
+  return { treffer: liste, inSchlange: offen.length > 0, mehrdeutig: offen.length === 1 && !eindeutig, anWarnung: offen.length === 1 && !!liste[0].an, rt: rt, rtFehler: rtFehler };
 }
 
 function warteschlange() {
   const p = lies_('Produkte').z, zb = lies_('Stufen').z;
-  return { zahlen: zahlen_(p), liste: p.filter(inSchlange_).slice(0, 400).map(function (r) { return kurz_(r, zb); }),
+  const zw = anZwillinge_(p);
+  return { zahlen: zahlen_(p), liste: p.filter(inSchlange_).slice(0, 400).map(function (r) { const x = kurz_(r, zb), z = zw(r); if (z.length) x.an = z.map(function (a) { return a.id + ' (' + a.status + ')'; }).join(', '); return x; }),
     zuletzt: PropertiesService.getScriptProperties().getProperty('ABGLEICH_ZULETZT') || '' };
 }
 
@@ -911,13 +912,15 @@ function spiegeln_(e) {
   const unvollstaendig = gelesen.fehlt.length > 0;
 
   const aus = gesperrt_(function () {
-    const da = {}, neu = [], status = {}, verdacht = [], alle = lies_('Produkte').z, zw = anZwillinge_(alle);
+    const pr = lies_('Produkte'), da = {}, neu = [], status = {}, verdacht = [], alle = pr.z, zw = anZwillinge_(alle, true);
+    /* Ohne Spalte «Übernommen am» (vor «einrichten») kann der Schutz für übernommene Stücke nicht greifen: dann fällt nichts heraus */
+    const ohneSpalte = !!pr.kopf && pr.kopf.indexOf('Übernommen am') < 0;
     let entfaellt = 0;
     alle.forEach(function (p) {
       const pid = pgNorm_(p['PG-ID']) || String(p['PG-ID']);
       da[pid] = 1;
       if (p['Herkunft'] !== 'Retoure') return;
-      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid] && !unvollstaendig && !String(p['Übernommen am'] || '').trim()) { status[p._r] = 'Entfällt'; entfaellt++; }
+      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid] && !unvollstaendig && !ohneSpalte && !String(p['Übernommen am'] || '').trim()) { status[p._r] = 'Entfällt'; entfaellt++; }
       if (p['Analyse-Status'] === 'Entfällt' && offenDort[pid]) {
         const an = anderer[pid] ? zw(p) : [];
         if (an.length) verdacht.push(pid + ' ~ ' + an[0].id); else status[p._r] = 'Offen';
@@ -976,7 +979,7 @@ function galaxusNr_(link) {
   return m ? m[1] : '';
 }
 function nameTokens_(s) {
-  return norm_(s).split(' ').filter(function (w, i, a) { return w && a.indexOf(w) === i && NAME_STOPP.indexOf(w) < 0 && (w.length >= 3 || (/\d/.test(w) && w.length >= 2)); });
+  return norm_(s).split(' ').filter(function (w, i, a) { return w && a.indexOf(w) === i && NAME_STOPP.indexOf(w) < 0 && (w.length >= 3 || /\d/.test(w)); });
 }
 /** Wie gut ein Name zu den Suchwörtern passt (0 bis 1). Die Marke (erstes Wort) muss vorkommen; ein passendes Modell (Wort mit Ziffern) zählt extra. */
 function nameTreffer_(tok, name) {
@@ -989,6 +992,8 @@ function nameTreffer_(tok, name) {
   return Math.min(1, treffer.length / tok.length + (modell ? 0.2 : 0));
 }
 /** Modellnummer: Buchstaben mit Ziffern (z7, rp5, 390a) oder mindestens drei Ziffern; keine Masse wie 4g, 54mm, 120w. */
+/** Zahl im Namen, die das Modell unterscheidet (auch einstellig: AirPods 2 und 4), ohne Masse. */
+function zahlWort_(w) { return /\d/.test(w) && !/^\d+(g|gb|tb|mb|mm|cm|m|w|kw|v|l|ml|h|kg|mah|hz|p|k|x)$/.test(w); }
 function modellWort_(w) { return /\d/.test(w) && !/^\d+(g|gb|tb|mb|mm|cm|m|w|kw|v|l|ml|h|kg|mah|hz|p|k|x)$/.test(w) && (/[a-z]/.test(w) || w.length >= 3); }
 /** In beide Richtungen: Suchwörter im Namen, oder der (kurze) Name des Return Tools ganz in den Suchwörtern (z.B. «Denver MCR 50»). */
 function nameAehnlich_(tok, name) {
@@ -1100,7 +1105,7 @@ function rtProdukt_(r) {
  * Stücke ohne Inventar (AN-…), die dasselbe Produkt sein könnten wie ein Stück mit PG-ID: gleiche Galaxus-Nummer oder sehr ähnlicher Name.
  * Gibt eine Funktion zurück: (Produktzeile) → [{ id, status }]. Nur für PG-IDs, sonst leer.
  */
-function anZwillinge_(produkte) {
+function anZwillinge_(produkte, streng) {
   const an = produkte.filter(function (r) { return /^AN-\d+$/.test(String(r['PG-ID'])); }).map(function (r) {
     return { id: String(r['PG-ID']), status: String(r['Analyse-Status'] || ''), gx: galaxusNr_(r['Link']), tok: nameTokens_(r['Bezeichnung']), bez: String(r['Bezeichnung'] || '') };
   });
@@ -1111,10 +1116,11 @@ function anZwillinge_(produkte) {
     return an.filter(function (a) {
       if (gx && a.gx === gx) return true;
       if (gx && a.gx) return false;                                         // beide mit Galaxus-Nummer, aber verschieden: andere Variante
-      const ma = a.tok.filter(modellWort_), mp = tok.filter(modellWort_);
-      if (ma.length && mp.length && !ma.some(function (w) { return mp.indexOf(w) > -1; })) return false;     // verschiedene Modelle (z.B. Z1 und Z7)
+      const ma = a.tok.filter(zahlWort_), mp = tok.filter(zahlWort_);
+      if (ma.length && mp.length && !ma.some(function (w) { return mp.indexOf(w) > -1; })) return false;     // verschiedene Modelle (z.B. Z1 und Z7, AirPods 2 und 4)
       const hin = nameTreffer_(a.tok, bez), her = tok.length >= 2 ? nameTreffer_(tok, a.bez) : 0;
-      return hin >= 0.7 || (her >= 0.9 && hin >= 0.3);
+      /* streng (Abgleich hält Stücke zurück): beide Namen decken sich in beide Richtungen. Sonst (Warnung in Suche und Übernehmen) genügt eine Richtung. */
+      return streng ? hin >= 0.7 && her >= 0.7 : hin >= 0.7 || (her >= 0.9 && hin >= 0.3);
     })
       .map(function (a) { return { id: a.id, status: a.status }; });
   };
@@ -1150,6 +1156,8 @@ function uebernehmen(pid, bestaetigt) {
     const an = anZwillinge_(alle)({ 'PG-ID': z.id, 'Bezeichnung': z.bez, 'Link': z.link });
     if (an.length) return { zwilling: an.map(function (a) { return a.id + ' (' + a.status + ')'; }).join(', '), id: z.id };
   }
+  const kp = lies_('Produkte').kopf;
+  if (kp && kp.indexOf('Übernommen am') < 0) throw new Error('Im Tab «Produkte» fehlt die Spalte «Übernommen am». Bitte im Editor «einrichten» ausführen.');
   const id = gesperrt_(function () {
     const q = lies_('Produkte').z.filter(function (r) { return pgNorm_(r['PG-ID']) === n; })[0], jetzt = zeit_();
     if (q) {
@@ -3465,7 +3473,7 @@ function umbau_(ss) {
   const pr = ss.getSheetByName('Produkte');
   if (pr) { const pk = kopf_(pr); for (let c = pk.length; c > 0; c--) if (PRODUKTE_WEG.indexOf(pk[c - 1]) > -1) pr.deleteColumn(c); }
   /* Produkte: neue Spalten hinten anhängen (z.B. «Übernommen am», 24.10.2026) */
-  if (pr) { const pk = kopf_(pr).filter(String), fehlt = SPALTEN['Produkte'].filter(function (c) { return pk.indexOf(c) < 0; }); if (fehlt.length) kopfzeile(pr, pk.concat(fehlt)); }
+  if (pr) { const pk = kopf_(pr), fehlt = SPALTEN['Produkte'].filter(function (c) { return pk.indexOf(c) < 0; }); if (fehlt.length) kopfzeile(pr, pk.concat(fehlt)); }
 
   /* Einstellungen: umbenennen, entfernen, nachtragen */
   const es = ss.getSheetByName('Einstellungen');

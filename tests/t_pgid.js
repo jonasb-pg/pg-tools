@@ -11,7 +11,8 @@ const TABS = {
     zeile('PG-0203', 'Denver MCR 50', 40064081, 'Analyse'), zeile('PG-204', 'imoo Watch Phone Z1 (41 mm, 4G)', '', 'Analyse')]),
   'Archiv Stationär': leer().concat([KOPF, zeile('PG-300', 'Tonies Toniebox alt', '', 'Analyse')]),
   'Scanner': leer().concat([['☑', 'Erfasst', 'Bezeichnung', 'Barcode', 'Lagerort'], ['', '', 'Ohne Nummer Gerät', '7611111111111', 'Analyse']]),
-  'Listen': [['Liste'], ['PG-202 Notiz']]
+  'Listen': [['Liste'], ['PG-202 Notiz']],
+  'Online': leer().concat([KOPF]), 'Berner Brocki': leer().concat([KOPF]), 'Caritas': leer().concat([KOPF]), 'Heilsarmee': leer().concat([KOPF])
 };
 function blatt(name) {
   const v = TABS[name], breit = () => Math.max.apply(null, v.map(r => r.length));
@@ -29,7 +30,8 @@ const c = { console, JSON, Math, Date, RegExp, Utilities: { formatDate: () => ''
 vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/analyse/Code.gs', 'utf8'), c);
 let PRODUKTE = [], LOG = [];
 c.einst_ = () => ({ 'Return Tool ID': 'RT', 'Return Tool Tab': 'Analyse' });
-c.lies_ = n => ({ z: (n === 'Produkte' ? PRODUKTE : []).map((p, i) => Object.assign({ _r: i + 2 }, p)) });
+let PK = ['PG-ID', 'Herkunft', 'Bezeichnung', 'Barcode', 'Link', 'Analyse-Status', 'Übernommen am'];
+c.lies_ = n => ({ kopf: PK, z: (n === 'Produkte' ? PRODUKTE : []).map((p, i) => Object.assign({ _r: i + 2 }, p)) });
 c.schreib_ = (n, objs) => { objs.forEach(o => PRODUKTE.push(Object.assign({}, o))); };
 c.setz_ = (n, feld, werte) => { Object.keys(werte).forEach(r => { PRODUKTE[Number(r) - 2][feld] = werte[r]; }); };
 c.gesperrt_ = f => f(); c.log_ = (a, id, d) => LOG.push(a + ' ' + id + ' ' + d); c.zeit_ = () => '24.10.2026';
@@ -45,6 +47,15 @@ assert.strictEqual(c.galaxusNr_('https://www.brack.ch/wahl-1381328'), '');
 assert.ok(c.nameTreffer_(c.nameTokens_('beurer mg 195 9 stufen 120 min massagepistole'), 'Beurer MG 195 (9 Stufen, 120 min)') >= 0.6);
 assert.ok(c.nameAehnlich_(c.nameTokens_('denver mcr 50 patefonas ruda plattenspieler'), 'Denver MCR 50') >= 0.6, 'kurzer Name ganz enthalten');
 assert.ok(c.nameTreffer_(c.nameTokens_('jabra evolve 65 te link 390a'), 'Jabra Evolve2 55') < 0.6, 'evolve2 ist nicht evolve');
+
+/* Zwillinge: streng (Abgleich) vs. Warnung */
+const Z = (anName, pgName, streng) => c.anZwillinge_([{ 'PG-ID': 'AN-0001', 'Bezeichnung': anName, 'Analyse-Status': 'Erledigt' }], streng)({ 'PG-ID': 'PG-1', 'Bezeichnung': pgName }).length > 0;
+assert.ok(!Z('Apple AirPods Pro 2', 'Apple AirPods 4', true) && !Z('Apple AirPods Pro 2', 'Apple AirPods 4'), 'AirPods 2 ≠ 4');
+assert.ok(!Z('Philips Hue Bridge', 'Philips Hue Go', true), 'Hue Bridge hält Hue Go nicht zurück');
+assert.ok(!Z('iPhone 13', 'iPhone 13 Pro', true), 'iPhone 13 hält 13 Pro nicht zurück');
+assert.ok(!Z('Nespresso Kapselmaschine', 'Nespresso Vertuo Next Kapselmaschine', true));
+assert.ok(Z('beurer mg 195 9 stufen 120 min massagepistole', 'Beurer MG 195 (9 Stufen, 120 min)', true), 'echter Doppel bleibt erkannt');
+assert.ok(Z('denver mcr 50 patefonas ruda plattenspieler', 'Denver MCR 50') && !Z('denver mcr 50 patefonas ruda plattenspieler', 'Denver MCR 50', true), 'Denver: Warnung, aber kein Zurückhalten');
 
 /* 1. Abgleich */
 PRODUKTE = [{ 'PG-ID': 'AN-0027', 'Herkunft': 'Ohne Inventar', 'Bezeichnung': 'Babymoov Premium Care', 'Link': gx(111), 'Analyse-Status': 'Erledigt' },
@@ -89,6 +100,13 @@ let u = c.uebernehmen('pg-201'); assert.strictEqual(u.id, 'PG-201');
 let p = P('PG-201'); assert.ok(p && p['Analyse-Status'] === 'Offen' && p['Übernommen am'] === '24.10.2026');
 c.spiegeln_(c.einst_()); assert.strictEqual(P('PG-201')['Analyse-Status'], 'Offen', 'Abgleich nimmt Übernommenes nicht heraus');
 assert.throws(() => c.uebernehmen('PG-300'), /Archiv/);
+/* Vor «einrichten» (Spalte fehlt): nichts fällt heraus, Übernehmen meldet es klar */
+PK = PK.filter(k => k !== 'Übernommen am');
+PRODUKTE.push({ 'PG-ID': 'PG-777', 'Herkunft': 'Retoure', 'Bezeichnung': 'Weg', 'Analyse-Status': 'Offen' });
+assert.strictEqual(c.spiegeln_(c.einst_()).entfaellt, 0, 'ohne Spalte kein Entfällt');
+assert.throws(() => c.uebernehmen('PG-201'), /einrichten/);
+PK.push('Übernommen am');
+assert.strictEqual(c.spiegeln_(c.einst_()).entfaellt, 1, 'mit Spalte fällt PG-777 heraus');
 assert.throws(() => c.uebernehmen('AN-0001'), /Ungültige/);
 u = c.uebernehmen('PG-202'); assert.ok(u.zwilling && /AN-0028/.test(u.zwilling), 'Warnung AN-0028 vor dem Übernehmen');
 assert.ok(!P('PG-202'), 'noch nichts geschrieben');
