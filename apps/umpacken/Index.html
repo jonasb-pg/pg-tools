@@ -375,7 +375,8 @@
     if (gebinde) V.D.zuordnung[k] = { gebinde: gebinde, preis: preisWert }; else delete V.D.zuordnung[k];
     V.letzte = [k].concat(V.letzte.filter(function (x) { return x !== k; })).slice(0, 50);
     V.qId = V.D.id;
-    V.Q.push(code ? { code: code, wunsch: p.id, gebinde: gebinde, preis: preisWert, vorher: '' } : { id: p.id, gebinde: gebinde, preis: preisWert, vorher: vorher });
+    /* sid: Kennung dieses einen Scans. Kommt die Antwort nicht an und der Browser schickt ihn nochmals, bucht der Server kein zweites Stück (Review 24.10.2026). */
+    V.Q.push(code ? { code: code, wunsch: p.id, gebinde: gebinde, preis: preisWert, vorher: '', sid: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) } : { id: p.id, gebinde: gebinde, preis: preisWert, vorher: vorher });
     sichereQ(); senden();
   }
   /* Was noch in der Schlange wartet, über den Stand vom Server legen (Barcode-Scans mit dem angezeigten Stück) */

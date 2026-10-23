@@ -497,7 +497,7 @@ function zuordnen(id, ops, kuerzel) {
   const d = durchgang_(id);
   if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   return gesperrt_(function () {
-    const z = zuordnungVon_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], ku = String(kuerzel || '').toUpperCase().slice(0, 4);
+    const z = zuordnungVon_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], ku = String(kuerzel || '').toUpperCase().slice(0, 4), gemerkt = {};
     lies_('Gebinde').z.forEach(function (g) { if (String(g['Durchgang']) === id) gebinde[String(g['Gebinde'])] = g; });
     lies_('Bestand').z.forEach(function (p) {
       if (String(p['Durchgang']) !== id) return;
@@ -508,6 +508,11 @@ function zuordnen(id, ops, kuerzel) {
     const gName = function (g) { return gebinde[g] ? gebinde[g]['Name'] : 'kein Gebinde'; };
     (ops || []).forEach(function (o) {
       if (!o.id && o.code) {
+        /* Wiederholter Barcode-Scan (Antwort nicht angekommen, Seite neu geladen): nicht ein zweites Stück derselben EAN buchen. */
+        const schon = scanSchon_(o.sid);
+        if (schon && z[norm_(schon)]) { konflikte.push({ id: schon, code: o.code, grund: 'schon gespeichert', gebinde: z[norm_(schon)].gebinde, gleich: true }); return; }
+        const wk = norm_(o.wunsch || '');
+        if (wk && z[wk] && z[wk].gebinde === o.gebinde && z[wk].kuerzel === ku) { konflikte.push({ id: o.wunsch, code: o.code, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return; }
         const r = stueckZuCode_(o.code, bestand, proBc, z, o.wunsch);
         if (r.fehler) { konflikte.push({ id: o.wunsch || o.code, code: o.code, grund: r.fehler }); return; }
         o = Object.assign({}, o, { id: r.id, vorher: '' });
@@ -525,11 +530,24 @@ function zuordnen(id, ops, kuerzel) {
       const pid = String(bestand[k]['PG-ID']);
       neu.push({ 'Durchgang': id, 'PG-ID': pid, 'Gebinde': o.gebinde || '', 'Preis': preis, 'Zeit': t, 'Kürzel': ku });
       if (o.gebinde) z[k] = { gebinde: o.gebinde, preis: preis, zeit: t, kuerzel: ku }; else delete z[k];
-      if (o.code) ergebnis.push({ code: o.code, wunsch: o.wunsch || '', id: pid, gebinde: o.gebinde });
+      if (o.code) { ergebnis.push({ code: o.code, wunsch: o.wunsch || '', id: pid, gebinde: o.gebinde }); if (o.sid) gemerkt[o.sid] = pid; }
     });
     schreib_('Zuordnung', neu);
+    scanMerken_(gemerkt);
     return { zuordnung: z, konflikte: konflikte, ergebnis: ergebnis };
   });
+}
+/** Gespeicherte Barcode-Scans pro Scan-Kennung (12 Stunden), damit eine Wiederholung kein zweites Stück bucht. */
+function scanSchon_(sid) {
+  if (!sid) return '';
+  try { return CacheService.getScriptCache().get('scan:' + String(sid).slice(0, 40)) || ''; } catch (err) { return ''; }
+}
+function scanMerken_(m) {
+  const k = Object.keys(m);
+  if (!k.length) return;
+  const o = {};
+  k.forEach(function (s) { o['scan:' + String(s).slice(0, 40)] = m[s]; });
+  try { CacheService.getScriptCache().putAll(o, 43200); } catch (err) { /* ohne Speicher bleibt der Schutz über das Gebinde */ }
 }
 /** Barcode → freies Stück der Quelle. { id } oder { fehler }. */
 function stueckZuCode_(code, bestand, proBc, z, wunsch) {

@@ -45,6 +45,7 @@ const RT = datei({
   'Archiv Stationär': leer5.concat([K6, st('PG-60', 'Alt', '', 3, 'KID-14'), st('PG-61', 'Alt', '', 3, 'KIDS-15')]),
   'Dashboard': [['Zahlen'], ['ohne Lagerort-Spalte']]
 });
+const CACHE = {};
 const erstellt = [];
 let lockFrei = true, rtKaputt = false, driveKaputt = false;
 const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Error, isFinite,
@@ -53,6 +54,7 @@ const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Er
     openByUrl: (u) => { const s = erstellt.find(x => x.getUrl() === u); if (!s) throw new Error('nicht gefunden'); return s; } },
   DriveApp: { getFileById: () => ({ moveTo() { if (driveKaputt) throw new Error('Ordner fehlt'); }, setSharing() { if (driveKaputt) throw new Error('Richtlinie'); } }), getFolderById: () => ({}), Access: {}, Permission: {} },
   LockService: { getScriptLock: () => ({ tryLock: () => lockFrei, releaseLock() {} }) },
+  CacheService: { getScriptCache: () => ({ get: k => CACHE[k] || null, putAll: o => Object.assign(CACHE, o) }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'test@pg' }) },
   Utilities: { formatDate: (d, tz, f) => f === 'dd/MM/yyyy' ? '24/10/2026' : c.UHR } , UHR: '24.10.2026 08:00:00' };
 vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/umpacken/Code.gs', 'utf8'), c);
@@ -113,6 +115,14 @@ r4 = j(c.zuordnen('U-0001', [{ id: 'PG-2', gebinde: G[0], vorher: '' }], 'AA'));
 assert.ok(r4.konflikte[0].gleich === true, 'gleiches Kürzel, gleiches Gebinde: als «schon gespeichert» erkennbar');
 const zz = DB.getSheetByName('Zuordnung').v.filter(z => z[0] === 'U-0001' && z[1] === 'PG-2');
 assert.strictEqual(zz.length, 1, 'PG-2 genau einmal gespeichert');
+/* Wiederholter Barcode-Scan (Antwort nicht angekommen): kein zweites Stück, sondern «schon gespeichert» (Review 24.10.2026) */
+let r5 = j(c.zuordnen('U-0001', [{ code: '111', wunsch: 'PG-1', gebinde: G[0], vorher: '', sid: 'scan-a' }], 'AA'));
+assert.deepStrictEqual(r5.ergebnis.map(x => x.id), ['PG-1']);
+r5 = j(c.zuordnen('U-0001', [{ code: '111', wunsch: 'PG-1', gebinde: G[0], vorher: '', sid: 'scan-a' }], 'AA'));
+assert.ok(r5.konflikte.length === 1 && r5.konflikte[0].gleich === true && r5.konflikte[0].id === 'PG-1' && !r5.ergebnis.length, 'gleiche Scan-Kennung: schon gespeichert');
+r5 = j(c.zuordnen('U-0001', [{ code: '111', wunsch: 'PG-1', gebinde: G[0], vorher: '' }], 'AA'));
+assert.ok(r5.konflikte[0].gleich === true, 'ohne Kennung (alte Seite): Wunsch schon im gleichen Gebinde vom gleichen Kürzel = schon gespeichert');
+assert.strictEqual(DB.getSheetByName('Zuordnung').v.filter(z => z[0] === 'U-0001' && z[1] === 'PG-1').length, 1, 'PG-1 genau einmal');
 /* Unbekannter Barcode; Stück ohne Barcode nur per PG-ID */
 assert.ok(/nicht in der Quelle/.test(j(c.zuordnen('U-0001', [{ code: '999', wunsch: '', gebinde: G[0], vorher: '' }], 'AA')).konflikte[0].grund));
 assert.ok(!j(c.zuordnen('U-0001', [{ id: 'PG-6', gebinde: G[0], vorher: '' }], 'AA')).konflikte.length, 'PG-6 per PG-ID');
