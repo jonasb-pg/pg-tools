@@ -53,7 +53,7 @@ const TZ = 'Europe/Zurich';
 const PAARE_PRO_ANFRAGE = 60;               // Paare pro Anfrage an Claude
 const PROFILE_PRO_ANFRAGE = 10;             // Suchprofile pro Anfrage an Claude
 const PARALLEL = 5;                         // gleichzeitige Anfragen an Claude (eine Gruppe; nach jeder Gruppe wird gespeichert)
-const PAARE_PRO_LAUF = 1500;                // höchstens so viele Paare pro Lauf an Claude (6-Minuten-Limit von Apps Script)
+const PAARE_PRO_LAUF = 900;                // höchstens so viele Paare pro Lauf an Claude (6-Minuten-Limit von Apps Script)
 const PASST_MAX = 3;                        // so viele Produkte stehen höchstens in der Zelle «Passt»
 
 const KOPF = ['Gesucht', 'Mehr Infos (was ist zwingend, was egal)', 'Limit CHF', 'Suchprofil (von Claude, anpassbar)',

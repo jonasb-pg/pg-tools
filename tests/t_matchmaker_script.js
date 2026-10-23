@@ -1,6 +1,8 @@
 /* Matchmaker-Script (apps/matchmaker/Code.gs), Datenintegrität (24.10.2026):
    Tageslauf behält Treffer und entfernt verschwundene (M5), Gruppe und Urteil mit Barcode/Link (M6), Ausschluss über ANALYSE TOOL «Analysen» und
    sichtbarer Hinweis, wenn nicht lesbar, Scanner ohne ID markiert (M7), Prüfen und Schreiben in der Dokument-Sperre.
+   Version .2: alte Urteile ohne Produkt-Schlüssel gelten weiter über die Bezeichnung (Urteil mit Schlüssel gewinnt),
+   Zwischenspeichern nach jeder Gruppe, höchstens PAARE_PRO_LAUF Paare pro Lauf mit Hinweis im Status.
    Sheets im Speicher, Claude gestubbt. Lauf: node tests/t_matchmaker_script.js */
 const vm = require('vm'), fs = require('fs'), assert = require('assert'), crypto = require('crypto');
 const sperre = { dok: false, dokBesetzt: false };
@@ -37,8 +39,8 @@ const KOPF = ['Gesucht', 'Mehr Infos (was ist zwingend, was egal)', 'Limit CHF',
 const kennung = (g, i, p) => Array.from(crypto.createHash('md5').update(g + '\n' + i + '\n' + p, 'utf8').digest()).slice(0, 5).map(x => ('0' + x.toString(16)).slice(-2)).join('');
 const MM = datei({
   'Matchmaker': [['Matchmaker'], [''], KOPF, ['Toaster', '', 50, PROFIL1, '', '', '', '', false], ['Wasserkocher', '', 40, PROFIL2, '', '', '', '', false]],
-  /* altes Urteil ohne Produkt-Schlüssel: gilt nicht für PG-1 (hat Barcode) */
-  'Urteile': [['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am'], [kennung('Toaster', '', PROFIL1), 'Toaster', 'Dualit Toaster', 'nein', 'alt', '01.10.2026']]
+  /* altes Urteil ohne Produkt-Schlüssel (vor 0e30fe8): gilt weiter für «Toaster Rot» (PG-5, hat Barcode), wird nicht neu geprüft */
+  'Urteile': [['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am'], [kennung('Toaster', '', PROFIL1), 'Toaster', 'Toaster Rot', 'passt', 'alt', '01.10.2026']]
 });
 MM.sheets.find(s => s.name === 'Urteile').breite = 6;
 const KRT = ['☑', 'ID', 'Sendung', 'Erfasst', 'Bezeichnung', '#', 'Barcode', 'Link', 'Kategorie', 'OVP', 'VP', 'Wert', 'CH', 'Lagerort'];
@@ -56,6 +58,13 @@ const RT = datei({
 const AN = datei({ 'Analysen': [['Analyse-Nr', 'PG-ID', 'Reusable', 'Regal'], ['A-1', 'PG-4', 'Ja', 'Matchmaker'], ['A-2', 'PG-5', 'Nein', ''], ['A-3', 'PG-5', 'Ja', 'Analysiert']] });
 let analyseKaputt = false, paareGeprueft = 0, beimPruefen = null;
 const alerts = [];
+/* Claude-Antwort: Zubehör = nein, sonst passt */
+function antwort(q) {
+  const frage = JSON.parse(q.payload).messages[0].content;
+  const urteile = [];
+  frage.split('\n').forEach(l => { const m = /^\[(\d+)\] (.*)$/.exec(l); if (!m) return; paareGeprueft++; urteile.push({ nr: Number(m[1]), urteil: /zubehoer/.test(m[2]) ? 'nein' : 'passt', hinweis: '' }); });
+  return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', input: { urteile: urteile } }] }) };
+}
 const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Error, isFinite, parseFloat, decodeURIComponent,
   SpreadsheetApp: { getActiveSpreadsheet: () => MM, getUi: () => ({ alert: (t) => alerts.push(t) }), flush() {},
     openById: (id) => { if (id === '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E') return RT; if (analyseKaputt) throw new Error('Kein Zugriff'); return AN; } },
@@ -66,20 +75,19 @@ const c = { console, JSON, Date, Math, Object, String, Number, Array, RegExp, Er
   Utilities: { formatDate: (d, tz, f) => fmt(d, f), sleep() {}, DigestAlgorithm: {}, Charset: {},
     computeDigest: (a, t) => Array.from(crypto.createHash('md5').update(t, 'utf8').digest()).map(x => x > 127 ? x - 256 : x) },
   UrlFetchApp: { fetchAll: (reqs) => reqs.map(q => {
-    const frage = JSON.parse(q.payload).messages[0].content;
     if (beimPruefen) { beimPruefen(); beimPruefen = null; }
-    const urteile = [];
-    frage.split('\n').forEach(l => { const m = /^\[(\d+)\] (.*)$/.exec(l); if (!m) return; paareGeprueft++; urteile.push({ nr: Number(m[1]), urteil: /zubehoer/.test(m[2]) ? 'nein' : 'passt', hinweis: '' }); });
-    return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ stop_reason: 'tool_use', content: [{ type: 'tool_use', input: { urteile: urteile } }] }) };
+    return antwort(q);
   }) } };
 vm.createContext(c);
-vm.runInContext(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8'), c);
+const QUELLE = fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8');
+vm.runInContext(QUELLE, c);
 const mm = MM.getSheetByName('Matchmaker'), U = MM.getSheetByName('Urteile');
 const zelle = (r, col) => String(mm.v[r - 1][col - 1] || '');
 const status = () => String(mm.v[1][0]);
-assert.ok(/const VERSION = '2026-10-24\.1'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
+assert.ok(/const VERSION = '2026-10-24\.2'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
 
 /* Lauf 1: ganzer Bestand */
+paareGeprueft = 0;
 c.sucheAlles();
 assert.deepStrictEqual(alerts, [], 'kein Fehler: ' + alerts.join(' | '));
 let p1 = zelle(4, 5);
@@ -93,6 +101,10 @@ assert.strictEqual(U.v[0][6], 'Produkt-Schlüssel', 'Urteile: Spalte Produkt-Sch
 assert.ok(U.v.slice(2).every(r => /\|(bc|link):|\|$/.test(r[6])), 'jedes neue Urteil hat den Produkt-Schlüssel');
 assert.ok(U.v.some(r => r[2] === 'Dualit Toaster' && r[3] === 'nein' && /bc:222/.test(r[6])) && U.v.some(r => r[2] === 'Dualit Toaster' && r[3] === 'passt' && /bc:111/.test(r[6])), 'zwei Urteile für «Dualit Toaster» (führende Null im Barcode egal)');
 assert.ok(passtGeschrieben.length === 1 && passtGeschrieben[0] === true, 'Ergebnis in der Dokument-Sperre geschrieben');
+/* Rückfall: altes Urteil ohne Schlüssel liefert weiter den Treffer PG-5 und wird nicht neu bezahlt */
+assert.ok(!U.v.slice(2).some(r => r[2] === 'Toaster Rot'), 'altes Urteil «Toaster Rot» gilt weiter, kein neues Urteil geschrieben');
+assert.strictEqual(paareGeprueft, 4, 'nur Paare ohne Urteil an Claude (PG-1, PG-2, Scanner, PG-3), nicht PG-5 (PG-4 ausgeschlossen)');
+assert.ok(/PG-5/.test(p1), 'PG-5 über das alte Urteil in «Passt»: ' + p1);
 
 /* Lauf 2: heute erfasst. PG-6 neu, PG-3 verkauft. Bisherige Treffer bleiben, verschwundene fallen weg, nur Neues geht an Claude. */
 RT.getSheetByName('Stationär').v.push(z('PG-6', heute, 'Toaster Neu', '777', '', 35, 'HOM-4'));
@@ -112,6 +124,15 @@ c.sucheAlles();
 assert.ok(/ACHTUNG: ANALYSE TOOL nicht lesbar \(Kein Zugriff\)/.test(status()), status());
 assert.ok(/PG-4/.test(zelle(4, 5) + zelle(4, 6)) || /\+ \d weitere/.test(zelle(4, 5)), 'ohne ANALYSE TOOL nicht ausgeschlossen (und gemeldet)');
 analyseKaputt = false;
+
+/* Neueres Urteil mit Produkt-Schlüssel überschreibt das alte ohne Schlüssel */
+U.v.push([kennung('Toaster', '', PROFIL1), 'Toaster', 'Toaster Rot', 'nein', 'von Hand', heute, 'toaster rot|bc:555']);
+paareGeprueft = 0;
+c.sucheAlles();
+assert.ok(![4, 5, 6, 7].some(k => /PG-5/.test(zelle(4, k + 1))), 'PG-5: Urteil mit Schlüssel (nein) gewinnt über altes (passt)');
+assert.ok(/PG-1\b/.test(zelle(4, 5)), 'übrige Treffer bleiben: ' + zelle(4, 5));
+assert.strictEqual(paareGeprueft, 0, 'nichts neu geprüft');
+assert.ok(U.v.some(r => r[2] === 'Toaster Rot' && !r[6]), 'alte Zeile bleibt stehen');
 
 /* Sheet während der Suche verändert: nichts schreiben */
 RT.getSheetByName('Stationär').v.push(z('PG-7', heute, 'Toaster Blau', '888', '', 15, 'HOM-4'));
@@ -133,4 +154,56 @@ mm.v[3][8] = true;
 c.onEdit(ev(mm, 4, 9));
 assert.ok(mm.v[3][0] === 'Wasserkocher' && MM.getSheetByName('Erledigt').v.some(r => r[1] === 'Toaster'), 'Sperre frei: Auftrag nach «Erledigt» verschoben');
 assert.strictEqual(sperre.dok, false, 'Sperre wieder frei');
+
+/* Zwischenspeichern und Limit: eigenes Sheet, eine Anfrage pro Gruppe (PARALLEL 1, 1 Paar pro Anfrage), höchstens 3 Paare pro Lauf */
+const QUELLE2 = QUELLE.replace(/const PAARE_PRO_ANFRAGE = \d+;/, 'const PAARE_PRO_ANFRAGE = 1;').replace(/const PARALLEL = \d+;/, 'const PARALLEL = 1;').replace(/const PAARE_PRO_LAUF = \d+;/, 'const PAARE_PRO_LAUF = 3;');
+assert.ok(/PAARE_PRO_ANFRAGE = 1;/.test(QUELLE2) && /PARALLEL = 1;/.test(QUELLE2) && /PAARE_PRO_LAUF = 3;/.test(QUELLE2), 'Konstanten gesetzt');
+const MM2 = datei({
+  'Matchmaker': [['Matchmaker'], [''], KOPF, ['Toaster', '', 50, PROFIL1, '', '', '', '', false]],
+  'Urteile': [['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am', 'Produkt-Schlüssel'],
+    [kennung('Toaster', '', PROFIL1), 'Toaster', 'Toaster Rot', 'ähnlich', 'alt', '01.10.2026', '']]
+});
+MM2.sheets.find(s => s.name === 'Urteile').breite = 7;
+/* Variante: gleiche Bezeichnung «Toaster Rot», anderer Barcode → teilt das alte Urteil */
+RT.getSheetByName('Stationär').v.push(z('PG-8', '20.10.2026', 'Toaster Rot', '999', '', 26, 'HOM-5'));
+let aufrufe = 0, wirftBeim = 0;
+const c2 = Object.assign({}, c, {
+  SpreadsheetApp: Object.assign({}, c.SpreadsheetApp, { getActiveSpreadsheet: () => MM2 }),
+  UrlFetchApp: { fetchAll: (reqs) => { aufrufe++; if (aufrufe === wirftBeim) throw new Error('Zeitlimit überschritten'); return reqs.map(antwort); } }
+});
+vm.createContext(c2);
+vm.runInContext(QUELLE2, c2);
+const mm2 = MM2.getSheetByName('Matchmaker'), U2 = MM2.getSheetByName('Urteile');
+const status2 = () => String(mm2.v[1][0]);
+const neueZeilen = () => U2.v.slice(2).length;
+/* Offen: PG-1, PG-2, Scanner, PG-6, PG-7 (5 Paare); PG-5 und PG-8 über das alte Urteil, PG-4 ausgeschlossen */
+
+/* a) zweite Gruppe wirft: die erste ist gespeichert */
+alerts.length = 0; wirftBeim = 2; aufrufe = 0; paareGeprueft = 0;
+c2.sucheAlles();
+assert.ok(/fehlgeschlagen/.test(alerts.join(' ')) && /Zeitlimit/.test(alerts.join(' ')), 'Lauf bricht ab: ' + alerts.join(' | '));
+assert.strictEqual(neueZeilen(), 1, 'Urteil der ersten Gruppe gespeichert, obwohl die zweite abbricht');
+assert.ok(U2.v[2][6] && U2.v[2][6].indexOf('|') > 0, 'mit Produkt-Schlüssel gespeichert');
+
+/* b) Neustart: nur der Rest, höchstens 3 Paare, Hinweis im Status */
+alerts.length = 0; wirftBeim = 0; aufrufe = 0; paareGeprueft = 0;
+c2.sucheAlles();
+assert.deepStrictEqual(alerts, [], 'kein Fehler: ' + alerts.join(' | '));
+assert.strictEqual(paareGeprueft, 3, 'Limit: 3 Paare pro Lauf');
+assert.strictEqual(aufrufe, 3, 'drei Gruppen');
+assert.strictEqual(neueZeilen(), 4, 'jede Gruppe gespeichert');
+assert.ok(/Noch 1 Paare offen – bitte nochmals starten\./.test(status2()), status2());
+const ae = [6, 7, 8].map(k => String(mm2.v[3][k - 1] || '')).join(' ');
+assert.ok(/PG-5/.test(ae) && /PG-8/.test(ae), 'Variante PG-8 teilt das alte Urteil «ähnlich» mit PG-5: ' + ae);
+
+/* c) nochmals: der letzte Rest, kein Hinweis mehr; danach nichts mehr zu prüfen */
+paareGeprueft = 0;
+c2.sucheAlles();
+assert.strictEqual(paareGeprueft, 1, 'nur noch der Rest');
+assert.strictEqual(neueZeilen(), 5, 'alle 5 Paare gespeichert, keins doppelt');
+assert.ok(!/Paare offen/.test(status2()), status2());
+paareGeprueft = 0;
+c2.sucheAlles();
+assert.strictEqual(paareGeprueft, 0, 'alles beurteilt, nichts doppelt bezahlt');
+assert.ok(!U2.v.slice(2).some(r => r[2] === 'Toaster Rot'), 'Toaster Rot (PG-5, PG-8) nie neu geprüft');
 console.log('t_matchmaker_script ok');
