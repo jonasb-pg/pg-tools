@@ -765,11 +765,11 @@ function findeQuelle_(id, auchAndere, nurFrisch) {
   return nurFrisch ? such(true) : (such(false) || such(true));          // nicht in der gemerkten Kopie: frisch nachsehen
 }
 /** Tab «Archiv …» des Return Tools, in dem das Stück steht (frisch gelesen), sonst ''. */
-function imArchiv_(id) {
+function imArchiv_(id, meldungen) {
   const src = rtQuelle_(), ziel = idNorm_(id);
   let tab = '';
   rtTabs_(src, true).archiv.forEach(function (t) {
-    if (!tab && quelleSicher_(src, t, true, null, false).some(function (r) { return r.id && idNorm_(r.id) === ziel; })) tab = t;
+    if (!tab && quelleSicher_(src, t, true, meldungen || null, false).some(function (r) { return r.id && idNorm_(r.id) === ziel; })) tab = t;
   });
   return tab;
 }
@@ -780,9 +780,10 @@ function imArchiv_(id) {
 function vorpruefen_(id, auchAndere) {
   const ana = findeAnalyse_(id), pg = /^PG-\d+$/.test(idNorm_(id));
   if (ana && !pg) return { ana: ana, rt: null, archiv: '' };              // AN-…: steht nicht im Return Tool
-  const rt = findeQuelle_(id, !!ana || auchAndere, true), archiv = pg ? imArchiv_(id) : '';
-  /* Review 24.10.2026: Steht die Nummer aktiv UND im Archiv, nicht still starten (auchArchiv: Bestätigung nötig) */
-  return { ana: ana, rt: rt, archiv: rt ? '' : archiv, auchArchiv: rt ? archiv : '' };
+  const fehler = [], rt = findeQuelle_(id, !!ana || auchAndere, true), archiv = pg ? imArchiv_(id, fehler) : '';
+  /* Review 24.10.2026: Steht die Nummer aktiv UND im Archiv, nicht still starten (auchArchiv: Bestätigung nötig).
+     Ist ein Archiv-Tab nicht lesbar, ist das Archiv nicht geprüft: ebenfalls Bestätigung (archivFehler). */
+  return { ana: ana, rt: rt, archiv: rt ? '' : archiv, auchArchiv: rt ? archiv : '', archivFehler: fehler.join(' ') };
 }
 
 /** archivOk: Bestätigung, wenn die Nummer aktiv und zugleich im Archiv steht (Review 24.10.2026). */
@@ -798,6 +799,7 @@ function starteListing(id, auchAndere, archivOk) {
     if (!l && rc) neuAusRc_(id);
     else if (!l && !vor) throw new Error('Das Listing von ' + id + ' wurde eben geändert. Bitte nochmals versuchen.');
     else if (!l && vor.archiv) throw new Error('Produkt ' + id + ' steht im Return Tool im Tab «' + vor.archiv + '» (nicht mehr an Lager). Nicht listen.');
+    else if (!l && vor.archivFehler && !vor.archiv && archivOk !== true) throw new Error('Bitte bestätigen: Das Archiv des Return Tools konnte nicht geprüft werden (' + vor.archivFehler + '). Nur listen, wenn ' + id + ' sicher an Lager ist.');
     else if (!l && vor.auchArchiv && archivOk !== true) throw new Error('Bitte bestätigen: ' + id + ' steht im Return Tool aktiv im Tab «' + (vor.rt ? vor.rt.tab : 'Analyse') + '» und zugleich im Tab «' + vor.auchArchiv + '». Nur listen, wenn das Stück sicher an Lager ist.');
     else if (!l && vor.ana) {
       const q = vor.ana;
@@ -934,6 +936,7 @@ function buendelHinzu(id, zusatzId) {
     const vor = vorpruefen_(zusatzId, true);
     if (vor.archiv) throw new Error('Produkt ' + zusatzId + ' steht im Return Tool im Tab «' + vor.archiv + '» (nicht mehr an Lager). Nicht listen.');
     if (vor.auchArchiv) throw new Error('Produkt ' + zusatzId + ' steht im Return Tool aktiv und zugleich im Tab «' + vor.auchArchiv + '». Bitte zuerst im Return Tool klären.');
+    if (vor.archivFehler) throw new Error('Das Archiv des Return Tools konnte nicht geprüft werden (' + vor.archivFehler + '). Bündel-Teil erst hinzufügen, wenn das Archiv wieder lesbar ist.');
   }
   const lock = sperre_(20000);
   try {
@@ -2069,9 +2072,11 @@ function karten_(sv, sl, si) {
  * Listings nach Nummer, Artikel-Nr des aktuellen Links und Artikel-Nr früherer Links (S5). Bei mehreren Zeilen pro Stück zählt die, die nicht frei ist.
  */
 function listingKarte_(rows) {
-  const karte = { id: {}, artikel: {}, alt: {} };
+  const karte = { id: {}, artikel: {}, alt: {}, teil: {} };
   rows.forEach(function (row, i) {
     const id = String(row[0]).trim(); if (!id) return;
+    /* Review 24.10.2026: Teile eines laufenden Bündels, damit ein später Verkauf über die alte eigene Zeile des Teils nicht als sicher gilt */
+    if (FREI.indexOf(row[1]) === -1) liste_(row[col_('Bündel-IDs') - 1]).forEach(function (t) { if (karte.teil[idNorm_(t)] === undefined) karte.teil[idNorm_(t)] = i; });
     const setze = function (map, k) { if (map[k] === undefined || FREI.indexOf(rows[map[k]][1]) !== -1) map[k] = i; };
     setze(karte.id, idNorm_(id));
     const a = artikelAusLink_(row[col_('Ricardo-Link') - 1]);
@@ -2087,7 +2092,8 @@ function listingKarte_(rows) {
 function verkaufZuordnen_(karte, rows, referenz, artikel) {
   artikel = String(artikel || '').trim(); referenz = String(referenz || '').trim();
   if (artikel && karte.artikel[artikel] !== undefined) {
-    const i = karte.artikel[artikel], neu = karte.id[idNorm_(rows[i][0])];
+    const i = karte.artikel[artikel], eigene = karte.id[idNorm_(rows[i][0])], imBuendel = karte.teil[idNorm_(rows[i][0])];
+    const neu = eigene !== undefined && eigene !== i && FREI.indexOf(rows[eigene][1]) === -1 ? eigene : (imBuendel !== undefined && imBuendel !== i ? imBuendel : eigene);
     /* Review 24.10.2026: Link einer freien (alten) Zeile, während dasselbe Stück auf einer neueren Zeile offen oder gelistet ist: früheres Angebot */
     if (neu !== undefined && neu !== i && FREI.indexOf(rows[i][1]) !== -1 && FREI.indexOf(rows[neu][1]) === -1) {
       return { i: neu, sicher: false, warnung: 'Verkauf über ein früheres Angebot (Artikel-Nr ' + artikel + ') von ' + rows[i][0] + '. Status nicht geändert: prüfen, ob das Stück zweimal verkauft wurde, und das andere Angebot beenden.' };
