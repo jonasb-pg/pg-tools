@@ -29,7 +29,7 @@ with sync_playwright() as p:
     s.click('#ana-liste button'); s.wait_for_timeout(200)
     ok(s.is_visible('#arbeit'), 'Listing offen')
     ok(s.eval_on_selector_all('#d-zustand button', 'b => b.every(x => x.disabled)') and s.is_disabled('#d-getestet'), 'Zustand und Prüfung gesperrt')
-    ok(s.is_hidden('#d-maengel-block') and 'A-0001' in s.inner_text('#d-ana'), 'Mängel aus, Hinweis Analyse')
+    ok(s.is_hidden('#d-maengel-block') and 'aus der Analyse' in s.inner_text('#d-ana') and 'A-0001' not in s.inner_text('#d-ana'), 'Mängel aus, Hinweis Analyse')
     ok(s.text_content('#t-knopf') == 'Text aus der Analyse wiederherstellen' and s.is_visible('#t-geaendert'), 'Knopf und Vermerk geändert')
     ok('Regal «Ricardo Offline»' in s.inner_text('#a-meta') and s.is_visible('#felder a[href="https://drive.google.com/x"]'), 'Regal und Foto-Ordner-Link')
     s.click('#t-knopf'); s.wait_for_timeout(100); s.click('#dialog-ja'); s.wait_for_timeout(200)

@@ -18,7 +18,7 @@
  * Sperren: gesperrt_ schützt jedes Schreiben ins Sheet (kurz, ohne Netzwerk). allein_ sorgt dafür, dass nur ein Abgleich gleichzeitig läuft.
  */
 
-const VERSION = '2026-10-21.2';
+const VERSION = '2026-10-23.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -765,7 +765,10 @@ function suche(q) {
     const mm = imMatchmaker_();
     liste.forEach(function (x) { if (mm[x.id]) x.mm = mm[x.id]; });
   }
-  return { treffer: liste, inSchlange: offen.length > 0 };
+  /* Nichts im Analyse Tool: im ganzen Return Tool suchen (alle Tabs, auch Archive). So wird kein Stück mit PG-ID neu angelegt. */
+  let rt = [];
+  if (!liste.length) try { rt = rtSuche_(q).slice(0, 15); } catch (err) { log_('Return-Tool-Suche', q, err.message); }
+  return { treffer: liste, inSchlange: offen.length > 0, rt: rt };
 }
 
 function warteschlange() {
@@ -786,8 +789,12 @@ function aktualisieren(mitFehlern) {
   return w;
 }
 
-/** Stück, das nicht im Return Tool steht: Name oder Link genügt. Bekommt eine eigene Nummer (AN-0001). */
-function ohneInventar(name, link, vp, kategorie, ovp) {
+/**
+ * Stück, das nachweislich nicht im Return Tool steht. Bekommt eine eigene Nummer (AN-0001).
+ * Schutz gegen Doppel: Zuerst wird das ganze Return Tool nach dem Namen durchsucht. Gibt es Treffer, kommt die Liste zurück
+ * (das Stück wird dann mit seiner PG-ID übernommen). Anlegen trotz Treffern oder ohne Treffer nur mit Grund.
+ */
+function ohneInventar(name, link, vp, kategorie, ovp, grund, trotzdem) {
   name = String(name || '').trim(); link = String(link || '').trim();
   if (!name && link) {                                                      // Name aus dem letzten Teil des Links
     name = link.split('?')[0].replace(/\/+$/, '').split('/').pop() || '';
@@ -795,6 +802,13 @@ function ohneInventar(name, link, vp, kategorie, ovp) {
     name = name.replace(/-\d+$/, '').replace(/[-_]+/g, ' ').trim();
   }
   if (!name) throw new Error('Bitte einen Produktnamen oder einen Link eingeben.');
+  grund = String(grund || '').trim();
+  if (!trotzdem) {
+    let k = [];
+    try { k = rtSuche_(name); } catch (err) { throw new Error('Das Return Tool konnte nicht durchsucht werden. Bitte später nochmals versuchen.'); }
+    if (k.length) return { kandidaten: k.slice(0, 15) };
+  }
+  if (grund.length < 5) throw new Error('Bitte angeben, warum das Stück nicht im Return Tool steht.');
   const id = gesperrt_(function () {
     let max = 0;
     lies_('Produkte').z.forEach(function (r) { const m = /^AN-(\d+)$/.exec(String(r['PG-ID'])); if (m) max = Math.max(max, Number(m[1])); });
@@ -803,7 +817,7 @@ function ohneInventar(name, link, vp, kategorie, ovp) {
       'Neupreis CHF': zahl_(ovp), 'VP CHF': zahl_(vp), 'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_('', name), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' }]);
     return neu;
   }, ['Produkte']);
-  log_('Ohne Inventar angelegt', id, name);
+  log_('Ohne Inventar angelegt', id, name + ' · Grund: ' + grund);
   return { id: id };
 }
 
@@ -847,14 +861,14 @@ function tagsueber_(e) {
 }
 
 /**
- * Gleicht die Warteschlange mit dem Tab «Analyse» im Return Tool ab. Das Return Tool wird nur gelesen.
+ * Gleicht die Warteschlange mit dem Tab «Analyse» im Return Tool ab, dazu alle Stücke mit Lagerort «Analyse» in den anderen Kanal-Tabs. Das Return Tool wird nur gelesen.
  * - Neue Stücke kommen in die Warteschlange.
  * - Was dort nicht mehr im Tab steht oder schon einen Eintrag bei «Reusable» hat, fällt heraus («Entfällt») und kommt zurück, wenn es wieder auftaucht.
  */
 function spiegeln_(e) {
   const id = String(e['Return Tool ID'] || '').trim(), tab = String(e['Return Tool Tab'] || '').trim();
   if (!id || !tab) throw new Error('Die Einstellungen «Return Tool ID» und «Return Tool Tab» müssen ausgefüllt sein.');
-  const quelle = SpreadsheetApp.openById(id).getSheetByName(tab);
+  const ssRt = SpreadsheetApp.openById(id), quelle = ssRt.getSheetByName(tab);
   const v = quelle ? quelle.getDataRange().getValues() : [];
   let k = -1;                                                               // Kopfzeile suchen: die Zeile mit «ID» und «Bezeichnung»
   for (let i = 0; i < Math.min(v.length, 15) && k < 0; i++) {
@@ -872,30 +886,169 @@ function spiegeln_(e) {
   }
   /* Schutz: Ein falscher oder leerer Tab darf die Warteschlange nicht leeren. */
   if (!dort.length) throw new Error('Im Return Tool wurde der Tab «' + tab + '» nicht gefunden oder er ist leer.');
+  /* Stücke mit Lagerort «Analyse» in den anderen Kanal-Tabs (z.B. Stationär) gehören auch in die Warteschlange. Archive nicht. */
+  const imTab = {};
+  dort.forEach(function (x) { imTab[String(x['ID']).trim()] = 1; });
+  rtLagerortAnalyse_(ssRt, tab).forEach(function (o) {
+    const pid = String(o['ID']).trim();
+    if (imTab[pid]) return;
+    imTab[pid] = 1;
+    o._anderer = 1;
+    dort.push(o);
+    if (!String(o['Reusable'] || '').trim()) offenDort[pid] = 1;
+  });
+  const uebernommen = uebernommen_(), anderer = {};
+  dort.forEach(function (x) { if (x._anderer) anderer[String(x['ID']).trim()] = 1; });
 
   return gesperrt_(function () {
-    const da = {}, neu = [], status = {};
+    const da = {}, neu = [], status = {}, anNamen = [], verdacht = [];
     let entfaellt = 0;
-    lies_('Produkte').z.forEach(function (p) {
+    const alle = lies_('Produkte').z;
+    alle.forEach(function (p) {
+      const pid = String(p['PG-ID']);
+      if (/^AN-/.test(pid)) { const w = norm_(p['Bezeichnung']).split(' ').filter(function (x) { return x.length >= 3; }); if (w.length >= 2) anNamen.push({ id: pid, w: w }); }
+    });
+    const schonAn = function (bez) { const b = norm_(bez); return anNamen.filter(function (x) { return x.w.every(function (w) { return b.indexOf(w) > -1; }); })[0]; };
+    alle.forEach(function (p) {
       const pid = String(p['PG-ID']);
       da[pid] = 1;
       if (p['Herkunft'] !== 'Retoure') return;
-      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid]) { status[p._r] = 'Entfällt'; entfaellt++; }
-      if (p['Analyse-Status'] === 'Entfällt' && offenDort[pid]) status[p._r] = 'Offen';
+      if (p['Analyse-Status'] === 'Offen' && !offenDort[pid] && !uebernommen[pid]) { status[p._r] = 'Entfällt'; entfaellt++; }
+      if (p['Analyse-Status'] === 'Entfällt' && offenDort[pid]) {
+        const an = anderer[pid] ? schonAn(p['Bezeichnung']) : null;
+        if (an) verdacht.push(pid + ' ~ ' + an.id); else status[p._r] = 'Offen';
+      }
     });
     dort.forEach(function (r) {
       const pid = String(r['ID']).trim();
       if (da[pid] || !offenDort[pid]) return;
       da[pid] = 1;
-      const ean = ean_(r['Barcode']), bez = String(r['Bezeichnung']).trim();
-      neu.push({ 'PG-ID': pid, 'Herkunft': 'Retoure', 'Bezeichnung': txt_(bez), 'Anzahl': Number(r['#']) || 1, 'Barcode': ean || txt_(r['Barcode']), 'Link': txt_(r['Link']),
-        'Kategorie': txt_(r['Kategorie']), 'Neupreis CHF': zahl_(r['OVP']), 'VP CHF': zahl_(r['VP']),
-        'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_(ean, bez), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' });
+      /* Aus einem anderen Tab und schon als Stück ohne Inventar (AN-…) analysiert? Dann nicht ein zweites Mal in die Warteschlange. */
+      if (r._anderer) { const an = schonAn(r['Bezeichnung']); if (an) { verdacht.push(pid + ' ~ ' + an.id); return; } }
+      neu.push(rtProdukt_(r));
     });
     setz_('Produkte', 'Analyse-Status', status);
     schreib_('Produkte', neu);
+    if (verdacht.length) log_('Abgleich-Hinweis', '', 'Nicht übernommen, vermutlich schon als AN analysiert: ' + verdacht.join(', '));
     return { neu: neu.length, entfaellt: entfaellt };
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Return Tool: Die PG-ID ist die einzige Nummer eines Stücks            */
+/* ------------------------------------------------------------------ */
+
+/** Zeile des Return Tools → Zeile im Tab «Produkte». */
+function rtProdukt_(r) {
+  const ean = ean_(r['Barcode']), bez = String(r['Bezeichnung']).trim();
+  return { 'PG-ID': String(r['ID']).trim(), 'Herkunft': 'Retoure', 'Bezeichnung': txt_(bez), 'Anzahl': Number(r['#']) || 1, 'Barcode': ean || txt_(r['Barcode']), 'Link': txt_(r['Link']),
+    'Kategorie': txt_(r['Kategorie']), 'Neupreis CHF': zahl_(r['OVP']), 'VP CHF': zahl_(r['VP']),
+    'Importiert am': zeit_(), 'Recherche-Schlüssel': schluessel_(ean, bez), 'Recherche-Status': 'Offen', 'Analyse-Status': 'Offen' };
+}
+/** Kopfzeile eines Return-Tool-Tabs: die Zeile mit «ID» und «Bezeichnung» in den ersten 15 Zeilen. -1, wenn es keine gibt. */
+function rtKopf_(v) {
+  for (let i = 0; i < Math.min(v.length, 15); i++) {
+    const z = v[i].map(function (x) { return String(x).trim(); });
+    if (z.indexOf('ID') > -1 && z.indexOf('Bezeichnung') > -1) return i;
+  }
+  return -1;
+}
+function rtObjekt_(kopf, zeile) { const o = {}; kopf.forEach(function (n, j) { if (n) o[n] = zeile[j]; }); return o; }
+function rtArchiv_(name) { return /^archiv/i.test(String(name).trim()); }
+
+/** Alle Zeilen mit Lagerort «Analyse» aus den Kanal-Tabs ausser dem Tab «Analyse» selbst und den Archiven. Ein Tab, der nicht lesbar ist, wird übersprungen. */
+function rtLagerortAnalyse_(ss, ohneTab) {
+  const aus = [];
+  ss.getSheets().forEach(function (sh) {
+    const name = sh.getName();
+    if (name === ohneTab || rtArchiv_(name)) return;
+    try {
+      const sp = sh.getLastColumn(), zeilen = sh.getLastRow();
+      if (sp < 2 || zeilen < 2) return;
+      const v = sh.getRange(1, 1, zeilen, sp).getValues(), k = rtKopf_(v);
+      if (k < 0) return;
+      const kopf = v[k].map(function (x) { return String(x).trim(); }), cL = kopf.indexOf('Lagerort');
+      if (cL < 0) return;
+      for (let i = k + 1; i < v.length; i++) {
+        if (String(v[i][cL]).trim().toLowerCase() !== 'analyse') continue;
+        const o = rtObjekt_(kopf, v[i]);
+        if (String(o['ID'] || '').trim() && String(o['Bezeichnung'] || '').trim()) aus.push(o);
+      }
+    } catch (err) { log_('Abgleich-Hinweis', name, 'Tab nicht lesbar: ' + err.message); }
+  });
+  return aus;
+}
+
+/**
+ * Sucht im ganzen Return Tool (alle Tabs, auch Archive): PG-ID, Barcode (nur Ziffern) oder Name (alle Wörter ab 3 Zeichen).
+ * Liefert [{ id, bezeichnung, barcode, tab, lagerort, archiv }], Stücke ausserhalb der Archive zuerst.
+ */
+function rtSuche_(q) {
+  q = String(q || '').trim();
+  const e = einst_(), rid = String(e['Return Tool ID'] || '').trim();
+  if (!rid || q.length < 3) return [];
+  const ss = SpreadsheetApp.openById(rid), alsId = /^PG-\d+$/i.test(q), nurZiffern = /^\d{6,14}$/.test(q);
+  const woerter = norm_(q).split(' ').filter(function (w) { return w.length >= 3; });
+  let such = q;
+  if (alsId) such = q.toUpperCase();
+  else if (!nurZiffern) { if (!woerter.length) return []; such = woerter.slice().sort(function (a, b) { return b.length - a.length; })[0]; }
+  const zellen = ss.createTextFinder(such).matchEntireCell(alsId || nurZiffern).findAll();
+  const proTab = {};
+  zellen.slice(0, 400).forEach(function (z) { const sh = z.getSheet(), n = sh.getName(); (proTab[n] = proTab[n] || { sh: sh, zeilen: {} }).zeilen[z.getRow()] = 1; });
+  const aus = [], gesehen = {};
+  Object.keys(proTab).forEach(function (n) {
+    const sh = proTab[n].sh, sp = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(15, sh.getLastRow()), sp).getValues(), k = rtKopf_(kv);
+    if (k < 0) return;
+    const kopf = kv[k].map(function (x) { return String(x).trim(); }), nr = Object.keys(proTab[n].zeilen).map(Number).filter(function (r) { return r > k + 1; });
+    let zeilen;
+    if (nr.length > 15) { const alle = sh.getRange(1, 1, sh.getLastRow(), sp).getValues(); zeilen = nr.map(function (r) { return alle[r - 1]; }); }
+    else zeilen = nr.map(function (r) { return sh.getRange(r, 1, 1, sp).getValues()[0]; });
+    zeilen.forEach(function (z) {
+      const o = rtObjekt_(kopf, z), id = String(o['ID'] || '').trim(), bez = String(o['Bezeichnung'] || '').trim();
+      if (!id || !bez) return;
+      if (alsId && id.toUpperCase() !== such) return;
+      if (nurZiffern && String(o['Barcode'] || '').replace(/\D/g, '') !== q) return;
+      if (!alsId && !nurZiffern) { const b = norm_(bez); if (!woerter.every(function (w) { return b.indexOf(w) > -1; })) return; }
+      const key = id + '|' + n;
+      if (gesehen[key]) return;
+      gesehen[key] = 1;
+      aus.push({ id: id, bezeichnung: bez, barcode: String(o['Barcode'] || ''), tab: n, lagerort: String(o['Lagerort'] || ''), archiv: rtArchiv_(n), o: o });
+    });
+  });
+  aus.sort(function (a, b) { return (a.archiv - b.archiv) || (Number(b.id.replace(/\D/g, '')) - Number(a.id.replace(/\D/g, ''))); });
+  return aus.map(function (x) { const y = Object.assign({}, x); delete y.o; return y; });
+}
+
+/** PG-IDs, die über die Suche ins Analyse Tool übernommen wurden: Der Abgleich nimmt sie nicht wieder heraus. */
+function uebernommen_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('UEBERNOMMEN') || '{}'); } catch (err) { return {}; }
+}
+
+/** Übernimmt ein Stück mit seiner PG-ID aus dem Return Tool in die Warteschlange (wenn es nicht im Tab «Analyse» steht). Das Return Tool wird nur gelesen. */
+function uebernehmen(pid) {
+  pid = String(pid || '').trim().toUpperCase();
+  if (!/^PG-\d+$/.test(pid)) throw new Error('Ungültige PG-ID.');
+  const e = einst_(), ss = SpreadsheetApp.openById(String(e['Return Tool ID']));
+  let o = null, tab = '';
+  ss.createTextFinder(pid).matchEntireCell(true).findAll().some(function (z) {
+    const sh = z.getSheet();
+    if (rtArchiv_(sh.getName())) return false;
+    const sp = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(15, sh.getLastRow()), sp).getValues(), k = rtKopf_(kv);
+    if (k < 0 || z.getRow() <= k + 1) return false;
+    const x = rtObjekt_(kv[k].map(function (v) { return String(v).trim(); }), sh.getRange(z.getRow(), 1, 1, sp).getValues()[0]);
+    if (String(x['ID'] || '').trim().toUpperCase() !== pid) return false;
+    o = x; tab = sh.getName(); return true;
+  });
+  if (!o) throw new Error(pid + ' steht in keinem aktiven Tab des Return Tools (nur im Archiv oder gar nicht).');
+  gesperrt_(function () {
+    const p = lies_('Produkte').z.filter(function (r) { return String(r['PG-ID']).toUpperCase() === pid; })[0];
+    if (p) { if (p['Analyse-Status'] === 'Entfällt') { const st = {}; st[p._r] = 'Offen'; setz_('Produkte', 'Analyse-Status', st); } }
+    else schreib_('Produkte', [rtProdukt_(o)]);
+    const u = uebernommen_(); u[pid] = zeit_();
+    PropertiesService.getScriptProperties().setProperty('UEBERNOMMEN', JSON.stringify(u));
+  }, ['Produkte']);
+  log_('Aus Return Tool übernommen', pid, tab + ' · Lagerort ' + String(o['Lagerort'] || '–'));
+  return { id: pid };
 }
 
 function kopfzeilen_() { return { 'x-api-key': key_(), 'anthropic-version': API_VERSION }; }
@@ -2284,7 +2437,7 @@ function abschliessen(d) {
       if (ric) schreib_('Ricardo', [Object.assign(ric, { 'Analyse-Nr': r['Analyse-Nr'], 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offline' })]);
       mmStatus_(pg, 'Nicht geklappt');                                // der alte Matchmaker-Eintrag gilt nicht mehr
       if (mmV) schreib_('Matchmaker', [Object.assign(mmV, { 'Analyse-Nr': r['Analyse-Nr'], 'Suchauftrag': txt_(auftrag), 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offen' })]);
-      return { nr: String(r['Analyse-Nr']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: r['Dauer Min'], budget: u.produkt.budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
+      return { nr: String(r['Analyse-Nr']), pgid: String(r['PG-ID']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: r['Dauer Min'], budget: u.produkt.budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
     });
     if (alt) mmVermerk_(e, alt, pg + ' · nicht geklappt · ' + heute);
     if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute + (mmV && mmV['Foto-Ordner'] ? ' · Fotos: ' + mmV['Foto-Ordner'] : ''));
@@ -2326,7 +2479,7 @@ function abschliessen(d) {
     alle.forEach(function (r) { if (String(r['PG-ID']) === String(p['PG-ID'])) { st[r._r] = 'Erledigt'; r['Analyse-Status'] = 'Erledigt'; } });
     setz_('Produkte', 'Analyse-Status', st);
     PropertiesService.getScriptProperties().deleteProperty(REP_STAND + p['PG-ID']);       // kam das Stück aus dem Regal «Reparatur», ist sein Stand erledigt
-    return { nr: nr, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm };
+    return { nr: nr, pgid: String(p['PG-ID']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm };
   }, ['Produkte', 'Analysen', 'Testmittel']);
   takt_('gespeichert');
   if (mm) mmVermerk_(e, mm, pg + ' · ' + p['Bezeichnung'] + ' · ' + heute + (mmV && mmV['Foto-Ordner'] ? ' · Fotos: ' + mmV['Foto-Ordner'] : ''));

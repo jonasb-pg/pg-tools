@@ -13,7 +13,7 @@ if(n==='warteschlange')setTimeout(function(){f({zahlen:{offen:2,bereit:2,laeuft:
 if(n==='vorab')setTimeout(function(){var m={};a[0].forEach(function(id){m[id]=window.mach(id)});f(m)},5);
 if(n==='uiTempo')setTimeout(function(){f(true)},5);
 if(n==='abschliessen')setTimeout(function(){var m=window.ABS;if(m==='netz'){window.ABS='ok';g(new Error('NetworkError: connection failure'));return;}
- if(m==='fehler'){g(new Error('Es fehlen noch Fotos: Hauptbild.'));return;} f({nr:'A-000042',reusable:true,grade:'A',regal:'Analysiert',befund:'b',verkaufsinfo:'v',dauerMin:1,budget:10,zahlen:{offen:2,bereit:1,laeuft:0}})},400);
+ if(m==='fehler'){g(new Error('Es fehlen noch Fotos: Hauptbild.'));return;} f({nr:'A-000042',pgid:'PG-1',reusable:true,grade:'A',regal:'Analysiert',befund:'b',verkaufsinfo:'v',dauerMin:1,budget:10,zahlen:{offen:2,bereit:1,laeuft:0}})},400);
 }};return o;})()}};
 window.mach=function(id){return {produkt:{id:id,bezeichnung:'Gerät '+id,vp:100,budget:10,stufe:'Vollprüfung',umfang:'Kern'},ablauf:['ident','funktion','zustand','entscheid'],
  zustand:{grade:[['A','Neu und originalverpackt',''],['B','Neu',''],['C','Gebraucht','']]},recherche:true,infos:[],handbuch:null,ident:{marke:'M',modell:id},rueckruf:null,firmware:false,
@@ -40,7 +40,7 @@ with sync_playwright() as p:
     assert pg.evaluate('AN') is None and 'abgeschlossen' in pg.text_content('#fertig') and 'Wird gespeichert' in pg.text_content('#fertig'), pg.text_content('#fertig')
     assert pg.is_visible('#sp-info')
     pg.wait_for_timeout(600)
-    assert 'A-000042' in pg.text_content('#fertig') and pg.evaluate('SP.length') == 0 and not pg.is_visible('#sp-info'), pg.text_content('#fertig')
+    assert 'A-000042' not in pg.text_content('#fertig') and 'PG-1 ·' in pg.text_content('#fertig') and pg.evaluate('SP.length') == 0 and not pg.is_visible('#sp-info'), pg.text_content('#fertig')
     # 3. Abgelehnt: zurück zu Pausiert mit Meldung, beim Fortsetzen am Entscheid
     pg.evaluate("ABS='fehler'"); bis_entscheid(pg, 'PG-2'); pg.evaluate('abschluss()'); pg.wait_for_timeout(600)
     assert 'Gerät PG-2' in pg.text_content('#nav-pausiert') and '⚠' in pg.text_content('#nav-pausiert'), pg.text_content('#nav-pausiert')

@@ -545,7 +545,7 @@
     'ana.hilfe': ['Titel, Beschrieb, Zustand, Startpreis, Versand und Fotos hat die Analyse vorbereitet. Stück aus dem Regal «Ricardo Offline» nehmen.', 'Title, description, condition, starting price, shipping and photos were prepared in the analysis. Take the item from the shelf «Ricardo Offline».'],
     'ana.leer': ['Keine analysierten Stücke offen.', 'No analysed items open.'], 'th.zustand': ['Zustand', 'Condition'], 'th.fotos': ['Fotos', 'Photos'], 'th.analysiert': ['Analysiert', 'Analysed'],
     'ana.ordner': ['Ordner', 'Folder'], 'ana.quelle': ['aus der Analyse', 'from the analysis'],
-    'ana.gesperrt': ['Zustand und Prüfung stammen aus der Analyse {0} und lassen sich hier nicht ändern.', 'Condition and check come from analysis {0} and cannot be changed here.'],
+    'ana.gesperrt': ['Zustand und Prüfung stammen aus der Analyse und lassen sich hier nicht ändern.', 'Condition and check come from the analysis and cannot be changed here.'],
     's2.analyse': ['Text aus der Analyse wiederherstellen', 'Restore text from the analysis'], 's2.analyse.frage': ['Den Text der Analyse wiederherstellen? Deine Änderungen gehen verloren.', 'Restore the text from the analysis? Your changes will be lost.'],
     's2.analyse.ok': ['Text aus der Analyse. Bitte gegenlesen.', 'Text from the analysis. Please proofread.'],
     's2.geaendert': ['Text der Analyse wurde {0}.', 'The analysis text was changed ({0}).'],
@@ -956,7 +956,7 @@
     var wahl = R ? R.zustandWahl : ''; R = r; R.zustandWahl = wahl || r.zustand;
     $('a-titel').textContent = r.id + (r.buendelIds.length ? t('a.weitere', r.buendelIds.length) : '') + ': ' + r.bezeichnung;
     $('a-meta').textContent = t('a.meta', r.lagerort || t('a.unbekannt'), r.ean || t('a.keine'), r.startpreis) + (r.neupreis ? t('a.neupreis', Number(r.neupreis).toFixed(2)) : '') +
-      (r.analyseNr ? t('a.analyse', r.analyseNr) : '') + (r.regal ? t('a.regal', r.regal) : '');
+      (r.regal ? t('a.regal', r.regal) : '');
     /* Aus der Analyse: Zustand und Prüfung stehen fest, der Text lässt sich wiederherstellen */
     $('d-ana').hidden = !r.analyse; $('d-ana').textContent = r.analyse ? t('ana.gesperrt', r.analyseNr) : '';
     Array.prototype.forEach.call($('d-zustand').querySelectorAll('button'), function (b) { b.disabled = !!r.analyse; });
