@@ -141,12 +141,7 @@ function einrichten() {
     e.getRange(e.getLastRow(), 2).setNumberFormat('@').setFontColor('#0000FF');
   });
   // 24.10.2026: alte Vorgabe der Hinweis-Tabs (mit «Spenden», ohne «Analyse» und «Scanner») auf die heutigen Kanal-Tabs umstellen. Von Hand geänderte Werte bleiben, nur «Spenden» fällt weg
-  for (let i = 2; i <= e.getLastRow(); i++) {
-    if (String(e.getRange(i, 1).getValue()).trim() !== 'Hinweis-Tabs') continue;
-    const wert = String(e.getRange(i, 2).getValue()).trim();
-    if (wert === HINWEIS_TABS_ALT) e.getRange(i, 2).setValue(HINWEIS_TABS);
-    else if (liste_(wert).indexOf('Spenden') !== -1) e.getRange(i, 2).setValue(liste_(wert).filter(function (t) { return t !== 'Spenden'; }).join(', '));   // Tab «Spenden» gibt es nicht mehr
-  }
+  hinweisTabsBereinigen_(e);
   cfgVergessen_();
 
   let v = ss.getSheetByName(TAB_V);
@@ -193,6 +188,16 @@ function einrichten() {
   mailsEinrichten_();
   log_('Einrichten', '', 'Aufbau geprüft');
   try { SpreadsheetApp.getUi().alert('Ricardo Tool ist eingerichtet.'); } catch (err) { /* ohne UI aufgerufen */ }
+}
+
+/** Teil von «einrichten»: alte Vorgabe der Hinweis-Tabs ersetzen; aus einem von Hand geänderten Wert nur «Spenden» entfernen (den Tab gibt es nicht mehr). */
+function hinweisTabsBereinigen_(e) {
+  for (let i = 2; i <= e.getLastRow(); i++) {
+    if (String(e.getRange(i, 1).getValue()).trim() !== 'Hinweis-Tabs') continue;
+    const wert = String(e.getRange(i, 2).getValue()).trim();
+    if (wert === HINWEIS_TABS_ALT) e.getRange(i, 2).setValue(HINWEIS_TABS);
+    else if (liste_(wert).indexOf('Spenden') !== -1) e.getRange(i, 2).setValue(liste_(wert).filter(function (t) { return t !== 'Spenden'; }).join(', '));
+  }
 }
 
 /** Schreibt die Kopfzeile. Bestehende Spalten müssen passen: lieber eine klare Meldung als Daten in der falschen Spalte. */

@@ -948,7 +948,7 @@
   function bestaetigen(m, nochmals) { if (!/^(Bitte bestätigen|Please confirm):/.test(m)) return false; frage(m, nochmals); return true; }
   function listingStarten(id, andere) {
     var fertig = function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); };
-    ruf('starteListing', [id, andere === true], fertig, function (m) { return bestaetigen(m, function () { ruf('starteListing', [id, andere === true, true], fertig); }); });
+    ruf('starteListing', andere === true ? [id, true] : [id], fertig, function (m) { return bestaetigen(m, function () { ruf('starteListing', [id, andere === true, true], fertig); }); });
   }
   /* Knöpfe tragen nur Liste und Index, nie die Nummer selbst (Review 24.10.2026) */
   function startAus(liste, i) { var x = ({ t: TREFFER, e: EIGENE, a: ANA })[liste][i]; if (x) start(x.id); }

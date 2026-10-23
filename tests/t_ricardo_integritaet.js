@@ -115,9 +115,16 @@ ok(r.treffer.length === 2 && r.treffer.every(x => /Möglicherweise dasselbe Stü
 r = S.c("suche('A-000007')");
 ok(r.treffer.length === 1 && r.treffer[0].id === 'PG-300', 'S6: Suche nach Analyse-Nr');
 S.E.d.push(['Hinweis-Tabs', 'Stationär, Spenden']); S.E.d = S.E.d.filter((z, i) => !(z[0] === 'Hinweis-Tabs' && i < S.E.d.length - 1)); S.c('cfgVergessen_()'); S.neu();
-wirft(() => S.c("suche('Toaster')"), /Den Tab «Spenden» gibt es nicht/, 'M2: fehlender Tab gibt einen Fehler');
+r = S.c("suche('Toaster')");
+ok(r.treffer.length === 1 && r.lesefehler.length === 1 && /Tab «Spenden» nicht lesbar/.test(r.lesefehler[0]), 'M2/Review 2: fehlender Hinweis-Tab als Meldung, Suche läuft weiter');
+S.E.d.find(z => z[0] === 'Such-Tabs')[1] = 'Online, Webshop'; S.c('cfgVergessen_()'); S.neu();
+wirft(() => S.c("suche('Toaster')"), /Den Tab «Webshop» gibt es nicht/, 'M2: fehlender Such-Tab bleibt ein harter Fehler');
+S.E.d.find(z => z[0] === 'Such-Tabs')[1] = 'Online';
 S.E.d.find(z => z[0] === 'Hinweis-Tabs')[1] = 'Stationär, Caritas'; S.RT.Caritas.d[5] = ['Name', 'Preis']; S.c('cfgVergessen_()'); S.neu(); for (const k of Object.keys(S.CACHE)) delete S.CACHE[k];
-wirft(() => S.c("suche('Toaster')"), /Im Tab «Caritas» fehlt die Kopfzeile/, 'M2: fehlende Kopfzeile gibt einen Fehler');
+r = S.c("suche('Toaster')");
+ok(r.lesefehler.length === 1 && /Tab «Caritas» nicht lesbar: Im Tab «Caritas» fehlt die Kopfzeile/.test(r.lesefehler[0]), 'M2/Review 2: fehlende Kopfzeile im Hinweis-Tab als Meldung');
+delete S.RT['Stationär']; S.neu(); for (const k of Object.keys(S.CACHE)) delete S.CACHE[k];
+ok(S.c("starteListing('PG-100')").id === 'PG-100', 'Review 2: fehlender Hinweis-Tab legt den Start nicht lahm');
 
 /* ---------- S3, S4: eigene Listings, vergebene Stücke ---------- */
 S = sandbox();
@@ -225,9 +232,19 @@ ok(S.c('uebersicht()').unzugeordnet.length === 1, 'M4: Übersicht liefert die un
 S = sandbox();
 S.listing({ 'PG-ID': 'PG-100', 'Status': 'Retourniert' });
 S.RE.d.push(S.c('R_COLS').map(k => ({ 'Retoure-Nr': 'RT-0001', 'Status': 'Offen', 'PG-ID': 'PG-100', 'Preis CHF': 40, 'Versand CHF': 9 })[k] ?? ''));
-wirft(() => S.c("retoureSchritt('RT-0001', 'rueckzahlung', '490')"), /höher als Preis und Porto \(CHF 49\.00\)/, 'K6: 490 statt 49 abgefangen');
-S.neu(); S.c("retoureSchritt('RT-0001', 'rueckzahlung', '49')");
-ok(S.RE.d[1][S.c('R_COLS').indexOf('Rückzahlung CHF')] === 49, 'K6: Preis + Porto geht');
+wirft(() => S.c("retoureSchritt('RT-0001', 'rueckzahlung', '490')"), /^Bitte bestätigen: Die Rückzahlung \(CHF 490\.00\) ist mehr als Preis und Porto \(CHF 49\.00\)/, 'K6/Review 3: 490 statt 49 verlangt Bestätigung');
+ok(S.RE.d[1][S.c('R_COLS').indexOf('Rückzahlung CHF')] === '', 'K6: ohne Bestätigung nichts erfasst');
+S.neu(); S.c("retoureSchritt('RT-0001', 'rueckzahlung', '58', true)");
+ok(S.RE.d[1][S.c('R_COLS').indexOf('Rückzahlung CHF')] === 58, 'Review 3: mit Bestätigung mehr als Preis + Porto (Rückporto)');
+S = sandbox();
+S.RE.d.push(S.c('R_COLS').map(k => ({ 'Retoure-Nr': 'RT-0002', 'Status': 'Offen', 'PG-ID': 'PG-100' })[k] ?? ''));
+wirft(() => S.c("retoureSchritt('RT-0002', 'rueckzahlung', '20')"), /^Bitte bestätigen: Der Preis des Verkaufs ist unbekannt/, 'Review 3: Preis unbekannt verlangt Bestätigung');
+S.neu(); S.c("retoureSchritt('RT-0002', 'rueckzahlung', '20', true)");
+ok(S.RE.d[1][S.c('R_COLS').indexOf('Rückzahlung CHF')] === 20, 'Review 3: mit Bestätigung erfasst');
+S = sandbox(); S.listing({ 'PG-ID': 'PG-100', 'Status': 'Retourniert' });
+S.RE.d.push(S.c('R_COLS').map(k => ({ 'Retoure-Nr': 'RT-0001', 'Status': 'Offen', 'PG-ID': 'PG-100', 'Preis CHF': 40, 'Versand CHF': 9 })[k] ?? ''));
+S.c("retoureSchritt('RT-0001', 'rueckzahlung', '49')");
+ok(S.RE.d[1][S.c('R_COLS').indexOf('Rückzahlung CHF')] === 49, 'K6: Preis + Porto geht ohne Bestätigung');
 
 /* ---------- K7: MAIL_LETZTE erst nach erfolgreichem Schreiben ---------- */
 S = sandbox();
@@ -241,5 +258,52 @@ ok(!S.PROPS.MAIL_LETZTE, 'K7: MAIL_LETZTE bleibt leer, wenn das Schreiben scheit
 S.PE.kaputt = false; S.neu();
 S.c('mailsLesen_()');
 ok(Number(S.PROPS.MAIL_LETZTE) > 0 && S.PE.d.length === 2, 'K7: nach erfolgreichem Schreiben gesetzt');
+
+/* ---------- Review 24.10.2026 ---------- */
+/* 1: neu gelistet über eine NEUE Zeile, Verkauf über den alten Link */
+S = sandbox();
+S.listing({ 'PG-ID': 'PG-100', 'Status': 'Unverkauft', 'Bezeichnung': 'Toaster', 'Ricardo-Link': 'https://www.ricardo.ch/de/a/t-1111111111/' });
+S.listing({ 'PG-ID': 'PG-100', 'Status': 'Gelistet', 'Bezeichnung': 'Toaster', 'Ricardo-Link': 'https://www.ricardo.ch/de/a/t-2222222222/', 'Gelistet am': new Date() });
+{
+  const sv = S.ctx.SpreadsheetApp.getActive().getSheetByName('Verkäufe'), sl = S.ctx.SpreadsheetApp.getActive().getSheetByName('Listings'), si = S.ctx.SpreadsheetApp.getActive().getSheetByName('Posteingang');
+  S.neu(); let kt = S.c('karten_')(sv, sl, si);
+  S.c('mailWirkung_')({ art: 'Verkauf', referenz: 'PG-100', artikel: '1111111111', verkauf: '8001', titel: 'Toaster', preis: 30, versand: 9, total: 39, kaeufer: 'k', lieferart: 'x', datum: new Date(), id: 'm' }, kt, []);
+  kt.schreiben();
+  ok(S.L.d[1][1] === 'Unverkauft' && S.L.d[2][1] === 'Gelistet', 'Review 1: alte und neue Zeile behalten ihren Status');
+  ok(S.PE.d.some(z => z[0] === 'W-8001' && /früheres Angebot \(Artikel-Nr 1111111111\)/.test(z[S.icol('Text')])) && S.VK.d[1][S.vcol('PG-ID')] === 'PG-100', 'Review 1: Hinweis «früheres Angebot», PG-ID am Verkauf');
+  S.neu(); kt = S.c('karten_')(sv, sl, si);
+  ok(S.c('mailWirkung_')({ art: 'Nicht verkauft', artikel: '1111111111', id: 'n1', datum: new Date() }, kt, []) === false && S.L.d[2][1] === 'Gelistet', 'Review 1: «nicht verkauft» zum alten Angebot ändert die neue Zeile nicht');
+  S.neu(); kt = S.c('karten_')(sv, sl, si);
+  S.c('mailWirkung_')({ art: 'Verkauf', referenz: 'PG-100', artikel: '2222222222', verkauf: '8002', titel: 'Toaster', preis: 30, versand: 9, total: 39, kaeufer: 'k', lieferart: 'x', datum: new Date(), id: 'm2' }, kt, []);
+  kt.schreiben();
+  ok(S.L.d[2][1] === 'Verkauft', 'Review 1: Verkauf über den aktuellen Link setzt die neue Zeile auf «Verkauft»');
+}
+/* 2: «einrichten» entfernt «Spenden» auch aus einem von Hand geänderten Wert */
+S = sandbox();
+S.E.d.find(z => z[0] === 'Hinweis-Tabs')[1] = 'Stationär, Spenden, Caritas';
+S.c('hinweisTabsBereinigen_')(S.E);
+ok(S.E.d.find(z => z[0] === 'Hinweis-Tabs')[1] === 'Stationär, Caritas', 'Review 2: «einrichten» entfernt nur «Spenden»');
+S.E.d.find(z => z[0] === 'Hinweis-Tabs')[1] = 'Stationär, Caritas, Heilsarmee, Berner Brocki, Spenden'; S.c('hinweisTabsBereinigen_')(S.E);
+ok(S.E.d.find(z => z[0] === 'Hinweis-Tabs')[1] === S.c('HINWEIS_TABS'), 'Review 2: alte Vorgabe wird ganz ersetzt');
+/* 4: zweiter Durchgang ohne Treffer liest Hinweis- und Archiv-Tabs aus der Kopie */
+S = sandbox();
+S.c("suche('nichtsda xyz')");
+const gelesen = {}; Object.keys(S.RT).forEach(n => { const alt = S.RT[n].getDataRange; S.RT[n].getDataRange = () => { gelesen[n] = (gelesen[n] || 0) + 1; return alt(); }; });
+S.neu(); S.c("suche('nochmals nichts')");
+ok(gelesen.Online === 1 && !gelesen['Stationär'] && !gelesen['Archiv Entsorgt'], 'Review 4: ohne Treffer nur Such-Tabs frisch (' + JSON.stringify(gelesen) + ')');
+/* 5: 4 bis 7 Ziffern auch im Namen */
+S = sandbox(); S.RT.Online.d.push(RT_KOPF.map(k => ({ ID: 'PG-900', Bezeichnung: 'Bosch Serie 4 Geschirrspüler 6000', VP: 50 })[k] ?? ''));
+ok(S.c("suche('6000')").treffer.some(x => x.id === 'PG-900'), 'Review 5: Zahl im Namen gefunden');
+/* 7, 8: Nummer aktiv UND im Archiv */
+S = sandbox();
+S.RT['Archiv Entsorgt'].d.push(RT_KOPF.map(k => ({ ID: 'PG-101', Bezeichnung: 'Kabel alt' })[k] ?? ''));
+wirft(() => S.c("starteListing('PG-101')"), /^Bitte bestätigen: PG-101 steht im Return Tool aktiv im Tab «Online» und zugleich im Tab «Archiv Entsorgt»/, 'Review 8: aktiv und im Archiv verlangt Bestätigung');
+ok(!S.L.d.some(z => z[0] === 'PG-101'), 'Review 8: ohne Bestätigung kein Listing');
+S.neu(); ok(S.c("starteListing('PG-101', false, true)").id === 'PG-101', 'Review 8: mit Bestätigung gestartet');
+S = sandbox();
+S.listing({ 'PG-ID': 'PG-100', 'Status': 'In Arbeit', 'Bezeichnung': 'Toaster', 'Startpreis CHF': 30, 'Quelle Tab': 'Online' });
+wirft(() => S.c("buendelHinzu('PG-100', 'PG-50')"), /steht im Return Tool im Tab «Archiv Entsorgt»/, 'Review 7: Bündel-Teil im Archiv gesperrt');
+S.RT['Archiv Entsorgt'].d.push(RT_KOPF.map(k => ({ ID: 'PG-101', Bezeichnung: 'Kabel alt' })[k] ?? '')); S.neu();
+wirft(() => S.c("buendelHinzu('PG-100', 'PG-101')"), /aktiv und zugleich im Tab «Archiv Entsorgt»/, 'Review 7: Bündel-Teil aktiv und im Archiv gesperrt');
 
 console.log(fehler ? fehler + ' Fehler' : 'alle Tests ok'); process.exit(fehler ? 1 : 0);

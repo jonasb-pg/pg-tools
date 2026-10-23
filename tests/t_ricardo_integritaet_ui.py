@@ -30,7 +30,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'ablauf:schicht3': {'art': 'schicht3', 'links': LINKS, 'versand': [], 'warten': [], 'regale': {}}}
 stub = """<script>window.AUFRUFE=[];window.D=%s;window.open=function(){};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
- return function(l,name,args){AUFRUFE.push([name,args]);var key=name==='ablauf'?'ablauf:'+args[0]:name;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[key]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
+ return function(l,name,args){AUFRUFE.push([name,args]);var f=D.__fehler&&D.__fehler[name];if(f&&args[f.idx]!==true){setTimeout(function(){fail&&fail({message:f.text})},5);return;}var key=name==='ablauf'?'ablauf:'+args[0]:name;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[key]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
 html = html.replace('<head>', '<head>' + stub, 1)
 fehler = 0
 def ok(b, m):
@@ -38,7 +38,7 @@ def ok(b, m):
     print('ok' if b else 'FEHLER', m); fehler += 0 if b else 1
 with sync_playwright() as p:
     b = p.chromium.launch(); s = b.new_page(viewport={'width': 1300, 'height': 1400}); err = []
-    s.on('pageerror', lambda e: err.append(str(e)))
+    s.on('pageerror', lambda e: err.append(str(e) + ' ' + str(e.stack)[:300]))
     s.set_content(html); s.wait_for_timeout(400)
     rufe = lambda n: [x[1] for x in s.evaluate('AUFRUFE') if x[0] == n]
     # ---------- M3: Täglich zeigt den zweiten Verkauf ----------
@@ -53,6 +53,7 @@ with sync_playwright() as p:
     ok('ohne ID' in tr, 'S1: Scanner ohne ID nicht listbar')
     ok('Im Archiv des Return Tools' in tr and 'Archiv Entsorgt' in tr and 'gesperrt' in tr, 'S1: Archiv gezeigt und gesperrt')
     ok('In den Listings dieses Tools' in tr and 'RC-0003' in tr and 'Neu listen' in tr, 'S3: eigenes RC-Listing mit «Neu listen»')
+    ok("start('" not in s.inner_html('#treffer') and 'startAus' in s.inner_html('#treffer'), 'Review 6: Knöpfe ohne Nummer im onclick (Liste und Index)')
     ok('Anderer Kanal' in tr and s.locator('#treffer tr:has-text("PG-77") button').count() == 0, 'S4: vergebenes Stück ohne Knopf, mit Entscheid')
     ok(s.locator('#treffer tr:has-text("PG-50") button').count() == 0, 'S1: Archiv-Zeile ohne Knopf')
     s.click('#treffer tr:has-text("PG-200") button'); s.wait_for_timeout(100)
@@ -77,6 +78,23 @@ with sync_playwright() as p:
     ok(s.is_visible('#dialog') and 'Achtung: 1 Verkäufe sind keinem Listing zugeordnet' in s.inner_text('#dialog-text') and '7001' in s.inner_text('#dialog-text'), 'M4: Warnung im Dialog')
     s.click('#dialog-ja'); s.wait_for_timeout(200)
     ok(rufe('setzeStatus')[-1] == ['PG-101', 'Unverkauft', True], 'M4: mit Bestätigung an den Server')
+    # ---------- Review: Lesefehler, Bestätigungen ----------
+    s.evaluate("schliesse && schliesse()"); s.evaluate("zeige('listen')"); s.wait_for_timeout(200)
+    s.evaluate("D.suche = { treffer: [{ id: 'PG-101', name: 'Kabel', tab: 'Online', ort: 'TEC-2', erfasst: '', vp: 8, status: '', teilVon: '', quelle: 'rt', warnung: '' }], andere: [], archiv: [], eigene: [], anzahl: 1, lesefehler: ['Tab «Caritas» nicht lesbar: Im Tab «Caritas» fehlt die Kopfzeile'] }")
+    s.evaluate("D.__fehler = { starteListing: { idx: 2, text: 'Bitte bestätigen: PG-101 steht im Return Tool aktiv im Tab «Online» und zugleich im Tab «Archiv Entsorgt». Nur listen, wenn das Stück sicher an Lager ist.' } }")
+    s.evaluate("$('q').value='Kabel'; suchen()"); s.wait_for_timeout(250)
+    ok('Caritas» nicht lesbar' in s.text_content('#such-meldung') and 'PG-101' in s.text_content('#treffer'), 'Review 2: Lesefehler als Hinweis, Treffer trotzdem da')
+    s.click('#treffer button.haupt-knopf'); s.wait_for_timeout(200)
+    ok(s.is_visible('#dialog') and 'zugleich im Tab «Archiv Entsorgt»' in s.inner_text('#dialog-text'), 'Review 8: Nachfrage, wenn aktiv und im Archiv')
+    s.click('#dialog-ja'); s.wait_for_timeout(200)
+    ok(rufe('starteListing')[-1] == ['PG-101', False, True], 'Review 8: nach Ja mit Bestätigung')
+    s.evaluate("schliesse && schliesse()")
+    s.evaluate("D.__fehler = { retoureSchritt: { idx: 3, text: 'Bitte bestätigen: Die Rückzahlung (CHF 58.00) ist mehr als Preis und Porto (CHF 49.00), z.B. Rückporto?' } }; D.retouren = { offen: [{ nr: 'RT-0001', verkauf: '1', pgId: 'PG-1', titel: 'X', kaeufer: 'k', name: 'Vera', eroeffnet: '', grund: 'Defekt', notiz: '', iban: '', betrag: '49.00', rueckzahlung: '', rueckzahlungAm: '', ricardo: '', ricardoFrist: '', ricardoTage: 10, entscheid: '' }], abgeschlossen: 0, entscheide: [], auszahlungen: 1 }; D.retoureSchritt = D.retouren; RT = null; zeige('retour');")
+    s.wait_for_timeout(300)
+    s.evaluate("$('rb-0').value = '58'; retoureSchritt(0, 'rueckzahlung')"); s.wait_for_timeout(100); s.click('#dialog-ja'); s.wait_for_timeout(200)
+    ok(s.is_visible('#dialog') and 'mehr als Preis und Porto' in s.inner_text('#dialog-text'), 'Review 3: Rückzahlung über Preis + Porto: Bestätigung')
+    s.click('#dialog-ja'); s.wait_for_timeout(200)
+    ok(rufe('retoureSchritt')[-1] == ['RT-0001', 'rueckzahlung', '58', True], 'Review 3: nach Ja mit Bestätigung')
     ok(not err, 'keine JS-Fehler ' + str(err))
     b.close()
 print('alle Tests ok' if not fehler else '%d Fehler' % fehler); raise SystemExit(1 if fehler else 0)
