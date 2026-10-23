@@ -25,9 +25,19 @@
  * - Stücke mit Ergebnis im ANALYSE TOOL (Tab «Analysen», letzte Zeile pro PG-ID: Regal Matchmaker oder Ricardo Offline, Reusable Nein)
  *   werden nicht durchsucht. Ist das ANALYSE TOOL nicht lesbar, steht das rot im Status.
  * - Prüfen «Sheet verändert?» und Schreiben in einer Dokument-Sperre; der Haken «Geholt» nimmt dieselbe Sperre.
+ *
+ * Alte Urteile und Zwischenspeichern (24.10.2026, Version .2)
+ * - Urteile von vor dem Produkt-Schlüssel (Spalte 7 im Tab «Urteile» leer) gelten weiter für alle Produkte mit gleicher
+ *   normierter Bezeichnung, wie früher. Gibt es für Produkt und Suchauftrag ein Urteil mit Produkt-Schlüssel, gewinnt dieses
+ *   (es ist immer neuer, denn seit dem Produkt-Schlüssel wird jedes Urteil mit Schlüssel geschrieben). Varianten (gleiche
+ *   Bezeichnung, anderer Barcode) teilen sich so das alte Urteil, bis jemand es neu beurteilen lässt (alte Zeile löschen).
+ *   So gehen keine Treffer verloren, und nichts wird doppelt bezahlt.
+ * - Claude-Urteile werden nach jeder Gruppe gleichzeitiger Anfragen gespeichert. Pro Lauf höchstens PAARE_PRO_LAUF Paare;
+ *   der Rest steht im Status («Noch N Paare offen – bitte nochmals starten»). Ein Lauf, der am 6-Minuten-Limit abbricht,
+ *   verliert nur die laufende Gruppe; ein Neustart prüft nur den Rest.
  */
 
-const VERSION = '2026-10-24.1';
+const VERSION = '2026-10-24.2';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -42,7 +52,8 @@ const MODELL = 'claude-sonnet-5-5';         // Claude-Modell für Suchprofil und
 const TZ = 'Europe/Zurich';
 const PAARE_PRO_ANFRAGE = 60;               // Paare pro Anfrage an Claude
 const PROFILE_PRO_ANFRAGE = 10;             // Suchprofile pro Anfrage an Claude
-const PARALLEL = 5;                         // gleichzeitige Anfragen an Claude
+const PARALLEL = 5;                         // gleichzeitige Anfragen an Claude (eine Gruppe; nach jeder Gruppe wird gespeichert)
+const PAARE_PRO_LAUF = 1500;                // höchstens so viele Paare pro Lauf an Claude (6-Minuten-Limit von Apps Script)
 const PASST_MAX = 3;                        // so viele Produkte stehen höchstens in der Zelle «Passt»
 
 const KOPF = ['Gesucht', 'Mehr Infos (was ist zwingend, was egal)', 'Limit CHF', 'Suchprofil (von Claude, anpassbar)',
@@ -221,13 +232,26 @@ function sucheAusfuehren_(ss, sh, hz, modus, key) {
   // 3. Urteile: aus dem Speicher, der Rest von Claude
   hilfsTabs_(ss);
   const speicher = ladeUrteile_(ss);
-  const offen = paare.filter(function (x) { return !speicher[schluessel_(auftraege[x.a], produkte[x.p])]; });
+  /* Offen = ohne Urteil (auch kein altes über die Bezeichnung). Gleicher Schlüssel nur einmal (sonst doppelt bezahlt). Nach Suchauftrag sortiert, dann begrenzt. */
+  const doppelt = {};
+  const alleOffen = paare.filter(function (x) {
+    if (urteilFuer_(speicher, auftraege[x.a], produkte[x.p])) return false;
+    const k = schluessel_(auftraege[x.a], produkte[x.p]);
+    if (doppelt[k]) return false;
+    doppelt[k] = true;
+    return true;
+  }).sort(function (x, y) { return x.a - y.a || x.p - y.p; });
+  const offen = alleOffen.slice(0, PAARE_PRO_LAUF);
+  const spaeter = alleOffen.length - offen.length;
   let ungeprueft = 0;
   if (offen.length) {
     ss.toast(offen.length + ' Paare werden von Claude geprüft …', 'Matchmaker', 120);
-    const neu = pruefeMitClaude_(key, auftraege, produkte, offen);
-    speichereUrteile_(ss, auftraege, produkte, neu);
-    neu.forEach(function (u) { speicher[schluessel_(auftraege[u.a], produkte[u.p])] = { urteil: u.urteil, hinweis: u.hinweis }; });
+    /* Nach jeder Gruppe speichern: bricht der Lauf ab (Zeitlimit, Fehler), bleiben die Urteile der fertigen Gruppen. */
+    const neu = pruefeMitClaude_(key, auftraege, produkte, offen, function (gruppe) {
+      speichereUrteile_(ss, auftraege, produkte, gruppe);
+      SpreadsheetApp.flush();
+      gruppe.forEach(function (u) { speicher.mit[schluessel_(auftraege[u.a], produkte[u.p])] = { urteil: u.urteil, hinweis: u.hinweis }; });
+    });
     ungeprueft = offen.length - neu.length;
   }
   if (modus === 'alles') raeumeUrteileAuf_(ss, auftraege);
@@ -267,9 +291,10 @@ function sucheAusfuehren_(ss, sh, hz, modus, key) {
   if (bestand.ausgelassen.length) text += ' Nicht gelesen: ' + bestand.ausgelassen.join(', ') + '.';
   if (erledigt.fehler) text += ' ACHTUNG: ANALYSE TOOL nicht lesbar (' + erledigt.fehler + '). Stücke im Matchmaker, auf Ricardo oder nicht reusable sind NICHT ausgeschlossen.';
   if (ungeprueft) text += ' ACHTUNG: ' + ungeprueft + ' Paare konnte Claude nicht prüfen, sie fehlen in der Liste. Suche nochmals starten.';
+  if (spaeter) text += ' Noch ' + spaeter + ' Paare offen – bitte nochmals starten.';
   if (ohneProfil.length) text += ' ACHTUNG: ' + ohneProfil.length + ' Suchaufträge ohne Suchprofil wurden nicht durchsucht (' +
     ohneProfil.slice(0, 5).map(function (a) { return '«' + a.gesucht + '»'; }).join(', ') + (ohneProfil.length > 5 ? ' …' : '') + '). Grund: ' + (DIAGNOSE || 'unbekannt') + ' Suche nochmals starten.';
-  status_(sh, text, ungeprueft > 0 || ohneProfil.length > 0 || !!erledigt.fehler);
+  status_(sh, text, ungeprueft > 0 || spaeter > 0 || ohneProfil.length > 0 || !!erledigt.fehler);
   return text;
 }
 
@@ -598,7 +623,7 @@ function gruppiere_(stuecke) {
   stuecke.forEach(function (it) {
     const k = it.bez.toLowerCase() + '|' + (it.vp == null ? '' : it.vp) + '|' + ident_(it);
     if (!map[k]) {
-      map[k] = { bez: it.bez, slug: it.slug, vp: it.vp, ids: [], orte: [], tag: '', neu: false, schl: norm_(it.bez) + '|' + ident_(it), text: ' ' + norm_(it.bez + ' ' + it.such) + ' ' };
+      map[k] = { bez: it.bez, slug: it.slug, vp: it.vp, ids: [], orte: [], tag: '', neu: false, nb: norm_(it.bez), schl: norm_(it.bez) + '|' + ident_(it), text: ' ' + norm_(it.bez + ' ' + it.such) + ' ' };
       liste.push(map[k]);
     }
     if (it.neu) map[k].neu = true;
@@ -706,28 +731,40 @@ function urteilFrage_(teil, auftraege, produkte) {
   return l.join('\n');
 }
 
-function pruefeMitClaude_(key, auftraege, produkte, offen) {
+/**
+ * Lässt Claude die offenen Paare beurteilen. speichern(urteile) wird nach jeder Gruppe gleichzeitiger Anfragen mit deren
+ * Urteilen aufgerufen (Zwischenspeichern). Was in einer Antwort fehlt, wird bis zu zweimal nachgefragt. Gibt alle Urteile zurück.
+ */
+function pruefeMitClaude_(key, auftraege, produkte, offen, speichern) {
   let rest = offen.slice().sort(function (x, y) { return x.a - y.a || x.p - y.p; });
   const fertig = [];
   for (let runde = 0; runde < 3 && rest.length; runde++) {
     const teile = [];
     for (let i = 0; i < rest.length; i += PAARE_PRO_ANFRAGE) teile.push(rest.slice(i, i + PAARE_PRO_ANFRAGE));
-    const antworten = frageClaude_(key, teile.map(function (t) {
-      return { system: URTEIL_SYSTEM, frage: urteilFrage_(t, auftraege, produkte), tool: URTEIL_TOOL };
-    }));
-    const naechste = [];
-    teile.forEach(function (t, k) {
-      const gesehen = {};
-      const liste = listeAus_(antworten[k], 'urteile');
-      liste.forEach(function (u) {
-        const i = Number(u && u.nr);
-        const art = normUrteil_(u && u.urteil);
-        if (!(i >= 0 && i < t.length) || !art || gesehen[i]) return;
-        gesehen[i] = true;
-        fertig.push({ a: t[i].a, p: t[i].p, urteil: art, hinweis: String(u.hinweis || '').replace(/\s+/g, ' ').trim().slice(0, 90) });
+    const naechste = [], ausgewertet = {};
+    const auswerten = function (indizes, antworten) {
+      const neu = [];
+      indizes.forEach(function (k) {
+        if (ausgewertet[k]) return;
+        ausgewertet[k] = true;
+        const t = teile[k], gesehen = {};
+        listeAus_(antworten[k], 'urteile').forEach(function (u) {
+          const i = Number(u && u.nr);
+          const art = normUrteil_(u && u.urteil);
+          if (!(i >= 0 && i < t.length) || !art || gesehen[i]) return;
+          gesehen[i] = true;
+          neu.push({ a: t[i].a, p: t[i].p, urteil: art, hinweis: String(u.hinweis || '').replace(/\s+/g, ' ').trim().slice(0, 90) });
+        });
+        t.forEach(function (x, i) { if (!gesehen[i]) naechste.push(x); });
       });
-      t.forEach(function (x, i) { if (!gesehen[i]) naechste.push(x); });
-    });
+      if (neu.length && speichern) speichern(neu);
+      neu.forEach(function (u) { fertig.push(u); });
+    };
+    frageClaude_(key, teile.map(function (t) {
+      return { system: URTEIL_SYSTEM, frage: urteilFrage_(t, auftraege, produkte), tool: URTEIL_TOOL };
+    }), auswerten);
+    // Anfragen ohne Antwort (Claude überlastet): in der nächsten Runde nochmals
+    teile.forEach(function (t, k) { if (!ausgewertet[k]) t.forEach(function (x) { naechste.push(x); }); });
     rest = naechste;
   }
   return fertig;
@@ -744,10 +781,12 @@ function normUrteil_(v) {
 /**
  * Schickt mehrere Anfragen gleichzeitig an Claude. Gibt pro Anfrage das Ergebnis-Objekt zurück oder null.
  * Überlastung und Zeitlimits werden bis zu dreimal wiederholt. Ein ungültiger Schlüssel bricht sofort ab.
+ * nachGruppe(indizes, ergebnis), falls angegeben: nach jeder Gruppe (fetchAll) mit den Anfragen, die beantwortet wurden (Code 200).
+ * Bei einem Abbruch (Schlüssel, Modell, 400) läuft nachGruppe vorher noch für die übrigen Antworten der Gruppe.
  */
 let DIAGNOSE = '';   // Grund der letzten Antwort ohne Ergebnis
 
-function frageClaude_(key, anfragen) {
+function frageClaude_(key, anfragen, nachGruppe) {
   const ergebnis = anfragen.map(function () { return null; });
   let offen = anfragen.map(function (_, i) { return i; });
   let letzterFehler = '';
@@ -774,10 +813,13 @@ function frageClaude_(key, anfragen) {
           muteHttpExceptions: true
         };
       }));
+      const beantwortet = [];
+      let abbruch = null;
       res.forEach(function (r, k) {
         const i = gruppe[k];
         const code = r.getResponseCode();
         if (code === 200) {
+          beantwortet.push(i);
           try {
             const data = JSON.parse(r.getContentText());
             const block = (data.content || []).filter(function (b) { return b.type === 'tool_use'; })[0];
@@ -791,13 +833,16 @@ function frageClaude_(key, anfragen) {
           return; // nicht wiederholen: dieselbe Anfrage gäbe dieselbe Antwort
         }
         const text = r.getContentText().slice(0, 200);
-        if (code === 401 || code === 403) throw new Error('Der Claude-Schlüssel wurde abgelehnt (' + code + '). Im Menü Matchmaker → «Claude-Schlüssel setzen» neu hinterlegen.');
-        if (code === 404) throw new Error('Das Modell «' + MODELL + '» wurde nicht gefunden. Oben im Script die Zeile MODELL anpassen.');
-        if (code === 400) throw new Error('Claude hat die Anfrage abgelehnt (400): ' + text);
+        if (abbruch) return;
+        if (code === 401 || code === 403) { abbruch = new Error('Der Claude-Schlüssel wurde abgelehnt (' + code + '). Im Menü Matchmaker → «Claude-Schlüssel setzen» neu hinterlegen.'); return; }
+        if (code === 404) { abbruch = new Error('Das Modell «' + MODELL + '» wurde nicht gefunden. Oben im Script die Zeile MODELL anpassen.'); return; }
+        if (code === 400) { abbruch = new Error('Claude hat die Anfrage abgelehnt (400): ' + text); return; }
         letzterFehler = code + ': ' + text;
         DIAGNOSE = 'Claude meldet ' + code + ': ' + text.slice(0, 160);
         naechste.push(i);
       });
+      if (nachGruppe && beantwortet.length) nachGruppe(beantwortet, ergebnis);
+      if (abbruch) throw abbruch;
     }
     offen = naechste;
   }
@@ -814,18 +859,30 @@ function kennung_(a) {
 /** Urteil pro Suchauftrag (Kennung) und Produkt (Bezeichnung und Barcode/Link, nicht nur die Bezeichnung). */
 function schluessel_(a, p) { return a.kennung + '|' + p.schl; }
 
+/**
+ * Gespeicherte Urteile: { mit: { 'Kennung|Produkt-Schlüssel': Urteil }, alt: { 'Kennung|normierte Bezeichnung': Urteil } }.
+ * mit = Zeilen mit Produkt-Schlüssel (Spalte 7). alt = Zeilen von vor dem Produkt-Schlüssel (Spalte 7 leer): Sie gelten
+ * weiter für alle Produkte mit dieser Bezeichnung, auch für Varianten mit anderem Barcode (wie früher), bis ein Urteil
+ * mit Schlüssel da ist. Bei mehreren Zeilen zum selben Schlüssel gilt die unterste.
+ */
 function ladeUrteile_(ss) {
   const sh = ss.getSheetByName(TAB_URTEILE);
-  const map = {};
-  if (!sh || sh.getLastRow() < 2) return map;
-  /* Spalte 7 = Produkt-Schlüssel. Alte Zeilen ohne Schlüssel gelten nur für Produkte ohne Barcode und Link (sonst wird neu geprüft). */
+  const speicher = { mit: {}, alt: {} };
+  if (!sh || sh.getLastRow() < 2) return speicher;
   sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function (r) {
     const art = normUrteil_(r[3]);
     if (!r[0] || !art) return;
-    const schl = String(r[6] || '').trim() || norm_(r[2]) + '|';
-    map[String(r[0]).trim() + '|' + schl] = { urteil: art, hinweis: String(r[4] || '').trim() };
+    const kennung = String(r[0]).trim(), schl = String(r[6] || '').trim();
+    const u = { urteil: art, hinweis: String(r[4] || '').trim() };
+    if (schl) speicher.mit[kennung + '|' + schl] = u;
+    else speicher.alt[kennung + '|' + norm_(r[2])] = u;
   });
-  return map;
+  return speicher;
+}
+
+/** Das geltende Urteil für Suchauftrag und Produkt: zuerst mit Produkt-Schlüssel, sonst ein altes über die Bezeichnung. null, wenn keins. */
+function urteilFuer_(speicher, a, p) {
+  return speicher.mit[schluessel_(a, p)] || speicher.alt[a.kennung + '|' + p.nb] || null;
 }
 
 function speichereUrteile_(ss, auftraege, produkte, neu) {
@@ -860,15 +917,22 @@ function raeumeUrteileAuf_(ss, auftraege) {
  * So behält ein Tageslauf die Treffer früherer Läufe, und Treffer auf verschwundene Stücke fallen weg.
  */
 function trefferPaare_(auftraege, produkte, paare, speicher) {
-  const nachKennung = {}, nachSchl = {}, gesehen = {}, aus = [];
+  const nachKennung = {}, nachSchl = {}, nachBez = {}, gesehen = {}, aus = [];
   auftraege.forEach(function (a, ai) { (nachKennung[a.kennung] = nachKennung[a.kennung] || []).push(ai); });
-  produkte.forEach(function (p, pi) { (nachSchl[p.schl] = nachSchl[p.schl] || []).push(pi); });
+  produkte.forEach(function (p, pi) {
+    (nachSchl[p.schl] = nachSchl[p.schl] || []).push(pi);
+    (nachBez[p.nb] = nachBez[p.nb] || []).push(pi);
+  });
   const dazu = function (ai, pi) { const k = ai + '|' + pi; if (!gesehen[k]) { gesehen[k] = true; aus.push({ a: ai, p: pi }); } };
   paare.forEach(function (x) { dazu(x.a, x.p); });
-  Object.keys(speicher).forEach(function (k) {
-    if (speicher[k].urteil === 'nein') return;
-    const i = k.indexOf('|'), kennung = k.slice(0, i), schl = k.slice(i + 1);
-    (nachKennung[kennung] || []).forEach(function (ai) { (nachSchl[schl] || []).forEach(function (pi) { dazu(ai, pi); }); });
+  /* Kandidaten aus beiden Speichern; ob das Paar wirklich ein Treffer ist, entscheidet urteilFuer_ in ergebnisZeilen_ (Schlüssel vor alt). */
+  [[speicher.mit, nachSchl], [speicher.alt, nachBez]].forEach(function (x) {
+    const map = x[0], index = x[1];
+    Object.keys(map).forEach(function (k) {
+      if (map[k].urteil === 'nein') return;
+      const i = k.indexOf('|'), kennung = k.slice(0, i), rest = k.slice(i + 1);
+      (nachKennung[kennung] || []).forEach(function (ai) { (index[rest] || []).forEach(function (pi) { dazu(ai, pi); }); });
+    });
   });
   return aus;
 }
@@ -884,7 +948,7 @@ function produktText_(p, hinweis) {
 function ergebnisZeilen_(auftraege, produkte, paare, speicher) {
   const proAuftrag = auftraege.map(function () { return { passt: [], aehnlich: [] }; });
   paare.forEach(function (x) {
-    const u = speicher[schluessel_(auftraege[x.a], produkte[x.p])];
+    const u = urteilFuer_(speicher, auftraege[x.a], produkte[x.p]);
     if (!u) return;
     if (u.urteil === 'passt') proAuftrag[x.a].passt.push({ p: produkte[x.p], h: u.hinweis });
     else if (u.urteil === 'ähnlich') proAuftrag[x.a].aehnlich.push({ p: produkte[x.p], h: u.hinweis });
