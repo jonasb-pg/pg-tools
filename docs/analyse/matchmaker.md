@@ -162,6 +162,10 @@ Umsetzung der unabhängigen Code-Prüfung (19 Befunde, dazu Z6, Z7, Z12 aus der 
 
 Geänderte bestehende Tests (Verhalten absichtlich geändert): `tests/t_matchmaker_script.js` – Version .3; Scanner-Stück jetzt unter «Ähnlich» (Z12); «Sheet verändert» schreibt die unveränderten Aufträge (Befund 15); «zweite Gruppe wirft» ersetzt durch die Zeitbremse, weil ein Verbindungsfehler den Lauf nicht mehr abbricht (Befunde 9, 10).
 
+### Nachprüfung 24.10.2026 (Befund 4)
+
+`ausAnalyseIds_(zellen, tage)`: Ein Stück im Vermerk «Aus Analyse» eines geholten Auftrags ist nur ausgeschlossen, solange es nach dem Vermerk nicht nochmals analysiert wurde. `tage` = Tag der letzten Analyse je Stück aus dem ANALYSE TOOL (`leseErledigt_`, Spalte «Ende»), das Datum des Vermerks steht am Zeilenende (vor «· Fotos:»). Gleicher Tag oder Vermerk ohne Datum: weiter ausgeschlossen. So wird eine Retoure wieder angeboten. Gleiche Regel wie `mmGeholt_` im Analyse Tool. Test: `tests/t_matchmaker_p2410_nachpruefung.js`.
+
 ### Beim Einspielen
 
 | Was | Folge |
@@ -171,6 +175,7 @@ Geänderte bestehende Tests (Verhalten absichtlich geändert): `tests/t_matchmak
 | Tab «Matchmaker» | keine neue Spalte («Aus Analyse» gibt es als J). Fehlt eine Pflichtspalte im Kopf, bricht die Suche mit «Spalten verschoben» ab, statt umzubauen. |
 | Urteile | Kennungen unverändert, nichts wird gelöscht oder neu bezahlt. Barcodes mit «(01)», «01»-Präfix (16 Ziffern), Bindestrich oder Apostroph in der Mitte haben einen neuen Produkt-Schlüssel; ihre alten Urteile gelten über die alte Schreibweise weiter. |
 | Kosten im ersten Lauf | neu an Claude nur: Paare ohne Urteil (neue oder geänderte Aufträge seit 09:45) und neue Kandidaten über die Kategorie bei Stücken ohne Link. Begrenzt durch 900 Paare und die Zeitbremse. |
+| Spalte J «Aus Analyse» (Nachprüfung) | Vor dem Go-live durchsehen: Ein Eintrag «PG-… · …» ohne späteres «nicht geklappt»/«Ricardo» reserviert den Auftrag im Analyse Tool sofort (Z5/Z8). Für Stücke, die anders weitergegangen sind, eine Zeile «PG-… · nicht geklappt · Datum» ergänzen. |
 | Ergebnis ändert sich | Scanner-Stücke wandern von «Passt» nach «Ähnlich»; Stücke auf Ricardo, im Umpack Tool verkauft/entsorgt oder bei geholten Aufträgen verschwinden aus den Listen. |
 | Status rot im ersten Lauf | wenn die Person, die sucht, Ricardo Tool oder Umpack Tool nicht lesen kann (Grund steht im Status), oder wenn ein Return-Tool-Tab eine Pflichtspalte nicht hat (dann bleiben Passt/Ähnlich auf dem alten Stand). |
 | Tagesläufe | dauern etwas länger (Kandidaten im ganzen Bestand), kosten aber nur für Paare ohne Urteil. |

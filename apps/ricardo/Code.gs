@@ -90,7 +90,7 @@ const DEFAULTS = [
   ['Laufzeit Tage', 6, 'Vorschlag für die Laufzeit der Auktion. Beim Listen kann man pro Angebot eine andere Laufzeit eintragen (Spalte «Laufzeit Tage» im Tab «Listings»).'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
   ['Post Frankierlizenz', '60162228', 'Frankierlizenz Pakete Inland für die Etiketten (Barcode API der Post). Zugang: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET'],
-  ['Etiketten-Format', 'ZPL', 'ZPL = Etikette für den Zebra ZD220 (A6, 200 dpi): druckt direkt über «Zebra Browser Print» oder kommt als Datei in den Download-Ordner (Druckprogramm). PDF = Etikette als PDF-Datei (A6, 300 dpi).'],
+  ['Etiketten-Format', 'PDF', 'PDF (Vorgabe) = Etikette als PDF-Datei (A6, 300 dpi) im Download-Ordner. ZPL = Etikette für den Zebra ZD220 (A6, 200 dpi), druckt direkt über «Zebra Browser Print». Erst auf ZPL stellen, wenn ein Testdruck aus der echten Web-App geklappt hat. Seiten, die vor der Umstellung geöffnet wurden, bekommen immer PDF.'],
   ['Post Absender', 'Pretty Good GmbH, Pappelweg 24, 3013, Bern', 'Absender auf der Etikette: Name, Strasse und Nr., PLZ, Ort (mit Komma getrennt)'],
   ['Schlusssatz', SCHLUSSSATZ, 'Steht am Ende jedes Beschriebs. Keine Domain verwenden. Gleicher Satz wie «Ricardo-Schlusssatz» im ANALYSE TOOL'],
   ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
@@ -713,8 +713,10 @@ function leseQuelle_(src, tab, art) {
   if (h === -1 && art === 'extra') return null;
   if (h === -1 && art === 'archiv') {
     einmalProTag_('archivkopf:' + tab, 'Return Tool', 'Tab «' + tab + '» heisst «Archiv…», hat aber keine Kopfzeile (Spalten ID und Bezeichnung in den ersten 12 Zeilen). Wird übersprungen.');
+    archivOhneKopf_(tab, true);
     return null;
   }
+  if (art === 'archiv') archivOhneKopf_(tab, false);
   if (h === -1) throw new Error('Return Tool: Im Tab «' + tab + '» fehlt die Kopfzeile (Spalten Bezeichnung und ID in den ersten 12 Zeilen).');
   const kopf = vals[h].map(function (x) { return String(x).trim(); });
   const c = function (name) { return kopf.indexOf(name); };
@@ -739,6 +741,19 @@ function leseQuelle_(src, tab, art) {
   }
   return out;
 }
+/**
+ * Nach-Review 24.10.2026 (11): Archiv-Tabs ohne Kopfzeile werden übersprungen (Prüfung 14). Damit das nicht still bleibt (ein beschädigter Kopf schaltet
+ * die Archivprüfung beim Start ab), merkt sich das Tool sie in der Script-Eigenschaft ARCHIV_OHNE_KOPF; Admin › Betrieb zeigt sie rot.
+ */
+function archivOhneKopf_(tab, ohne) {
+  try {
+    const pr = PropertiesService.getScriptProperties(), m = JSON.parse(pr.getProperty('ARCHIV_OHNE_KOPF') || '{}');
+    if (ohne === !!m[tab]) return;
+    if (ohne) m[tab] = Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy HH:mm'); else delete m[tab];
+    pr.setProperty('ARCHIV_OHNE_KOPF', JSON.stringify(m));
+  } catch (e) { console.warn('ARCHIV_OHNE_KOPF: ' + e.message); }
+}
+function archiveOhneKopf_() { try { const m = JSON.parse(PropertiesService.getScriptProperties().getProperty('ARCHIV_OHNE_KOPF') || '{}'); return Object.keys(m).map(function (k) { return { tab: k, seit: m[k] }; }); } catch (e) { return []; } }
 /** Zeile (0-basiert) der Kopfzeile in den ersten 12 Zeilen: «Bezeichnung» und «ID» (oder «Barcode», wenn barcodeReicht), sonst -1. */
 function kopfZeile_(vals, barcodeReicht) {
   for (let i = 0; i < Math.min(12, vals.length); i++) {
@@ -847,6 +862,15 @@ function mmProzent_(ss) {
 function mmBeschrieb_(b) {
   [cfg_('Versandsatz'), cfg_('Schlusssatz')].forEach(function (x) { x = String(x || '').trim(); if (x && b.indexOf(x) === -1) b += '\n\n' + x; });
   return b;
+}
+/** Nach-Review 24.10.2026 (7): Matchmaker-Status ist «Ricardo», das Listing bzw. Bündel kam aber nicht zustande. Laut im Log und im Posteingang. */
+function mmNichtGelistet_(id, wo, err) {
+  const text = 'Im Matchmaker (ANALYSE TOOL) auf «Ricardo» gesetzt, aber ' + wo + ' nicht angelegt: ' + String((err && err.message) || err) + '. Bitte nochmals starten (keine neue Rückfrage) oder den Status im Matchmaker zurückstellen.';
+  log_('Matchmaker-Status FEHLER', id, text);
+  try {
+    const si = SpreadsheetApp.getActive().getSheetByName(TAB_I);
+    if (si) hinweiseSchreiben_(si, [{ id: 'WM-' + idNorm_(id), nr: '', pg: id, titel: id, text: text, datum: new Date() }]);
+  } catch (e) { log_('Matchmaker-Status FEHLER', id, 'Hinweis nicht geschrieben: ' + String(e.message || e)); }
 }
 /**
  * Beim Start des Listings oder Bündels: im ANALYSE TOOL den Matchmaker-Eintrag auf «Ricardo» setzen (nicht verkauft). Läuft ohne Sperre (externer Zugriff).
@@ -1003,15 +1027,21 @@ function starteListing(id, auchAndere, bestaetigt) {
   const rc = /^RC-\d+$/.test(id), l0 = listingsIndex_()[idNorm_(id)];
   if (l0) gebundenPruefen_(id, l0);
   const vor = rc || l0 ? null : vorpruefen_(id, auchAndere === true);
+  let mmGesetzt = false;
   if (vor) {
     vorFreigabe_(id, vor, bestaetigt, false);
+    /* Nach-Review 24.10.2026 (7): erst alle Prüfungen (auch der Preis), dann den Matchmaker-Status setzen */
+    if (vor.ana && !vor.ana.vp) throw new Error('Produkt ' + id + ' hat in der Analyse keinen Startpreis.');
+    if (!vor.ana && !vor.rt) throw new Error('Produkt ' + id + ' wurde in den Such-Tabs des Return Tools nicht gefunden.');
     if (vor.ana && vor.ana.mm) {
       const mm = mmAufRicardo_(vor.ana);
       if (!mm.ok) throw new Error('Listing nicht gestartet: Der Status im Matchmaker (ANALYSE TOOL) liess sich nicht auf «Ricardo» setzen. Bitte nochmals versuchen. (' + mm.fehler + ')');
+      mmGesetzt = vor.ana.mmStatus === 'Offen';
     }
   }
-  let nr = id;
-  const lock = sperre_(20000);
+  let nr = id, lock;
+  try { lock = sperre_(20000); }
+  catch (err) { if (mmGesetzt) mmNichtGelistet_(id, 'Listing', err); throw err; }
   try {
     const idx = listingsIndex_(), l = idx[idNorm_(id)];
     if (l) { gebundenPruefen_(id, l); nr = l.id; }
@@ -1043,6 +1073,7 @@ function starteListing(id, auchAndere, bestaetigt) {
       sh.appendRow(L_COLS.map(function (k) { return rec[k]; }));
       log_('Listing angelegt', id, q.name + (q.tab !== liste_(cfg_('Such-Tabs'))[0] ? ' (Tab ' + q.tab + ')' : ''));
     }
+  } catch (err) { if (mmGesetzt) mmNichtGelistet_(id, 'Listing', err); throw err;
   } finally { lock.releaseLock(); }
   return lade_(nr);
 }
@@ -1165,13 +1196,16 @@ function buendelHinzu(id, zusatzId, bestaetigt) {
     qVor = vor.ana || (vor.rt && liste_(cfg_('Such-Tabs')).indexOf(vor.rt.tab) !== -1 ? vor.rt : null);
     if (!qVor && !vor.archiv) throw new Error('Stück ' + zusatzId + ' wurde weder in der Analyse noch in den Such-Tabs des Return Tools gefunden.');
     vorFreigabe_(zusatzId, vor, bestaetigt, true);
+    if (!qVor.vp) throw new Error('Stück ' + zusatzId + ' hat keinen Startpreis.');   // Nach-Review (7): vor dem Matchmaker-Status
     if (qVor.mm) {
       const mm = mmAufRicardo_(qVor);
       if (!mm.ok) throw new Error('Bündel nicht ergänzt: Der Status im Matchmaker (ANALYSE TOOL) liess sich nicht auf «Ricardo» setzen. Bitte nochmals versuchen. (' + mm.fehler + ')');
       mmGesetzt = qVor.mmStatus === 'Offen';
     }
   }
-  const lock = sperre_(20000);
+  let lock;
+  try { lock = sperre_(20000); }
+  catch (err) { if (mmGesetzt) mmNichtGelistet_(zusatzId, 'Bündel ' + id, err); throw err; }
   try {
     const zeile = findeZeile_(sh, id);
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
@@ -1203,7 +1237,7 @@ function buendelHinzu(id, zusatzId, bestaetigt) {
     }
     log_('Bündel ergänzt', id, zusatzId + (q.tab ? ' (' + q.tab + ')' : ''));
   } catch (err) {
-    if (mmGesetzt) log_('Matchmaker-Status', zusatzId, 'Im Matchmaker auf «Ricardo» gesetzt, aber nicht ins Bündel ' + id + ' gekommen: ' + err.message);
+    if (mmGesetzt) mmNichtGelistet_(zusatzId, 'Bündel ' + id, err);
     throw err;
   } finally { lock.releaseLock(); }
   return lade_(id);
@@ -1442,7 +1476,7 @@ function laufzeitVon_(wert, standard) { const n = Number(wert); return n >= 1 &&
  * Klick: nichts ändern. Jeder andere Status: Fehler mit dem aktuellen Status (sonst fiele ein verkauftes Stück auf «Gelistet» zurück).
  * Link: nur Angebotslinks ricardo.ch/…/a/…-<Artikel-Nr> (angebotsLink_), Zusätze nach ? und # fallen weg; Doppel über die Artikel-Nr, nicht über die Schreibweise.
  */
-function markiereGelistet(id, link, tage) {
+function markiereGelistet(id, link, tage, bestaetigt) {
   id = String(id).trim();
   const a = angebotsLink_(link);
   if (!a) throw new Error('Das ist kein gültiger Ricardo-Angebotslink. Bitte die Adresse des veröffentlichten Angebots einfügen (ricardo.ch/…/a/…).');
@@ -1455,13 +1489,25 @@ function markiereGelistet(id, link, tage) {
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
     if (rec['Status'] === 'Gelistet' && artikelAusLink_(rec['Ricardo-Link']) === a.artikel) return lade_(id);
-    if (OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist «' + rec['Status'] + '» und kann nicht als gelistet gespeichert werden.' + (rec['Status'] === 'Gelistet' ? ' Es ist schon mit einem anderen Ricardo-Link gelistet.' : ''));
-    if (pruefe_(rec).length) throw new Error('Listing ist noch nicht vollständig: ' + pruefe_(rec).join('; '));
+    /* Nach-Review 24.10.2026 (5): Bei «Gelistet» darf ein falsch eingefügter Link mit Rückfrage ersetzt werden. Der alte Link kommt NICHT in «Frühere Links»
+       (sonst bliebe das Stück, dem er gehört, gesperrt und dessen Verkauf landete hier). Laufzeit und «Gelistet am» bleiben. */
+    const ersetzen = rec['Status'] === 'Gelistet';
+    if (ersetzen && bestaetigt !== true) throw new Error('Bitte bestätigen: ' + id + ' ist schon mit dem Ricardo-Link ' + String(rec['Ricardo-Link'] || '–') + ' gelistet. Link ersetzen (z.B. falsch eingefügt)? Der alte Link gilt dann nicht mehr für ' + id + '.');
+    if (!ersetzen && OFFEN.indexOf(rec['Status']) === -1) throw new Error('Listing ' + id + ' ist «' + rec['Status'] + '» und kann nicht als gelistet gespeichert werden.');
+    if (!ersetzen && pruefe_(rec).length) throw new Error('Listing ist noch nicht vollständig: ' + pruefe_(rec).join('; '));
     werte_(TAB_L, L_COLS.length).forEach(function (r) {
       if (idNorm_(r[0]) === idNorm_(id)) return;                          // eigenes früheres Angebot: erlaubt
       const arts = [artikelAusLink_(r[col_('Ricardo-Link') - 1])].concat(fruehere_(r[col_('Frühere Links') - 1]).map(artikelAusLink_));
       if (arts.indexOf(a.artikel) !== -1) throw new Error('Dieser Ricardo-Link ist bereits bei ' + String(r[0]).trim() + ' hinterlegt.');
     });
+    if (ersetzen) {
+      const alt = String(rec['Ricardo-Link'] || '');
+      rec['Ricardo-Link'] = a.link; rec['Bearbeitet von'] = nutzer_();
+      if (tage !== undefined && tage !== '') rec['Laufzeit Tage'] = laufzeitVon_(tage, cfg_('Laufzeit Tage'));
+      schreibe_(sh, zeile, rec, true);
+      log_('Link ersetzt', id, alt + ' → ' + a.link);
+      return lade_(id);
+    }
     /* 24.10.2026 (S5): «Neu listen» auf derselben Zeile. Der alte Link bleibt in «Frühere Links», damit ein Verkauf des alten Angebots erkannt wird */
     const vorher = String(rec['Ricardo-Link'] || '').trim(), fr = fruehere_(rec['Frühere Links']);
     const va = artikelAusLink_(vorher), schonDa = fr.indexOf(vorher) !== -1 || (!!va && fr.map(artikelAusLink_).indexOf(va) !== -1);
@@ -1626,18 +1672,23 @@ function findeZeile_(sh, id) {
 function listingsIndex_() {
   const idx = {};
   const setze = function (k, e) { if (!idx[k] || e.aktiv || !idx[k].aktiv) idx[k] = e; };
-  werte_(TAB_L, L_COLS.length).forEach(function (row) {
+  const rows = werte_(TAB_L, L_COLS.length), letzte = letzteZeilen_(rows);
+  rows.forEach(function (row, i) {
     const id = String(row[0]).trim();
     if (!id) return;
     const status = row[col_('Status') - 1], entscheid = String(row[col_('Entscheid unverkauft') - 1] || '').trim(), frei = FREI.indexOf(status) !== -1;
-    const vergeben = frei && ENTSCHEID_GEBUNDEN.indexOf(entscheid) !== -1, offen = frei && !entscheid && STATUS_ENTSCHEID.indexOf(status) !== -1;
+    /* Nach-Review 24.10.2026 (6): eine offene Zeile, nach der eine neuere Zeile desselben Stücks steht (alte Daten), ist abgelöst und nicht mehr offen */
+    const vergeben = frei && ENTSCHEID_GEBUNDEN.indexOf(entscheid) !== -1, offen = frei && !entscheid && STATUS_ENTSCHEID.indexOf(status) !== -1 && letzte[idNorm_(id)] === i;
     if (frei && !vergeben && !offen) return;
-    const art = { status: status, vergeben: vergeben, entscheid: vergeben ? entscheid : '', offen: offen, aktiv: !frei };
+    const art = { status: status, vergeben: vergeben, entscheid: vergeben ? entscheid : '', offen: offen, aktiv: !frei, zeile: i + 2 };
     setze(idNorm_(id), Object.assign({ id: id, link: String(row[col_('Ricardo-Link') - 1]) }, art));
     liste_(row[col_('Bündel-IDs') - 1]).forEach(function (b) { setze(idNorm_(b), Object.assign({ id: b, link: '', teilVon: id }, art)); });
   });
   return idx;
 }
+
+/** Index (0-basiert) der letzten Zeile je Nummer (Spalte PG-ID, normalisiert). */
+function letzteZeilen_(rows) { const m = {}; rows.forEach(function (r, i) { const id = String(r[0]).trim(); if (id) m[idNorm_(id)] = i; }); return m; }
 
 /** Laufende Angebote auf Ricardo. Prüfung 19: Ein Bündel ist ein Angebot, seine Teile zählen nicht extra. */
 function zaehleAktive_() {
@@ -1923,8 +1974,10 @@ function abgleichen_(alt, d, lv, karte, geaendert, hinweise, provision, zaehl) {
   if (!String(alt[vi('PG-ID')] || '').trim() && ['Storniert', 'Retourniert'].indexOf(st) === -1) {
     const z = verkaufZuordnen_(karte, lv, d['ReferenceNumber'], art);
     if (z && z.sicher) {
-      const L = lv[z.i], w = verkaufStatusErlaubt_(z, L, nr, lv, karte);
-      if (w === '' || w === true) {
+      const L = lv[z.i], w = verkaufStatusErlaubt_(z, L, nr, lv, karte), unplausibel = w === '' ? nachtragUnplausibel_(L, datum) : '';
+      if (unplausibel) hinweise.push({ nr: nr, artikel: art, pg: String(L[0]), titel: d['ArticleTitle'], datum: datum,
+        text: 'Verkauf ' + nr + ' (ohne PG-ID) könnte zu ' + L[0] + ' gehören, ' + unplausibel + '. Nichts geändert: bitte prüfen und im Admin-Teil zuordnen.' });
+      else if (w === '' || w === true) {
         alt[vi('PG-ID')] = String(L[0]);
         if (!alt[vi('Lagerort')]) alt[vi('Lagerort')] = L[col_('Lagerort') - 1];
         if (!alt[vi('Versandklasse')]) alt[vi('Versandklasse')] = L[col_('Versandklasse') - 1];
@@ -1938,6 +1991,19 @@ function abgleichen_(alt, d, lv, karte, geaendert, hinweise, provision, zaehl) {
     if (li !== undefined && String(lv[li][col_('Verkauf-Nr') - 1]) === nr && !(Number(lv[li][col_('Erzielter Preis CHF') - 1]) > 0)) { lv[li][col_('Erzielter Preis CHF') - 1] = Number(alt[vi('Preis CHF')]) || ''; geaendert[li] = true; }
   }
   return anders;
+}
+
+/**
+ * Nach-Review 24.10.2026 (8): Ein bekannter Verkauf ohne PG-ID wird beim Abgleich nur nachgetragen, wenn es plausibel ist: Das Listing hat einen Ricardo-Link
+ * (aktuell oder früher) und wurde nicht nach dem Verkauf angelegt. Sonst Grund als Text (dann nur ein Hinweis).
+ */
+function nachtragUnplausibel_(L, verkauftAm) {
+  const links = [L[col_('Ricardo-Link') - 1]].concat(fruehere_(L[col_('Frühere Links') - 1])).map(artikelAusLink_).filter(String);
+  if (!links.length) return 'das Listing hat aber noch nie einen Ricardo-Link gehabt (Status «' + L[col_('Status') - 1] + '»)';
+  const an = L[col_('Angelegt am') - 1];
+  if (an instanceof Date && verkauftAm instanceof Date && verkauftAm.getTime() < new Date(an.getFullYear(), an.getMonth(), an.getDate()).getTime())
+    return 'das Listing wurde aber erst nach dem Verkauf angelegt (' + datum_(an) + ')';
+  return '';
 }
 
 /** Listing nach einem Verkauf: Status, Preis, Verkauf-Nr, Datum (versandt: «Versendet»). */
@@ -3066,6 +3132,10 @@ const EN_REGELN = [
   [/^Post hat keine Etikette geliefert \((\S+)\): (.*)$/, 'Swiss Post did not deliver a label ($1): $2'],
   [/^Claude-Antwort unvollständig$/, 'Claude answer incomplete'],
   [/^Claude (\S+): (.*)$/, 'Claude error $1: $2'],
+  /* Nach-Review 24.10.2026 */
+  [/^Bitte bestätigen: (\S+) ist schon mit dem Ricardo-Link (\S+) gelistet\..*$/, 'Please confirm: $1 is already listed with the Ricardo link $2. Replace the link (e.g. pasted by mistake)? The old link no longer counts for $1.'],
+  [/^Dieser Verkauf ist bezahlt und versendet\. Storno nur über eine Retoure\.$/, 'This sale is paid and shipped. Cancellation only via a return.'],
+  [/^Bitte bestätigen: Verkauf (\S+) ist bezahlt \(CHF (\S+) am (\S*)\), aber nicht versendet\..*$/, 'Please confirm: sale $1 is paid (CHF $2 on $3) but not shipped. Cancel it? The money must be refunded: the refund works like for a return via «Refunds to» (ask the buyer for the IBAN).'],
   /* Rückfragen beim Start und im Bündel (Vertrag V5, Prüfung 3, 9, Z5); das Kürzel am Ende hängt enMitKuerzel_ wieder an */
   [/^Bitte bestätigen: Das Archiv des Return Tools konnte nicht geprüft werden \((.*)\)\. Nur listen, wenn (\S+) sicher an Lager ist\.$/, 'Please confirm: the Return Tool archive could not be checked ($1). Only list $2 if it is surely in stock.'],
   [/^Bitte bestätigen: (\S+) liegt im Matchmaker für Auftrag «(.*)»\. Dort nicht verkauft und jetzt auf Ricardo\?$/, 'Please confirm: $1 is in Matchmaker for request "$2". Not sold there and now on Ricardo?'],
@@ -3118,7 +3188,7 @@ function adminBetrieb() {
   const pr = PropertiesService.getScriptProperties();
   return { ki: !!pr.getProperty('ANTHROPIC_API_KEY'), mail: mailKontrolle_(), url: SpreadsheetApp.getActive().getUrl(),
     ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mailsAbholen'; }),
-    vorrat: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'suchVorrat'; }),
+    vorrat: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'suchVorrat'; }), archivOhneKopf: archiveOhneKopf_(),
     jetzt: jetztR_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), Date.now(), Number(cfg_('Zahlungserinnerung nach Tagen')) || 3) };
 }
 
@@ -3299,7 +3369,7 @@ function adminSuche(q) {
     const v = {}; V_COLS.forEach(function (k, j) { v[k] = row[j]; });
     if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Nachname']].join(' '))) return;
     const z = vZeile_(v); z.zeile = i + 2;
-    z.storno = V_OFFEN.indexOf(v['Status']) !== -1 && !(v['Bezahlt am'] instanceof Date);                       // Prüfung 5: nur unbezahlt und nicht versendet
+    z.storno = V_OFFEN.indexOf(v['Status']) !== -1;                                     // Prüfung 5 / Nach-Review 3: nicht versendet (bezahlt: mit Rückfrage)
     z.zuordnen = !String(v['PG-ID'] || '').trim() && ['Storniert', 'Retourniert'].indexOf(v['Status']) === -1;   // Prüfung 4
     verk.push(z);
   });
@@ -3326,7 +3396,7 @@ function adminLoescheListing(zeile, id) {
  * Storniert einen Verkauf. Die Zeile bleibt als «Storniert» stehen, damit der Verkauf beim nächsten Import nicht wieder erscheint. Das Stück wird frei
  * und wartet auf den Entscheid. Prüfung 5: nur unbezahlt und nicht versendet; bezahlte Verkäufe gehen über eine Retoure.
  */
-function adminLoescheVerkauf(zeile, nr) {
+function adminLoescheVerkauf(zeile, nr, bestaetigt) {
   pruefeAdmin_();
   const lock = sperre_(20000);
   try {
@@ -3337,8 +3407,11 @@ function adminLoescheVerkauf(zeile, nr) {
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (v['Status'] === 'Retourniert') throw new Error('Zu diesem Verkauf läuft eine Retoure. Bitte im Reiter «Retouren» abschliessen.');
     if (v['Status'] === 'Storniert') throw new Error('Verkauf ' + nr + ' ist schon storniert.');
-    if (v['Bezahlt am'] instanceof Date || v['Status'] === 'Bezahlt und versendet') throw new Error('Dieser Verkauf ist bezahlt. Storno nur über eine Retoure.');
+    if (v['Status'] === 'Bezahlt und versendet') throw new Error('Dieser Verkauf ist bezahlt und versendet. Storno nur über eine Retoure.');
     if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist «' + v['Status'] + '» und kann hier nicht storniert werden.');
+    /* Nach-Review 24.10.2026 (3): bezahlt, aber nicht versendet (z.B. Stück fehlt oder kaputt): Storno mit Rückfrage, die Rückzahlung kommt als Aufgabe in den Posteingang */
+    const bezahlt = v['Bezahlt am'] instanceof Date, betrag = (Number(v['Total CHF']) || 0).toFixed(2), wer = [v['Vorname'], v['Nachname']].join(' ').trim() || String(v['Käufer'] || '');
+    if (bezahlt && bestaetigt !== true) throw new Error('Bitte bestätigen: Verkauf ' + nr + ' ist bezahlt (CHF ' + betrag + ' am ' + datum_(v['Bezahlt am']) + '), aber nicht versendet. Stornieren? Das Geld muss zurück: die Rückzahlung läuft wie bei einer Retoure über «Rückzahlungen an» (IBAN beim Käufer erfragen).');
     v['Status'] = 'Storniert'; v['Storniert am'] = new Date();
     ADRESSE.forEach(function (k) { v[k] = ''; });
     sv.getRange(zeile, 1, 1, V_COLS.length).setValues([V_COLS.map(function (k) { return v[k]; })]);
@@ -3348,8 +3421,13 @@ function adminLoescheVerkauf(zeile, nr) {
       const rec = zeileZuRec_(sl, lz);
       if (String(rec['Verkauf-Nr']) === String(nr)) { rec['Status'] = 'Storniert'; rec['Entscheid unverkauft'] = ''; schreibe_(sl, lz, rec, true); }
     }
+    if (bezahlt) {
+      const si = ss.getSheetByName(TAB_I);
+      if (si) hinweiseSchreiben_(si, [{ id: 'WS-' + nr, nr: String(nr), artikel: String(v['Artikel-Nr'] || ''), pg: pg, titel: v['Titel'], datum: new Date(),
+        text: 'Bezahlter Verkauf ' + nr + ' storniert (nicht versendet). Rückzahlung CHF ' + betrag + ' an ' + wer + ' veranlassen: IBAN beim Käufer erfragen, wie bei Retouren über «Rückzahlungen an» (' + (cfg_('Rückzahlungen an') || '–') + '). Danach diese Aufgabe erledigen.' }]);
+    }
     wochen_();
-    log_('Admin: Verkauf storniert', pg, String(nr));
+    log_('Admin: Verkauf storniert', pg, String(nr) + (bezahlt ? ' (war bezahlt, CHF ' + betrag + ': Rückzahlung offen)' : ''));
     return true;
   } finally { lock.releaseLock(); }
 }
@@ -3705,6 +3783,8 @@ function ablauf(art) {
 /** Nummern (normalisiert) mit einer nicht freien Zeile, auch als Bündel-Teil. */
 function aktiveNummern_(ls) {
   const a = {};
+  a._letzte = {};                                                          // Nach-Review (6): letzte Zeile je Nummer
+  ls.forEach(function (r) { a._letzte[idNorm_(r['PG-ID'])] = r._zeile; });
   ls.forEach(function (r) { if (FREI.indexOf(r['Status']) !== -1) return; a[idNorm_(r['PG-ID'])] = true; liste_(r['Bündel-IDs']).forEach(function (b) { a[idNorm_(b)] = true; }); });
   return a;
 }
@@ -3713,7 +3793,8 @@ function aktiveNummern_(ls) {
  * (alte Daten von vor dem 24.10.2026), gilt die alte Zeile als abgelöst und erscheint nicht mehr unter «nicht verkauft».
  */
 function entscheidOffen_(r, aktiv) {
-  return STATUS_ENTSCHEID.indexOf(r['Status']) !== -1 && !String(r['Entscheid unverkauft'] || '').trim() && !aktiv[idNorm_(r['PG-ID'])];
+  const k = idNorm_(r['PG-ID']), letzte = aktiv._letzte || {};
+  return STATUS_ENTSCHEID.indexOf(r['Status']) !== -1 && !String(r['Entscheid unverkauft'] || '').trim() && !aktiv[k] && (letzte[k] === undefined || letzte[k] === r._zeile);
 }
 
 /* ---------- Bank-Export: Zahlungen zuordnen ---------- */
@@ -3802,9 +3883,12 @@ function entscheidUnverkauft(id, entscheid) {
   if (ENTSCHEIDE_UNVERKAUFT.indexOf(entscheid) === -1) throw new Error('Unbekannter Entscheid.');
   const lock = sperre_(20000);
   try {
-    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), zeile = findeZeile_(sh, id);
+    /* Nach-Review 24.10.2026 (6): auf die Zeile, die listingsIndex_ als offen meldet (nicht einfach die letzte oder die nicht freie) */
+    const sh = SpreadsheetApp.getActive().getSheetByName(TAB_L), l = listingsIndex_()[idNorm_(id)];
+    const zeile = l && l.offen && !l.teilVon ? l.zeile : findeZeile_(sh, id);
     if (!zeile) throw new Error('Listing ' + id + ' nicht gefunden.');
     const rec = zeileZuRec_(sh, zeile);
+    if (idNorm_(rec['PG-ID']) !== idNorm_(id)) throw new Error('Das Listing von ' + id + ' wurde eben geändert. Bitte nochmals versuchen.');
     if (['Unverkauft', 'Storniert'].indexOf(rec['Status']) === -1) throw new Error('Das Stück ist «' + rec['Status'] + '», nicht unverkauft.');
     rec['Entscheid unverkauft'] = entscheid; rec['Bearbeitet von'] = nutzer_();
     if (entscheid === 'Neu listen') rec['Status'] = 'Bereit';
@@ -3854,14 +3938,15 @@ function przl_(klasse) {
  * 24.10.2026 (Prüfung 18): Vor dem Aufruf der Post in der Sperre den Verkauf frisch ansehen. Hat er schon eine Sendungsnummer, nur mit Bestätigung (neu);
  * läuft gerade eine Etikette dafür (Doppelklick, zweite Person), gar nicht. Gespeichert wird in der Zeile, die jetzt diese Verkauf-Nr hat.
  */
-function etikette(nr, vorschau, neu) {
+function etikette(nr, vorschau, neu, formate) {
   nr = String(nr).trim();
   const v = alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']) === nr; })[0];
   if (!v) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
   if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist «' + v['Status'] + '».');
   const klasse = String(v['Lieferart'] || '') + ' ' + String(v['Versandklasse'] || '');   // Lieferart aus Ricardo («Paket B-Post»), Sperrgut aus der Versandklasse
   const e = empfaenger_(v);
-  const anfrage = postAnfrage_(e, vorschau);
+  /* Nach-Review 24.10.2026 (1): ZPL nur, wenn die Einstellung es will UND die Seite sagt, dass sie ZPL kann (formate). Ältere Seiten: immer PDF. */
+  const anfrage = postAnfrage_(e, vorschau, Array.isArray(formate) && formate.map(String).indexOf('zpl') !== -1);
   anfrage.item.attributes.przl = przl_(klasse);
   const merker = 'etikette:' + nr, cache = CacheService.getScriptCache();
   if (!vorschau) {
@@ -3880,23 +3965,37 @@ function etikette(nr, vorschau, neu) {
   catch (err) { if (!vorschau) try { cache.remove(merker); } catch (e2) { /* läuft nach 2 Minuten ab */ } throw err; }
   if (!vorschau) {
     /* Die Etikette ist bezahlt: speichern, auch wenn sich die Zeile verschoben hat. Scheitert es, bleibt die Nummer im Log und in der Antwort. */
+    /* Nach-Review 24.10.2026 (2): Die Sendungsnummer wird auch bei besetzter Sperre gespeichert: bis 45 s warten, sonst die eine Zelle ohne Sperre
+       schreiben, nachdem die Zeile frisch geprüft ist (Verkauf-Nr in Spalte A). Sonst entstünde später eine zweite Etikette ohne Rückfrage. */
+    const speichern = function () {
+      const x = verkaufZeile_(nr);
+      if (!x) throw new Error('Verkauf ' + nr + ' nicht mehr gefunden');
+      const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+      if (String(sv.getRange(x._zeile, 1).getValue()).trim() !== nr) throw new Error('Zeile von Verkauf ' + nr + ' hat sich eben verschoben');
+      const alt = String(x['Sendungsnummer'] || '').trim();
+      sv.getRange(x._zeile, V_COLS.indexOf('Sendungsnummer') + 1, 1, 2).setValues([[r.sendungsnummer, new Date()]]);
+      if (alt && alt !== r.sendungsnummer) log_('Etikette ersetzt', String(v['PG-ID'] || ''), nr + ': ' + alt + ' → ' + r.sendungsnummer);
+    };
     try {
-      const lock = sperre_(20000);
-      try {
-        const x = verkaufZeile_(nr);
-        if (!x) throw new Error('Verkauf ' + nr + ' nicht mehr gefunden');
-        const alt = String(x['Sendungsnummer'] || '').trim();
-        SpreadsheetApp.getActive().getSheetByName(TAB_S).getRange(x._zeile, V_COLS.indexOf('Sendungsnummer') + 1, 1, 2).setValues([[r.sendungsnummer, new Date()]]);
-        if (alt && alt !== r.sendungsnummer) log_('Etikette ersetzt', String(v['PG-ID'] || ''), nr + ': ' + alt + ' → ' + r.sendungsnummer);
-      } finally { lock.releaseLock(); }
+      let lock = null;
+      try { lock = sperre_(45000); } catch (e3) { lock = null; }
+      if (lock) { try { speichern(); } finally { lock.releaseLock(); } }
+      else {
+        vergiss_();                                                        // frisch lesen, nicht aus dem Speicher dieses Aufrufs
+        speichern();
+        try { SpreadsheetApp.flush(); } catch (e4) { /* trotzdem weiter */ }
+        log_('Etikette ohne Sperre gespeichert', String(v['PG-ID'] || ''), nr + ' ' + r.sendungsnummer + ' (Sperre war länger als 45 s besetzt)');
+      }
       log_('Etikette', String(v['PG-ID'] || ''), nr + ' ' + r.sendungsnummer + ' ' + przl_(klasse).join('+'));
     } catch (err) {
       log_('Etikette nicht gespeichert', String(v['PG-ID'] || ''), nr + ' Sendung ' + r.sendungsnummer + ': ' + String(err.message || err));
-      r.warnungen = (r.warnungen ? r.warnungen + ' ' : '') + 'Sendungsnummer ' + r.sendungsnummer + ' nicht gespeichert (' + String(err.message || err) + ').';
+      r.warnungen = (r.warnungen ? r.warnungen + ' ' : '') + 'Sendungsnummer ' + r.sendungsnummer + ' nicht gespeichert (' + String(err.message || err) + '). Bitte im Tab «Verkäufe» beim Verkauf ' + nr + ' eintragen, sonst entsteht eine zweite Etikette.';
+      r.nichtGespeichert = true;
     } finally { try { cache.remove(merker); } catch (e2) { /* läuft nach 2 Minuten ab */ } }
   }
   /* E1: die Oberfläche druckt ZPL direkt (Zebra Browser Print) oder lädt die Datei herunter, kein neuer Tab */
-  return { nr: nr, sendung: r.sendungsnummer, daten: r.daten, typ: r.typ, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.' + r.typ, warnungen: r.warnungen, produkt: przl_(klasse).join('+') };
+  return { nr: nr, sendung: r.sendungsnummer, daten: r.daten, typ: r.typ, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.' + r.typ, warnungen: r.warnungen,
+    nichtGespeichert: !!r.nichtGespeichert, produkt: przl_(klasse).join('+') };
 }
 /** Verkauf mit dieser Nummer, frisch gelesen (in einer Sperre), mit _zeile. */
 function verkaufZeile_(nr) { return alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']).trim() === String(nr).trim(); })[0] || null; }
@@ -4008,7 +4107,7 @@ function postAbsender_() {
   return { name1: t[0], street: t[1], zip: t[2], city: t[3], country: 'CH' };
 }
 /** Anfrage für eine Etikette. e = { id, firma, vorname, nachname, strasse, nr, postfach, plz, ort, przl, gramm }. */
-function postAnfrage_(e, vorschau) {
+function postAnfrage_(e, vorschau, zplOk) {
   const empf = { name1: e.nachname || e.firma, firstName: e.vorname || undefined, name2: e.firma && e.nachname ? e.firma : undefined,
     street: e.strasse || undefined, houseNo: e.nr || undefined, pobox: e.postfach || undefined, zip: String(e.plz || ''), city: e.ort, country: 'CH' };
   Object.keys(empf).forEach(function (k) { if (empf[k] === undefined || empf[k] === '') delete empf[k]; });
@@ -4016,7 +4115,7 @@ function postAnfrage_(e, vorschau) {
   if (e.gramm) attr.weight = Math.min(99999, Math.round(Number(e.gramm)));
   const absender = postAbsender_();
   if (e.zusatz) absender.name2 = String(e.zusatz).slice(0, 35);   // Entscheid Jonas 19.10.2026: Verkauf-Nr und PG-ID beim Absender, damit man das Paket zuordnen kann
-  const zpl = etikettenFormat_() === 'zpl';
+  const zpl = !!zplOk && etikettenFormat_() === 'zpl';
   return { language: 'DE', frankingLicense: String(cfg_('Post Frankierlizenz') || '60162228'), ppFranking: false, customer: absender,
     labelDefinition: { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: zpl ? 'ZPL2' : 'PDF', imageResolution: zpl ? 200 : 300, printPreview: !!vorschau },
     item: { itemID: String(e.id || '').slice(0, 35), recipient: empf, attributes: attr } };
@@ -4025,9 +4124,9 @@ function postAnfrage_(e, vorschau) {
  * Zusatz E1 (24.10.2026, Jonas: «direkt auf den Zebra drucken»): Etiketten-Format aus der Einstellung, Vorgabe ZPL (ZPL2, A6, 200 dpi wie im Post-Login).
  * Die Barcode API liefert das Etikett in beiden Formaten base64 in item.label[0].
  */
-function etikettenFormat_() { return /^pdf$/i.test(String(cfg_('Etiketten-Format') || '').trim()) ? 'pdf' : 'zpl'; }
+function etikettenFormat_() { return /^zpl$/i.test(String(cfg_('Etiketten-Format') || '').trim()) ? 'zpl' : 'pdf'; }   // Nach-Review (1): Vorgabe PDF, auch wenn die Einstellung fehlt
 /** Etikette holen: { sendungsnummer, daten (base64, ZPL oder PDF), typ ('zpl'|'pdf'), pdf (nur bei PDF, für ältere Oberflächen), warnungen }. */
-function postEtikette_(e, vorschau) { return postEtiketteAnfrage_(postAnfrage_(e, vorschau)); }
+function postEtikette_(e, vorschau, zplOk) { return postEtiketteAnfrage_(postAnfrage_(e, vorschau, zplOk)); }
 function postEtiketteAnfrage_(anfrage) {
   const r = UrlFetchApp.fetch(POST_LABEL_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     headers: { Authorization: 'Bearer ' + postToken_() }, payload: JSON.stringify(anfrage) });
@@ -4045,7 +4144,7 @@ function postEtiketteAnfrage_(anfrage) {
 function postTest() {
   nurEditor_();                                                           // Prüfung 21
   const a = postAbsender_();
-  const x = postEtikette_({ id: 'TEST-1', firma: a.name1, nachname: 'Test', strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city, przl: 'ECO', gramm: 1000 }, true);
+  const x = postEtikette_({ id: 'TEST-1', firma: a.name1, nachname: 'Test', strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city, przl: 'ECO', gramm: 1000 }, true, true);
   const aus = 'Post ok: Sendungsnummer ' + (x.sendungsnummer || '(Muster)') + ', ' + x.typ.toUpperCase() + ' ' + Math.round(String(x.daten || '').length * 3 / 4 / 1024) + ' KB' + (x.warnungen ? ', Hinweise: ' + x.warnungen : '');
   console.log(aus);
   return aus;

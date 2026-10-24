@@ -1153,17 +1153,18 @@
     };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, ersatz); else ersatz();
   }
-  function gelistet(danach) {
-    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); gelistet(danach); }); return; }   // zuerst fertig speichern, dann prüfen
+  function gelistet(danach, ok) {
+    if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); gelistet(danach, ok); }); return; }   // zuerst fertig speichern, dann prüfen
     /* 21.10.2026 (Jonas): keine Kontrollliste zum Abhaken mehr vor «Gelistet» */
     if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
     /* Prüfung 1: «Gelistet» nur aus «In Arbeit» oder «Bereit» (schon gelistet: der Server nimmt nur denselben Link nochmals) */
     if (['In Arbeit', 'Bereit', 'Gelistet'].indexOf(R.status) === -1) { melde(t('s4.status', st(R.status)), 'stop'); return; }
-    ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
+    /* Nach-Review 24.10.2026 (5): schon gelistet, anderer Link: der Server fragt («Link ersetzen?»), danach mit Bestätigung nochmals */
+    ruf('markiereGelistet', ok ? [R.id, $('r-link').value, $('r-tage').value, true] : [R.id, $('r-link').value, $('r-tage').value], function (r) {
       melde(t('s4.fertig', r.id), 'ok'); LISTING_OFFEN = '';
       still('startDaten', [], function (s) { S = s; texte(); });
       if (typeof danach === 'function') danach(); else schliesse();
-    });
+    }, function (m) { return bestaetigen(m, function () { gelistet(danach, true); }); });
   }
   function abbrechen() {
     frage(t('s4.abbr.frage', R.id), function () { ruf('setzeStatus', [R.id, 'Abgebrochen'], function () { schliesse(); }); });
@@ -1384,7 +1385,11 @@
     var los = function () { ruf('retoureSchritt', [o.nr, schritt, wert], fertig, function (m) { return bestaetigen(m, function () { ruf('retoureSchritt', [o.nr, schritt, wert, true], fertig); }); }); };
     if (schritt === 'rueckzahlung') frage(t('rt.f.zahlung', wert, o.name || o.kaeufer), los); else los();
   }
-  function retoureEntscheid(i, j) { ruf('retoureSchritt', [RT.offen[i].nr, 'entscheid', RT.entscheide[j]], function (r) { RT = r; zeichneRetouren(); }); }
+  /* Nach-Review 24.10.2026 (4): Rückfrage des Servers (z.B. «Defekt» → «Neu listen») bestätigen und mit true nochmals */
+  function retoureEntscheid(i, j) {
+    var nr = RT.offen[i].nr, e = RT.entscheide[j], fertig = function (r) { RT = r; zeichneRetouren(); };
+    ruf('retoureSchritt', [nr, 'entscheid', e], fertig, function (m) { return bestaetigen(m, function () { ruf('retoureSchritt', [nr, 'entscheid', e, true], fertig); }); });
+  }
 
 
   /* ---------- Admin ---------- */
@@ -1406,7 +1411,8 @@
   function zeichneBetrieb(r) {
     var z = function (ok, text, warn) { return '<div class="meldung ' + (ok ? (warn ? 'warn' : '') : 'stop') + '" style="margin:8px 0">' + esc(text) + '</div>'; }, m = r.mail;
     $('adm-status').innerHTML = z(m.aktiv, m.aktiv ? t('adm.mail.an', m.letzte || '–') : t('adm.mail.aus')) + (m.warnung ? z(true, t('adm.mail.still'), true) : '') + (m.unecht ? z(true, t('adm.mail.unecht', m.unecht), true) : '')
-      + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + (r.vorrat === undefined ? '' : z(r.vorrat, t(r.vorrat ? 'adm.vorrat' : 'adm.keinvorrat'))) + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
+      + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + (r.vorrat === undefined ? '' : z(r.vorrat, t(r.vorrat ? 'adm.vorrat' : 'adm.keinvorrat')))
+      + ((r.archivOhneKopf || []).length ? z(false, t('adm.archivkopf', r.archivOhneKopf.map(function (a) { return a.tab + ' (' + a.seit + ')'; }).join(', '))) : '') + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
     var j = r.jetzt, kachel = function (name, zahl) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div></div>'; };
     if (j) $('adm-status').innerHTML = '<div class="kacheln">' + kachel(t('kz.gelistet'), String(j.gelistet)) + kachel(t('kz.zupacken'), String(j.zuPacken)) + kachel(t('kz.zahlung', j.zahlTage), String(j.zahlungOffen)) + '</div>' + $('adm-status').innerHTML;
     $('adm-sheet').href = r.url;
@@ -1519,7 +1525,8 @@
   }
   function adminLoesche(art, i) {
     if (art === 'l') { var l = AD.listings[i]; frage(t('ad.f.listing', l.id), function () { ruf('adminLoescheListing', [l.zeile, l.id], adminFertig); }); }
-    else { var o = AD.verkaeufe[i]; frage(t('ad.f.verkauf', o.nr), function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr], adminFertig); }); }
+    /* Nach-Review (3): bezahlt, nicht versendet: der Server fragt nach (Rückzahlung), danach mit Bestätigung */
+    else { var o = AD.verkaeufe[i]; frage(t('ad.f.verkauf', o.nr), function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr], adminFertig, function (m) { return bestaetigen(m, function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr, true], adminFertig); }); }); }); }
   }
   function zeichneEinst(l) {
     EINST = l;
@@ -1641,14 +1648,16 @@
     'v.nachgetragen': [' PG-ID nachgetragen: {0}.', ' PG-ID added: {0}.'], 'v.preise': [' Beträge aus dem Bericht übernommen: {0}.', ' Amounts taken from the report: {0}.'],
     'ad.nichtloeschbar': ['läuft oder verkauft: nicht löschbar', 'running or sold: cannot be deleted'], 'ad.retoure': ['bezahlt: nur über eine Retoure', 'paid: only via a return'],
     'ad.zuordnen': ['Zuordnen', 'Assign'], 'ad.zuordnen.fehlt': ['Bitte die PG-ID des Stücks eingeben.', 'Please enter the PG-ID of the item.'],
-    'ad.f.verkauf': ['Verkauf {0} stornieren? Geht nur, solange er nicht bezahlt und nicht versendet ist. Er zählt nicht mehr zum Umsatz, das Stück wartet danach auf den Entscheid (Ablauf «Listing»). Der Verkauf bleibt als «Storniert» vermerkt, damit er beim nächsten Import nicht wieder erscheint.',
-      'Cancel sale {0}? Only possible while it is unpaid and not shipped. It no longer counts towards revenue; the item then waits for a decision («Listing» routine). The sale stays recorded as «Cancelled» so that it does not reappear with the next import.'],
+    'ad.f.verkauf': ['Verkauf {0} stornieren? Geht nur, solange er nicht versendet ist (ist er bezahlt, fragt das Tool nach und legt die Rückzahlung als Aufgabe an). Er zählt nicht mehr zum Umsatz, das Stück wartet danach auf den Entscheid (Ablauf «Listing»). Der Verkauf bleibt als «Storniert» vermerkt, damit er beim nächsten Import nicht wieder erscheint.',
+      'Cancel sale {0}? Only possible while it is not shipped (if it is paid, the tool asks and adds the refund as a task). It no longer counts towards revenue; the item then waits for a decision («Listing» routine). The sale stays recorded as «Cancelled» so that it does not reappear with the next import.'],
     'f.t1.ohne': ['{0} Gutschriften ohne Treffer (von Hand prüfen)', '{0} credits without a match (check by hand)'],
     'adm.vorrat': ['Der Suchvorrat läuft von selbst (alle 5 Minuten, 06 bis 21 Uhr).', 'The search cache runs by itself (every 5 minutes, 06 to 21 h).'],
     'adm.keinvorrat': ['Der Auslöser «suchVorrat» fehlt: im Apps Script «einrichten» ausführen, sonst ist die Suche langsam.', 'The trigger «suchVorrat» is missing: run «einrichten» in Apps Script, otherwise search is slow.'],
     'e1.datei': ['Datei', 'File'], 'e1.weg': ['Etikette schon erstellt, die Datei ist nicht mehr im Speicher der Seite.', 'Label already created; the file is no longer in the page memory.'],
     'e1.gedruckt': ['Etikette gedruckt (Zebra).', 'Label printed (Zebra).'], 'e1.download': ['Etikette im Download-Ordner: anklicken und drucken.', 'Label in the Downloads folder: click it and print.'],
-    'e1.download.pdf': ['Etikette (PDF) im Download-Ordner.', 'Label (PDF) in the Downloads folder.']
+    'e1.download.pdf': ['Etikette (PDF) im Download-Ordner.', 'Label (PDF) in the Downloads folder.'],
+    'e1.unklar': ['Unklar, ob die Etikette gedruckt wurde (der Drucker hat nicht geantwortet). Am Drucker nachsehen; fehlt sie: «Nochmals drucken» oder «Datei».', 'Unclear whether the label was printed (the printer did not answer). Check the printer; if it is missing: «Print again» or «File».'],
+    'adm.archivkopf': ['Archiv-Tab ohne Kopfzeile, wird bei der Archivprüfung übersprungen: {0}. Im Return Tool die Kopfzeile (ID, Bezeichnung) wiederherstellen.', 'Archive tab without header row, skipped by the archive check: {0}. Restore the header (ID, Bezeichnung) in the Return Tool.']
   });
   var F = null, FA = 'taeglich', BANK = null, FALL = null, SCHR = 0, ADR = null, FERTIG = false;
   /* Teile des bisherigen Listings (Suche, Stück bearbeiten) werden in den Schritt verschoben, nicht kopiert. HEIM merkt sich, wo sie hingehören. */
@@ -2090,15 +2099,16 @@
   }
   function rtOrtHtml(o) { return o.rtOrt && o.rtOrt !== o.lagerort ? '<span class="klein">' + t('v.rtort', esc(o.rtOrt)) + '</span>' : ''; }
   function etikette(nr, neu) {
-    ruf('etikette', neu ? [nr, false, true] : [nr], function (e) { etiketteDa(nr, e); }, function (m) { return bestaetigen(m, function () { etikette(nr, true); }); });
+    /* Nach-Review (1): 4. Argument = Formate, die diese Seite kann. Der Server liefert ZPL nur dann (und nur mit Einstellung «ZPL»), sonst PDF */
+    ruf('etikette', [nr, false, !!neu, ['zpl', 'pdf']], function (e) { etiketteDa(nr, e); }, function (m) { return bestaetigen(m, function () { etikette(nr, true); }); });
   }
   function etiketteDa(nr, e) {
-    var typ = e.typ === 'zpl' ? 'zpl' : 'pdf', et = { nr: nr, daten: e.daten || e.pdf || '', typ: typ, name: e.name || ('Etikette ' + nr + '.' + typ), sendung: e.sendung };
+    var typ = e.typ === 'zpl' ? 'zpl' : 'pdf', et = { nr: nr, daten: e.daten || e.pdf || '', typ: typ, name: e.name || ('Etikette ' + nr + '.' + typ), sendung: e.sendung, warnung: e.warnungen || '' };
     ETIKETTEN[nr] = et;
     var o = F && F.verkaeufe ? F.verkaeufe.offen.filter(function (x) { return x.nr === nr; })[0] : null;
     if (o) o.sendung = e.sendung;
     if (FALL && FALL.o && FALL.o.nr === nr) FALL.o.sendung = e.sendung;
-    if (e.warnungen) melde(e.warnungen, 'warn');
+    if (et.warnung) melde(et.warnung, 'stop');                          // Nach-Review (2): bleibt stehen, wird von den Meldungen zum Druck nicht überschrieben
     etikettAusgeben(et);
     zeichneAblauf();
   }
@@ -2109,18 +2119,23 @@
     var a = document.createElement('a'); a.href = etikettUrl(et); a.download = et.name; a.target = '_self'; a.style.display = 'none';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
+  /* Meldung zum Druck: Gibt es eine Warnung des Servers (z.B. Sendungsnummer nicht gespeichert), bleibt sie vorne und die Meldung ist «stop» */
+  function meldeEt(et, text, art) { if (et.warnung) melde(et.warnung + ' · ' + text, 'stop'); else melde(text, art); }
   function etikettAusgeben(et) {
-    if (et.typ !== 'zpl') { etikettHerunterladen(et); melde(t('e1.download.pdf'), 'ok'); return; }
+    if (et.typ !== 'zpl') { etikettHerunterladen(et); meldeEt(et, t('e1.download.pdf'), 'ok'); return; }
     zebraDruck(etikettText(et), function (gedruckt) {
-      if (gedruckt) { melde(t('e1.gedruckt'), 'ok'); return; }
-      etikettHerunterladen(et); melde(t('e1.download'), 'ok');
+      if (gedruckt === true) { meldeEt(et, t('e1.gedruckt'), 'ok'); return; }
+      /* Nach-Review (9): Auftrag ging an den Drucker, aber keine Antwort: kein Download (sonst zwei Etiketten), sondern nachsehen lassen */
+      if (gedruckt === 'unklar') { meldeEt(et, t('e1.unklar'), 'stop'); return; }
+      etikettHerunterladen(et); meldeEt(et, t('e1.download'), 'ok');
     });
   }
-  /* Zebra Browser Print: Standarddrucker holen (höchstens 1,5 s), dann das ZPL schicken. Jeder Fehler: fertig(false), ohne Meldung. */
+  /* Zebra Browser Print: Standarddrucker holen (höchstens 1,5 s), dann das ZPL schicken. Fehler vor dem Senden oder Fehlerantwort: fertig(false) (Datei); gesendet, aber keine Antwort: fertig('unklar'). */
   var ZEBRA = 'https://127.0.0.1:9101';
   function mitFrist(p, ms) { return new Promise(function (ja, nein) { var z = setTimeout(function () { nein(new Error('Frist')); }, ms); p.then(function (x) { clearTimeout(z); ja(x); }, function (f) { clearTimeout(z); nein(f); }); }); }
   function zebraDruck(zpl, fertig) {
     if (typeof fetch !== 'function') { fertig(false); return; }
+    var gesendet = false;
     var fertigEinmal = function (x) { if (fertig) { var f = fertig; fertig = null; f(x); } };
     try {
       mitFrist(fetch(ZEBRA + '/default?type=printer', { method: 'GET' }), 1500)
@@ -2128,10 +2143,11 @@
         .then(function (txt) {
           var geraet = JSON.parse(txt);
           if (!geraet || !(geraet.uid || geraet.name)) throw new Error('kein Drucker');
+          gesendet = true;                                                   // ab hier kann der Drucker den Auftrag schon haben
           return mitFrist(fetch(ZEBRA + '/write', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ device: geraet, data: zpl }) }), 10000);
         })
-        .then(function (r) { fertigEinmal(!!(r && r.ok)); })
-        .catch(function () { fertigEinmal(false); });
+        .then(function (r) { fertigEinmal(!!(r && r.ok)); })              // Antwort mit Fehler (z.B. 500): nicht gedruckt, Datei
+        .catch(function () { fertigEinmal(gesendet ? 'unklar' : false); });
     } catch (e) { fertigEinmal(false); }
   }
   Object.assign(AKTIONEN, { etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
