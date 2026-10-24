@@ -20,7 +20,7 @@ SUCHE = {'treffer': [{'id': 'PG-100', 'name': 'Philips Toaster HD2581', 'tab': '
                     {'id': 'PG-77', 'name': 'Philips Toaster grau', 'ort': '', 'erfasst': '01.08.2026', 'status': 'Unverkauft', 'entscheid': 'Anderer Kanal', 'rc': False, 'warnung': ''}],
          'mehr': False, 'anzahl': 6}
 DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und originalverpackt', 'Gebraucht'], 'maengelPflicht': ['Gebraucht'], 'laufzeit': 6, 'retoureGruende': [], 'kiAktiv': True, 'mailAktiv': True, 'aktiv': 3, 'schwelle': 90},
-         'suche': SUCHE, 'starteListing': R, 'aehnlicheStuecke': {'kandidaten': []}, 'analyseListe': [], 'aufgaben': AU, 'mailsJetzt': AU,
+         'suche': SUCHE, 'starteListing': R, 'lade': R, 'entscheidUnverkauft': {'art': 'schicht1'}, 'aehnlicheStuecke': {'kandidaten': []}, 'analyseListe': [], 'aufgaben': AU, 'mailsJetzt': AU,
          'zaehler': {'offen': 0, 'zuPacken': 0, 'versand': 0, 'retouren': 0}, 'verkaeufe': {'offen': []}, 'retouren': {'offen': []},
          'uebersicht': {'letzterImport': '', 'aktiv': 1, 'schwelle': 90, 'laufzeit': 6, 'liste': [{'id': 'PG-101', 'status': 'Gelistet', 'name': 'Kabel', 'ort': 'TEC-2', 'link': 'x', 'buendel': '', 'regal': '', 'seit': '01.10.2026', 'laufzeit': 6, 'abgelaufen': True}],
                         'unzugeordnet': [{'nr': '7001', 'artikel': '6666666666', 'titel': 'Neu: Lampe'}]},
@@ -62,8 +62,9 @@ with sync_playwright() as p:
     ok(rufe('starteListing')[-1] == ['PG-200', True], 'S1: nach Ja: starteListing mit Bestätigung')
     s.evaluate("schliesse && schliesse()"); s.evaluate("zeige('listen')"); s.wait_for_timeout(200)
     s.evaluate("$('q').value='Philips Toaster'; suchen()"); s.wait_for_timeout(200)
-    s.click('#treffer tr:has-text("RC-0003") button'); s.wait_for_timeout(200)
-    ok(rufe('starteListing')[-1] == ['RC-0003'], 'S3: «Neu listen» startet das RC-Listing')
+    s.click('#treffer tr:has-text("RC-0003") button'); s.wait_for_timeout(250)
+    # 24.10.2026 (Prüfung 7): «Unverkauft» ohne Entscheid: «Neu listen» ist der Entscheid auf derselben Zeile, danach weiter bearbeiten
+    ok(rufe('entscheidUnverkauft')[-1] == ['RC-0003', 'Neu listen'] and rufe('lade')[-1] == ['RC-0003'], 'S3: «Neu listen» entscheidet und öffnet das RC-Listing')
     # ---------- S2 (Entscheid Jonas 24.10.2026): nur PG-ID; bei «nicht gefunden» ähnliche Stücke zeigen ----------
     s.evaluate("schliesse && schliesse()"); s.evaluate("zeige('listen')"); s.wait_for_timeout(200)
     ok(s.locator('#frei').count() == 0 and s.locator('#fr-name').count() == 0 and 'ohne Inventar' not in s.text_content('#such-karte'), 'S2: kein Weg mehr zu neuen RC-Listings')

@@ -3054,6 +3054,7 @@ function adminBetrieb() {
   const pr = PropertiesService.getScriptProperties();
   return { ki: !!pr.getProperty('ANTHROPIC_API_KEY'), mail: mailKontrolle_(), url: SpreadsheetApp.getActive().getUrl(),
     ausloeser: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'mailsAbholen'; }),
+    vorrat: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'suchVorrat'; }),
     jetzt: jetztR_(objekte_(TAB_L, L_COLS), objekte_(TAB_S, V_COLS), Date.now(), Number(cfg_('Zahlungserinnerung nach Tagen')) || 3) };
 }
 

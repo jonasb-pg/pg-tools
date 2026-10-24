@@ -132,7 +132,7 @@
     V.offen++; $('lade').hidden = false;
     var fertig = function () { V.offen--; $('lade').hidden = V.offen <= 0 && (!V.Q.length || !!V.haengt); };
     google.script.run.withSuccessHandler(function (x) { fertig(); if (ok) ok(x); })
-      .withFailureHandler(function (e) { fertig(); var m = String((e && e.message) || e).replace(/^Error:\s*/, ''); if (fehler) fehler(m); else melde(m, true); }).api(name, args || []);
+      .withFailureHandler(function (e) { fertig(); var m = String((e && e.message) || e).replace(/^Error:\s*/, ''); if (fehler) fehler(m); else { melde(m, true); piep(false); } }).api(name, args || []);
   }
 
   /* ---------- Start: alle Durchgänge ---------- */
@@ -163,7 +163,7 @@
     if (V.qLaeuft || (V.Q.length && !V.haengt && V.qId && V.qId !== id)) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; }
     ruf('laden', [id], function (d) {
       if (V.qId && V.qId !== d.id) { if (V.qLaeuft) { melde('Es wird noch gespeichert. Bitte nochmals öffnen.', true); return; } V.Q = []; V.qId = ''; V.haengt = null; }     // Schlange eines anderen Durchgangs bleibt im Speicher (oben sichtbar)
-      setzeD(d); ngLaden(d.id); V.ansicht = d.status === 'Scan' ? 'scan' : 'abschluss';
+      setzeD(d); V.ansicht = d.status === 'Scan' ? 'scan' : 'abschluss';
       /* Ungespeicherte Scans von vorher (Neuladen, Netz weg) nachsenden */
       var alt = []; try { alt = JSON.parse(lies('um-q-' + d.id) || '[]') || []; } catch (e) { alt = []; }
       if (alt.length && d.status === 'Scan') { V.Q = alt; V.qId = d.id; V.haengt = null; ueberlagere(d.zuordnung); melde(alt.length + ' Scans von vorher werden nachgespeichert.'); senden(); }
@@ -269,6 +269,7 @@
   /* ---------- 2 · Scan ---------- */
   /* Der Browser kennt Bestand und Zuordnung und entscheidet sofort. Gespeichert wird im Hintergrund (Warteschlange), der Server prüft noch einmal. */
   function setzeD(d) {
+    if (!V.D || V.D.id !== d.id) ngLaden(d.id);          // rote Liste «Nicht gespeichert» gehört zum Durchgang
     V.D = d; V.idx = {}; V.bar = {}; V.geb = {};
     d.bestand.forEach(function (p) { V.idx[pgNorm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
     d.gebinde.forEach(function (g) { V.geb[g.id] = g; });
@@ -372,7 +373,7 @@
   /* Ein Scan: PG-ID oder Barcode. Barcode: Der Browser zeigt das erste freie Stück an, der Server wählt beim Speichern selbst ein freies Stück dieser EAN
      (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen. */
   function scanne() {
-    var el = $('scan'), code = norm(el.value); el.value = ''; fokusScan();
+    var el = $('scan'), code = norm(el.value); el.value = ''; if (!KAM.an && !KAM.foto) el.focus();
     if (!code) return;
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     var g = V.geb[V.aktiv];
@@ -856,7 +857,7 @@
   var TS = { buf: '', t: 0, el: null, alt: null };
   document.addEventListener('keydown', function (ev) {
     var t = ev.target, jetzt = Date.now();
-    if (V.ansicht !== 'scan' || !$('scan') || (t && t.id === 'scan')) { TS.buf = ''; return; }
+    if (V.ansicht !== 'scan' || !$('scan') || (t && t.id === 'scan') || (t && t.closest && t.closest('.geb-zeile'))) { TS.buf = ''; return; }     // Gebinde-Editor: Lagerort-Etikett darf ins Feld
     if (ev.key && ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
       if (!TS.buf || jetzt - TS.t > 50) { TS.buf = ''; TS.el = t; TS.alt = t && t.tagName === 'INPUT' ? t.value : null; }
       TS.buf += ev.key; TS.t = jetzt; return;

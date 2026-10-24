@@ -893,6 +893,8 @@
   /* 24.10.2026: Alle Treffer zeigen (Audit S1, S3, M1). Listbar nur aus Such-Tabs und Analyse; andere Kanäle nach Bestätigung; Archiv gesperrt. */
   var ANDERE = [], EIGENE = [];
   function warnHtml(r) { return r.warnung ? '<br><span class="etikett orange">' + esc(r.warnung) + '</span>' : ''; }
+  /* Prüfung 7: wartet das Stück auf den Entscheid (Unverkauft/Storniert ohne Entscheid)? */
+  function entscheidOffen(r) { return !!r.entscheidOffen || (['Unverkauft', 'Storniert'].indexOf(r.status) !== -1 && !r.entscheid); }
   function statusHtml(r) { return '<span class="etikett">' + esc(st(r.status)) + (r.entscheid ? ' · ' + esc(t('f.e.' + r.entscheid)) : '') + '</span>'; }
   function suchen() {
     var q = $('q').value.trim();
@@ -908,8 +910,8 @@
         var zl = '';
         x.treffer.forEach(function (r, i) {
           var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
-          if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' + (r.entscheidOffen ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '');
-          else if (r.entscheidOffen) knopf = statusHtml(r) + ' <button onclick="neuListenAus(\'t\',' + i + ')">' + t('such.neulisten') + '</button><br><span class="still">' + t('such.entscheid') + '</span>';
+          if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' + (entscheidOffen(r) ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '');
+          else if (entscheidOffen(r)) knopf = statusHtml(r) + ' <button onclick="neuListenAus(\'t\',' + i + ')">' + t('such.neulisten') + '</button><br><span class="still">' + t('such.entscheid') + '</span>';
           else if (!r.status && r.mm && r.mmStatus === 'Geholt') knopf = '<span class="etikett rot">' + t('such.geholt') + '</span>';
           else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="startAus(\'t\',' + i + ')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
           else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="startAus(\'t\',' + i + ')">' + t('such.weiter') + '</button>';
@@ -921,7 +923,7 @@
       if (x.andere.length) {
         var z = '';
         x.andere.forEach(function (r, i) {
-          var k = r.teilVon ? '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' : r.status ? statusHtml(r) + (r.entscheidOffen ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '') : !r.id ? '<span class="still">' + t('such.ohneid') + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          var k = r.teilVon ? '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' : r.status ? statusHtml(r) + (entscheidOffen(r) ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '') : !r.id ? '<span class="still">' + t('such.ohneid') + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
           z += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td>' + (r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '') + '</td><td>' + k + '</td></tr>';
         });
         h += '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z);
@@ -939,7 +941,7 @@
           var k;
           if (r.teilVon) k = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
           else if (r.status === 'In Arbeit' || r.status === 'Bereit') k = '<button onclick="startAus(\'e\',' + i + ')">' + t('such.weiter') + '</button>';
-          else if (r.entscheidOffen) k = statusHtml(r) + ' <button onclick="neuListenAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';   // Prüfung 7: Entscheid auf derselben Zeile
+          else if (entscheidOffen(r)) k = statusHtml(r) + ' <button onclick="neuListenAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';   // Prüfung 7: Entscheid auf derselben Zeile
           else if (r.rc && !r.entscheid && ['Abgebrochen', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="startAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';
           else k = statusHtml(r) + (r.rc || r.entscheid ? '' : '<br><span class="still">' + t('such.nichtquelle') + '</span>');
           ze += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + k + '</td></tr>';
@@ -980,7 +982,7 @@
   /* 24.10.2026 (Vertrag V5): Die Frage zum Matchmaker stellt jetzt der Server (auch wenn die Suche das Stück nur aus dem Return Tool kennt) */
   function start(id) { listingStarten(id); }
   /* Prüfung 7: «Unverkauft» ohne Entscheid: «Neu listen» ist der Entscheid auf derselben Zeile, danach weiter bearbeiten */
-  function neuListen(id) { ruf('entscheidUnverkauft', [id, 'Neu listen'], function () { $('treffer').innerHTML = ''; $('q').value = ''; weiter(id); }); }
+  function neuListen(id) { ruf('entscheidUnverkauft', [id, 'Neu listen'], function () { ruf('lade', [id], function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); }); }); }
   function neuListenAus(liste, i) { var x = ({ t: TREFFER, e: EIGENE })[liste][i]; if (x) neuListen(x.id); }
 
   /* ---------- Aus der Analyse ---------- */
@@ -1175,18 +1177,40 @@
     feld = feld || 'v-datei';
     var d = $(feld).files[0];
     if (!d) { melde(t('v.datei.fehlt'), 'stop'); return; }
-    var leser = new FileReader();
-    leser.onload = function () {
-      ruf('importVerkaeufe', [String(leser.result)], function (v) {
+    leseText(d, function (text) {
+      ruf('importVerkaeufe', [text], function (v) {
         var i = v.import;
-        $(feld === 'v-datei' ? 'v-meldung' : 'f-bericht-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + (i.ergaenzt ? t('v.ergaenzt', i.ergaenzt) : '') + '</div>'
+        $(feld === 'v-datei' ? 'v-meldung' : 'f-bericht-meldung').innerHTML = '<div class="meldung ok">' + t('v.neu', i.neu, i.bekannt) + (i.ohne ? t('v.ohne', i.ohne) : '') + (i.ergaenzt ? t('v.ergaenzt', i.ergaenzt) : '') + (i.nachgetragen ? t('v.nachgetragen', i.nachgetragen) : '') + (i.preise ? t('v.preise', i.preise) : '') + '</div>'
           + (i.fehlten ? '<div class="meldung warn">' + t('v.fehlten', i.fehlten) + '</div>' : '')
           + (i.warnungen ? '<div class="meldung warn">' + t('v.warnungen', i.warnungen) + '</div>' : '');
         $(feld).value = ''; VK = v; zeichneVerkaeufe(); if (danach) danach(v);
       });
-    };
-    leser.onerror = function () { melde(t('v.datei.fehler'), 'stop'); };
-    leser.readAsText(d, 'UTF-8');
+    });
+  }
+  /* Prüfung 22: Kodierung erkennen. Zuerst UTF-8 (streng); enthält die Datei Zeichen, die in UTF-8 ungültig sind, ist es Windows-1252 (E-Banking-Export). */
+  function textAusBytes(b) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(b).replace(/^\uFEFF/, ''); }
+    catch (e) { return new TextDecoder('windows-1252').decode(b); }
+  }
+  function leseText(datei, fertig) {
+    var leser = new FileReader();
+    leser.onerror = function () { lade(false); melde(t('v.datei.fehler'), 'stop'); };
+    leser.onload = function () { fertig(textAusBytes(new Uint8Array(leser.result))); };
+    leser.readAsArrayBuffer(datei);
+  }
+  /* Prüfung 22: CSV mit Anführungszeichen über Zeilenumbrüche hinweg (Buchungstext mit Zeilenumbruch) */
+  function csvZeilen(text, tr) {
+    var out = [], z = [], f = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { f += '"'; i++; } else if (ch === '"') q = false; else f += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === tr) { z.push(f); f = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; z.push(f); f = ''; out.push(z); z = []; }
+      else f += ch;
+    }
+    if (f !== '' || z.length) { z.push(f); out.push(z); }
+    return out;
   }
   function ladeVerkaeufe() {
     if (VK) { zeichneVerkaeufe(); still('verkaeufe', [], function (v) { if (v && gleich(v, VK)) return; if (v) { VK = v; if (ANSICHT === 'verkauf') zeichneVerkaeufe(); } }); return; }
@@ -1381,7 +1405,7 @@
   function zeichneBetrieb(r) {
     var z = function (ok, text, warn) { return '<div class="meldung ' + (ok ? (warn ? 'warn' : '') : 'stop') + '" style="margin:8px 0">' + esc(text) + '</div>'; }, m = r.mail;
     $('adm-status').innerHTML = z(m.aktiv, m.aktiv ? t('adm.mail.an', m.letzte || '–') : t('adm.mail.aus')) + (m.warnung ? z(true, t('adm.mail.still'), true) : '') + (m.unecht ? z(true, t('adm.mail.unecht', m.unecht), true) : '')
-      + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
+      + z(r.ausloeser, t(r.ausloeser ? 'adm.ausloeser' : 'adm.keinausloeser')) + (r.vorrat === undefined ? '' : z(r.vorrat, t(r.vorrat ? 'adm.vorrat' : 'adm.keinvorrat'))) + z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki'));
     var j = r.jetzt, kachel = function (name, zahl) { return '<div class="kachel"><div class="n">' + esc(name) + '</div><div class="z">' + esc(zahl) + '</div></div>'; };
     if (j) $('adm-status').innerHTML = '<div class="kacheln">' + kachel(t('kz.gelistet'), String(j.gelistet)) + kachel(t('kz.zupacken'), String(j.zuPacken)) + kachel(t('kz.zahlung', j.zahlTage), String(j.zahlungOffen)) + '</div>' + $('adm-status').innerHTML;
     $('adm-sheet').href = r.url;
@@ -1472,19 +1496,26 @@
     var h = '', z = '';
     AD.listings.forEach(function (l, i) {
       z += '<tr><td class="mono">' + esc(l.id) + (l.buendel ? '<br>+ ' + esc(l.buendel) : '') + '</td><td>' + esc(l.name) + '</td><td><span class="etikett">' + esc(st(l.status)) + '</span></td><td class="mono">' + esc(l.am) + '</td>' +
-        '<td><button onclick="adminLoesche(\'l\',' + i + ')">' + t('ad.loeschen') + '</button></td></tr>';
+        '<td>' + (l.loeschbar === false ? '<span class="klein">' + t('ad.nichtloeschbar') + '</span>' : '<button onclick="adminLoesche(\'l\',' + i + ')">' + t('ad.loeschen') + '</button>') + '</td></tr>';   // Prüfung 5
     });
     if (z) h += '<h3 style="margin:20px 0 0">' + t('ad.listings') + '</h3>' + tab(['th.id', 'th.produkt', 'th.status', 'th.angelegt', ''], z);
     z = '';
     AD.verkaeufe.forEach(function (o, i) {
       z += '<tr><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td><td>' + (o.pgId ? esc(o.pgId) + ' ' : '') + esc(o.titel) + '</td><td>' + esc(o.kaeufer) + '<span class="klein">CHF ' + esc(o.total) + '</span></td>' +
         '<td><span class="etikett">' + esc(st(o.status)) + '</span></td>' +
-        '<td>' + (o.status === 'Storniert' || o.status === 'Retourniert' ? '' : '<button onclick="adminLoesche(\'v\',' + i + ')">' + t('ad.loeschen') + '</button>') + '</td></tr>';
+        '<td>' + (o.storno === false || o.status === 'Storniert' || o.status === 'Retourniert' ? (o.bezahlt && o.status !== 'Storniert' && o.status !== 'Retourniert' ? '<span class="klein">' + t('ad.retoure') + '</span>' : '') : '<button onclick="adminLoesche(\'v\',' + i + ')">' + t('ad.loeschen') + '</button>')
+        + (o.zuordnen ? '<div class="reihe" style="margin-top:6px"><input type="text" id="az-' + i + '" placeholder="PG-ID" style="height:40px;font-size:15px;width:140px"> <button onclick="adminZuordnen(' + i + ')">' + t('ad.zuordnen') + '</button></div>' : '') + '</td></tr>';   // Prüfung 4, 5
     });
     if (z) h += '<h3 style="margin:20px 0 0">' + t('ad.verkaeufe') + '</h3>' + tab(['th.verkauf', 'th.stueck', 'th.kaeufer', 'th.status', ''], z);
     $('ad-liste').innerHTML = h || '<p class="still" style="margin-top:12px">' + t('ad.leer') + '</p>';
   }
   function adminFertig() { melde(t('ad.erledigt'), 'ok'); adminSuchen(); still('startDaten', [], function (s) { S = s; texte(); }); zaehlerLaden(); }
+  /* Prüfung 4: Verkauf ohne PG-ID von Hand zuordnen (der Server prüft wie bei der automatischen Zuordnung) */
+  function adminZuordnen(i, ok) {
+    var o = AD.verkaeufe[i], pg = ($('az-' + i) || {}).value || '';
+    if (!pg.trim()) { melde(t('ad.zuordnen.fehlt'), 'stop'); return; }
+    ruf('adminVerkaufZuordnen', ok ? [o.zeile, o.nr, pg.trim(), true] : [o.zeile, o.nr, pg.trim()], adminFertig, function (m) { return bestaetigen(m, function () { adminZuordnen(i, true); }); });
+  }
   function adminLoesche(art, i) {
     if (art === 'l') { var l = AD.listings[i]; frage(t('ad.f.listing', l.id), function () { ruf('adminLoescheListing', [l.zeile, l.id], adminFertig); }); }
     else { var o = AD.verkaeufe[i]; frage(t('ad.f.verkauf', o.nr), function () { ruf('adminLoescheVerkauf', [o.zeile, o.nr], adminFertig); }); }
@@ -1596,6 +1627,27 @@
     'g.v.bestaetigen': ['Versand bestätigen', 'Confirm shipping'], 'g.v.bestaetigen.r': ['Beim Verkauf «Versand bestätigen» klicken und die Sendungsnummer {0} einfügen. Damit ist der Verkauf abgeschlossen.', 'Click «Versand bestätigen» on the sale and paste tracking number {0}. That closes the sale.'],
     'g.v.bestaetigen.k': ['Nummer kopieren, Ricardo öffnen', 'Copy number, open Ricardo'], 'g.v.versendet': ['Versendet', 'Shipped'],
     'g.v.warten': ['{0} Pakete warten noch auf Zahlung und bleiben im Regal.', '{0} parcels are still awaiting payment and stay on the shelf.']
+  });
+  /* Prüfung 24.10.2026 und Zusatz E1: neue Texte */
+  Object.assign(T, {
+    'still.fehler': ['Laden im Hintergrund gescheitert: {0}', 'Loading in the background failed: {0}'],
+    'q.beschaeftigt': ['Das Tool ist gerade beschäftigt, nächster Versuch in {0} s …', 'The tool is busy, next try in {0} s …'],
+    'such.entscheid': ['Entscheid offen: «Neu listen» oder im Ablauf «Listing» entscheiden.', 'Decision open: «Relist» or decide in the «Listing» routine.'],
+    'such.geholt': ['im Matchmaker geholt', 'picked up in Matchmaker'],
+    'ana.fehler': ['Die Liste «Aus der Analyse» konnte nicht geladen werden: {0}', 'The list «From the analysis» could not be loaded: {0}'],
+    's4.status': ['Das Listing ist «{0}» und kann nicht als gelistet gespeichert werden.', 'The listing is «{0}» and cannot be saved as listed.'],
+    'v.rtort': ['Lagerort laut Return Tool (alt): {0}', 'Location per Return Tool (old): {0}'],
+    'v.nachgetragen': [' PG-ID nachgetragen: {0}.', ' PG-ID added: {0}.'], 'v.preise': [' Beträge aus dem Bericht übernommen: {0}.', ' Amounts taken from the report: {0}.'],
+    'ad.nichtloeschbar': ['läuft oder verkauft: nicht löschbar', 'running or sold: cannot be deleted'], 'ad.retoure': ['bezahlt: nur über eine Retoure', 'paid: only via a return'],
+    'ad.zuordnen': ['Zuordnen', 'Assign'], 'ad.zuordnen.fehlt': ['Bitte die PG-ID des Stücks eingeben.', 'Please enter the PG-ID of the item.'],
+    'ad.f.verkauf': ['Verkauf {0} stornieren? Geht nur, solange er nicht bezahlt und nicht versendet ist. Er zählt nicht mehr zum Umsatz, das Stück wartet danach auf den Entscheid (Ablauf «Listing»). Der Verkauf bleibt als «Storniert» vermerkt, damit er beim nächsten Import nicht wieder erscheint.',
+      'Cancel sale {0}? Only possible while it is unpaid and not shipped. It no longer counts towards revenue; the item then waits for a decision («Listing» routine). The sale stays recorded as «Cancelled» so that it does not reappear with the next import.'],
+    'f.t1.ohne': ['{0} Gutschriften ohne Treffer (von Hand prüfen)', '{0} credits without a match (check by hand)'],
+    'adm.vorrat': ['Der Suchvorrat läuft von selbst (alle 5 Minuten, 06 bis 21 Uhr).', 'The search cache runs by itself (every 5 minutes, 06 to 21 h).'],
+    'adm.keinvorrat': ['Der Auslöser «suchVorrat» fehlt: im Apps Script «einrichten» ausführen, sonst ist die Suche langsam.', 'The trigger «suchVorrat» is missing: run «einrichten» in Apps Script, otherwise search is slow.'],
+    'e1.datei': ['Datei', 'File'], 'e1.weg': ['Etikette schon erstellt, die Datei ist nicht mehr im Speicher der Seite.', 'Label already created; the file is no longer in the page memory.'],
+    'e1.gedruckt': ['Etikette gedruckt (Zebra).', 'Label printed (Zebra).'], 'e1.download': ['Etikette im Download-Ordner: anklicken und drucken.', 'Label in the Downloads folder: click it and print.'],
+    'e1.download.pdf': ['Etikette (PDF) im Download-Ordner.', 'Label (PDF) in the Downloads folder.']
   });
   var F = null, FA = 'taeglich', BANK = null, FALL = null, SCHR = 0, ADR = null, FERTIG = false;
   /* Teile des bisherigen Listings (Suche, Stück bearbeiten) werden in den Schritt verschoben, nicht kopiert. HEIM merkt sich, wo sie hingehören. */
@@ -1986,11 +2038,10 @@
     var leser = new FileReader();
     leser.onerror = function () { lade(false); melde(t('v.datei.fehler'), 'stop'); };
     if (/\.csv$/i.test(d.name)) {
-      leser.onload = function () {
-        var text = String(leser.result), trenner = (text.split('\n')[0].match(/;/g) || []).length >= (text.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
-        weiter(text.split(/\r?\n/).map(function (z) { return csvZeile(z, trenner); }));
-      };
-      leser.readAsText(d, 'UTF-8');
+      leseText(d, function (text) {
+        var erste = text.split('\n')[0], trenner = (erste.match(/;/g) || []).length >= (erste.match(/,/g) || []).length ? ';' : ',';
+        weiter(csvZeilen(text, trenner));
+      });
     } else {
       leser.onload = function () { xlsxLaden(function () {
         try { var wb = XLSX.read(new Uint8Array(leser.result), { type: 'array', cellDates: true }); weiter(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true })); }
@@ -1999,18 +2050,12 @@
       leser.readAsArrayBuffer(d);
     }
   }
-  function csvZeile(z, tr) {
-    var out = [], f = '', q = false;
-    for (var i = 0; i < z.length; i++) {
-      var ch = z[i];
-      if (q) { if (ch === '"' && z[i + 1] === '"') { f += '"'; i++; } else if (ch === '"') q = false; else f += ch; }
-      else if (ch === '"') q = true; else if (ch === tr) { out.push(f); f = ''; } else f += ch;
-    }
-    out.push(f); return out;
-  }
   function bankHtml() {
     if (!BANK) return '';
     var r = BANK, h = '<div class="meldung">' + t('f.t1.erg', r.gutschriften, r.offen, r.sicher.length, r.unsicher.length, r.schonErfasst) + '</div>';
+    /* Prüfung 22: Gutschriften ohne Treffer zeigen, damit sie von Hand geprüft werden */
+    if ((r.ohneTreffer || []).length) h += '<details class="meldung warn" id="f-bank-ohne"><summary>' + t('f.t1.ohne', r.ohneTreffer.length) + '</summary><ul>' + r.ohneTreffer.map(function (o) {
+      return '<li>' + esc(tagCh(o.datum, true)) + ' · CHF ' + esc(o.betrag) + ' · ' + esc(o.text) + (o.auftrag ? ' · ' + esc(o.auftrag) : '') + '</li>'; }).join('') + '</ul></details>';
     if (!r.sicher.length && !r.unsicher.length) return h + '<p class="still">' + t('f.t1.keine') + '</p>';
     var zeile = function (o, i, an) {
       return '<label class="haken aufgabe" style="margin:8px 0"><input type="checkbox" class="bank-wahl" data-i="' + i + '" ' + (an ? 'checked' : '') + '> <span><strong>' + esc(o.titel) + '</strong> <span class="still">'

@@ -357,6 +357,12 @@ test('B18 stand(): ohne Sperre, ohne Log bei abgeschlossenem Durchgang, mit Stat
   S.lockFrei = false;
   for (let i = 0; i < 10; i++) { const r = j(c.api('stand', [d.id])); assert.strictEqual(r.status, 'Abgeschlossen'); assert.strictEqual(r.zuordnung['PG-1'].gebinde, d.gebinde[0].id); }
   assert.strictEqual(tab(DB, 'Log').length, vor, 'keine Log-Zeilen');
+  /* alte Seite (vor dem Neuladen) fragt noch über zuordnen ohne Scans ab: Fehler an die Seite, aber keine Log-Flut */
+  S.lockFrei = true;
+  for (let i = 0; i < 3; i++) assert.throws(() => c.api('zuordnen', [d.id, [], 'BB']), /nicht im Scan/);
+  assert.strictEqual(tab(DB, 'Log').length, vor, 'keine Log-Zeilen von alten Abfragen');
+  assert.throws(() => c.api('zuordnen', [d.id, [{ id: 'PG-1', gebinde: d.gebinde[0].id, vorher: '' }], 'BB']), /nicht im Scan/);
+  assert.strictEqual(tab(DB, 'Log').length, vor + 1, 'echter Scan nach dem Abschluss steht im Log');
 });
 
 /* ---------- Befund 20: Erledigt mit PG-ID ---------- */

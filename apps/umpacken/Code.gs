@@ -246,7 +246,11 @@ function api(name, args) {
     scanStarten: scanStarten, abschliessen: abschliessen, erledigt: erledigt, wiederOeffnen: wiederOeffnen, verwerfen: verwerfen }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   try { return f.apply(null, args || []); }
-  catch (e) { log_('Fehler', '', name + ': ' + (e && e.message)); throw e; }
+  catch (e) {
+    /* Abfrage alter Seiten (zuordnen ohne Scans, bis sie nach dem Einspielen neu geladen sind): Fehler geht an die Seite, aber nicht alle 20 s ins Log (Prüfung 24.10.2026) */
+    if (!(name === 'zuordnen' && args && Array.isArray(args[1]) && !args[1].length)) log_('Fehler', '', name + ': ' + (e && e.message));
+    throw e;
+  }
 }
 
 /** Startseite: alle Durchgänge, der neueste zuerst. */

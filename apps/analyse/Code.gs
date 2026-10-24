@@ -1435,6 +1435,7 @@ function abholen_() {
       try { x = JSON.parse(zeile); } catch (err) { return; }
       if (!x || typeof x !== 'object') return;
       const cid = String(x.custom_id || ''), res = x.result || {}, msg = res.message || {}, ok = res.type === 'succeeded';
+      if (!cid) return;                                                         // Zeile ohne Auftrag: nichts zuzuordnen
       const roh = ok && msg.stop_reason === 'end_turn' ? json_(text_(msg)) : null, d = rechercheNorm_(roh);
       const nurVergleich = cid.charAt(0) === 'v', p = name[nurVergleich ? cid.slice(1) : cid] || {};
       /* Der Antworttext wird nur aufbewahrt, wo man ihn zum Beurteilen braucht: beim Vergleichsmodell ganz, bei einer nicht lesbaren Antwort das Ende. */
@@ -2597,13 +2598,15 @@ function mmAuftraege_(e) {
   if (!s) throw new Error('Tab «Matchmaker» fehlt im Matchmaker Sheet.');
   const v = s.getDataRange().getValues(), k = v.findIndex(function (z) { return z.map(function (x) { return String(x).trim(); }).indexOf('Gesucht') > -1; });
   if (k < 0) throw new Error('Spalte «Gesucht» fehlt im Matchmaker Sheet.');
-  const kopf = v[k].map(String), sp = mmSpalten_(kopf, ['Mehr Infos', 'Suchprofil']), aus = [];
+  const kopf = v[k].map(String), sp = mmSpalten_(kopf, ['Mehr Infos']), aus = [];
+  /* Das Suchprofil ist eine Hilfe für die KI («wenn vorhanden»): Fehlt die Spalte, geht es ohne, aber es steht einmal pro Tag im Log. */
+  if (sp.profil < 0 && einmalProTag_('mm-profil', ['Suchprofil']).length) log_('Matchmaker-Hinweis', '', 'Spalte «Suchprofil» fehlt im Matchmaker Sheet: Die Aufträge werden ohne Suchprofil geprüft.');
   for (let i = k + 1; i < v.length; i++) {
     const g = String(v[i][sp.gesucht] || '').trim();
     if (!g || (sp.geholt > -1 && v[i][sp.geholt] === true)) continue;
     const vermerk = sp.aus > -1 ? String(v[i][sp.aus] || '').trim() : '';
     aus.push({ zeile: i + 1, gesucht: g, mehr: String(v[i][sp.mehr] || '').trim(), limit: sp.limit > -1 ? v[i][sp.limit] : '',
-      profil: String(v[i][sp.profil] || '').trim(), aus: vermerk, ids: mmVermerkIds_(vermerk) });
+      profil: sp.profil > -1 ? String(v[i][sp.profil] || '').trim() : '', aus: vermerk, ids: mmVermerkIds_(vermerk) });
   }
   /* Gleiche Aufträge (gleiches Gesucht und Mehr Infos, z.B. zwei Kundinnen suchen dasselbe) bekommen eine laufende Nummer: M6 trifft so den richtigen. */
   const zaehler = {};

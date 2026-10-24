@@ -14,7 +14,10 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'starteListing': R, 'erstelleText': dict(R, geaendert='', textQuelle='Analyse'), 'verkaeufe': {'offen': []}, 'retouren': {'offen': []}}
 stub = """<script>window.AUFRUFE=[];window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
- return function(l,name,args){AUFRUFE.push(name);var D=%s;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[name]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
+ return function(l,name,args){AUFRUFE.push(name);window.ARGS=window.ARGS||[];ARGS.push([name,args]);var D=%s;
+ /* 24.10.2026 (Vertrag V5): der Server fragt beim Matchmaker-Stück nach, bis «mm» bestätigt ist */
+ if(name==='starteListing'&&args[0]==='PG-200'&&!(Array.isArray(args[2])&&args[2].indexOf('mm')>=0)){setTimeout(function(){fail&&fail({message:'Bitte bestätigen: PG-200 liegt im Matchmaker für Auftrag «Föhn gesucht». Dort nicht verkauft und jetzt auf Ricardo? [mm]'})},5);return;}
+ setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[name]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
 html = html.replace('<head>', '<head>' + stub, 1)
 fehler = 0
 def ok(b, m):
@@ -40,10 +43,11 @@ with sync_playwright() as p:
     n0 = s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length")
     s.evaluate("$('q').value='PG-200'; suchen()"); s.wait_for_timeout(150)
     ok('im Matchmaker' in s.text_content('#treffer'), 'Suche: Etikett «im Matchmaker»')
-    s.click('#treffer button.haupt-knopf'); s.wait_for_timeout(100)
-    ok(s.is_visible('#dialog') and 'Föhn gesucht' in s.inner_text('#dialog-text') and s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0, 'Nachfrage vor dem Start, noch kein Listing')
+    s.click('#treffer button.haupt-knopf'); s.wait_for_timeout(150)
+    # 24.10.2026 (Vertrag V5): die Nachfrage kommt vom Server (erster Aufruf ohne Bestätigung legt nichts an), das Kürzel «[mm]» wird nicht angezeigt
+    ok(s.is_visible('#dialog') and 'Föhn gesucht' in s.inner_text('#dialog-text') and '[mm]' not in s.inner_text('#dialog-text') and s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0 + 1, 'Nachfrage vor dem Start (vom Server), noch kein Listing')
     s.click('#dialog-ja'); s.wait_for_timeout(200)
-    ok(s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0 + 1, 'nach Ja: Listing startet')
+    ok(s.evaluate("AUFRUFE.filter(function(x){return x==='starteListing'}).length") == n0 + 2 and s.evaluate("ARGS.filter(function(x){return x[0]==='starteListing'}).pop()[1]") == ['PG-200', False, ['mm']], 'nach Ja: Listing startet mit Bestätigung «mm»')
     ok(not err, 'keine JS-Fehler ' + str(err))
     b.close()
 print('alle Tests ok' if not fehler else '%d Fehler' % fehler); raise SystemExit(1 if fehler else 0)
