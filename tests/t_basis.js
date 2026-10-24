@@ -84,4 +84,13 @@ ctx.basisEinrichten_(ss, { name: 'Test Tool', version: 'v1', zweck: 'Zweck.' }, 
   { tab: 'Daten', art: 'arbeit', inhalt: 'Daten.' }, { tab: 'Log', art: 'protokoll', inhalt: 'Verlauf.' }, { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Werte.' }
 ], []);
 assert.strictEqual(JSON.stringify(reihenfolge.map(function (s) { return [s.name, s.farben, s.tab, s.schutz.filter(Boolean)]; })), vorher);
+/* 4. Prüfung 24.10.2026: Basis.gs steckt in vier Projekten (Analyse, Ricardo, Umpack, Ersatzteil). Kopien im Repo gleich, keine Namenskonflikte. */
+assert.strictEqual(lies('apps/umpacken/Basis.gs'), basis, 'apps/umpacken/Basis.gs weicht von apps/basis/Basis.gs ab');
+[['apps/umpacken/Code.gs', 'KATALOG'], ['apps/ersatzteil/Code.gs', 'ERSATZTEIL_KATALOG']].forEach(function (x) {
+  const c = { console: console, SpreadsheetApp: {}, PropertiesService: {}, CacheService: {}, Utilities: {}, Session: {}, ScriptApp: {}, LockService: {}, UrlFetchApp: {}, HtmlService: {}, DriveApp: {}, GmailApp: {}, Logger: { log: function () {} } };
+  vm.createContext(c);
+  vm.runInContext(lies(x[0]) + '\n' + basis + '\n;this.__k = ' + x[1] + ';', c);
+  assert.ok(Array.isArray(c.__k) && c.__k.length, x[0] + ': Katalog fehlt');
+  assert.ok(!/function basis[A-Z]|const BASIS/.test(lies(x[0])), x[0] + ': definiert basis*-Funktion selbst');
+});
 console.log('t_basis ok');

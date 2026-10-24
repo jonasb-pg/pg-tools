@@ -9,10 +9,10 @@
 | 2 | `node --check` auf Code.gs (als .js) und auf die `<script>`-Blöcke aus Index.html | Syntax OK |
 | 3 | Code.gs in `vm.runInNewContext` mit Stubs (Session, PropertiesService, Utilities, SpreadsheetApp, DriveApp, ScriptApp, HtmlService, LockService, UrlFetchApp) | «top-level OK» (fängt `ReferenceError … before initialization`) |
 | 4 | Oberfläche lokal mit Playwright, `google.script.run` gestubbt | keine `pageerror`, Screenshots ansehen |
-| 5 | Zeilen-Patch in den Monaco-Editor des Scripts (prüft Zeilenzahl vorher) | djb2-Hash und Länge im Editor = lokal |
-| 6 | Speichern (Strg+S / Symbol) | «In Google Drive gespeichert» |
+| 5 | Zeilen-Patch in den Monaco-Editor des Scripts: vorher djb2-Prüfsumme des Editor-Inhalts gegen den Git-Stand prüfen, nachher gegen den neuen Stand | Prüfsumme vorher = Git-Stand, nachher = Repo |
+| 6 | Speichern (Strg+S / Symbol). **Achtung:** Zeitgesteuerte Auslöser laufen sofort mit dem gespeicherten Code, das an das Matchmaker Sheet gebundene Script ist beim Speichern sofort live. Erst speichern, wenn der Code live gehen darf (Go von Jonas), dann gleich «einrichten» und Bereitstellung. | «In Google Drive gespeichert» |
 | 7 | Test-Adresse `/dev` neu laden | Version unten links |
-| 8 | Bei Änderung an `Basis.gs`: Datei «Basis» in beiden Projekten ersetzen, Hash prüfen | Hash in beiden Editoren = Repo |
+| 8 | Bei Änderung an `Basis.gs`: Datei «Basis» in allen vier Projekten ersetzen (Analyse, Ricardo, Umpack, Ersatzteil), Prüfsumme prüfen. `t_basis.js` prüft die Repo-Kopien und Namenskonflikte | Prüfsumme in allen Editoren = Repo |
 | 9 | Nach Änderungen an Tabs oder Basis: «einrichten» ausführen | Tab «Übersicht» zeigt neue Version |
 | 10 | Commit ins Repo mit Doku-Update | |
 | 11 | Bei einer neuen Bereitstellung (Live-Version): Sheet «TOOL LINKS» nachführen (Spalten Bereitstellung, Code-Version, Stand) | Zeile des Tools aktuell |
@@ -50,7 +50,7 @@ Jeder KI-Aufruf schreibt eine Zeile in den Tab «Kosten» (`kostenzeile_`). Rich
 
 ## Tests (lokal, nicht im Repo-CI)
 
-Alle auf einmal: `sh tools/tests.sh`. `t_basis.js` prüft die gemeinsame Basis mit beiden Tools.
+Alle auf einmal: `sh tools/tests.sh`. `t_basis.js` prüft die gemeinsame Basis mit allen vier Tools, `t_gemeinsam_ids.js`, dass alle Tools PG-IDs und Barcodes gleich vergleichen.
 
 | Skript | Prüft |
 |---|---|
