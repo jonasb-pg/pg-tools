@@ -2195,7 +2195,8 @@ function handbuchSchreiben_(e, zeile) {
     const c = kopf.indexOf('Schlüssel');
     let r = 0;
     for (let i = 1; i < v.length && !r; i++) if (String(v[i][c]) === String(zeile['Schlüssel'])) r = i + 1;
-    s.getRange(r || s.getLastRow() + 1, 1, 1, kopf.length).setValues([row]);
+    if (!r) { r = s.getLastRow() + 1; platzFuer_(s, r, 1); }               // Vertrag V2: am Ende des Tabs zuerst eine Zeile anfügen
+    s.getRange(r, 1, 1, kopf.length).setValues([row]);
     SpreadsheetApp.flush();
   });
   uebNeu_();                                                            // noch einmal nach dem Schreiben: Wer in der Zwischenzeit las, hat den alten Stand gemerkt
@@ -2722,9 +2723,14 @@ function mmVermerk_(e, mm, text, pg, meins) {
     pg = pg || String(text || '').split(' · ')[0];
     const m = mmAuftraege_(e), a = mmFinde_(m.liste, mm, pg, meins);
     if (!a) { log_('Matchmaker-Vermerk', pg, 'Auftrag nicht mehr offen oder schon reserviert: ' + mm.gesucht + ' · ' + text); return; }
-    let c = mmSpalten_(m.kopf).aus + 1;
-    if (!c) { c = m.kopf.filter(String).length + 1; m.blatt.getRange(m.kopfZeile, c).setValue('Aus Analyse').setFontWeight('bold'); }
-    const sp = mmSpalten_(m.kopf), gz = m.blatt.getRange(a.zeile, sp.gesucht + 1);
+    const sp = mmSpalten_(m.kopf);
+    let c = sp.aus + 1;
+    if (!c) {
+      c = m.kopf.filter(String).length + 1;
+      if (typeof m.blatt.getMaxColumns === 'function' && c > m.blatt.getMaxColumns()) m.blatt.insertColumnsAfter(m.blatt.getMaxColumns(), c - m.blatt.getMaxColumns());
+      m.blatt.getRange(m.kopfZeile, c).setValue('Aus Analyse').setFontWeight('bold');
+    }
+    const gz = m.blatt.getRange(a.zeile, sp.gesucht + 1);
     if (gz.getValue && norm_(gz.getValue()) !== norm_(a.gesucht)) { log_('Matchmaker-Vermerk', pg, 'Zeile ' + a.zeile + ' hat sich verschoben, nichts geschrieben: ' + text); return; }
     const z = m.blatt.getRange(a.zeile, c), alt = String(z.getValue() || '').trim();
     z.setValue(txt_((alt ? alt + '\n' : '') + text));

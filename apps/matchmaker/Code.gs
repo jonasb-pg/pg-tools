@@ -468,6 +468,7 @@ function istAlt_(sh, hz) {
  * Fehlt eine Pflichtspalte, ist eine doppelt, oder stehen Passt und Ähnlich 1–3 nicht nebeneinander: Fehler «Spalten verschoben».
  */
 function spalten_(sh, hz) {
+  if (!hz) throw new Error('Im Tab «' + TAB + '» fehlt die Kopfzeile (eine Spalte «Gesucht» in den ersten 12 Zeilen).');
   const k = sh.getRange(hz, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(function (x) { return String(x).trim(); });
   const sp = { max: 0 }, fehler = [];
   SPALTEN.forEach(function (d) {

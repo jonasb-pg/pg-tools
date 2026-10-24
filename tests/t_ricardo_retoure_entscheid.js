@@ -27,7 +27,8 @@ assert.strictEqual(listing['Status'], 'Retourniert');
 assert.throws(function () { c.retoureSchritt('RT-0001', 'entscheid', 'Verschenken'); }, /Unbekannter Entscheid/);
 c.retoureSchritt('RT-0001', 'entscheid', 'Neu listen');
 assert.strictEqual(rzeile['Status'], 'Abgeschlossen');
-assert.strictEqual(listing['Status'], 'Bereit', 'Neu listen bringt das Stück ins Listing');
+/* 24.10.2026 (Prüfung 8): nach einer Retoure neu prüfen und neu beschreiben: «In Arbeit» statt sofort «Bereit» */
+assert.strictEqual(listing['Status'], 'In Arbeit', 'Neu listen bringt das Stück ins Listing (neu zu prüfen)');
 assert.strictEqual(listing['Entscheid unverkauft'], 'Neu listen');
 assert.throws(function () { c.retoureSchritt('RT-0001', 'entscheid', 'Entsorgung'); }, /bereits abgeschlossen/);
 

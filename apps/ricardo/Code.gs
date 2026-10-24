@@ -86,6 +86,7 @@ const DEFAULTS = [
   ['Laufzeit Tage', 6, 'Vorschlag für die Laufzeit der Auktion. Beim Listen kann man pro Angebot eine andere Laufzeit eintragen (Spalte «Laufzeit Tage» im Tab «Listings»).'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
   ['Post Frankierlizenz', '60162228', 'Frankierlizenz Pakete Inland für die Etiketten (Barcode API der Post). Zugang: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET'],
+  ['Etiketten-Format', 'ZPL', 'ZPL = Etikette für den Zebra ZD220 (A6, 200 dpi): druckt direkt über «Zebra Browser Print» oder kommt als Datei in den Download-Ordner (Druckprogramm). PDF = Etikette als PDF-Datei (A6, 300 dpi).'],
   ['Post Absender', 'Pretty Good GmbH, Pappelweg 24, 3013, Bern', 'Absender auf der Etikette: Name, Strasse und Nr., PLZ, Ort (mit Komma getrennt)'],
   ['Schlusssatz', SCHLUSSSATZ, 'Steht am Ende jedes Beschriebs. Keine Domain verwenden. Gleicher Satz wie «Ricardo-Schlusssatz» im ANALYSE TOOL'],
   ['Provision %', 12, 'Pauschale Ricardo-Provision für die Auswertung (Ricardo verlangt je nach Produkttyp 8 bis 12 %)'],
@@ -3801,7 +3802,8 @@ function etikette(nr, vorschau, neu) {
       r.warnungen = (r.warnungen ? r.warnungen + ' ' : '') + 'Sendungsnummer ' + r.sendungsnummer + ' nicht gespeichert (' + String(err.message || err) + ').';
     } finally { try { cache.remove(merker); } catch (e2) { /* läuft nach 2 Minuten ab */ } }
   }
-  return { nr: nr, sendung: r.sendungsnummer, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.pdf', warnungen: r.warnungen, produkt: przl_(klasse).join('+') };
+  /* E1: die Oberfläche druckt ZPL direkt (Zebra Browser Print) oder lädt die Datei herunter, kein neuer Tab */
+  return { nr: nr, sendung: r.sendungsnummer, daten: r.daten, typ: r.typ, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.' + r.typ, warnungen: r.warnungen, produkt: przl_(klasse).join('+') };
 }
 /** Verkauf mit dieser Nummer, frisch gelesen (in einer Sperre), mit _zeile. */
 function verkaufZeile_(nr) { return alleVerkaeufe_().filter(function (x) { return String(x['Verkauf-Nr']).trim() === String(nr).trim(); })[0] || null; }
@@ -3921,11 +3923,17 @@ function postAnfrage_(e, vorschau) {
   if (e.gramm) attr.weight = Math.min(99999, Math.round(Number(e.gramm)));
   const absender = postAbsender_();
   if (e.zusatz) absender.name2 = String(e.zusatz).slice(0, 35);   // Entscheid Jonas 19.10.2026: Verkauf-Nr und PG-ID beim Absender, damit man das Paket zuordnen kann
+  const zpl = etikettenFormat_() === 'zpl';
   return { language: 'DE', frankingLicense: String(cfg_('Post Frankierlizenz') || '60162228'), ppFranking: false, customer: absender,
-    labelDefinition: { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'PDF', imageResolution: 300, printPreview: !!vorschau },
+    labelDefinition: { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: zpl ? 'ZPL2' : 'PDF', imageResolution: zpl ? 200 : 300, printPreview: !!vorschau },
     item: { itemID: String(e.id || '').slice(0, 35), recipient: empf, attributes: attr } };
 }
-/** Etikette holen: { sendungsnummer, pdf (base64), warnungen }. */
+/*
+ * Zusatz E1 (24.10.2026, Jonas: «direkt auf den Zebra drucken»): Etiketten-Format aus der Einstellung, Vorgabe ZPL (ZPL2, A6, 200 dpi wie im Post-Login).
+ * Die Barcode API liefert das Etikett in beiden Formaten base64 in item.label[0].
+ */
+function etikettenFormat_() { return /^pdf$/i.test(String(cfg_('Etiketten-Format') || '').trim()) ? 'pdf' : 'zpl'; }
+/** Etikette holen: { sendungsnummer, daten (base64, ZPL oder PDF), typ ('zpl'|'pdf'), pdf (nur bei PDF, für ältere Oberflächen), warnungen }. */
 function postEtikette_(e, vorschau) { return postEtiketteAnfrage_(postAnfrage_(e, vorschau)); }
 function postEtiketteAnfrage_(anfrage) {
   const r = UrlFetchApp.fetch(POST_LABEL_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
@@ -3937,14 +3945,15 @@ function postEtiketteAnfrage_(anfrage) {
     const f = it && it.errors ? JSON.stringify(it.errors) : text;
     throw new Error('Post hat keine Etikette geliefert (' + r.getResponseCode() + '): ' + String(f).slice(0, 300));
   }
-  return { sendungsnummer: String(it.identCode || ''), pdf: it.label[0], warnungen: it.warnings ? JSON.stringify(it.warnings) : '' };
+  const typ = String((anfrage.labelDefinition || {}).imageFileType || 'PDF').toUpperCase().indexOf('ZPL') === 0 ? 'zpl' : 'pdf';
+  return { sendungsnummer: String(it.identCode || ''), daten: it.label[0], typ: typ, pdf: typ === 'pdf' ? it.label[0] : '', warnungen: it.warnings ? JSON.stringify(it.warnings) : '' };
 }
-/** Im Editor ausführen: Anmeldung und eine Muster-Etikette (SPECIMEN, kostenlos) an die eigene Adresse. Legt das PDF in «Meine Ablage» nicht ab, zeigt nur das Ergebnis. */
+/** Im Editor ausführen: Anmeldung und eine Muster-Etikette (SPECIMEN, kostenlos) an die eigene Adresse, im eingestellten Format (ZPL oder PDF). Legt nichts ab, zeigt nur das Ergebnis. */
 function postTest() {
   nurEditor_();                                                           // Prüfung 21
   const a = postAbsender_();
   const x = postEtikette_({ id: 'TEST-1', firma: a.name1, nachname: 'Test', strasse: String(a.street).replace(/\s+\d+\w?$/, ''), nr: (String(a.street).match(/(\d+\w?)$/) || [])[1] || '', plz: a.zip, ort: a.city, przl: 'ECO', gramm: 1000 }, true);
-  const aus = 'Post ok: Sendungsnummer ' + (x.sendungsnummer || '(Muster)') + ', PDF ' + Math.round(x.pdf.length * 3 / 4 / 1024) + ' KB' + (x.warnungen ? ', Hinweise: ' + x.warnungen : '');
+  const aus = 'Post ok: Sendungsnummer ' + (x.sendungsnummer || '(Muster)') + ', ' + x.typ.toUpperCase() + ' ' + Math.round(String(x.daten || '').length * 3 / 4 / 1024) + ' KB' + (x.warnungen ? ', Hinweise: ' + x.warnungen : '');
   console.log(aus);
   return aus;
 }

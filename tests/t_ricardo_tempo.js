@@ -75,12 +75,12 @@ A.push(['PG-51', 'Neu', 'Text', 'Neues Stück']); neu();
 ok(run("findeAnalyse_('PG-51') !== null") && oeffnen === 2, 'eben analysiertes Stück: findeAnalyse_ liest frisch');
 run("findeAnalyse_('PG-51'); findeAnalyse_('PG-50')");
 ok(oeffnen === 2, 'im gleichen Aufruf nur einmal geöffnet');
-/* 8. Weg A: uiTempo schreibt eine Zeile «Tempo UI», ohne Sperre, und nimmt nur gültige Namen */
+/* 8. Weg A: uiTempo schreibt (24.10.2026, Prüfung 21: heisst uiTempo_, nur über api()) eine Zeile «Tempo UI», ohne Sperre, und nimmt nur gültige Namen */
 const logs = []; vm.runInContext('log_ = function (a, id, d) { LOGS.push([a, d]); }', Object.assign(c, { LOGS: logs }));
 const g0 = gesperrt;
-run("uiTempo([{ n: 'ablauf', anzahl: 4, median: 1200, max: 4100, blk: 1 }, { n: 'x<script>', anzahl: 1, median: 1, max: 1 }, { n: 'setzeVerkauf', anzahl: 2, median: 900, max: 1500, blk: 0 }])");
+run("uiTempo_([{ n: 'ablauf', anzahl: 4, median: 1200, max: 4100, blk: 1 }, { n: 'x<script>', anzahl: 1, median: 1, max: 1 }, { n: 'setzeVerkauf', anzahl: 2, median: 900, max: 1500, blk: 0 }])");
 ok(logs.length === 1 && logs[0][0] === 'Tempo UI' && logs[0][1] === 'ablauf 4× Median 1.2 s, max 4.1 s, 1× wartend · setzeVerkauf 2× Median 0.9 s, max 1.5 s', 'uiTempo: eine Zeile, Median/Max in s ' + JSON.stringify(logs));
 ok(gesperrt === g0, 'uiTempo ohne Sperre');
-run('uiTempo([])'); run("uiTempo('quatsch')");
+run('uiTempo_([])'); run("uiTempo_('quatsch')");
 ok(logs.length === 1, 'leer oder ungültig: keine Zeile');
 console.log(fehler ? 'Fehler: ' + fehler : 'alle Tests ok'); process.exit(fehler ? 1 : 0);

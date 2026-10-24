@@ -95,9 +95,9 @@ S.RT['Stationär'].d[6].push('x'); // Spalte ohne Kopf: egal
 /* 1. Erste Suche ohne Vorrat: liest alles, merkt sich Hinweis-Tabs schlank */
 let r = S.c("suche('Toaster')");
 ok(r.treffer.length === 1 && r.andere.length === 1, 'Toaster: 1 Treffer Online, 1 in Stationär');
-const st = S.c("gepacktLesen_('rt:Stationär')");
+const st = S.c("gepacktLesen_('rt1:Stationär')");
 ok(st && st[0].schlank === true && st[0].spez === undefined && st[0].kat === undefined, 'Stationär schlank gemerkt');
-const on = S.c("gepacktLesen_('rt:Online')");
+const on = S.c("gepacktLesen_('rt1:Online')");
 ok(on && !on[0].schlank && on[0].ovp === 60, 'Online ganz gemerkt (mit Neupreis)');
 ok(S.c('VORRAT') === null, 'Vorrat nach der Suche geleert');
 /* 2. Zweite Suche: kein Tab des Return Tools wird gelesen, wenige Zugriffe */

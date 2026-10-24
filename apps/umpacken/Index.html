@@ -724,6 +724,9 @@
     KAM.letzteP = { id: q ? q.id : '', barcode: q ? q.barcode : code };
     var el = $('scan'); if (!el) return;
     el.value = code; scanne();
+    /* Nicht gebucht (abgelehnt, schon im Gebinde): keine Sperre für andere Codes, sonst ginge das verlangte PG-Etikett im selben Bild verloren.
+       Der abgelehnte Code selbst bleibt gesperrt, bis er 1 s aus dem Bild war (kein Dauerpiepen). */
+    if (!V.rueck || V.rueck.art !== 'ok') { KAM.letzteP = null; KAM.sperreBis = 0; }
     try { if (navigator.vibrate) navigator.vibrate(V.rueck && V.rueck.art === 'ok' ? 60 : [80, 60, 80]); } catch (e) { /* ohne */ }
     kamText();
   }

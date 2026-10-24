@@ -212,6 +212,7 @@ with sync_playwright() as p:
     s.evaluate("UM.waechter=300; MODUS='haengen'")
     scan(s, 'PG-1', 50)
     s.wait_for_timeout(450)
+    s.evaluate("clearTimeout(UM.wTimer); UM.waechter=60000")      # zweiten Wächter anhalten, damit die Reihenfolge der Antworten eindeutig ist
     scan(s, 'PG-2', 50)
     ok(ops(s) == [['PG-1'], ['PG-1']] and s.evaluate("UM.Q.length") == 2, 'B20 Wächter: nach 300 ms nochmals gesendet, Scans bleiben ' + json.dumps(ops(s)))
     s.evaluate("MODUS='ok'; WARTET.shift()()"); s.wait_for_timeout(80)

@@ -871,8 +871,10 @@
     $('such-meldung').innerHTML = ''; $('treffer').innerHTML = ''; FERTIG = null; zeichneFertig();
     if (!q) return;
     ruf('suche', [q], function (r) {
-      /* Sofort starten nur, wenn eindeutig: eine gescannte PG-ID oder ein Barcode, der nur zu diesem Stück gehört, und kein möglicher AN-Doppel */
-      if (r.inSchlange && r.treffer.length === 1 && !r.mehrdeutig && !r.treffer[0].an) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else { if (r.treffer[0].d) VORAB[r.treffer[0].id] = { d: r.treffer[0].d, zeit: Date.now() }; analyse(r.treffer[0].id, t0); } return; }
+      /* H1 (24.10.2026): Ob sofort gestartet wird, sagt der Server (r.sofort): nur bei einer PG-ID, die genau zu einem offenen Stück passt, ohne möglichen AN-Doppel.
+         Per Barcode oder Name kommt immer die Liste, die Person vergleicht die PG-ID auf dem Etikett. (Ohne r.sofort: Antwort eines älteren Servers, Regel wie bisher.) */
+      var sofort = r.sofort !== undefined ? r.sofort : (r.inSchlange && r.treffer.length === 1 && !r.mehrdeutig && !r.treffer[0].an);
+      if (sofort && r.treffer.length === 1) { if (r.treffer[0].status === 'Reparatur') repWeiter(r.treffer[0].id); else { if (r.treffer[0].d) VORAB[r.treffer[0].id] = { d: r.treffer[0].d, zeit: Date.now() }; analyse(r.treffer[0].id, t0); } return; }
       var mm = r.inSchlange ? [] : r.treffer.filter(function (x) { return x.mm; });
       if (mm.length) {                                                          // im Regal «Matchmaker»: Wiedereinstieg, wenn es dort nicht geklappt hat
         $('such-meldung').innerHTML = mm.map(function (x) { return '<div class="meldung warn"><p><strong>' + esc(x.id) + '</strong> · ' + esc(x.bezeichnung) + '<br>' + tx('mm.liegt', x.mm) + '</p><div class="knoepfe">' + taste('mmZurueck', 'mm.zurueck', 'pink', ' data-v="' + esc(x.id) + '"') + '</div></div>'; }).join('');
@@ -883,8 +885,10 @@
         $('treffer').innerHTML = (r.treffer.length ? '<h3 class="gruppe">' + tx('such.imTool') + '</h3>' + tabelle(r.treffer, false) : '') + (r.rt && r.rt.length ? '<h3 class="gruppe">' + tx('such.imRt') + '</h3>' + rtTabelle(r.rt) : '');
         return;
       }
-      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? (r.mehrdeutig ? 'such.mehrdeutig' : (r.anWarnung ? 'such.anWarn' : 'such.mehrere')) : 'such.erledigt')), r.inSchlange ? '' : 'warn');
-      $('treffer').innerHTML = r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '';
+      var rtAuch = r.inSchlange && r.rt && r.rt.length;                         // H1: weitere Stücke mit diesem Barcode im Return Tool
+      $('such-meldung').innerHTML = box(t(!r.treffer.length ? 'such.keine' : (r.inSchlange ? (r.mehrdeutig ? 'such.mehrdeutig' : (r.anWarnung ? 'such.anWarn' : (r.treffer.length === 1 ? 'such.etikett' : 'such.mehrere'))) : 'such.erledigt')), r.inSchlange ? '' : 'warn')
+        + (rtAuch ? box(t('such.rtAuch'), 'warn') : '') + (r.inSchlange && r.rtFehler ? box(r.rtFehler, 'stop') : '');
+      $('treffer').innerHTML = (r.treffer.length ? tabelle(r.treffer, r.inSchlange) : '') + (rtAuch ? '<h3 class="gruppe">' + tx('such.imRt') + '</h3>' + rtTabelle(r.rt) : '');
       if (r.inSchlange) vorabHolen(r.treffer);
     }, function (m) { $('such-meldung').innerHTML = box(m, 'warn'); });
   }
@@ -906,17 +910,26 @@
   function rtAktion(p) {
     if (p.ohneId) return '<span class="etikett">' + tx('rt.ohneId') + '</span>';
     if (p.archiv) return '<span class="etikett">' + tx('rt.archiv') + '</span>';
-    if (p.status === 'Erledigt') return '<span class="etikett">' + tx('rt.erledigt') + '</span>';
+    /* N5 (24.10.2026): Eine Retoure, die wieder im Return Tool steht, lässt sich nach Rückfrage neu analysieren (neue Analyse, die alte bleibt). */
+    if (p.status === 'Erledigt') return '<span class="etikett">' + tx('rt.erledigt') + '</span> <a href="#" class="link" data-a="nochmal" data-v="' + esc(p.id) + '">' + tx('rt.nochmal') + '</a>';
     if (p.status === 'Reparatur') return '<button class="mini" data-a="repWeiter" data-v="' + esc(p.id) + '">' + tx('rp.weiter') + '</button>';
     if (p.status === 'Offen') return '<button class="mini" data-a="starten" data-v="' + esc(p.id) + '">' + tx('such.start') + '</button>';
     return '<button class="mini" data-a="uebernehmen" data-v="' + esc(p.id) + '">' + tx('rt.los') + '</button>';
   }
   function uebernehmenTrotzdem(id) { uebernehmen(id, true); }
+  function nochmal(id) { uebernehmen(id, false); }
+  function retoure(id) { uebernehmen(id, 'retoure'); }
+  /* Aus dem Admin (zurückgehaltene Stücke, Retouren): zuerst zur Seite «Analysieren», dort läuft es wie aus der Suche. */
+  function admUebernehmen(id) { zeige('scan'); uebernehmen(id, false); }
   function uebernehmen(id, bestaetigt) {
     var t0 = Date.now();
     if (AN) { melde(t('fuss.laeuft'), true); return; }
     $('such-meldung').innerHTML = box(t('re.laeuft'), 'warn');
-    ruf('uebernehmen', [id, bestaetigt === true], function (r) {
+    ruf('uebernehmen', [id, bestaetigt === 'retoure' ? 'retoure' : bestaetigt === true], function (r) {
+      if (r.erledigt) {                                                           // N5: schon analysiert, vielleicht eine Retoure
+        $('such-meldung').innerHTML = '<div class="meldung stop"><p>' + esc(t('rt.erledigtFrage', r.id, r.erledigt)) + '</p><div class="knoepfe"><button class="mini" data-a="retoure" data-v="' + esc(r.id) + '">' + tx('rt.retoure') + '</button></div></div>';
+        return;
+      }
       if (r.zwilling) {                                                           // könnte schon als Stück ohne Inventar analysiert sein
         $('such-meldung').innerHTML = '<div class="meldung stop"><p>' + esc(t('rt.zwilling', r.id, r.zwilling)) + '</p><div class="knoepfe"><button class="mini" data-a="uebernehmenTrotzdem" data-v="' + esc(r.id) + '">' + tx('rt.trotzdem') + '</button></div></div>';
         return;
@@ -1890,7 +1903,8 @@
         + (extra || '') + (FS.laedt[a] ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt', FS.laedt[a]) + '</p>' : '') + ('<div class="knoepfe"><button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button><button class="knopf" data-a="fsGalerie" data-v="' + a + '">' + tx('fs.galerie') + '</button></div>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fsOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
-    $('fs-liste').innerHTML = zeile('hauptbild', 'ri.haupt', 'fs.haupt', 1) + zeile('weitere', 'ri.weitere', 'fs.weitere', 2)
+    $('fs-liste').innerHTML = (FS.fehl && FS.fehl.length ? '<div class="meldung stop"><p>' + tx('fs.nochmal', FS.fehl.length) + '</p><div class="knoepfe"><button class="knopf pink" data-a="fsNochmal">' + tx('fs.nochmalKnopf') + '</button></div></div>' : '')
+      + zeile('hauptbild', 'ri.haupt', 'fs.haupt', 1) + zeile('weitere', 'ri.weitere', 'fs.weitere', 2)
       + zeile('typenschild', 'ri.typ', 'fs.typ', st && st.ohneTypenschild ? null : 1, cb('typenschild', st && st.ohneTypenschild, 'ri.ohneTyp'))
       + zeile('mangel', 'ri.mangel', 'fs.mangel', null, cb('mangel', st && st.ohneMangel, 'ri.ohneMangel'));
   }
@@ -1921,17 +1935,36 @@
     FS.warte.push({ datei: datei, art: art }); FS.laedt[art] = (FS.laedt[art] || 0) + 1;
     fsZeichnen(); fsNaechstes();
   }
+  /*
+   * N8 (24.10.2026): Scheitert das Hochladen (Netz am Handy), bleibt das Foto in der Warteschlange und wird bis zu dreimal neu versucht (verkleinert gemerkt).
+   * Klappt es dann nicht, bleibt es unter «nicht hochgeladen» mit Knopf «Nochmals hochladen», statt still verloren zu gehen.
+   */
   function fsNaechstes() {
     if (FS.laeuft) return;
     var x = FS.warte.shift();
     if (!x) return;
     FS.laeuft = true;
     var fertig = function () { FS.laedt[x.art]--; if (FS.laedt[x.art] <= 0) delete FS.laedt[x.art]; FS.laeuft = false; fsZeichnen(); fsNaechstes(); };
+    var hoch = function (daten) {
+      google.script.run.withSuccessHandler(function (st) { FS.st = st; fertig(); })
+        .withFailureHandler(function (e) {
+          var m = String((e && e.message) || e).replace(/^Error:\s*/, '');
+          x.daten = daten; x.versuche = (x.versuche || 0) + 1;
+          if (x.versuche < 3) { FS.laeuft = false; FS.warte.unshift(x); melde(t('fs.wiederholt'), true); setTimeout(fsNaechstes, 3000 * x.versuche); return; }
+          FS.fehl = (FS.fehl || []).concat([x]); melde(m + ' · ' + t('fs.nochmal', FS.fehl.length), true); fertig();
+        }).api(L, 'fotoHochladen', [FS.id, x.art, daten]);
+    };
+    if (x.daten) { hoch(x.daten); return; }
     verkleinern(x.datei, function (daten) {
       if (!daten) { melde(t('fs.keinbild'), true); fertig(); return; }
-      google.script.run.withSuccessHandler(function (st) { FS.st = st; fertig(); })
-        .withFailureHandler(function (e) { melde(String((e && e.message) || e).replace(/^Error:\s*/, ''), true); fertig(); }).api(L, 'fotoHochladen', [FS.id, x.art, daten]);
+      hoch(daten);
     });
+  }
+  function fsNochmal() {
+    var l = FS.fehl || [];
+    FS.fehl = [];
+    l.forEach(function (x) { x.versuche = 0; FS.warte.push(x); FS.laedt[x.art] = (FS.laedt[x.art] || 0) + 1; });
+    fsZeichnen(); fsNaechstes();
   }
   function fsWeg(fileId) { ruf('fotoLoeschen', [FS.id, fileId], function (st) { FS.st = st; fsZeichnen(); }); }
   function fsOhne(art, k, el) { ruf('fotoOhne', [FS.id, art, !!el.checked], function (st) { FS.st = st; fsZeichnen(); }); }
@@ -1981,17 +2014,20 @@
     if (!r) {                                                                 // ohne Urteil im Browser wie bisher: auf den Server warten
       ruf('abschliessen', [d], function (r) {
         if (!AN || AN.d.produkt.id !== p.id) return;
+        if (r.ueberblickNeu) { umstellen(AN, r.d); LAUF = {}; sichern(); zeichneAnalyse(); melde(t('sp.neu', (r.neu || []).join(', ')), true); return; }
+        if (r.konflikt) { melde(t('sp.konflikt', r.konflikt.id || p.id, r.konflikt.kuerzel || '?', r.konflikt.zeit || '?'), true); return; }
         if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
-        fertigZeigen(p, r);
+        ausPausiert(AN.lauf); fertigZeigen(p, r);
       });
       return;
     }
     if (r.offen) { LAUF.urteil = r; zeichneSchritt(); return; }
     sichern();
     var an = JSON.parse(JSON.stringify(AN));
-    an.seit = null;
+    an.seit = null; delete an.tab;
     SP.push({ k: K, id: p.id, titel: p.bezeichnung, d: d, an: an, versuche: 0 });
     spMerken();
+    ausPausiert(AN.lauf);
     var reg = d.kanal === 'matchmaker' && r.reusable ? 'Matchmaker' : (d.kanal === 'ricardo' && r.reusable ? 'Ricardo Offline' : (r.reusable ? 'Analysiert' : ''));
     fertigZeigen(p, { reusable: r.reusable, grade: r.grade, regal: reg, befund: r.befund, verkaufsinfo: r.verkaufsinfo, dauerMin: Math.round((Number(d.aktivSek) || 0) / 6) / 10,
       budget: p.budget, nr: '', speichert: true });
@@ -2002,38 +2038,94 @@
     REP = REP.filter(function (x) { return x.id !== p.id; }); zeichneRep();
     ende(); if (r.zahlen) zahlen(r.zahlen); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
   }
-  var SP = (function () { try { var l = JSON.parse(localStorage.getItem('at-speichern') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } })(), SP_LAEUFT = false;
-  function spMerken() { try { localStorage.setItem('at-speichern', JSON.stringify(SP)); } catch (e) { /* ohne Speicher: nur bis zum Schliessen */ } spZeigen(); }
+  /*
+   * Speicher-Warteschlange (at-speichern). M5 (24.10.2026): Vor jedem Schreiben frisch lesen und mit dem Speicher zusammenführen (Schlüssel = Lauf-ID):
+   * Einträge eines anderen Tabs gehen nicht verloren. Was dieses Tab erledigt hat (SP_WEG), kommt nicht zurück. Doppelt geschickt ist harmlos: Der Server erkennt die Lauf-ID.
+   */
+  var SP = (function () { try { var l = JSON.parse(localStorage.getItem('at-speichern') || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } })(), SP_LAEUFT = false, SP_WEG = {};
+  function spKey(x) { return (x.d && x.d.lauf) || (x.an && x.an.lauf) || ('alt-' + String((x.d && x.d.kuerzel) || x.k || '').toUpperCase() + '-' + (Number(x.d && x.d.start) || 0)); }
+  function spMerken() {
+    var alt = [];
+    try { alt = JSON.parse(localStorage.getItem('at-speichern') || '[]'); if (!Array.isArray(alt)) alt = []; } catch (e) { alt = []; }
+    var da = {};
+    SP.forEach(function (x) { da[spKey(x)] = 1; });
+    alt.forEach(function (x) { var k = spKey(x); if (!da[k] && !SP_WEG[k]) { SP.push(x); da[k] = 1; } });
+    try { localStorage.setItem('at-speichern', JSON.stringify(SP)); } catch (e) { /* ohne Speicher: nur bis zum Schliessen */ }
+    spZeigen();
+  }
+  function spWeg(x) { SP_WEG[spKey(x)] = 1; SP = SP.filter(function (y) { return y !== x; }); spMerken(); }
   function spZeigen() { var el = $('sp-info'); if (!el) return; var n = SP.filter(function (x) { return x.k === K; }).length; el.hidden = !n; el.textContent = n ? t('sp.laeuft', n) : ''; }
+  /* Einträge von vor dem 24.10.2026 bekommen Lauf-ID und Namen nachgetragen (gleiche Regel wie der Server: Kürzel und Start). */
+  function spAlt(x) {
+    if (!x.d.lauf) x.d.lauf = spKey(x);                                       // gleicher Schlüssel vorher und nachher (sonst käme der Eintrag beim Zusammenführen zurück)
+    if (!x.d.bezug && x.an && x.an.d) x.d.bezug = bezugVon(x.an.d);
+    if (!x.d.v) x.d.v = VERSION;
+  }
   function spWeiter() {
     if (SP_LAEUFT || !SP.length) return;
     var x = SP[0];
+    spAlt(x);
     SP_LAEUFT = true;
     leise('abschliessen', [x.d], function (r) {
       SP_LAEUFT = false;
+      /* H3/M1 (24.10.2026): Kennzeichen statt Fehlertext (gleich in jeder Sprache). Die Analyse geht nie verloren, sie kommt unter «Pausiert». */
+      if (r && r.ueberblickNeu) { spNeu(x, r); return; }
+      if (r && r.konflikt) { spFehler(x, t('sp.konflikt', r.konflikt.id || x.id, r.konflikt.kuerzel || '?', r.konflikt.zeit || '?')); return; }
       if (r && r.offen) { spFehler(x, t('sp.offen')); return; }
-      SP.shift(); spMerken();
+      spWeg(x);                                                                 // gespeichert (r.schon: war schon gespeichert, nichts doppelt)
       if (r && r.zahlen) zahlen(r.zahlen);
       if (FERTIG && FERTIG.r && FERTIG.r.id === x.id && FERTIG.r.speichert) { r.id = x.id; FERTIG.r = r; zeichneFertig(); }
       spWeiter();
     }, function (m, e) {
       SP_LAEUFT = false;
-      /* Netz weg oder Google kurz nicht erreichbar: später nochmals. Eine echte Absage des Servers (z.B. Fotos fehlen) geht zurück an die Person. */
+      /* Netz weg oder Google kurz nicht erreichbar: später nochmals. Eine echte Absage des Servers (z.B. Fotos fehlen) geht zurück an die Person.
+         24.10.2026 (H3): «bereits analysiert» zählt nicht mehr als «schon gespeichert»: Das entscheidet der Server über die Lauf-ID. */
       var netz = !m || /network|netzwerk|timeout|zeitüberschreitung|NetworkError|Failed to fetch|^0$/i.test(m);
       if (netz && ++x.versuche < 6) { spMerken(); setTimeout(spWeiter, 5000 * x.versuche); return; }
-      if (/bereits analysiert/.test(m)) { SP.shift(); spMerken(); spWeiter(); return; }   // schon gespeichert (z.B. doppelt geschickt)
       spFehler(x, m);
     });
   }
   /* Speichern abgelehnt: Die Analyse kommt mit Stand und Meldung zu «Pausiert». Dort geht es am gleichen Schritt weiter. */
   function spFehler(x, m) {
-    SP = SP.filter(function (y) { return y !== x; }); spMerken();
-    var l = pausierte().filter(function (y) { return !(y.k === x.k && y.d.produkt.id === x.id); }), a = x.an;
-    a.k = x.k; a.pausiertAm = Date.now(); a.fehler = m; a.i = Math.max(0, a.d.ablauf.indexOf('entscheid'));
-    l.unshift(a); pausierteSpeichern(l); zeichnePausiert();
+    spWeg(x);
+    var a = x.an;
+    a.i = Math.max(0, a.d.ablauf.indexOf('entscheid'));
+    zuPausiert(a, x.k, m);
     if (FERTIG && FERTIG.r && FERTIG.r.id === x.id) { FERTIG = null; zeichneFertig(); }
     melde(t('sp.fehler', x.titel, m), true);
     spWeiter();
+  }
+  /* M1: Der Überblick hat sich geändert. Antworten nach Namen zuordnen, die Analyse unter «Pausiert» beim ersten geänderten Schritt. */
+  function spNeu(x, r) {
+    spWeg(x);
+    var a = x.an, m = t('sp.neu', (r.neu || []).join(', '));
+    umstellen(a, r.d);
+    zuPausiert(a, x.k, m);
+    if (FERTIG && FERTIG.r && FERTIG.r.id === x.id) { FERTIG = null; zeichneFertig(); }
+    melde(t('sp.fehler', x.titel, m), true);
+    spWeiter();
+  }
+  /*
+   * M1 (24.10.2026): Neuer Überblick vom Server für eine laufende Analyse. Antworten werden über die Namen zugeordnet (nie über die Position):
+   * Funktionen, fehlende Teile, Sicherheitspunkte. «Alles in Ordnung» bei den Sicherheitspunkten und das Zurücksetzen gelten nur, wenn die Liste gleich blieb.
+   * Weiter geht es beim ersten Schritt, der sich geändert hat.
+   */
+  function umstellen(a, nd) {
+    var od = a.d, s = a.s, fn = {}, fe = {}, sw = {}, nam = function (l) { return JSON.stringify((l || []).map(function (x) { return Array.isArray(x) ? x[0] : (x && x.n !== undefined ? x.n : x); })); };
+    od.funktion.liste.forEach(function (x, i) { if (s.fn && s.fn[i]) fn[x.n] = s.fn[i]; });
+    s.fn = {}; nd.funktion.liste.forEach(function (x, i) { if (fn[x.n]) s.fn[i] = fn[x.n]; });
+    Object.keys(s.fehlt || {}).forEach(function (i) { fe[od.liefer.teile[i]] = 1; });
+    s.fehlt = {}; nd.liefer.teile.forEach(function (x, i) { if (fe[x]) s.fehlt[i] = true; });
+    Object.keys(s.sicherWahl || {}).forEach(function (i) { sw[od.sicher[i]] = 1; });
+    s.sicherWahl = {}; nd.sicher.forEach(function (x, i) { if (sw[x]) s.sicherWahl[i] = true; });
+    var anders = { sicher: nam(od.sicher) !== nam(nd.sicher), voll: nam(od.liefer.teile) !== nam(nd.liefer.teile), funktion: nam(od.funktion.liste) !== nam(nd.funktion.liste), reset: nam(od.reset) !== nam(nd.reset) };
+    if (anders.sicher) { s.sicher = false; s.sicherNein = Object.keys(s.sicherWahl).length > 0; }
+    if (anders.reset) s.reset = 0;
+    if (s.ko && nd.ablauf.indexOf(s.ko.schritt) < 0) { s.ko = null; s.ab = null; }
+    var i = -1;
+    nd.ablauf.some(function (k, n) { if (anders[k] || (od.ablauf.indexOf(k) < 0 && k !== 'handbuch')) { i = n; return true; } return false; });
+    a.d = nd; a.gate = null;
+    a.i = i > -1 ? i : Math.max(0, nd.ablauf.indexOf('entscheid'));
   }
   function zeichneFertig() {
     var r = FERTIG && FERTIG.r, zeileF = function (name, id, text) {
@@ -2204,6 +2296,18 @@
     var z = function (ok, text) { return '<div class="meldung ' + (ok ? '' : 'stop') + '" style="margin:8px 0">' + esc(text) + '</div>'; }, h = '';
     h += z(r.ki, t(r.ki ? 'adm.ki' : 'adm.keinki')) + z(r.ausloeser, t(r.ausloeser ? 'adm.auto' : 'adm.keinauto') + ' ' + t('adm.zuletzt', (r.schlange && r.schlange.zuletzt) || t('liste.nie')))
       + z(r.importAn, t(r.importAn ? 'adm.an' : 'adm.aus'));
+    /* 24.10.2026: Meldungen des letzten Abgleichs (N7 Fehler, Z11 Laufzeit und Konten, M3 nicht lesbare Tabs, M4 zurückgehaltene Stücke, N5 Retouren, Z4 Zeilen ohne Bezeichnung) */
+    var a = r.abgleich || {}, info = a.info || {}, id = function (x) { return String(x).split(' ')[0]; };
+    var liste = function (titel, l, mitKnopf, klasse) {
+      if (!l || !l.length) return '';
+      return '<div class="meldung ' + (klasse || 'warn') + '" style="margin:8px 0"><strong>' + tx(titel) + '</strong><ul>' + l.map(function (x) {
+        return '<li>' + esc(x) + (mitKnopf && /^PG-\d+$/.test(id(x)) ? ' <button class="mini" data-a="admUebernehmen" data-v="' + esc(id(x)) + '">' + tx('adm.uebernehmen') + '</button>' : '') + '</li>'; }).join('') + '</ul></div>';
+    };
+    if (a.fehler) h += z(false, t('start.abgleichFehler', a.fehler.zeit || '?', a.fehler.text || '?'));
+    if (a.konten && a.konten.length > 1) h += z(false, t('adm.konten', a.konten.join(', ')));
+    h += liste('adm.nichtLesbar', info.nichtLesbar, false, 'stop') + liste('adm.verdacht', info.verdacht, true) + liste('adm.wieder', info.wieder, true) + liste('adm.ohneBez', info.ohneBez, false);
+    if (a.dauer) h += '<p class="still" style="margin:8px 0 0">' + tx('adm.dauer', a.dauer) + '</p>';
+    if (info.tabs && info.tabs.length) h += '<p class="still" style="margin:4px 0 0">' + tx('adm.tabs', info.tabs.join(', ')) + '</p>';
     if (r.budget !== undefined) {
       var pz = r.budget ? Math.min(100, Math.round(Number(r.verbraucht) / Number(r.budget) * 100)) : 0;
       h += '<div class="meldung' + (pz >= 90 ? ' warn' : '') + '" style="margin:8px 0">' + esc(t('adm.budget', r.verbraucht, r.budget)) + '<div class="balken"><i style="width:' + pz + '%"></i></div></div>';
@@ -2309,7 +2413,8 @@
   }
   var SEITEN = { scan: null, teile: ['bestellliste', zeichneBestell], werkstatt: ['werkstatt', zeichneWerkstatt], admin: ['adminDaten', zeichneAdmin] };
   /* Alles Klickbare trägt den Namen seiner Aktion in data-a und, wenn nötig, data-v (Wert) und data-k (Schlüssel). Ein Listener für die ganze Seite ruft A[Name](Wert, Schlüssel, Element). */
-  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: uebernehmen, uebernehmenTrotzdem: uebernehmenTrotzdem,
+  var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: function (id) { uebernehmen(id, false); }, uebernehmenTrotzdem: uebernehmenTrotzdem,
+    nochmal: nochmal, retoure: retoure, admUebernehmen: admUebernehmen, fsNochmal: fsNochmal,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
@@ -2324,6 +2429,10 @@
     K = lies('at-kuerzel-tag') === heute() || lauf ? (lies('at-kuerzel') || '') : '';
     texte(); $('wer').textContent = K; zeichnePausiert();
     spZeigen(); setTimeout(spWeiter, 1500);                                       // liegengebliebenes Speichern (z.B. nach Neuladen) nachholen
+    /* M5: zweites Tab erkennen. Beim Schliessen/Neuladen den eigenen Puls löschen, sonst hält das neu geladene Tab sich selbst für ein zweites. */
+    tabPuls(); setInterval(tabPuls, 3000);
+    window.addEventListener('storage', function (ev) { if (ev.key === 'at-tab' && ev.newValue) { try { if (JSON.parse(ev.newValue).id !== TAB_ID) zweiterTab(); } catch (e) { /* nicht lesbar */ } } });
+    window.addEventListener('pagehide', function () { try { var x = JSON.parse(lies('at-tab') || 'null'); if (x && x.id === TAB_ID) merke('at-tab', null); } catch (e) { /* nichts */ } });
     logo.addEventListener('error', ohneLogo);
     if (logo.complete && !logo.naturalWidth) ohneLogo();
     document.addEventListener('click', function (ev) {

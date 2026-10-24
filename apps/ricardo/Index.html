@@ -178,6 +178,7 @@
   #hinweis { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:30; max-width:min(680px, calc(100% - 32px)); padding:12px 44px 12px 16px;
     border:2px solid var(--ink); border-radius:4px; background:var(--weiss); font-weight:600; cursor:pointer; }
   #hinweis.ok { background:var(--pink); }
+  #hinweis.warn { background:var(--pink-hell); }
   #hinweis.stop { background:var(--ink); color:var(--weiss); }
   #hinweis::after { content:"×"; position:absolute; right:14px; top:8px; font-size:20px; }
   #dialog { position:fixed; inset:0; z-index:40; background:rgba(10,10,10,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -741,13 +742,28 @@
     lade(true);
     var t0 = Date.now();
     google.script.run.withSuccessHandler(function (x) { messe(name, t0, true); lade(false); ok(x); })
-      .withFailureHandler(function (e) { messe(name, t0, true); lade(false); var m = String(e.message || e).replace(/^Error:\s*/, ''); if (fehler && fehler(m)) return; melde(m, 'stop'); })
+      .withFailureHandler(function (e) { messe(name, t0, true); lade(false); var m = String(e.message || e).replace(/^Error:\s*/, ''); if (fehler && fehler(m)) return; melde(ohneKuerzel(m), 'stop'); })
       .api(L, name, args);
   }
-  function still(name, args, ok) {
+  /* 24.10.2026 (Prüfung 24): Fehler beim stillen Laden nicht schlucken. fehler (freiwillig) zeigt ihn selbst, sonst ein Hinweis oben. */
+  function still(name, args, ok, fehler) {
     var t0 = Date.now();
-    google.script.run.withSuccessHandler(function (x) { messe(name, t0, false); ok(x); }).withFailureHandler(function () { messe(name, t0, false); }).api(L, name, args);
+    google.script.run.withSuccessHandler(function (x) { messe(name, t0, false); ok(x); })
+      .withFailureHandler(function (e) { messe(name, t0, false); var m = String((e && e.message) || e).replace(/^Error:\s*/, ''); if (fehler) fehler(m); else melde(t('still.fehler', m), 'warn'); })
+      .api(L, name, args);
   }
+  /* Rückfragen des Servers tragen am Ende ein Kürzel, z.B. «[mm]» (Vertrag V5): nicht anzeigen, aber beim zweiten Aufruf mitschicken */
+  function kuerzel(m) { var k = /\s\[([a-z]+)\]$/.exec(String(m)); return k ? k[1] : ''; }
+  function ohneKuerzel(m) { return String(m).replace(/\s\[[a-z]+\]$/, ''); }
+  /* Prüfung 13: Knöpfe mit Text vom Server (Links, Nummern) tragen ihn in data-*, nie im onclick. Eine Stelle verteilt die Klicks. */
+  function akt(name, a, b) { return ' data-akt="' + esc(name) + '"' + (a !== undefined ? ' data-a="' + esc(a) + '"' : '') + (b !== undefined ? ' data-b="' + esc(b) + '"' : ''); }
+  var AKTIONEN = {};
+  document.addEventListener('click', function (e) {
+    var k = e.target && e.target.closest ? e.target.closest('[data-akt]') : null;
+    if (!k || k.disabled || !AKTIONEN[k.getAttribute('data-akt')]) return;
+    e.preventDefault();
+    AKTIONEN[k.getAttribute('data-akt')](k.getAttribute('data-a'), k.getAttribute('data-b'), k);
+  });
 
   /* ---------- Tempo 19.10.2026: Weg A ----------
      1. Zeitmessung im Browser: wie lange jemand auf den Server wartet (blockierend) oder nicht. Alle 2 Minuten eine Zeile «Tempo UI» ins Log.
@@ -785,7 +801,9 @@
     schlangeWeiter();
   }
   function schlangeAnzeige() { var n = SCHLANGE.length; $('schlange').hidden = !n; $('schlange').textContent = t('q.speichert', n); }
-  function netzfehler(m) { return /network|netzwerk|failed to fetch|timeout|zeitüberschreitung|verbindung|connection|xhr/i.test(m); }
+  /* Prüfung 10: «gerade beschäftigt» (Sperre) ist kein Netzfehler. Es wird mit sichtbarem Hinweis wiederholt, danach die Box mit «Nochmals». */
+  function beschaeftigt(m) { return /gerade beschäftigt|is busy right now|lock timeout/i.test(m); }
+  function netzfehler(m) { return !beschaeftigt(m) && /network|netzwerk|failed to fetch|timeout|zeitüberschreitung|verbindung|connection|xhr/i.test(m); }
   function schlangeWeiter() {
     schlangeAnzeige();
     if (SCHLANGE_LAEUFT) return;
@@ -802,6 +820,7 @@
       messe(j.name, t0, false);
       var m = String((e && e.message) || e).replace(/^Error:\s*/, '');
       if (netzfehler(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; setTimeout(schlangeWeiter, 2000 * j.versuche); return; }
+      if (beschaeftigt(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; $('schlange').hidden = false; $('schlange').textContent = t('q.beschaeftigt', 5 * j.versuche); setTimeout(schlangeWeiter, 5000 * j.versuche); return; }
       fertig();
       (j.opt.keys || []).forEach(function (k) { if (!PEND[k]) delete ERLEDIGT[k]; });   // der Fall kommt zurück in die Liste
       schlangeFehler(j, m);
@@ -889,7 +908,9 @@
         var zl = '';
         x.treffer.forEach(function (r, i) {
           var knopf, preis = r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '';
-          if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
+          if (r.teilVon) knopf = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' + (r.entscheidOffen ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '');
+          else if (r.entscheidOffen) knopf = statusHtml(r) + ' <button onclick="neuListenAus(\'t\',' + i + ')">' + t('such.neulisten') + '</button><br><span class="still">' + t('such.entscheid') + '</span>';
+          else if (!r.status && r.mm && r.mmStatus === 'Geholt') knopf = '<span class="etikett rot">' + t('such.geholt') + '</span>';
           else if (!r.status) knopf = r.vp ? '<button class="haupt-knopf" onclick="startAus(\'t\',' + i + ')">' + t('such.listen') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
           else if (r.status === 'In Arbeit' || r.status === 'Bereit') knopf = '<button onclick="startAus(\'t\',' + i + ')">' + t('such.weiter') + '</button>';
           else knopf = statusHtml(r);
@@ -900,7 +921,7 @@
       if (x.andere.length) {
         var z = '';
         x.andere.forEach(function (r, i) {
-          var k = r.teilVon ? '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' : r.status ? statusHtml(r) : !r.id ? '<span class="still">' + t('such.ohneid') + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
+          var k = r.teilVon ? '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>' : r.status ? statusHtml(r) + (r.entscheidOffen ? '<br><span class="still">' + t('such.entscheid') + '</span>' : '') : !r.id ? '<span class="still">' + t('such.ohneid') + '</span>' : r.vp ? '<button onclick="trotzdem(' + i + ')">' + t('such.trotzdem') + '</button>' : '<span class="still">' + t('such.keinpreis') + '</span>';
           z += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.tab) + '</td><td>' + esc(r.ort) + '</td><td>' + (r.vp ? 'CHF ' + Number(r.vp).toFixed(2) : '') + '</td><td>' + k + '</td></tr>';
         });
         h += '<div class="meldung warn">' + t('such.anders') + '</div>' + tab(['th.id', 'th.produkt', 'th.kanal', 'th.ort', 'th.preis', ''], z);
@@ -918,7 +939,8 @@
           var k;
           if (r.teilVon) k = '<span class="still">' + t('such.imbuendel', esc(r.teilVon)) + '</span>';
           else if (r.status === 'In Arbeit' || r.status === 'Bereit') k = '<button onclick="startAus(\'e\',' + i + ')">' + t('such.weiter') + '</button>';
-          else if (r.rc && !r.entscheid && ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="startAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';
+          else if (r.entscheidOffen) k = statusHtml(r) + ' <button onclick="neuListenAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';   // Prüfung 7: Entscheid auf derselben Zeile
+          else if (r.rc && !r.entscheid && ['Abgebrochen', 'Retour abgeschlossen'].indexOf(r.status) !== -1) k = statusHtml(r) + ' <button onclick="startAus(\'e\',' + i + ')">' + t('such.neulisten') + '</button>';
           else k = statusHtml(r) + (r.rc || r.entscheid ? '' : '<br><span class="still">' + t('such.nichtquelle') + '</span>');
           ze += '<tr><td class="mono">' + esc(r.id) + '</td><td>' + esc(r.name) + warnHtml(r) + '</td><td>' + esc(r.ort) + '</td><td class="mono">' + esc(r.erfasst) + '</td><td>' + k + '</td></tr>';
         });
@@ -945,23 +967,28 @@
   }
   var TREFFER = [];
   /* Review 24.10.2026: Meldet der Server «Bitte bestätigen: …», fragt die Oberfläche nach und ruft mit Bestätigung nochmals auf */
-  function bestaetigen(m, nochmals) { if (!/^(Bitte bestätigen|Please confirm):/.test(m)) return false; frage(m, nochmals); return true; }
-  function listingStarten(id, andere) {
+  /* Mit Kürzel (Vertrag V5): nochmals(kuerzel), die Aufrufer sammeln die bestätigten Kürzel. Ohne Kürzel: nochmals('') wie bisher (true). */
+  function bestaetigen(m, nochmals) { if (!/^(Bitte bestätigen|Please confirm):/.test(m)) return false; var k = kuerzel(m); frage(ohneKuerzel(m), function () { nochmals(k); }); return true; }
+  function mitBestaetigung(ok, k) { return k ? (Array.isArray(ok) ? ok : (ok === true ? ['archiv'] : [])).concat([k]) : (Array.isArray(ok) ? ok.concat(['archiv']) : true); }
+  function listingStarten(id, andere, ok) {
     var fertig = function (r) { $('treffer').innerHTML = ''; $('q').value = ''; oeffne(r); };
-    ruf('starteListing', andere === true ? [id, true] : [id], fertig, function (m) { return bestaetigen(m, function () { ruf('starteListing', [id, andere === true, true], fertig); }); });
+    var args = ok === undefined ? (andere === true ? [id, true] : [id]) : [id, andere === true, ok];
+    ruf('starteListing', args, fertig, function (m) { return bestaetigen(m, function (k) { listingStarten(id, andere, mitBestaetigung(ok, k)); }); });
   }
   /* Knöpfe tragen nur Liste und Index, nie die Nummer selbst (Review 24.10.2026) */
   function startAus(liste, i) { var x = ({ t: TREFFER, e: EIGENE, a: ANA })[liste][i]; if (x) start(x.id); }
-  function start(id) {
-    var los = function () { listingStarten(id); };
-    /* 21.10.2026: Stück aus dem Matchmaker. Mit dem Start gilt es dort als nicht verkauft. */
-    var a = (TREFFER || []).concat(ANA || []).filter(function (x) { return x.id === id; })[0];
-    if (a && a.mm && (a.mmStatus || 'Offen') === 'Offen' && !a.status) frage(t('mm.frage', id, a.auftrag || '–'), los); else los();
-  }
+  /* 24.10.2026 (Vertrag V5): Die Frage zum Matchmaker stellt jetzt der Server (auch wenn die Suche das Stück nur aus dem Return Tool kennt) */
+  function start(id) { listingStarten(id); }
+  /* Prüfung 7: «Unverkauft» ohne Entscheid: «Neu listen» ist der Entscheid auf derselben Zeile, danach weiter bearbeiten */
+  function neuListen(id) { ruf('entscheidUnverkauft', [id, 'Neu listen'], function () { $('treffer').innerHTML = ''; $('q').value = ''; weiter(id); }); }
+  function neuListenAus(liste, i) { var x = ({ t: TREFFER, e: EIGENE })[liste][i]; if (x) neuListen(x.id); }
 
   /* ---------- Aus der Analyse ---------- */
   var ANA = [];
-  function ladeAnalyse() { still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); if (ANSICHT === 'ablauf' && FA === 'schicht1' && !FALL && F) zeichneAblauf(); }); }
+  function ladeAnalyse() {
+    still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); if (ANSICHT === 'ablauf' && FA === 'schicht1' && !FALL && F) zeichneAblauf(); },
+      function (m) { $('ana-karte').hidden = false; $('ana-liste').innerHTML = '<div class="meldung warn">' + esc(t('ana.fehler', m)) + '</div>'; melde(t('ana.fehler', m), 'warn'); });   // Prüfung 24
+  }
   function zeichneAnalyse() {
     $('ana-karte').hidden = false;
     if (!ANA.length) { $('ana-liste').innerHTML = '<p class="still" style="margin-top:12px">' + t('ana.leer') + '</p>'; return; }
@@ -1054,9 +1081,11 @@
       fehler: function () { if (R && R.id === id && FALL && FALL.listing) { $('karte-zu').hidden = true; geheSchritt(schritt); } } });
   }
   function wirdGespeichert() { $('karte-zu').textContent = t('s3.speichert'); $('karte-zu').hidden = false; $('karte-auf').hidden = true; }
-  function buendelPlus() {
+  /* Vertrag V5: auch im Bündel fragt der Server nach (Matchmaker, Return Tool), danach mit den bestätigten Kürzeln nochmals */
+  function buendelPlus(ok) {
     var z = $('b-id').value.trim(); if (!z) return;
-    ruf('buendelHinzu', [R.id, z], function (r) { $('b-id').value = ''; fuelle(r); aktualisiere(r); });
+    ruf('buendelHinzu', Array.isArray(ok) ? [R.id, z, ok] : [R.id, z], function (r) { $('b-id').value = ''; fuelle(r); aktualisiere(r); },
+      function (m) { return bestaetigen(m, function (k) { buendelPlus(mitBestaetigung(Array.isArray(ok) ? ok : [], k || 'archiv')); }); });
   }
   function buendelWeg() {
     if (!R.buendelIds.length) return;
@@ -1125,6 +1154,8 @@
     if (schlangeBusy()) { lade(true); WARTEN.push(function () { lade(false); gelistet(danach); }); return; }   // zuerst fertig speichern, dann prüfen
     /* 21.10.2026 (Jonas): keine Kontrollliste zum Abhaken mehr vor «Gelistet» */
     if (R.fehlt && R.fehlt.length) { melde(t('s3.zu'), 'stop'); return; }
+    /* Prüfung 1: «Gelistet» nur aus «In Arbeit» oder «Bereit» (schon gelistet: der Server nimmt nur denselben Link nochmals) */
+    if (['In Arbeit', 'Bereit', 'Gelistet'].indexOf(R.status) === -1) { melde(t('s4.status', st(R.status)), 'stop'); return; }
     ruf('markiereGelistet', [R.id, $('r-link').value, $('r-tage').value], function (r) {
       melde(t('s4.fertig', r.id), 'ok'); LISTING_OFFEN = '';
       still('startDaten', [], function (s) { S = s; texte(); });
@@ -1171,7 +1202,7 @@
         + (o.status === 'Bereit zum Versand' ? '<button class="haupt-knopf" onclick="verkauf(' + i + ',\'versendet\')">' + t('v.versendet') + '</button>' : '')
         + (!o.bezahlt ? ' <button onclick="verkauf(' + i + ',\'bezahlt\')">' + t('v.bezahlt') + '</button>' : '');
       z += '<tr class="' + (o.status === 'Zu packen' ? 'zeile-neu' : '') + '"><td class="mono">' + esc(o.am) + '<br>' + t('v.nr', esc(o.nr)) + '</td>' +
-        '<td>' + (o.bild ? '<img class="vbild" src="' + esc(o.bild) + '" alt="">' : '') + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span></td>' +
+        '<td>' + (o.bild ? '<img class="vbild" src="' + esc(o.bild) + '" alt="">' : '') + (o.pgId ? esc(o.pgId) : t('v.nichtzu')) + ' ' + esc(o.titel) + '<span class="klein">' + (o.lagerort ? t('v.ort', esc(o.lagerort)) : '') + esc(o.klasse) + '</span>' + rtOrtHtml(o) + '</td>' +
         '<td>' + esc(o.name) + '<span class="klein">' + esc(o.ort) + (o.kaeufer && o.kaeufer !== o.name ? ', ' + esc(o.kaeufer) : '') + '</span>' +
         (o.ohneAdresse ? '<span class="klein">' + t('v.ohneadr') + '</span>' : '') + '</td>' +
         '<td class="betrag">CHF ' + esc(o.total) + '</td><td><span class="etikett">' + esc(st(o.status)) + '</span>' + (o.meldet && !o.bezahlt ? '<br><span class="etikett hell" style="margin-top:4px">' + t('v.meldet') + '</span>' : '') + (o.bezahlt ? '<br><span class="klein">' + t('f.t2.bezahlt', esc(o.bezahlt)) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
@@ -1231,8 +1262,8 @@
       z += '<div class="aufgabe ' + (knapp ? 'sehr-alt' : '') + '"><div class="kopf"><div>' + stueckHtml(o) + '</div>' + alterEtikett(o.alter) + '</div>'
         + '<p>' + t('a.vorschlag', esc(o.betrag), esc(o.preis)) + (o.frist ? ' · <span class="' + (knapp ? 'etikett rot' : '') + '">' + t('a.frist', esc(o.frist), o.restStunden) + '</span>' : '') + '</p>'
         + '<p><span class="etikett ' + (annehmen ? 'hell' : '') + '">' + esc(o.empfehlung) + '</span></p>'
-        + '<div class="knoepfe">' + (o.link ? '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(o.link) + '\')">' + t('a.oeffnen') + '</button>' : '')
-        + '<button onclick="erledigt(\'' + esc(o.id) + '\')">' + t('a.erledigt') + '</button></div></div>';
+        + '<div class="knoepfe">' + (o.link ? '<button class="haupt-knopf"' + akt('link', o.link) + '>' + t('a.oeffnen') + '</button>' : '')
+        + '<button' + akt('erledigt', o.id) + '>' + t('a.erledigt') + '</button></div></div>';
     });
     return z;
   }
@@ -1243,8 +1274,8 @@
       z += '<div class="aufgabe ' + alterKlasse(o.alter) + '"><div class="kopf"><div><span class="etikett">' + esc(o.art) + '</span> ' + stueckHtml(o) + (o.von ? ' <span class="still">' + t('a.von', esc(o.von)) + '</span>' : '') + '</div>' + alterEtikett(o.alter) + '</div>'
         + (o.text ? '<div class="frage">' + esc(o.text) + '</div>' : (nachricht && o.art === 'Nachricht' ? '<p class="still">' + t('a.nachricht') + '</p>' : ''))
         + (o.art === 'Frage' ? (o.entwurf ? '<label for="' + p + 'ae-' + i + '">' + t('a.entwurf') + '</label><textarea id="' + p + 'ae-' + i + '" rows="5">' + esc(o.entwurf) + '</textarea>' : '<p class="still">' + t('a.keinentwurf') + '</p>') : '')
-        + '<div class="knoepfe">' + (o.art === 'Frage' && o.entwurf ? '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'' + p + 'ae-' + i + '\',\'' + esc(o.link) + '\')">' + t('a.kopieren') + '</button>' : (o.link ? '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(o.link) + '\')">' + t('a.oeffnen') + '</button>' : ''))
-        + '<button onclick="erledigt(\'' + esc(o.id) + '\')">' + t('a.erledigt') + '</button></div></div>';
+        + '<div class="knoepfe">' + (o.art === 'Frage' && o.entwurf ? '<button class="haupt-knopf"' + akt('kopierOeffne', p + 'ae-' + i, o.link) + '>' + t('a.kopieren') + '</button>' : (o.link ? '<button class="haupt-knopf"' + akt('link', o.link) + '>' + t('a.oeffnen') + '</button>' : ''))
+        + '<button' + akt('erledigt', o.id) + '>' + t('a.erledigt') + '</button></div></div>';
     });
     return z;
   }
@@ -1254,12 +1285,13 @@
       z += '<div class="aufgabe ' + (o.tage >= 5 ? 'sehr-alt' : 'alt') + '"><div class="kopf"><div>' + stueckHtml({ titel: o.titel, pgId: o.pgId, artikel: '' }) + ' <span class="still">' + t('a.von', esc(o.kaeufer)) + ' · CHF ' + esc(o.total) + '</span></div><span class="etikett orange">' + t('a.tage', o.tage) + '</span></div>'
         + (o.meldet ? '<p><span class="etikett hell">' + t('a.meldet', esc(o.meldet)) + '</span></p>' : '')
         + '<label for="' + p + 'az-' + i + '">' + t('a.erinnerung') + '</label><textarea id="' + p + 'az-' + i + '" rows="6">' + esc(o.entwurf) + '</textarea>'
-        + '<div class="knoepfe"><button class="haupt-knopf" onclick="kopiereUndOeffne(\'' + p + 'az-' + i + '\',\'' + esc(o.link) + '\')">' + t('a.kopierenText') + '</button>'
-        + '<button onclick="erinnert(\'' + esc(o.nr) + '\')">' + t('a.erinnert') + '</button></div></div>';
+        + '<div class="knoepfe"><button class="haupt-knopf"' + akt('kopierOeffne', p + 'az-' + i, o.link) + '>' + t('a.kopierenText') + '</button>'
+        + '<button' + akt('erinnert', o.nr) + '>' + t('a.erinnert') + '</button></div></div>';
     });
     return z;
   }
-  function oeffneLink(u) { if (/^https:\/\/(www\.)?ricardo\.ch\//.test(u)) window.open(u, '_blank', 'noopener'); }
+  function istRicardo(u) { return /^https:\/\/(www\.)?ricardo\.ch\/[^\s"'<>]*$/.test(String(u || '')); }
+  function oeffneLink(u) { if (istRicardo(u)) window.open(u, '_blank', 'noopener'); }
   function kopiereUndOeffne(feld, u) {
     var text = $(feld).value;
     var fertig = function () { melde(t('kopiert'), 'ok'); oeffneLink(u); };
@@ -1269,6 +1301,9 @@
   function nachAufgaben(a) { AU = a; zeichneAufgaben(); if (F && F.art === 'taeglich') { F.aufgaben = a; if (ANSICHT === 'ablauf') zeichneAblauf(); } }
   function erledigt(id) { ruf('aufgabeErledigt', [id], nachAufgaben); }
   function erinnert(nr) { ruf('erinnerungErledigt', [nr], nachAufgaben); }
+  Object.assign(AKTIONEN, { link: function (a) { oeffneLink(a); }, kopierOeffne: function (a, b) { kopiereUndOeffne(a, b); }, erledigt: function (a) { erledigt(a); }, erinnert: function (a) { erinnert(a); },
+    weiter: function (a) { weiter(a); }, unverkauft: function (a, b) { unverkauft(a, b === '1'); }, fall: function (a) { fallStarten(a); },
+    sendung: function (a, b) { if (a) kopiereText(a); oeffneLink(b); } });
 
   /* ---------- Retouren ---------- */
   function ladeRetouren() {
@@ -1483,10 +1518,10 @@
     var z = '';
     l.forEach(function (x) {
       var a = '';
-      if (x.status === 'In Arbeit' || x.status === 'Bereit') a = '<button onclick="weiter(\'' + esc(x.id) + '\')">' + t('u.bearbeiten') + '</button>';
-      if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '" onclick="unverkauft(\'' + esc(x.id) + '\',' + (x.abgelaufen ? 1 : 0) + ')">' + t('u.unverkauft') + '</button>';
+      if (x.status === 'In Arbeit' || x.status === 'Bereit') a = '<button' + akt('weiter', x.id) + '>' + t('u.bearbeiten') + '</button>';
+      if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '"' + akt('unverkauft', x.id, x.abgelaufen ? '1' : '0') + '>' + t('u.unverkauft') + '</button>';
       var m = x.abgelaufen ? '<span class="etikett hell">' + t('u.abgelaufen') + '</span>' : '<span class="etikett">' + esc(st(x.status)) + '</span>';
-      z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (x.link ? '<span class="klein"><a href="' + esc(x.link) + '">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
+      z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (istRicardo(x.link) ? '<span class="klein"><a href="' + esc(x.link) + '" rel="noopener">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
         '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + (x.regal ? '<span class="klein">' + esc(x.regal) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
     });
     $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
@@ -1609,7 +1644,7 @@
     still('ablauf', [art], function (f) { ablaufDa(art, f); vorladen(arten); });
   }
   function zaehlerLaden() { still('zaehler', [], function (z) { if (!z) return; marke($('z-f-schicht2'), z.zuPacken); marke($('z-f-schicht3'), z.versand); marke($('z-retour'), z.retouren); marke($('z-verkauf'), z.offen); }); }
-  function ricKnopf(url, text) { return '<button class="haupt-knopf" onclick="oeffneLink(\'' + esc(url) + '\')">' + esc(text || t('g.oeffnen')) + '</button>'; }
+  function ricKnopf(url, text) { return '<button class="haupt-knopf"' + akt('link', url) + '>' + esc(text || t('g.oeffnen')) + '</button>'; }
   /* Was zu tun ist, direkt bei der Aktion: Ricardo (rosa) oder physisch (weiss), mit dem passenden Knopf */
   function tun(ort, text, knopf) {
     return '<div class="f-tun' + (ort === 'ricardo' ? ' rosa' : '') + '"><div class="f-tun-text"><div class="f-label">' + t(ort === 'ricardo' ? 'g.ricardo' : 'g.physisch') + '</div>' + text + '</div>'
@@ -1644,21 +1679,21 @@
         var x = f.o, frage = x.art === 'Frage' && x.entwurf;
         return [{ titel: x.art, html: (x.text ? '<div class="frage">' + esc(x.text) + '</div>' : '')
           + (frage ? '<label for="fx-text">' + t('a.entwurf') + '</label>' + textfeld('fx-text', x.entwurf, 5) : '')
-          + tun('ricardo', t(frage ? 'g.frage.r' : 'g.nachricht.r'), frage ? '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(x.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>' : (x.link ? ricKnopf(x.link) : '')),
+          + tun('ricardo', t(frage ? 'g.frage.r' : 'g.nachricht.r'), frage ? '<button class="haupt-knopf"' + akt('kopierOeffne', 'fx-text', x.link) + '>' + t('g.kopieren.oeffnen') + '</button>' : (x.link ? ricKnopf(x.link) : '')),
           aktion: [t('a.erledigt'), function () { aufgabeFertig(x.id); }] }];
       } });
     });
     (au.bewertungen || []).forEach(function (o) {
       l.push({ key: 'b' + o.id, titel: o.titel, info: o.von ? esc(o.von) : '', tag: t('g.bewertung'), o: o, schritte: function (f) {
         return [{ titel: t('g.bewertung'), html: textfeld('fx-text', f.o.entwurf, 3)
-          + tun('ricardo', t('g.bewertung.r'), '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(f.o.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>'),
+          + tun('ricardo', t('g.bewertung.r'), '<button class="haupt-knopf"' + akt('kopierOeffne', 'fx-text', f.o.link) + '>' + t('g.kopieren.oeffnen') + '</button>'),
           aktion: [t('a.erledigt'), function () { aufgabeFertig(f.o.id); }] }];
       } });
     });
     au.zahlung.forEach(function (o) {
       l.push({ key: 'z' + o.nr, titel: o.titel, info: (o.pgId ? esc(o.pgId) + ' · ' : '') + esc(o.kaeufer) + ' · CHF ' + esc(o.total), tag: t('a.tage', o.tage), tagKlasse: 'orange', o: o, schritte: function (f) {
         return [{ titel: t('g.erinnerung'), html: (f.o.meldet ? '<p><span class="etikett hell">' + t('a.meldet', esc(f.o.meldet)) + '</span></p>' : '') + textfeld('fx-text', f.o.entwurf, 6)
-          + tun('ricardo', t('g.erinnerung.r'), '<button class="haupt-knopf" onclick="kopiereUndOeffne(\'fx-text\',\'' + esc(f.o.link) + '\')">' + t('g.kopieren.oeffnen') + '</button>'),
+          + tun('ricardo', t('g.erinnerung.r'), '<button class="haupt-knopf"' + akt('kopierOeffne', 'fx-text', f.o.link) + '>' + t('g.kopieren.oeffnen') + '</button>'),
           aktion: [t('a.erinnert'), function () { hinter('erinnerungErledigt', [f.o.nr], { keys: [f.key], text: t('g.erinnerung') + ' ' + f.o.nr, ok: aufgabenStill }); fallFertig(); }],
           neben: [t('g.tz.hand.k'), function () { zahlungHandNr(f.o.nr, f.o.pgId || f.o.titel, f.o.total); }] }];
       } });
@@ -1779,10 +1814,10 @@
   function packSchritte(f) {
     var o = f.o;
     return [
-      { titel: t('g.p.holen'), html: (o.bild ? '<img class="f-bild" src="' + esc(o.bild) + '" alt="">' : '') + tun('physisch', t('g.p.holen.p', '<strong>' + esc(o.lagerort || '') + '</strong>'), ''),
+      { titel: t('g.p.holen'), html: (o.bild ? '<img class="f-bild" src="' + esc(o.bild) + '" alt="">' : '') + tun('physisch', t('g.p.holen.p', '<strong>' + esc(o.lagerort || '') + '</strong>') + rtOrtHtml(o), ''),
         aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
       { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? '' : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t('g.p.etikette.da', esc(o.sendung)) + '</span>' : ''),
-          F.postBereit ? '<button class="' + (o.sendung ? '' : 'haupt-knopf') + '" onclick="etikette(\'' + esc(o.nr) + '\')">' + t(o.sendung ? 'g.p.etikette.nochmals' : 'g.p.etikette.k') + '</button>' + (o.pdfUrl ? ' <a href="' + o.pdfUrl + '" download="Etikette ' + esc(o.nr) + '.pdf" target="_self">PDF</a>' : '') : '')),
+          F.postBereit ? etikettKnoepfe(o) : '')),
         aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
       { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
         aktion: [t('g.p.gepackt'), function () { hinter('setzeVerkauf', [o.nr, 'gepackt'], { keys: [f.key], text: t('g.p.gepackt') + ' ' + o.nr }); NEU_LADEN.schicht3 = 1; fallFertig(); }] }
@@ -1829,7 +1864,7 @@
         return [
           { titel: t('g.v.wagen'), html: tun('physisch', t('g.v.wagen.p', '<strong>' + esc(x.pgId || x.nr) + '</strong>', esc(regalName('unpaid'))), ''), aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
           { titel: t('g.v.bestaetigen'), html: tun('ricardo', t('g.v.bestaetigen.r', '<strong class="mono">' + esc(x.sendung || '–') + '</strong>'),
-              '<button class="haupt-knopf" onclick="kopiereText(\'' + esc(x.sendung) + '\');oeffneLink(\'' + esc(x.link) + '\')">' + t(x.sendung ? 'g.v.bestaetigen.k' : 'g.verkauf.oeffnen') + '</button>'),
+              '<button class="haupt-knopf"' + akt('sendung', x.sendung || '', x.link) + '>' + t(x.sendung ? 'g.v.bestaetigen.k' : 'g.verkauf.oeffnen') + '</button>'),
             aktion: [t('g.v.versendet'), function () { hinter('setzeVerkauf', [x.nr, 'versendet'], { keys: [f.key], text: t('g.v.versendet') + ' ' + x.nr }); fallFertig(); }] }
         ];
       } };
@@ -1863,7 +1898,7 @@
     if (FALL && FERTIG) {
       var rest = l.filter(function (x) { return x.key !== FALL.key; });
       h = '<div class="karte f-fertig"><h2>✓ ' + t('g.fertig') + ': ' + esc(FALL.titel) + '</h2>'
-        + (rest.length ? '<p class="still">' + t('g.offen', rest.length) + '</p><div class="f-weiter"><button onclick="zurListe()">' + t('g.liste') + '</button><button class="dunkel" onclick="fallStarten(\'' + esc(rest[0].key) + '\')">' + t('g.naechstes', esc(rest[0].titel)) + ' →</button></div>'
+        + (rest.length ? '<p class="still">' + t('g.offen', rest.length) + '</p><div class="f-weiter"><button onclick="zurListe()">' + t('g.liste') + '</button><button class="dunkel"' + akt('fall', rest[0].key) + '>' + t('g.naechstes', esc(rest[0].titel)) + ' →</button></div>'
           : '<p>' + t('g.allesfertig') + '</p><div class="f-weiter"><button onclick="zurListe()">' + t('g.liste') + '</button><span></span></div>') + '</div>';
       $('f-leiste').innerHTML = ''; $('f-schritte').innerHTML = h; return;
     }
@@ -1889,7 +1924,7 @@
     h = vorher + '<div class="karte"><div class="kopf"><h2>' + t('f.' + FA) + '</h2><span class="still">' + t('g.offen', l.length) + '</span></div>'
       + (l.length ? l.map(function (f) {
         return '<div class="f-zeile f-eintrag">' + (f.bild ? '<img class="vbild" src="' + esc(f.bild) + '" alt="">' : '') + '<div class="f-text"><strong>' + esc(f.titel) + '</strong><span class="still">' + (f.info || '') + '</span>'
-          + (f.tag ? ' <span class="etikett ' + (f.tagKlasse || '') + '">' + esc(f.tag) + '</span>' : '') + '</div><div class="knoepfe"><button class="haupt-knopf" onclick="fallStarten(\'' + esc(f.key) + '\')">' + t('g.start') + ' →</button></div></div>';
+          + (f.tag ? ' <span class="etikett ' + (f.tagKlasse || '') + '">' + esc(f.tag) + '</span>' : '') + '</div><div class="knoepfe"><button class="haupt-knopf"' + akt('fall', f.key) + '>' + t('g.start') + ' →</button></div></div>';
       }).join('') : '<p class="still">' + t('g.leer') + '</p>') + '</div>' + (nachher ? nachher() : '');
     $('f-schritte').innerHTML = h;
     einbauen();
@@ -1993,22 +2028,67 @@
     if (!wahl.length) { melde(t('f.t1.keine'), 'stop'); return; }
     ruf('bankBestaetigen', [wahl], function (f) { BANK = null; F = f; zeichneAblauf(); melde(t('f.t1.erfassen') + ': ' + wahl.length, 'ok'); });
   }
-  function etikette(nr) {
-    var o = F.verkaeufe.offen.filter(function (x) { return x.nr === nr; })[0];
-    var los = function () {
-      ruf('etikette', [nr], function (e) {
-        var bin = atob(e.pdf), bytes = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        var u = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-        if (o) { o.sendung = e.sendung; o.pdfUrl = u; }
-        if (FALL && FALL.o && FALL.o.nr === nr) { FALL.o.sendung = e.sendung; FALL.o.pdfUrl = u; }
-        melde(t('g.p.etikette.da', e.sendung), 'ok');
-        window.open(u, '_blank');
-        zeichneAblauf();
-      });
-    };
-    if (o && o.sendung) frage(t('f.s2.etikette.frage', o.pgId || nr, o.sendung), los); else los();
+  /*
+   * Zusatz E1 (24.10.2026, Jonas): Etikette direkt auf den Zebra ZD220. ZPL: zuerst über «Zebra Browser Print» auf dem PC (https://127.0.0.1:9101),
+   * geht das nicht (nicht installiert, Zertifikat, Browser sperrt den lokalen Zugriff, kein Drucker), still als Datei in den Download-Ordner (Druckprogramm).
+   * PDF: ebenfalls herunterladen, kein neuer Tab. Die Datei bleibt im Speicher der Seite: «Nochmals drucken» schickt sie nochmals (keine neue Sendungsnummer).
+   * «Neue Etikette» geht über den Server und fragt dort nach (Prüfung 18).
+   */
+  var ETIKETTEN = {};
+  function etikettKnoepfe(o) {
+    var et = ETIKETTEN[o.nr];
+    if (et) return '<button class="haupt-knopf"' + akt('etikettNochmals', o.nr) + '>' + t('g.p.etikette.nochmals') + '</button> <a href="' + etikettUrl(et) + '" download="' + esc(et.name) + '" target="_self">' + t('e1.datei') + '</a>'
+      + ' <button' + akt('etikettNeu', o.nr) + '>' + t('f.s2.etikette.neu') + '</button>';
+    if (o.sendung) return '<span class="klein">' + t('e1.weg') + '</span> <button' + akt('etikettNeu', o.nr) + '>' + t('f.s2.etikette.neu') + '</button>';
+    return '<button class="haupt-knopf"' + akt('etikettNeu', o.nr) + '>' + t('g.p.etikette.k') + '</button>';
   }
+  function rtOrtHtml(o) { return o.rtOrt && o.rtOrt !== o.lagerort ? '<span class="klein">' + t('v.rtort', esc(o.rtOrt)) + '</span>' : ''; }
+  function etikette(nr, neu) {
+    ruf('etikette', neu ? [nr, false, true] : [nr], function (e) { etiketteDa(nr, e); }, function (m) { return bestaetigen(m, function () { etikette(nr, true); }); });
+  }
+  function etiketteDa(nr, e) {
+    var typ = e.typ === 'zpl' ? 'zpl' : 'pdf', et = { nr: nr, daten: e.daten || e.pdf || '', typ: typ, name: e.name || ('Etikette ' + nr + '.' + typ), sendung: e.sendung };
+    ETIKETTEN[nr] = et;
+    var o = F && F.verkaeufe ? F.verkaeufe.offen.filter(function (x) { return x.nr === nr; })[0] : null;
+    if (o) o.sendung = e.sendung;
+    if (FALL && FALL.o && FALL.o.nr === nr) FALL.o.sendung = e.sendung;
+    if (e.warnungen) melde(e.warnungen, 'warn');
+    etikettAusgeben(et);
+    zeichneAblauf();
+  }
+  function etikettBytes(et) { var bin = atob(et.daten), b = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b; }
+  function etikettUrl(et) { if (!et.url) et.url = URL.createObjectURL(new Blob([etikettBytes(et)], { type: et.typ === 'zpl' ? 'text/plain' : 'application/pdf' })); return et.url; }
+  function etikettText(et) { var b = etikettBytes(et); try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { return atob(et.daten); } }
+  function etikettHerunterladen(et) {
+    var a = document.createElement('a'); a.href = etikettUrl(et); a.download = et.name; a.target = '_self'; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function etikettAusgeben(et) {
+    if (et.typ !== 'zpl') { etikettHerunterladen(et); melde(t('e1.download.pdf'), 'ok'); return; }
+    zebraDruck(etikettText(et), function (gedruckt) {
+      if (gedruckt) { melde(t('e1.gedruckt'), 'ok'); return; }
+      etikettHerunterladen(et); melde(t('e1.download'), 'ok');
+    });
+  }
+  /* Zebra Browser Print: Standarddrucker holen (höchstens 1,5 s), dann das ZPL schicken. Jeder Fehler: fertig(false), ohne Meldung. */
+  var ZEBRA = 'https://127.0.0.1:9101';
+  function mitFrist(p, ms) { return new Promise(function (ja, nein) { var z = setTimeout(function () { nein(new Error('Frist')); }, ms); p.then(function (x) { clearTimeout(z); ja(x); }, function (f) { clearTimeout(z); nein(f); }); }); }
+  function zebraDruck(zpl, fertig) {
+    if (typeof fetch !== 'function') { fertig(false); return; }
+    var fertigEinmal = function (x) { if (fertig) { var f = fertig; fertig = null; f(x); } };
+    try {
+      mitFrist(fetch(ZEBRA + '/default?type=printer', { method: 'GET' }), 1500)
+        .then(function (r) { if (!r.ok) throw new Error('kein Drucker'); return r.text(); })
+        .then(function (txt) {
+          var geraet = JSON.parse(txt);
+          if (!geraet || !(geraet.uid || geraet.name)) throw new Error('kein Drucker');
+          return mitFrist(fetch(ZEBRA + '/write', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ device: geraet, data: zpl }) }), 10000);
+        })
+        .then(function (r) { fertigEinmal(!!(r && r.ok)); })
+        .catch(function () { fertigEinmal(false); });
+    } catch (e) { fertigEinmal(false); }
+  }
+  Object.assign(AKTIONEN, { etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
   function kopiereText(text) {
     var fertig = function () { melde(t('kopiert'), 'ok'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, function () { melde(text, 'ok'); }); else melde(text, 'ok');

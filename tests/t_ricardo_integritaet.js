@@ -151,10 +151,10 @@ wirft(() => S.c("starteListing('PG-301')"), /vergeben \(Entscheid «Entsorgung»
 S.MM.kaputt = true;
 const vorher = S.L.d.length;
 wirft(() => S.c("starteListing('PG-400')"), /^Bitte bestätigen: PG-400 liegt im Matchmaker für Auftrag «Föhn gesucht»/, 'Vertrag V5: Matchmaker «Offen» verlangt die Bestätigung am Server');
-wirft(() => S.c("starteListing('PG-400', false, ['mm'])"), /Listing nicht gestartet: Der Status im Matchmaker/, 'M5: Fehler beim Statuswechsel bricht ab');
+wirft(() => S.c("starteListing('PG-400', false, ['mm', 'rt'])"), /Listing nicht gestartet: Der Status im Matchmaker/, 'M5: Fehler beim Statuswechsel bricht ab');
 ok(S.L.d.length === vorher, 'M5: keine Zeile angelegt');
 S.MM.kaputt = false; S.neu();
-l = S.c("starteListing('PG-400', false, ['mm'])");
+l = S.c("starteListing('PG-400', false, ['mm', 'rt'])");
 ok(l.id === 'PG-400' && S.MM.d[1][17] === 'Ricardo', 'M5: geht es (mit Bestätigung), startet das Listing und der Status ist «Ricardo»');
 
 /* ---------- M6: frisch lesen, Archiv sperrt ---------- */
