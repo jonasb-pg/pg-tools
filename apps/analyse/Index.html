@@ -364,6 +364,7 @@
             <div id="such-meldung"></div>
             <div id="treffer"></div>
             <p class="still" id="schlange-info" style="margin:8px 0 0"></p>
+            <div id="abgleich-info" hidden></div>
           </div>
           <div class="karte" id="ohne" hidden>
             <h2 data-t="ohne.titel"></h2>
@@ -495,7 +496,10 @@
 </div></div>
 <script>
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
-  var VERSION = '2026-10-15.13';                     // ein gespeicherter Lauf aus einer anderen Version wird verworfen
+  /* Version der Oberfläche. Geht beim Abschluss mit (N6, 24.10.2026). Ein gespeicherter Lauf aus einer anderen Version wird NICHT mehr verworfen:
+     Der Server vergleicht beim Abschluss die Namen der Schritte (d.bezug) und lässt geänderte Schritte neu bestätigen. */
+  var VERSION = '2026-10-24.2';
+  var TAB_ID = Math.random().toString(36).slice(2, 10);   // M5: dieses Browser-Tab (zweites Tab erkennen, Speicher zusammenführen)
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
   var LAUF = {};                                    // was zur laufenden Analyse nur im Moment gilt und nicht gespeichert wird: Wartezustände, das Urteil des Servers, offene Klappen
@@ -652,6 +656,24 @@
     'sp.laeuft': ['Speichert im Hintergrund: {0}', 'Saving in the background: {0}'], 'sp.speichert': ['Wird gespeichert …', 'Saving …'],
     'sp.fehler': ['«{0}» konnte nicht gespeichert werden: {1} Die Analyse liegt unter «Pausiert», dort geht es weiter.', '«{0}» could not be saved: {1} The analysis is under «Paused», continue there.'],
     'sp.offen': ['Es fehlt noch etwas.', 'Something is still missing.'], 'sp.noch': ['Dieses Stück wird gerade gespeichert.', 'This item is being saved right now.'],
+    'sp.konflikt': ['{0} ist schon analysiert ({1}, {2}). Diese Analyse ist nicht gespeichert und liegt unter «Pausiert». Bitte am Stück prüfen, dann abbrechen oder Jonas melden.', '{0} has already been analysed ({1}, {2}). This analysis was not saved and is under «Paused». Please check the item, then cancel or tell Jonas.'],
+    'sp.neu': ['Die Angaben zum Produkt haben sich geändert (z.B. Handbuch gelesen, neue Recherche). Bitte diese Schritte neu bestätigen: {0}.', 'The product details have changed (e.g. manual read, new research). Please confirm these steps again: {0}.'],
+    'tab.zweiter': ['Das Analyse Tool ist in diesem Browser noch in einem anderen Tab offen. Bitte nur in einem Tab arbeiten, sonst wird es unübersichtlich.', 'The Analyse Tool is also open in another tab of this browser. Please work in one tab only.'],
+    'such.etikett': ['Bitte die PG-ID auf dem Etikett mit der Liste vergleichen und das richtige Stück starten.', 'Please compare the PG-ID on the label with the list and start the right item.'],
+    'such.rtAuch': ['Im Return Tool gibt es weitere Stücke mit diesem Barcode. Liegt eines davon vor dir? Dann mit seiner PG-ID übernehmen.', 'The Return Tool has more items with this barcode. Is one of them in front of you? Then take it over with its PG-ID.'],
+    'rt.nochmal': ['Retoure? Neu analysieren', 'Return? Analyse again'],
+    'rt.erledigtFrage': ['{0} ist schon analysiert: {1}. Ist es eine Retoure, die wieder in die Analyse kommt? Dann entsteht eine neue Analyse, die alte bleibt.', '{0} has already been analysed: {1}. Is it a return that comes back to the analysis? Then a new analysis is created, the old one stays.'],
+    'rt.retoure': ['Ja, Retoure: neu analysieren', 'Yes, return: analyse again'],
+    'start.abgleichFehler': ['Der Abgleich mit dem Return Tool ist zuletzt gescheitert ({0}): {1}', 'The last sync with the Return Tool failed ({0}): {1}'],
+    'adm.abgleich': ['Abgleich', 'Sync'], 'adm.dauer': ['Letzter Lauf: {0}', 'Last run: {0}'],
+    'adm.konten': ['Der Abgleich lief in der letzten Stunde unter mehreren Konten: {0}. Nur ein Auslöser soll bleiben (im Script-Editor als das andere Konto unter «Auslöser» löschen).', 'The sync ran under several accounts in the last hour: {0}. Only one trigger should remain.'],
+    'adm.verdacht': ['Zurückgehalten, vielleicht schon als Stück ohne Inventar analysiert (PG ~ AN). Am Stück prüfen, dann übernehmen:', 'Held back, maybe already analysed as an item without inventory (PG ~ AN). Check the item, then take it over:'],
+    'adm.wieder': ['Erledigt, steht im Return Tool aber (wieder) in der Analyse ohne «Reusable». Retoure? Neu analysieren; sonst im Return Tool nachführen:', 'Done, but (again) in the Return Tool analysis without «Reusable». Return? Analyse again; otherwise update the Return Tool:'],
+    'adm.nichtLesbar': ['Im Return Tool nicht lesbar (darum fällt nichts heraus):', 'Not readable in the Return Tool (so nothing drops out):'],
+    'adm.ohneBez': ['Zeilen mit ID, aber ohne Bezeichnung (nicht übernommen):', 'Rows with ID but without description (not taken over):'],
+    'adm.uebernehmen': ['Übernehmen', 'Take over'], 'adm.tabs': ['Gelesene Kanal-Tabs: {0}', 'Channel tabs read: {0}'],
+    'fs.nochmal': ['{0} Foto(s) nicht hochgeladen. Nochmals versuchen oder neu aufnehmen.', '{0} photo(s) not uploaded. Try again or take them again.'], 'fs.nochmalKnopf': ['Nochmals hochladen', 'Upload again'],
+    'fs.wiederholt': ['Hochladen hat nicht geklappt, neuer Versuch …', 'Upload failed, trying again …'],
     'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
     'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
     'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pausieren', 'Pause'], 'weiter': ['Weiter', 'Resume'],
@@ -825,6 +847,12 @@
   }
   /* Startseite: eine Zeile zur Warteschlange. Die ganze Liste steht im Admin unter «Betrieb». */
   function zahlen(z) { $('schlange-info').textContent = t('start.schlange', z.bereit, z.laeuft); }
+  /* N7 (24.10.2026): Ist der Abgleich mit dem Return Tool zuletzt gescheitert, steht es auf der Startseite (sonst sähe die Warteschlange aktuell aus). */
+  function abgleichFehler(f) {
+    var el = $('abgleich-info');
+    if (!el) return;
+    el.hidden = !f; el.innerHTML = f ? box(t('start.abgleichFehler', f.zeit || '?', f.text || '?'), 'warn') : '';
+  }
   function sessionStart() {
     var k = $('kuerzel').value.trim().toUpperCase();
     if (!/^[A-ZÄÖÜ]{2,4}$/.test(k)) { $('start-meldung').innerHTML = box(t('start.fehler'), 'warn'); return; }
@@ -944,11 +972,18 @@
       mittelFehlt: [], mittelDa: [],              // nichts wird als fehlend angenommen: Unbekanntes fragt der Schritt «Funktion»
       reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '' };
   }
+  /* H2/H3 (24.10.2026): Jede Analyse hat eine Lauf-ID. Der Server erkennt daran einen wiederholten Abschluss (nichts doppelt) und unterscheidet ihn von einer zweiten Analyse desselben Stücks (Konflikt). */
+  function neuLauf() { return (K || 'X') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
+  /* M1 (24.10.2026): die Namen, auf die sich die Antworten beziehen (Funktion 1, 2, 3 … sind Positionen). Der Server vergleicht sie mit seinem Überblick. */
+  function bezugVon(d) {
+    return { ablauf: d.ablauf || [], sicher: d.sicher || [], liefer: (d.liefer && d.liefer.teile) || [], fn: ((d.funktion && d.funktion.liste) || []).map(function (x) { return x.n; }),
+      reset: (d.reset || []).map(function (x) { return x[0]; }) };
+  }
   /* d = Überblick vom Server, t0 = Zeitpunkt des Scans, fehler = Grund, warum die Recherche nicht geklappt hat. */
   function beginne(d, t0, fehler) {
     var jetzt = Date.now();
     /* Die Uhr startet, wenn der Überblick da ist: Scan, Erfassen und Recherche sind Wartezeit aufs Tool, nicht Arbeit (Feedback Simon 16.10.2026). t0 bleibt nur für Meldungen. */
-    AN = { v: VERSION, d: d, start: jetzt, aktiv: 0, seit: jetzt, i: 0, s: leer(d), gate: null, rm: {}, hb: null };
+    AN = { v: VERSION, lauf: neuLauf(), d: d, start: jetzt, aktiv: 0, seit: jetzt, i: 0, s: leer(d), gate: null, rm: {}, hb: null };
     if (d.handbuch && d.handbuch.status === 'Hochgeladen') { d.handbuch.status = 'liest'; AN.hb = 'liest'; }   // wird gerade gelesen (anderes Gerät oder Abgleich)
     LAUF = { suchFehler: fehler || '' };
     if (ANSICHT !== 'scan') zeige('scan');
@@ -978,15 +1013,51 @@
   }
   function abbruch(v, k, el) {
     if (!LAUF.abbruch) { LAUF.abbruch = true; el.textContent = t('a.abbruch2'); setTimeout(function () { LAUF.abbruch = false; el.textContent = t('a.abbruch'); }, 4000); return; }
-    ende(); melde(t('a.abgebrochen')); $('q').focus();
+    var lauf = AN && AN.lauf;
+    ende(); ausPausiert(lauf); melde(t('a.abgebrochen')); $('q').focus();
   }
 
   /* ---------- Uhr: zählt die aktive Zeit ---------- */
   function aktivMs() { return AN.aktiv + (AN.seit ? Date.now() - AN.seit : 0); }
   /* Speichert den Lauf. Die Zeit bis jetzt ist dann in «aktiv» gezählt: Nach einem Neuladen läuft die Uhr dort weiter, die Zeit dazwischen zählt nicht. */
+  /* M5 (24.10.2026): vor dem Schreiben frisch lesen. Steht dort die laufende Analyse eines anderen Tabs, kommt sie zuerst unter «Pausiert» (nichts geht verloren);
+     ohne eigene Analyse bleibt die des anderen Tabs stehen. */
   function sichern() {
     if (AN && AN.seit) { var jetzt = Date.now(); AN.aktiv += jetzt - AN.seit; AN.seit = jetzt; }
+    var alt = null;
+    try { alt = JSON.parse(lies('at-lauf') || 'null'); } catch (e) { alt = null; }
+    var fremd = alt && alt.d && alt.d.produkt && alt.s && alt.tab && alt.tab !== TAB_ID && (!AN || alt.lauf !== AN.lauf);
+    if (fremd && !AN) return;
+    if (fremd) { zuPausiert(alt, K, ''); zweiterTab(); }
+    if (AN) AN.tab = TAB_ID;
     merke('at-lauf', AN ? JSON.stringify(AN) : null);
+  }
+  /* Eine Analyse unter «Pausiert» legen (ersetzt einen Eintrag mit derselben Lauf-ID oder demselben Stück und Kürzel). Gibt false zurück, wenn der Speicher voll ist. */
+  function zuPausiert(a, k, fehler) {
+    var x = JSON.parse(JSON.stringify(a));
+    x.seit = null; x.k = x.k || k; x.pausiertAm = Date.now(); delete x.tab;
+    if (fehler) x.fehler = fehler;
+    if (x.mm && x.mm.laeuft) x.mm = null;
+    var l = pausierte().filter(function (y) { return !(x.lauf && y.lauf === x.lauf) && !(y.k === x.k && y.d.produkt.id === x.d.produkt.id); });
+    l.unshift(x);
+    var ok = pausierteSpeichern(l);
+    zeichnePausiert();
+    return ok;
+  }
+  /* Abgeschlossen oder abgebrochen: eine Kopie unter «Pausiert» (aus einem anderen Tab) gilt nicht mehr. */
+  function ausPausiert(lauf) {
+    if (!lauf) return;
+    var l = pausierte(), n = l.filter(function (x) { return x.lauf !== lauf; });
+    if (n.length !== l.length) { pausierteSpeichern(n); zeichnePausiert(); }
+  }
+  /* M5: zweites Tab im selben Browser erkennen (Puls alle 3 s in «at-tab») und einmal warnen. */
+  var ZWEITER = false;
+  function zweiterTab() { if (ZWEITER) return; ZWEITER = true; melde(t('tab.zweiter'), true); }
+  function tabPuls() {
+    var x = null;
+    try { x = JSON.parse(lies('at-tab') || 'null'); } catch (e) { x = null; }
+    if (x && x.id !== TAB_ID && Date.now() - x.t < 7000) zweiterTab();
+    merke('at-tab', JSON.stringify({ id: TAB_ID, t: Date.now() }));
   }
   function uhr() {
     $('uhr').hidden = !AN;
@@ -1022,11 +1093,11 @@
     if (!AN) return true;
     if (!AN.seit) { pause(); return false; }                                  // alter Stand mit angehaltener Uhr: nur weiterlaufen lassen
     if (Object.keys(OFFEN).length) { melde(t('pz.warte'), true); return false; }
-    var l = pausierte().filter(function (x) { return !(x.k === K && x.d.produkt.id === AN.d.produkt.id); });
+    var l = pausierte().filter(function (x) { return !(x.k === K && x.d.produkt.id === AN.d.produkt.id) && !(AN.lauf && x.lauf === AN.lauf); });
     if (l.filter(function (x) { return x.k === K; }).length >= PAUS_MAX) { melde(t('pz.voll', PAUS_MAX), true); return false; }
     sichern();
     var x = JSON.parse(JSON.stringify(AN)), name = AN.d.produkt.bezeichnung;
-    x.seit = null; x.k = K; x.pausiertAm = Date.now();
+    x.seit = null; x.k = K; x.pausiertAm = Date.now(); delete x.tab;
     if (x.mm && x.mm.laeuft) x.mm = null;
     l.unshift(x);
     if (!pausierteSpeichern(l)) { melde(t('pz.speicher'), true); return false; }
@@ -1043,6 +1114,7 @@
     pausierteSpeichern(l);
     var fehler = x.fehler;
     delete x.k; delete x.pausiertAm; delete x.fehler;
+    if (!x.lauf) x.lauf = neuLauf();                                          // pausiert vor dem 24.10.2026: bekommt jetzt seine Lauf-ID
     AN = x; AN.seit = Date.now(); LAUF = {};
     if (fehler) melde(fehler, true);
     if (ANSICHT !== 'scan') zeige('scan');
@@ -1419,7 +1491,7 @@
       var x = r.stand;
       FERTIG = null; zeichneFertig(); $('such-meldung').innerHTML = ''; $('treffer').innerHTML = '';
       x.s.kanal = '';
-      AN = { v: VERSION, d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: r.d.ablauf.length ? r.d.ablauf.length - 1 : 0, s: x.s, rm: x.rm || {}, hb: null, gate: null,
+      AN = { v: VERSION, lauf: neuLauf(), d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: r.d.ablauf.length ? r.d.ablauf.length - 1 : 0, s: x.s, rm: x.rm || {}, hb: null, gate: null,
         nachMm: true, mmAus: x.mm && x.mm.schluessel ? [x.mm.schluessel] : [], mm: null };
       LAUF = {};
       if (ANSICHT !== 'scan') zeige('scan');
@@ -1620,7 +1692,7 @@
     var g = AN.gate, v = g.sp, p = AN.d.produkt;
     if (!v.was) { $('sp-was').focus(); return; }
     sichern();
-    var stand = { s: AN.s, i: AN.i, aktiv: AN.aktiv, start: AN.start, rm: AN.rm, gate: { von: g.von, was: g.was, min: g.min, teil: Number(v.preis) || g.teil || 0 } };
+    var stand = { s: AN.s, i: AN.i, aktiv: AN.aktiv, start: AN.start, rm: AN.rm, lauf: AN.lauf, gate: { von: g.von, was: g.was, min: g.min, teil: Number(v.preis) || g.teil || 0 } };
     ruf('reparaturPause', [{ id: p.id, kuerzel: K, was: v.was, teil: v.teil ? { teil: v.teil, nummer: v.nummer, shop: v.shop, preis: v.preis, link: v.link } : null, stand: stand }], function (r) {
       if (!AN || AN.d.produkt.id !== p.id) return;
       FERTIG = { titel: p.bezeichnung, r: { pause: true, id: p.id, teil: !!v.teil } }; RIC = null;
@@ -1634,7 +1706,7 @@
       var x = r.stand;
       FERTIG = null; zeichneFertig();
       if (!x) { melde(t('rp.neu'), true); beginne(r.d, Date.now()); return; }
-      AN = { v: VERSION, d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: Number(x.i) || 0, s: x.s, rm: x.rm || {}, hb: null,
+      AN = { v: VERSION, lauf: x.lauf || neuLauf(), d: r.d, start: x.start, aktiv: Number(x.aktiv) || 0, seit: Date.now(), i: Number(x.i) || 0, s: x.s, rm: x.rm || {}, hb: null,
         gate: { art: 'defekt', von: x.gate.von, was: x.gate.was, min: x.gate.min, teil: x.gate.teil, phase: 'laeuft', weiter: true } };
       LAUF = {};
       if (ANSICHT !== 'scan') zeige('scan');
@@ -1658,7 +1730,7 @@
     else Object.keys(s.fn).forEach(function (i) { if (s.fn[i] === 'nok') delete s.fn[i]; });
     AN.gate = null; stand();
   }
-  function abbruchJetzt() { ende(); melde(t('a.abgebrochen')); $('q').focus(); }
+  function abbruchJetzt() { var lauf = AN && AN.lauf; ende(); ausPausiert(lauf); melde(t('a.abgebrochen')); $('q').focus(); }
   function resetOk() { AN.s.reset++; stand(); }
   function grade(g) { AN.s.grade = g; stand(); }
 
@@ -1874,7 +1946,9 @@
       sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), doch: Object.keys(s.doch || {}), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
       rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
       mm: s.kanal === 'matchmaker' && AN.mm && AN.mm.passt ? AN.mm.passt[0] : null, nachMm: !!AN.nachMm,
-      stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null };
+      stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null,
+      /* 24.10.2026: Lauf-ID (H2/H3), Version der Oberfläche (N6), Kennung und Namen des Überblicks, auf den sich die Antworten beziehen (M1) */
+      lauf: AN.lauf || '', v: VERSION, ueb: d.kennung || '', bezug: bezugVon(d) };
   }
   /* Holt das Urteil, wenn sich seit dem letzten Mal etwas geändert hat. Im Schritt «Zustand» zählt davon nur, was schon im Befund steht. */
   function urteilHolen() {
@@ -2297,10 +2371,13 @@
       S = s;
       if (FS) return;
       if (frisch) { try { merke('at-start', JSON.stringify({ v: VERSION, s: s })); } catch (e) { /* ohne Speicher */ } }
-      $('version').textContent = 'Version ' + s.version; $('nav-admin').hidden = !s.admin; $('nav-sektion2').hidden = !s.admin; zahlen(s.zahlen); ohneKat(); REP = s.reparatur || []; zeichneRep();
+      $('version').textContent = 'Version ' + s.version; $('nav-admin').hidden = !s.admin; $('nav-sektion2').hidden = !s.admin; zahlen(s.zahlen); abgleichFehler(s.abgleichFehler); ohneKat(); REP = s.reparatur || []; zeichneRep();
       if (einmal) return;
       einmal = true;
-      if (lauf && lauf.v === VERSION) { AN = lauf; AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; zeichneAnalyse(); } else merke('at-lauf', null);      // ein Abgleich, der beim Neuladen lief, startet neu
+      /* N6 (24.10.2026): Eine laufende Analyse bleibt auch nach einer neuen Version (früher verworfen, wenn VERSION nicht passte; die alte Konstante wurde nie erhöht).
+         Passt der Überblick nicht mehr, merkt es der Server beim Abschluss an den Namen der Schritte. */
+      if (lauf && lauf.d && lauf.d.produkt && lauf.s) { AN = lauf; if (!AN.lauf) AN.lauf = neuLauf(); AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; sichern(); zeichneAnalyse(); }
+      else merke('at-lauf', null);      // ein Abgleich, der beim Neuladen lief, startet neu
       if (!K) { $('start').hidden = false; $('kuerzel').focus(); } else if (!AN) $('q').focus();
     };
     var alt = null;

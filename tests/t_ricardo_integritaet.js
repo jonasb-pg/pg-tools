@@ -88,7 +88,8 @@ function sandbox() {
 /* ---------- K1: Nummern und Barcodes normalisieren ---------- */
 let S = sandbox();
 ok(['PG-123', 'pg 123', "PG'123", 'PG-0123', 'pg0123'].every(x => S.c('idNorm_(' + JSON.stringify(x) + ')') === 'PG-123'), 'K1: PG-Schreibweisen gleich');
-ok(S.c("idNorm_('RC-0001')") === 'RC-1' && S.c("idNorm_('AN-0008')") === 'AN-8' && S.c("idNorm_('A-000007')") === 'A-7' && S.c("idNorm_('PG-ALT-12')") === 'PG-ALT-12', 'K1: RC, AN, A, PG-ALT');
+/* 24.10.2026 (Vertrag V3): idNorm_ kennt nur PG, AN, RC, RT, ET; die Analyse-Nr (A-…) normalisiert nrNorm_, Unbekanntes bleibt (trim + gross) */
+ok(S.c("idNorm_('RC-0001')") === 'RC-1' && S.c("idNorm_('AN-0008')") === 'AN-8' && S.c("nrNorm_('A-000007')") === 'A-7' && S.c("idNorm_(' pg-alt-12 ')") === 'PG-ALT-12' && S.c("idNorm_('ET-007')") === 'ET-7', 'K1: RC, AN, A, PG-ALT, ET');
 ok(S.c("normEan_('(01)07613081105484(21)ABC')") === '7613081105484' && S.c("normEan_('0761234567890')") === S.c("normEan_(761234567890)"), 'K1: GS1-Präfix weg, führende Nullen egal');
 ok(S.c("matcher_('123')({ id: 'PG-123', name: 'x' })") === false && S.c("matcher_('0123')({ id: 'PG-123', name: 'x' })") === true, 'K1: reine Zahl ab 4 Stellen als PG-Nummer');
 ok(S.c("matcher_('A-7')({ id: 'PG-300', nr: 'A-000007', name: '' })") === true, 'S6: Analyse-Nr (A-…) gefunden');
@@ -128,12 +129,12 @@ ok(S.c("starteListing('PG-100')").id === 'PG-100', 'Review 2: fehlender Hinweis-
 
 /* ---------- S3, S4: eigene Listings, vergebene Stücke ---------- */
 S = sandbox();
-S.listing({ 'PG-ID': 'RC-0003', 'Status': 'Unverkauft', 'Bezeichnung': 'Vase blau', 'Startpreis CHF': 15, 'Quelle Tab': 'Frei' });
+S.listing({ 'PG-ID': 'RC-0003', 'Status': 'Abgebrochen', 'Bezeichnung': 'Vase blau', 'Startpreis CHF': 15, 'Quelle Tab': 'Frei' });   // 24.10.2026 (Prüfung 7): «Unverkauft» ohne Entscheid startet nicht neu, darum hier «Abgebrochen»
 S.listing({ 'PG-ID': 'PG-300', 'Status': 'Unverkauft', 'Bezeichnung': 'Stihl GTA 26', 'Entscheid unverkauft': 'Anderer Kanal' });
 S.listing({ 'PG-ID': 'PG-301', 'Status': 'Retour abgeschlossen', 'Bezeichnung': 'Bosch Akkuschrauber', 'Entscheid unverkauft': 'Entsorgung' });
 S.listing({ 'PG-ID': 'AN-0001', 'Status': 'Versendet', 'Bezeichnung': 'Altes Stück' });
 r = S.c("suche('rc-3')");
-ok(r.eigene.length === 1 && r.eigene[0].id === 'RC-0003' && r.eigene[0].rc && r.eigene[0].status === 'Unverkauft', 'S3: RC-Nummer aus dem Tab «Listings»');
+ok(r.eigene.length === 1 && r.eigene[0].id === 'RC-0003' && r.eigene[0].rc && r.eigene[0].status === 'Abgebrochen', 'S3: RC-Nummer aus dem Tab «Listings»');
 r = S.c("suche('AN-1')");
 ok(r.eigene.length === 1 && r.eigene[0].status === 'Versendet', 'S3: AN-Nummer aus dem Tab «Listings»');
 r = S.c("suche('Vase')");
@@ -149,11 +150,12 @@ wirft(() => S.c("starteListing('PG-301')"), /vergeben \(Entscheid «Entsorgung»
 /* ---------- M5: Matchmaker-Status scheitert, Listing startet nicht ---------- */
 S.MM.kaputt = true;
 const vorher = S.L.d.length;
-wirft(() => S.c("starteListing('PG-400')"), /Listing nicht gestartet: Der Status im Matchmaker/, 'M5: Fehler beim Statuswechsel bricht ab');
+wirft(() => S.c("starteListing('PG-400')"), /^Bitte bestätigen: PG-400 liegt im Matchmaker für Auftrag «Föhn gesucht»/, 'Vertrag V5: Matchmaker «Offen» verlangt die Bestätigung am Server');
+wirft(() => S.c("starteListing('PG-400', false, ['mm'])"), /Listing nicht gestartet: Der Status im Matchmaker/, 'M5: Fehler beim Statuswechsel bricht ab');
 ok(S.L.d.length === vorher, 'M5: keine Zeile angelegt');
 S.MM.kaputt = false; S.neu();
-l = S.c("starteListing('PG-400')");
-ok(l.id === 'PG-400' && S.MM.d[1][17] === 'Ricardo', 'M5: geht es, startet das Listing und der Status ist «Ricardo»');
+l = S.c("starteListing('PG-400', false, ['mm'])");
+ok(l.id === 'PG-400' && S.MM.d[1][17] === 'Ricardo', 'M5: geht es (mit Bestätigung), startet das Listing und der Status ist «Ricardo»');
 
 /* ---------- M6: frisch lesen, Archiv sperrt ---------- */
 S = sandbox();
@@ -175,7 +177,7 @@ ok(k.length >= 2 && k.some(x => x.id === 'PG-100') && k.some(x => x.id === 'PG-2
 ok(S.c("aehnlicheStuecke('Philips Rasierer')").kandidaten.length === 0, 'S2: gleiche Marke, zu wenig gleiche Wörter: nichts');
 ok(S.c("aehnlicheStuecke('(01)07290014754545')").kandidaten.some(x => x.id === 'PG-50' && x.archiv && x.grund === 'EAN'), 'S2: EAN findet Stück im Archiv');
 ok(S.c("aehnlicheStuecke('https://www.galaxus.ch/de/s4/product/toaster-x-5551234?utm=1')").kandidaten.some(x => x.id === 'PG-100' && x.grund === 'Galaxus-Link'), 'S2: Galaxus-Artikelnummer gegen Spalte «Link»');
-S.listing({ 'PG-ID': 'RC-0002', 'Status': 'Unverkauft', 'Bezeichnung': 'Holzstuhl Eiche' }); S.neu();
+S.listing({ 'PG-ID': 'RC-0002', 'Status': 'Abgebrochen', 'Bezeichnung': 'Holzstuhl Eiche' }); S.neu();   // Prüfung 7: frei ohne Entscheid-Pflicht
 ok(S.c("aehnlicheStuecke('Holzstuhl Eiche hell')").kandidaten.some(x => x.quelle === 'Listings' && x.id === 'RC-0002'), 'S2: eigene Listings als ähnliche Stücke');
 ok(S.c("starteListing('RC-0002')").id === 'RC-0002', 'S2: bestehendes RC-Listing lässt sich neu listen');
 

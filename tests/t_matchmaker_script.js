@@ -84,7 +84,7 @@ vm.runInContext(QUELLE, c);
 const mm = MM.getSheetByName('Matchmaker'), U = MM.getSheetByName('Urteile');
 const zelle = (r, col) => String(mm.v[r - 1][col - 1] || '');
 const status = () => String(mm.v[1][0]);
-assert.ok(/const VERSION = '2026-10-24\.2'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
+assert.ok(/const VERSION = '2026-10-24\.3'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
 
 /* Lauf 1: ganzer Bestand */
 paareGeprueft = 0;
@@ -94,7 +94,9 @@ let p1 = zelle(4, 5);
 assert.ok(/PG-1\b/.test(p1) && !/PG-2\b/.test(p1), 'M6: PG-1 und PG-2 (gleiche Bezeichnung und VP, anderer Barcode/Link) sind getrennte Produkte mit eigenem Urteil: ' + p1);
 assert.ok(!/PG-4/.test(p1), 'M7: PG-4 (Regal Matchmaker im ANALYSE TOOL) weggelassen');
 assert.ok(/PG-5/.test(p1) || /\+ 1 weitere/.test(p1), 'PG-5: letzte Zeile in «Analysen» gilt (Reusable Ja)');
-assert.ok(/ohne ID \(Scanner\)/.test(p1), 'M7: Scanner-Zeile ohne ID gekennzeichnet');
+/* 24.10.2026 (.3, Z12): Stücke ohne PG-ID nie unter «Passt», höchstens «Ähnlich» mit Hinweis */
+const ae1 = () => [6, 7, 8].map(k => zelle(4, k)).join('\n');
+assert.ok(!/ohne ID \(Scanner\)/.test(p1) && /ohne ID \(Scanner\)/.test(ae1()) && /ohne PG-ID/.test(ae1()), 'M7/Z12: Scanner-Zeile ohne ID gekennzeichnet, unter «Ähnlich»: ' + ae1());
 assert.ok(/PG-3/.test(zelle(5, 5)), 'Wasserkocher: PG-3');
 assert.ok(/1 Stück mit Ergebnis im ANALYSE TOOL .* weggelassen/.test(status()) && /1 Stück ohne ID \(Scanner\)/.test(status()), status());
 assert.strictEqual(U.v[0][6], 'Produkt-Schlüssel', 'Urteile: Spalte Produkt-Schlüssel ergänzt');
@@ -113,7 +115,7 @@ paareGeprueft = 0;
 c.sucheHeute();
 p1 = zelle(4, 5);
 assert.ok(/PG-6/.test(p1) && /PG-1\b|\+ \d weitere/.test(p1), 'M5: neue Treffer ergänzt, alte behalten: ' + p1);
-assert.ok(/\+ 1 weitere/.test(p1), 'vier Treffer (PG-1, PG-5, Scanner, PG-6): drei gezeigt, einer als «weitere»');
+assert.ok(/PG-1\b/.test(p1) && /PG-5/.test(p1) && !/weitere/.test(p1) && /ohne ID \(Scanner\)/.test(ae1()), 'drei Treffer unter «Passt» (PG-1, PG-5, PG-6), Scanner unter «Ähnlich» (Z12)');
 assert.strictEqual(zelle(5, 5), '', 'M5: Treffer auf PG-3 (nicht mehr im Bestand) entfernt');
 assert.strictEqual(paareGeprueft, 1, 'nur das neue Stück wurde geprüft');
 assert.ok(/bisherige Treffer behalten/.test(status()), status());
@@ -134,13 +136,16 @@ assert.ok(/PG-1\b/.test(zelle(4, 5)), 'übrige Treffer bleiben: ' + zelle(4, 5))
 assert.strictEqual(paareGeprueft, 0, 'nichts neu geprüft');
 assert.ok(U.v.some(r => r[2] === 'Toaster Rot' && !r[6]), 'alte Zeile bleibt stehen');
 
-/* Sheet während der Suche verändert: nichts schreiben */
+/* Sheet während der Suche verändert (24.10.2026 .3, Befund 15): unveränderte Aufträge bekommen ihr Ergebnis in ihrer jetzigen Zeile,
+   der geänderte bleibt unberührt, Status rot. Früher wurde das ganze Ergebnis verworfen. */
 RT.getSheetByName('Stationär').v.push(z('PG-7', heute, 'Toaster Blau', '888', '', 15, 'HOM-4'));
-const vorher = JSON.stringify(mm.v.slice(3).map(r => r.slice(4, 8)));
+const vorher5 = JSON.stringify(mm.v[4].slice(4, 8));
 beimPruefen = () => { mm.v[4][0] = 'Wasserkocher gross'; };
 passtGeschrieben.length = 0;
 c.sucheAlles();
-assert.ok(/verändert/.test(alerts.join(' ')) && passtGeschrieben.length === 0 && JSON.stringify(mm.v.slice(3).map(r => r.slice(4, 8))) === vorher, 'veränderte Zeilen: kein Schreiben');
+assert.ok(alerts.length === 0 && passtGeschrieben.length === 1 && passtGeschrieben[0] === true && /PG-7/.test(zelle(4, 5)) && JSON.stringify(mm.v[4].slice(4, 8)) === vorher5,
+  'veränderte Zeile nicht geschrieben, unveränderte schon (in der Sperre): ' + alerts.join(' | '));
+assert.ok(/ACHTUNG: 1 Suchaufträge wurden während der Suche neu erfasst oder geändert/.test(status()), status());
 mm.v[4][0] = 'Wasserkocher';
 
 /* Haken «Geholt» während die Suche schreibt (Dokument-Sperre besetzt): nichts verschieben, Haken zurück */
@@ -167,9 +172,13 @@ MM2.sheets.find(s => s.name === 'Urteile').breite = 7;
 /* Variante: gleiche Bezeichnung «Toaster Rot», anderer Barcode → teilt das alte Urteil */
 RT.getSheetByName('Stationär').v.push(z('PG-8', '20.10.2026', 'Toaster Rot', '999', '', 26, 'HOM-5'));
 let aufrufe = 0, wirftBeim = 0;
+/* Uhr für die Zeitbremse (24.10.2026 .3): uhrSprung rückt die Uhr beim nächsten Aufruf an Claude vor */
+let uhr = Date.now(), uhrSprung = 0;
+class UhrDate extends Date { constructor(...a) { if (a.length) super(...a); else super(uhr); } static now() { return uhr; } }
 const c2 = Object.assign({}, c, {
+  Date: UhrDate,
   SpreadsheetApp: Object.assign({}, c.SpreadsheetApp, { getActiveSpreadsheet: () => MM2 }),
-  UrlFetchApp: { fetchAll: (reqs) => { aufrufe++; if (aufrufe === wirftBeim) throw new Error('Zeitlimit überschritten'); return reqs.map(antwort); } }
+  UrlFetchApp: { fetchAll: (reqs) => { aufrufe++; if (aufrufe === wirftBeim) throw new Error('Zeitlimit überschritten'); if (uhrSprung) { uhr += uhrSprung; uhrSprung = 0; } return reqs.map(antwort); } }
 });
 vm.createContext(c2);
 vm.runInContext(QUELLE2, c2);
@@ -178,12 +187,16 @@ const status2 = () => String(mm2.v[1][0]);
 const neueZeilen = () => U2.v.slice(2).length;
 /* Offen: PG-1, PG-2, Scanner, PG-6, PG-7 (5 Paare); PG-5 und PG-8 über das alte Urteil, PG-4 ausgeschlossen */
 
-/* a) zweite Gruppe wirft: die erste ist gespeichert */
-alerts.length = 0; wirftBeim = 2; aufrufe = 0; paareGeprueft = 0;
+/* a) Zeitbremse nach der ersten Gruppe: die erste ist gespeichert, der Rest steht im Status.
+   (Bis .2 hiess der Fall «zweite Gruppe wirft, Lauf bricht ab». Seit Befund 10 bricht ein Verbindungsfehler den Lauf nicht mehr ab,
+   die Gruppe wird nachgefragt; das prüft tests/t_matchmaker_p2410_zeit.js. Den Abbruch mitten im Lauf stellt hier die Zeitbremse nach.) */
+alerts.length = 0; uhrSprung = 280000; aufrufe = 0; paareGeprueft = 0;
 c2.sucheAlles();
-assert.ok(/fehlgeschlagen/.test(alerts.join(' ')) && /Zeitlimit/.test(alerts.join(' ')), 'Lauf bricht ab: ' + alerts.join(' | '));
-assert.strictEqual(neueZeilen(), 1, 'Urteil der ersten Gruppe gespeichert, obwohl die zweite abbricht');
+assert.deepStrictEqual(alerts, [], 'kein Fehler: ' + alerts.join(' | '));
+assert.strictEqual(aufrufe, 1, 'nach der Zeitbremse keine neue Gruppe');
+assert.strictEqual(neueZeilen(), 1, 'Urteil der ersten Gruppe gespeichert');
 assert.ok(U2.v[2][6] && U2.v[2][6].indexOf('|') > 0, 'mit Produkt-Schlüssel gespeichert');
+assert.ok(/Noch 4 Paare offen – bitte nochmals starten\./.test(status2()) && /Zeitbremse/.test(status2()), status2());
 
 /* b) Neustart: nur der Rest, höchstens 3 Paare, Hinweis im Status */
 alerts.length = 0; wirftBeim = 0; aufrufe = 0; paareGeprueft = 0;

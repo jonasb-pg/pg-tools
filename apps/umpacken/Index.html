@@ -65,6 +65,10 @@
   #ungespeichert { background:#b00020; color:var(--weiss); padding:10px 24px; font-weight:600; border-bottom:2px solid var(--ink); position:sticky; top:0; z-index:6; }
   #ungespeichert p { margin:0 0 4px; } #ungespeichert button { background:var(--weiss); color:var(--ink); }
   .warn-text { color:#b00020; font-weight:600; font-size:13px; }
+  /* Nicht gespeicherte Scans (Konflikte, Ablehnungen): bleibt stehen, bis erledigt (Prüfung 24.10.2026) */
+  .karte.ng { background:var(--rot); border-color:#b00020; }
+  .karte.ng h3 { color:#b00020; }
+  td.gelb { background:var(--gelb); }
   /* Kamera-Scan (Handy): Leiste unten, bleibt beim Wechsel des Gebindes offen */
   .scan-reihe { display:flex; gap:8px; align-items:stretch; } .scan-reihe #scan { flex:1; min-width:0; }
   #kamera-knopf { white-space:nowrap; }
@@ -101,14 +105,22 @@
 <script>
 (function () {
   'use strict';
-  var V = { ansicht: 'start', start: null, D: null, setup: null, orte: null, aktiv: '', reiter: 'letzte', letzte: [], Q: [], qId: '', qLaeuft: false, haengt: null, rueck: null, offen: 0 };
+  var V = { ansicht: 'start', start: null, D: null, setup: null, orte: null, aktiv: '', reiter: 'letzte', letzte: [], Q: [], qId: '', qLaeuft: false, haengt: null, rueck: null, offen: 0,
+    qNr: 0, wTimer: null, waechter: 60000, ng: [], abfrageFehler: 0 };
+  var NICHT_GEFUNDEN = 'Nicht gefunden – prüfen';
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function chf(n) { return 'CHF ' + (Math.round(Number(n || 0) * 100) / 100).toFixed(2); }
   function norm(s) { return String(s == null ? '' : s).trim().toUpperCase(); }
-  function ortKey(s) { return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ''); }
-  /* Barcode ohne führende Nullen vergleichen (UPC-A = EAN-13 mit 0 davor), gleich wie der Server */
-  function bcKey(s) { var b = String(s == null ? '' : s).replace(/^'/, '').replace(/\s+/g, '').toUpperCase(); if (/^\d+$/.test(b)) b = b.replace(/^0+/, ''); return b; }
+  /* Gleiche Regeln wie der Server (Vertrag V3): PG-ID «pg 0862» = «PG-862», Lagerort ohne Trennzeichen, Barcode ohne GS1-(01), Bindestriche, führende Nullen */
+  function pgNorm(s) { var t = String(s == null ? '' : s).trim(), m = /^(PG|AN|RC|RT|ET)[\s'\-]?0*(\d+)$/i.exec(t); return m ? m[1].toUpperCase() + '-' + m[2] : t.toUpperCase(); }
+  function ortKey(s) { return String(s == null ? '' : s).toUpperCase().replace(/[\s\-–—_.\/]+/g, ''); }
+  function bcKey(s) {
+    var b = String(s == null ? '' : s).replace(/['’\s\-]/g, '').replace(/^\(01\)(?=\d{14}$)/, '');
+    if (/^01\d{14}$/.test(b)) b = b.slice(2);
+    return /^\d+$/.test(b) ? b.replace(/^0+/, '') : b.toUpperCase();
+  }
+  function uhr() { var d = new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function lies(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function merke(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ohne Speicher */ } }
   var toastZeit;
@@ -125,28 +137,33 @@
 
   /* ---------- Start: alle Durchgänge ---------- */
   function zurStart() {
-    if (V.Q.length && !V.haengt) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); return; }
+    if (V.Q.length && !V.haengt) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; }
     if (V.haengt) { V.Q = []; V.qId = ''; V.haengt = null; }      // bleibt im Speicher des Browsers und oben sichtbar
     V.ansicht = 'start'; V.D = null; history.replaceState && history.replaceState(null, '', '#');
     ruf('start', [], function (s) { V.start = s; $('version').textContent = 'Version ' + s.version; zeichne(); });
   }
   function startSeite() {
-    var s = V.start, offen = s ? s.durchgaenge.filter(function (d) { return d.status !== 'Abgeschlossen'; }) : [], zu = s ? s.durchgaenge.filter(function (d) { return d.status === 'Abgeschlossen'; }) : [];
+    var s = V.start, l = s ? s.durchgaenge : [];
+    var offen = l.filter(function (d) { return d.status !== 'Abgeschlossen' && d.status !== 'Verworfen'; }), zu = l.filter(function (d) { return d.status === 'Abgeschlossen'; }), weg = l.filter(function (d) { return d.status === 'Verworfen'; });
     var tab = function (l) {
       return '<table><thead><tr><th>Durchgang</th><th>Name</th><th>Quelle</th><th>Status</th><th>Erstellt</th><th></th></tr></thead><tbody>' + l.map(function (d) {
+        var weiter = d.status === 'Scan';
         return '<tr><td class="mono">' + esc(d.id) + '</td><td>' + esc(d.name) + '</td><td>' + esc(d.quelle) + (d.lagerorte ? ' · ' + esc(d.lagerorte) : '') + '</td><td>' + esc(d.status) + '</td><td>' + esc(d.erstellt) + '</td>'
-          + '<td><button class="klein ' + (d.status === 'Abgeschlossen' ? '' : 'pink') + '" data-a="oeffne" data-v="' + esc(d.id) + '">' + (d.status === 'Abgeschlossen' ? 'Ansehen' : 'Weiter') + '</button></td></tr>';
+          + '<td><button class="klein ' + (weiter ? 'pink' : '') + '" data-a="oeffne" data-v="' + esc(d.id) + '">' + (weiter ? 'Weiter' : 'Ansehen') + '</button></td></tr>';
       }).join('') + '</tbody></table>';
     };
     return '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Durchgänge</h2><button class="pink" data-a="neuerDurchgang">Neuer Durchgang</button></div>'
       + '</div>'
       + '<div class="karte"><h3>Offen</h3>' + (offen.length ? tab(offen) : '<p class="still">Keine.</p>') + '</div>'
-      + (zu.length ? '<div class="karte"><h3>Abgeschlossen</h3>' + tab(zu) + '</div>' : '');
+      + (zu.length ? '<div class="karte"><h3>Abgeschlossen</h3>' + tab(zu) + '</div>' : '')
+      + (weg.length ? '<div class="karte"><h3>Verworfen</h3>' + tab(weg) + '</div>' : '');
   }
   function oeffne(id) {
+    /* Prüfung 24.10.2026: nicht während des Speicherns wechseln, sonst kürzt die Antwort die Schlange des anderen Durchgangs */
+    if (V.qLaeuft || (V.Q.length && !V.haengt && V.qId && V.qId !== id)) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; }
     ruf('laden', [id], function (d) {
-      if (V.qId && V.qId !== d.id) { V.Q = []; V.qId = ''; V.haengt = null; }     // Schlange eines anderen Durchgangs bleibt im Speicher (oben sichtbar)
-      setzeD(d); V.ansicht = d.status === 'Abgeschlossen' ? 'abschluss' : 'scan';
+      if (V.qId && V.qId !== d.id) { if (V.qLaeuft) { melde('Es wird noch gespeichert. Bitte nochmals öffnen.', true); return; } V.Q = []; V.qId = ''; V.haengt = null; }     // Schlange eines anderen Durchgangs bleibt im Speicher (oben sichtbar)
+      setzeD(d); ngLaden(d.id); V.ansicht = d.status === 'Scan' ? 'scan' : 'abschluss';
       /* Ungespeicherte Scans von vorher (Neuladen, Netz weg) nachsenden */
       var alt = []; try { alt = JSON.parse(lies('um-q-' + d.id) || '[]') || []; } catch (e) { alt = []; }
       if (alt.length && d.status === 'Scan') { V.Q = alt; V.qId = d.id; V.haengt = null; ueberlagere(d.zuordnung); melde(alt.length + ' Scans von vorher werden nachgespeichert.'); senden(); }
@@ -165,7 +182,7 @@
   function ladeOrte() { ruf('lagerorte', [], function (o) { V.orte = o; if (V.ansicht === 'setup') zeichne(); }); }
   function setupSeite() {
     var s = V.setup, orte = V.orte;
-    var fehlt = orte && orte.fehlend && orte.fehlend.length ? '<div class="meldung warn" style="margin-top:8px">Nicht gelesen (fehlt im Return Tool oder ohne Kopfzeile): ' + esc(orte.fehlend.join(', ')) + '. Stücke dort fehlen in der Liste.</div>' : '';
+    var fehlt = orte && orte.fehlend && orte.fehlend.length ? '<div class="meldung warn" style="margin-top:8px">Nicht gelesen (fehlt im Return Tool oder ohne Spalte ID, Bezeichnung, Lagerort): ' + esc(orte.fehlend.join(', ')) + '. Stücke dort fehlen in der Liste.</div>' : '';
     var ortListe = !orte ? '<p class="still">Lädt …</p>' : fehlt + '<div class="reihe" style="margin-top:8px"><input type="text" id="s-filter" placeholder="Filter, z.B. KID" value="' + esc(s.filter) + '" style="max-width:240px"><button class="klein" data-a="alleOrte">Alle</button><button class="klein" data-a="keineOrte">Keine</button><span class="still" id="s-zahl"></span></div><div class="orte" id="s-orte">' + ortHtml() + '</div>';
     var geb = s.gebinde.map(function (g, i) {
       return '<div class="geb-zeile" data-i="' + i + '">'
@@ -194,14 +211,16 @@
     var s = V.setup, f = norm(s.filter);
     return V.orte.orte.filter(function (o) { return !f || norm(o.ort).indexOf(f) > -1; }).map(function (o) {
       var an = !!s.orte[o.ort];
-      return '<label class="' + (an ? 'an' : '') + '"><input type="checkbox" data-ort="' + esc(o.ort) + '"' + (an ? ' checked' : '') + '><span><b>' + esc(o.ort) + '</b> <span class="still">' + o.anzahl + '</span></span></label>';
+      /* Zeilen ohne gültige ID fallen nicht still heraus: Anzahl pro Lagerort (Prüfung 24.10.2026) */
+      return '<label class="' + (an ? 'an' : '') + '"><input type="checkbox" data-ort="' + esc(o.ort) + '"' + (an ? ' checked' : '') + '><span><b>' + esc(o.ort) + '</b> <span class="still">' + o.anzahl + '</span>'
+        + (o.ohneId ? ' <span class="warn-text">' + o.ohneId + ' ohne ID</span>' : '') + '</span></label>';
     }).join('');
   }
   function ortZahl() {
     if (!$('s-zahl') || !V.orte) return;
-    var n = 0, k = 0;
-    V.orte.orte.forEach(function (o) { if (V.setup.orte[o.ort]) { n += o.anzahl; k++; } });
-    $('s-zahl').textContent = k ? k + ' Lagerorte, ' + n + ' Stücke gewählt' : 'Noch nichts gewählt';
+    var n = 0, k = 0, x = 0;
+    V.orte.orte.forEach(function (o) { if (V.setup.orte[o.ort]) { n += o.anzahl; k++; x += o.ohneId || 0; } });
+    $('s-zahl').textContent = k ? k + ' Lagerorte, ' + n + ' Stücke gewählt' + (x ? ' · ' + x + ' Zeilen ohne ID kommen nicht mit' : '') : 'Noch nichts gewählt';
   }
   /* Neue Palette: nächste freie Nummer pro Kürzel (aus dem Return Tool und den Gebinden), z.B. KID → KID-13 */
   function vorschlagHtml(i) {
@@ -214,7 +233,12 @@
     }).join(' ') + '</div>';
   }
   /* Lagerort schon belegt (Return Tool, alle Tabs, oder offener Durchgang)? Der Server prüft beim Speichern nochmals. */
-  function belegtText(ort) { var k = ortKey(ort); return k && V.orte && V.orte.belegt && V.orte.belegt.indexOf(k) > -1 ? k + ' ist schon belegt' : ''; }
+  function belegtText(ort) {
+    var k = ortKey(ort);
+    if (!k || !V.orte || !V.orte.belegt) return '';
+    if (!V.orte.belegtKey) V.orte.belegtKey = V.orte.belegt.map(ortKey);      // ohne Trennzeichen vergleichen: KID15 = KID-15
+    return V.orte.belegtKey.indexOf(k) > -1 ? norm(ort).replace(/\s+/g, '') + ' ist schon belegt' : '';
+  }
   function setupLesen() {
     var s = V.setup;
     if ($('s-name')) s.name = $('s-name').value;
@@ -246,7 +270,7 @@
   /* Der Browser kennt Bestand und Zuordnung und entscheidet sofort. Gespeichert wird im Hintergrund (Warteschlange), der Server prüft noch einmal. */
   function setzeD(d) {
     V.D = d; V.idx = {}; V.bar = {}; V.geb = {};
-    d.bestand.forEach(function (p) { V.idx[norm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
+    d.bestand.forEach(function (p) { V.idx[pgNorm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
     d.gebinde.forEach(function (g) { V.geb[g.id] = g; });
     if (!V.geb[V.aktiv]) V.aktiv = lies('um-aktiv-' + d.id) || (d.gebinde[0] && d.gebinde[0].id) || '';
     if (!V.geb[V.aktiv]) V.aktiv = d.gebinde[0] ? d.gebinde[0].id : '';
@@ -267,12 +291,13 @@
     var d = V.D, z = d.zuordnung, zugeordnet = Object.keys(z).filter(function (k) { return V.idx[k]; }).length;
     var wahl = d.gebinde.map(function (g) { var s = stand(g.id); return '<button class="' + (g.id === V.aktiv ? 'an' : '') + '" data-a="aktiv" data-v="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><span class="etikett ' + g.art + '">' + (g.art === 'Verkauf' ? 'Verkauf · ' + esc(g.abnehmer) : g.art === 'Lager' ? 'Lager' : 'Entsorgung') + '</span> ' + (g.lagerort ? '<span class="mono">' + esc(g.lagerort) + '</span>' : '') + '<small>' + s.n + ' Stück · ' + chf(s.t) + '</small></button>'; }).join('');
     return '<div class="schritte"><span>1 · Setup</span><span class="an">2 · Scan</span><span>3 · Abschluss</span></div>'
+      + '<div id="ng-platz">' + ngHtml() + '</div>'
       + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Gebinde</h2><span class="still">' + zugeordnet + ' / ' + d.bestand.length + '</span></div>'
       + '<div class="gebinde-wahl">' + wahl + '</div>'
       + '<div class="scan-reihe"><input type="text" id="scan" placeholder="PG-ID oder Barcode scannen" autocomplete="off" autocapitalize="characters" data-enter="scanne"><button class="pink" id="kamera-knopf" data-a="kamera">' + (KAM.an ? 'Kamera aus' : 'Kamera') + '</button></div>'
       + '<div id="rueck">' + rueckHtml() + '</div></div>'
       + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt'], ['gebinde', 'Inhalt'], ['offen', 'Offen'], ['bearbeiten', 'Gebinde ändern']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
-      + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Zum Abschluss</button></div></div>';
+      + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Zum Abschluss</button><button data-a="verwerfen">Durchgang verwerfen</button></div></div>';
   }
   function rueckHtml() {
     var r = V.rueck;
@@ -280,20 +305,22 @@
     return '<div class="meldung ' + r.art + '"><span class="gross">' + esc(r.titel) + '</span>' + esc(r.text || '') + (r.knopf || '') + '</div>';
   }
   function zeile(p, mitAktion) {
-    var a = V.D.zuordnung[norm(p.id)], g = a && V.geb[a.gebinde];
+    var a = V.D.zuordnung[pgNorm(p.id)], g = a && V.geb[a.gebinde];
+    /* VP fehlt (leer, 0, unlesbar) und der Preis käme aus dem VP: gelb (Prüfung 24.10.2026) */
+    var gelb = p.vpFehlt && (!g || (g.art !== 'Entsorgung' && g.preisregel !== 'Null' && (a.preis === '' || a.preis === undefined)));
     return '<tr><td class="mono">' + esc(p.id) + '</td><td>' + esc(p.name) + (bcKey(p.barcode) ? '' : ' <span class="warn-text">nur per PG-ID-Etikett</span>') + '</td><td class="mono">' + esc(p.ort) + '</td><td>' + (g ? esc(g.name) : '–') + '</td>'
-      + '<td class="zahl">' + (g ? (mitAktion ? '<input type="number" min="0" step="0.05" value="' + preis(g, p, a.preis) + '" data-preis="' + esc(p.id) + '" style="width:100px;text-align:right"' + (g.art === 'Entsorgung' ? ' disabled' : '') + '>' : chf(preis(g, p, a.preis))) : chf(p.vp)) + '</td>'
+      + '<td class="zahl' + (gelb ? ' gelb' : '') + '"' + (gelb ? ' title="VP fehlt im Return Tool"' : '') + '>' + (g ? (mitAktion ? '<input type="number" min="0" step="0.05" value="' + preis(g, p, a.preis) + '" data-preis="' + esc(p.id) + '" style="width:100px;text-align:right"' + (g.art === 'Entsorgung' ? ' disabled' : '') + '>' : chf(preis(g, p, a.preis))) : chf(p.vp)) + '</td>'
       + (mitAktion ? '<td>' + (g ? '<button class="klein" data-a="entfernen" data-v="' + esc(p.id) + '">Entfernen</button>' : '') + '</td>' : '') + '</tr>';
   }
   function reiterHtml() {
     var d = V.D, kopf = function (akt) { return '<table><thead><tr><th>ID</th><th>Bezeichnung</th><th>Lagerort alt</th><th>Gebinde</th><th class="zahl">Preis</th>' + (akt ? '<th></th>' : '') + '</tr></thead><tbody>'; };
     if (V.reiter === 'letzte') return V.letzte.length ? kopf(true) + V.letzte.slice(0, 30).map(function (id) { return V.idx[id] ? zeile(V.idx[id], true) : ''; }).join('') + '</tbody></table>' : '<p class="still">Noch nichts.</p>';
     if (V.reiter === 'gebinde') return d.gebinde.map(function (g) {
-      var l = d.bestand.filter(function (p) { var a = d.zuordnung[norm(p.id)]; return a && a.gebinde === g.id; }), s = stand(g.id);
+      var l = d.bestand.filter(function (p) { var a = d.zuordnung[pgNorm(p.id)]; return a && a.gebinde === g.id; }), s = stand(g.id);
       return '<h3 style="margin-top:14px">' + esc(g.name) + ' <span class="still" style="text-transform:none">· ' + s.n + ' Stück · ' + chf(s.t) + '</span></h3>' + (l.length ? kopf(true) + l.map(function (p) { return zeile(p, true); }).join('') + '</tbody></table>' : '<p class="still">Leer.</p>');
     }).join('');
     if (V.reiter === 'offen') {
-      var o = d.bestand.filter(function (p) { return !d.zuordnung[norm(p.id)]; }), ob = o.filter(function (p) { return !bcKey(p.barcode); }).length;
+      var o = d.bestand.filter(function (p) { return !d.zuordnung[pgNorm(p.id)]; }), ob = o.filter(function (p) { return !bcKey(p.barcode); }).length;
       return '<p class="still">' + o.length + ' Stücke offen' + (ob ? ' · <span class="warn-text">' + ob + ' ohne Barcode: nur per PG-ID-Etikett</span>' : '') + '</p>' + (o.length ? kopf(false) + o.map(function (p) { return zeile(p, false); }).join('') + '</tbody></table>' : '');
     }
     if (V.reiter === 'bearbeiten') return bearbeitenHtml();
@@ -325,63 +352,111 @@
   function bearbWeg(i) { bearbLesen(); V.bearb.splice(Number(i), 1); $('reiter-inhalt').innerHTML = reiterHtml(); }
   function bearbSpeichern() {
     bearbLesen();
-    if (V.Q.length) { melde('Zuerst fertig speichern, dann nochmals.', true); return; }
-    ruf('gebindeAendern', [V.D.id, V.bearb], function (d) { V.bearb = null; setzeD(d); zeichne(); melde('Gebinde gespeichert.' + hinw(d), !!(d.hinweise && d.hinweise.length)); });
+    if (V.Q.length) { melde('Zuerst fertig speichern, dann nochmals.', true); piep(false); return; }
+    /* mit dem Gebinde-Stand, den dieses Gerät kennt: hat jemand anderes inzwischen geändert, lehnt der Server ab (Prüfung 24.10.2026) */
+    ruf('gebindeAendern', [V.D.id, V.bearb, V.D.gebindeStand || ''], function (d) { V.bearb = null; setzeD(d); ueberlagere(V.D.zuordnung); zeichne(); melde('Gebinde gespeichert.' + hinw(d), !!(d.hinweise && d.hinweise.length)); });
   }
-  function aktiv(id) { V.aktiv = id; merke('um-aktiv-' + V.D.id, id); zeichne(); }
+  function aktiv(id) { V.aktiv = id; KAM.sperreBis = 0; merke('um-aktiv-' + V.D.id, id); zeichne(); }     // Gebinde bewusst gewechselt: kurze Kamera-Sperre aufheben
   function reiter(r) { V.reiter = r; if (r !== 'bearbeiten') V.bearb = null; $('reiter-inhalt').innerHTML = reiterHtml(); Array.prototype.forEach.call(document.querySelectorAll('.reiter button'), function (b) { b.className = 'klein ' + (b.getAttribute('data-v') === r ? 'an' : ''); }); }
 
+  /* Jede Ablehnung: rot, tiefer Ton, nie ✅ ohne Speicherung (Prüfung 24.10.2026). ng = auch in die Liste «Nicht gespeichert – nochmals scannen». toast = auch unten (Aktionen aus der Tabelle). */
+  function ablehnen(titel, text, ng, toast) {
+    V.rueck = { art: 'stop', titel: titel, text: text || '' };
+    if (ng) ngDazu(ng.id, ng.grund);
+    if ($('rueck')) $('rueck').innerHTML = rueckHtml();
+    if (toast) melde(titel + (text ? ' ·' + text : ''), true);
+    kamText(); piep(false);
+  }
+  function fokusScan() { var s = $('scan'); if (s && V.ansicht === 'scan' && !KAM.an && !KAM.foto && !istHandy() && document.activeElement !== s) s.focus(); }
+
   /* Ein Scan: PG-ID oder Barcode. Barcode: Der Browser zeigt das erste freie Stück an, der Server wählt beim Speichern selbst ein freies Stück dieser EAN
-     (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP: PG-ID verlangen. */
+     (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen. */
   function scanne() {
-    var el = $('scan'), code = norm(el.value); el.value = ''; if (!KAM.an && !KAM.foto) el.focus();
+    var el = $('scan'), code = norm(el.value); el.value = ''; fokusScan();
     if (!code) return;
-    if (!K()) { V.rueck = { art: 'stop', titel: 'Bitte zuerst oben das Kürzel eintragen.' }; $('rueck').innerHTML = rueckHtml(); $('kuerzel').focus(); return; }
+    if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     var g = V.geb[V.aktiv];
-    if (!g) { V.rueck = { art: 'stop', titel: 'Bitte zuerst ein Gebinde wählen.' }; $('rueck').innerHTML = rueckHtml(); return; }
-    var p = V.idx[code], z = V.D.zuordnung, bc = '';
+    if (!g) { ablehnen('Bitte zuerst ein Gebinde wählen.'); return; }
+    var p = V.idx[pgNorm(code)], z = V.D.zuordnung, bc = '';
     if (!p && V.bar[bcKey(code)]) {
-      var l = V.bar[bcKey(code)], frei = l.filter(function (x) { return !z[norm(x.id)]; }), vp = {};
-      if (!frei.length) { V.rueck = { art: 'warn', titel: 'Alle ' + l.length + ' Stücke mit diesem Barcode zugeordnet', text: ' PG-ID scannen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
-      frei.forEach(function (x) { vp[Math.round(Number(x.vp || 0) * 100)] = true; });
-      if (Object.keys(vp).length > 1) { V.rueck = { art: 'warn', titel: frei.length + ' freie Stücke mit diesem Barcode, verschiedener VP', text: ' PG-ID-Etikett scannen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
+      var l = V.bar[bcKey(code)], frei = l.filter(function (x) { return !z[pgNorm(x.id)]; }), vp = {}, ort = {};
+      if (!frei.length) { ablehnen('❌ Alle ' + l.length + ' Stücke mit diesem Barcode zugeordnet', ' PG-ID scannen.'); return; }
+      frei.forEach(function (x) { vp[Math.round(Number(x.vp || 0) * 100)] = true; ort[ortKey(x.ort)] = x.ort || '(leer)'; });
+      if (Object.keys(vp).length > 1) { ablehnen('❌ ' + frei.length + ' freie Stücke mit diesem Barcode, verschiedener VP', ' PG-ID-Etikett scannen.'); return; }
+      if (Object.keys(ort).length > 1) { ablehnen('❌ ' + frei.length + ' freie Stücke mit diesem Barcode aus verschiedenen Lagerorten (' + Object.keys(ort).map(function (k) { return ort[k]; }).join(', ') + ')', ' PG-ID-Etikett scannen.'); return; }
       p = frei[0]; bc = code;
     }
-    if (!p) { V.rueck = { art: 'stop', titel: '❌ ' + code + ' ist nicht in der Quelle', text: ' Zur Seite legen.' }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
-    var a = z[norm(p.id)];
-    if (a && a.gebinde === g.id) { V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); piep(false); return; }
+    if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Zur Seite legen.'); fremdMelden(code, g.id); return; }
+    var a = z[pgNorm(p.id)];
+    if (a && a.gebinde === g.id) { V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return; }
     if (a) {
-      V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. ',
+      V.rueck = { art: 'stop', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. NICHT verschoben. ',
         knopf: '<div class="reihe" style="margin-top:8px"><button class="pink klein" data-a="verschieben" data-v="' + esc(p.id) + '">Nach ' + esc(g.name) + ' verschieben</button></div>' };
-      $('rueck').innerHTML = rueckHtml(); piep(false); return;
+      $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return;
     }
-    setze(p, g.id, '', '', bc);
+    if (!setze(p, g.id, '', '', bc)) return;          // abgelehnt: setze meldet rot
     V.rueck = { art: 'ok', titel: '✅ ' + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + ' (aus ' + p.ort + ')' };
     piep(true); neuZeichnenScan();
   }
-  function verschieben(id) { var p = V.idx[norm(id)], g = V.geb[V.aktiv], a = V.D.zuordnung[norm(id)]; if (!p || !g) return; setze(p, g.id, '', a ? a.gebinde : ''); V.rueck = { art: 'ok', titel: '✅ verschoben nach ' + g.name, text: ' ' + p.id + ' · ' + p.name }; neuZeichnenScan(); }
-  function entfernen(id) { var p = V.idx[norm(id)], a = V.D.zuordnung[norm(id)]; if (!p || !a) return; setze(p, '', '', a.gebinde); V.rueck = { art: 'warn', titel: p.id + ' aus dem Gebinde entfernt', text: ' Es bleibt, wo es war (' + p.ort + ').' }; neuZeichnenScan(); }
-  function preisSetzen(id, wert) {
-    var p = V.idx[norm(id)], a = V.D.zuordnung[norm(id)];
-    if (!p || !a) return;
-    var n = wert === '' ? '' : Math.round(parseFloat(String(wert).replace(',', '.')) * 100) / 100;
-    if (n !== '' && (!isFinite(n) || n < 0)) { melde('Bitte einen Preis ab 0 eintragen.', true); return; }
-    setze(p, a.gebinde, n, a.gebinde); melde(p.id + ': ' + chf(preis(V.geb[a.gebinde], p, n))); neuZeichnenScan();
+  /* Fremder Code (nicht in der Quelle): kommt über die Schlange ins Log des Servers (Prüfung 24.10.2026) */
+  function fremdMelden(code, gid) {
+    if (!V.D || V.haengt || (V.qId && V.qId !== V.D.id && V.Q.length)) return;
+    V.qId = V.D.id; V.Q.push({ unbekannt: String(code).slice(0, 40), bei: gid || '' }); sichereQ(); senden();
   }
-  /* Sofort im Browser, dann in die Warteschlange. vorher = was der Browser gesehen hat (der Server erkennt so, wenn jemand anderes schneller war). */
+  /* Barcode-Scan dieses Stücks wartet noch auf den Server (der Server kann ein anderes Stück derselben EAN wählen): Folgeaktionen erst nach der Antwort */
+  function bcOffen(k) { return V.Q.some(function (o) { return o.code && pgNorm(o.wunsch) === k; }); }
+  function verschieben(id) {
+    var k = pgNorm(id), p = V.idx[k], g = V.geb[V.aktiv], a = V.D.zuordnung[k];
+    if (!p || !g) return;
+    if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
+    if (!setze(p, g.id, '', a ? a.gebinde : '')) return;
+    V.rueck = { art: 'ok', titel: '✅ verschoben nach ' + g.name, text: ' ' + p.id + ' · ' + p.name }; piep(true); neuZeichnenScan();
+  }
+  function entfernen(id) {
+    var k = pgNorm(id), p = V.idx[k], a = V.D.zuordnung[k];
+    if (!p || !a) return;
+    if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT entfernt', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
+    if (!setze(p, '', '', a.gebinde)) return;
+    V.rueck = { art: 'warn', titel: p.id + ' aus dem Gebinde entfernt', text: ' Es bleibt, wo es war (' + p.ort + ').' }; neuZeichnenScan();
+  }
+  /* Preis plausibel (gleich wie der Server): ab 0, unter CHF 100 000, keine 8–14 Ziffern (= Barcode ins Preisfeld gescannt) */
+  function preisFehler(roh, n) {
+    if (n === '') return '';
+    if (/^\d{8,14}$/.test(roh)) return 'Das ist wohl ein Barcode, kein Preis.';
+    if (!isFinite(n) || n < 0) return 'Bitte einen Preis ab 0 eintragen.';
+    if (n >= 100000) return 'Preis zu hoch (ab CHF 100 000).';
+    return '';
+  }
+  function preisSetzen(id, wert) {
+    var k = pgNorm(id), p = V.idx[k], a = V.D.zuordnung[k];
+    if (!p || !a) return;
+    var roh = String(wert == null ? '' : wert).trim(), n = roh === '' ? '' : Math.round(parseFloat(roh.replace(',', '.')) * 100) / 100, f = preisFehler(roh, n);
+    if (f) { ablehnen('❌ Preis NICHT gespeichert: ' + p.id, ' ' + f, null, true); neuZeichnenScan(true); return; }
+    if (bcOffen(k)) { ablehnen('❌ Preis NICHT gespeichert: ' + p.id, ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); neuZeichnenScan(true); return; }
+    if (!setze(p, a.gebinde, n, a.gebinde)) { neuZeichnenScan(true); return; }
+    melde(p.id + ': ' + chf(preis(V.geb[a.gebinde], p, n))); neuZeichnenScan();
+  }
+  /* Sofort im Browser, dann in die Warteschlange. vorher = was der Browser gesehen hat (der Server erkennt so, wenn jemand anderes schneller war).
+     Gibt zurück, ob der Scan in der Schlange ist (Prüfung 24.10.2026: sonst rot «NICHT gespeichert», nie ✅). */
   function setze(p, gebinde, preisWert, vorher, code) {
-    var k = norm(p.id);
-    if (V.haengt || (V.qId && V.qId !== V.D.id && V.Q.length)) { melde('Zuerst die ungespeicherten Scans klären (oben).', true); return; }
+    var k = pgNorm(p.id);
+    if (V.haengt || (V.qId && V.qId !== V.D.id && V.Q.length)) {
+      var grund = V.haengt ? 'Durchgang nicht mehr im Scan' : 'andere Scans warten noch (oben)';
+      ablehnen('❌ NICHT gespeichert: ' + p.id, ' ' + grund + '. Stück zur Seite legen, zuerst oben klären.', { id: p.id, grund: grund }, true);
+      return false;
+    }
     if (gebinde) V.D.zuordnung[k] = { gebinde: gebinde, preis: preisWert }; else delete V.D.zuordnung[k];
     V.letzte = [k].concat(V.letzte.filter(function (x) { return x !== k; })).slice(0, 50);
     V.qId = V.D.id;
-    /* sid: Kennung dieses einen Scans. Kommt die Antwort nicht an und der Browser schickt ihn nochmals, bucht der Server kein zweites Stück (Review 24.10.2026). */
+    /* sid: Kennung dieses einen Scans. Kommt die Antwort nicht an und der Browser schickt ihn nochmals, bucht der Server kein zweites Stück (Spalte «Scan-ID»). */
     V.Q.push(code ? { code: code, wunsch: p.id, gebinde: gebinde, preis: preisWert, vorher: '', sid: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) } : { id: p.id, gebinde: gebinde, preis: preisWert, vorher: vorher });
     sichereQ(); senden();
+    return true;
   }
-  /* Was noch in der Schlange wartet, über den Stand vom Server legen (Barcode-Scans mit dem angezeigten Stück) */
-  function ueberlagere(zu) { V.Q.forEach(function (o) { var k = norm(o.id || o.wunsch); if (o.gebinde) zu[k] = { gebinde: o.gebinde, preis: o.preis }; else delete zu[k]; }); }
-  function sichereQ() { if (V.qId) merke('um-q-' + V.qId, JSON.stringify(V.Q)); $('lade').hidden = (!V.Q.length || !!V.haengt) && V.offen <= 0; banner(); }
+  /* Was noch in der Schlange wartet, über den Stand vom Server legen (Barcode-Scans mit dem angezeigten Stück; fremde Codes zählen nicht) */
+  function ueberlagere(zu) { V.Q.forEach(function (o) { var k = pgNorm(o.id || o.wunsch); if (!k) return; if (o.gebinde) zu[k] = { gebinde: o.gebinde, preis: o.preis }; else delete zu[k]; }); }
+  function sichereQ() { if (V.qId) { if (V.Q.length) merke('um-q-' + V.qId, JSON.stringify(V.Q)); else weg('um-q-' + V.qId); } $('lade').hidden = (!V.Q.length || !!V.haengt) && V.offen <= 0; banner(); }
+  function weg(k) { try { localStorage.removeItem(k); } catch (e) { /* ohne Speicher */ } }
   /* Ungespeicherte Scans (auch von früher, aus dem Speicher des Browsers): oben rot, bis gespeichert oder bewusst verworfen */
   function banner() {
     var l = [], b = $('ungespeichert');
@@ -395,43 +470,124 @@
     if (V.haengt && V.Q.length && !l.some(function (x) { return x.id === V.qId; })) l.push({ id: V.qId, q: V.Q });
     b.hidden = !l.length;
     b.innerHTML = l.map(function (x) {
-      return '<p>' + x.q.length + ' Scans von ' + esc(x.id) + ' sind NICHT gespeichert: ' + esc(x.q.map(function (o) { return o.id || o.wunsch || o.code; }).join(', ')) + '. '
+      return '<p>' + x.q.length + ' Scans von ' + esc(x.id) + ' sind NICHT gespeichert: ' + esc(x.q.map(function (o) { return o.id || o.wunsch || o.code || o.unbekannt; }).join(', ')) + '. '
         + (V.haengt && x.id === V.qId ? esc(V.haengt) + '. ' : '') + 'Admin: Durchgang wieder öffnen, dann hier öffnen, die Scans werden nachgespeichert.</p>'
         + '<div class="reihe"><button class="klein" data-a="oeffne" data-v="' + esc(x.id) + '">' + esc(x.id) + ' öffnen</button><button class="klein" data-a="qVerwerfen" data-v="' + esc(x.id) + '">Verwerfen</button></div>';
     }).join('');
   }
   function qVerwerfen(id) {
     if (!confirm('Die ungespeicherten Scans von ' + id + ' endgültig verwerfen? Die Stücke müssen dann nochmals gescannt werden.')) return;
-    try { localStorage.removeItem('um-q-' + id); } catch (e) { /* ohne Speicher */ }
+    weg('um-q-' + id);
     if (V.qId === id) { V.Q = []; V.haengt = null; }
     banner();
   }
+  /* Schlange eines Durchgangs, der gerade nicht offen ist, im Speicher kürzen (Antwort kam nach einem Wechsel) */
+  function qKuerzen(id, n) {
+    var q = []; try { q = JSON.parse(lies('um-q-' + id) || '[]') || []; } catch (e) { q = []; }
+    q = q.slice(n); if (q.length) merke('um-q-' + id, JSON.stringify(q)); else weg('um-q-' + id);
+    banner();
+  }
+
+  /* ---------- Liste «Nicht gespeichert – nochmals scannen» (Prüfung 24.10.2026) ----------
+     Konflikte vom Server und abgelehnte Scans bleiben stehen (pro Durchgang im Speicher des Browsers), bis sie gespeichert oder als erledigt abgehakt sind. */
+  function ngLaden(id) { try { V.ng = JSON.parse(lies('um-ng-' + id) || '[]') || []; } catch (e) { V.ng = []; } }
+  function ngSichern() { if (!V.D) return; if (V.ng.length) merke('um-ng-' + V.D.id, JSON.stringify(V.ng)); else weg('um-ng-' + V.D.id); }
+  function ngDazu(id, grund) {
+    var k = pgNorm(id);
+    V.ng = [{ id: String(id), grund: String(grund || ''), zeit: uhr() }].concat(V.ng.filter(function (x) { return pgNorm(x.id) !== k; })).slice(0, 100);
+    ngSichern(); ngZeichnen();
+  }
+  function ngWeg(id) { var k = pgNorm(id), n = V.ng.length; V.ng = V.ng.filter(function (x) { return pgNorm(x.id) !== k; }); if (V.ng.length !== n) { ngSichern(); ngZeichnen(); } }
+  function ngAlle() { if (!confirm('Alle ' + V.ng.length + ' Einträge als erledigt abhaken? Nur, wenn die Stücke nochmals gescannt oder geklärt sind.')) return; V.ng = []; ngSichern(); ngZeichnen(); }
+  function ngHtml() {
+    if (!V.ng || !V.ng.length) return '';
+    return '<div class="karte ng"><div class="reihe" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Nicht gespeichert – nochmals scannen (' + V.ng.length + ')</h3><button class="klein" data-a="ngAlle">Alle erledigt</button></div>'
+      + '<table><tbody>' + V.ng.map(function (x) {
+        var p = V.idx && V.idx[pgNorm(x.id)];
+        return '<tr><td class="mono">' + esc(x.id) + '</td><td>' + esc(p ? p.name : '') + '</td><td>' + esc(x.grund) + '</td><td class="still">' + esc(x.zeit) + '</td><td><button class="klein" data-a="ngWeg" data-v="' + esc(x.id) + '">Erledigt</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  function ngZeichnen() { var e = $('ng-platz'); if (e) e.innerHTML = ngHtml(); }
+
   function senden() {
     if (V.qLaeuft || !V.Q.length || V.haengt || !V.qId) return;
     V.qLaeuft = true;
-    var teil = V.Q.slice(0, 50), id = V.qId;
+    var teil = V.Q.slice(0, 50), id = V.qId, nr = ++V.qNr;
+    /* Wächter (Prüfung 24.10.2026): kommt nach 60 s keine Antwort, gibt er das Senden wieder frei. Die Scans bleiben im Speicher;
+       die Wiederholung bucht nichts doppelt (Scan-ID, vorher). Eine späte Antwort der alten Anfrage zählt nicht mehr. */
+    clearTimeout(V.wTimer);
+    V.wTimer = setTimeout(function () {
+      if (V.qNr !== nr || !V.qLaeuft) return;
+      V.qNr++; V.qLaeuft = false;
+      melde('Speichern dauert zu lange, neuer Versuch. Die Scans bleiben gespeichert im Browser.', true);
+      senden();
+    }, V.waechter);
     google.script.run.withSuccessHandler(function (r) {
-      V.qLaeuft = false; V.Q = V.Q.slice(teil.length); sichereQ();
-      if (!V.D || V.D.id !== id) return;
+      if (nr !== V.qNr) return;
+      clearTimeout(V.wTimer); V.qLaeuft = false;
+      /* Nur die eigene Schlange kürzen: ist inzwischen ein anderer Durchgang offen, nur dessen Speicher (Prüfung 24.10.2026) */
+      if (V.qId === id) { V.Q = V.Q.slice(teil.length); sichereQ(); } else qKuerzen(id, teil.length);
+      if (!V.D || V.D.id !== id) { if (V.Q.length) senden(); return; }
       /* Stand vom Server, darüber was noch in der Schlange wartet */
       V.D.zuordnung = r.zuordnung;
       ueberlagere(V.D.zuordnung);
-      (r.ergebnis || []).forEach(function (x) { var w = norm(x.wunsch), n = norm(x.id); if (w && w !== n) V.letzte = V.letzte.map(function (y) { return y === w ? n : y; }); });
-      var echt = r.konflikte.filter(function (c) { return !c.gleich; });
-      if (echt.length) { V.rueck = { art: 'stop', titel: 'Nicht gespeichert: ' + echt.map(function (c) { return c.id + ' (' + c.grund + ')'; }).join(', ') }; piep(false); }
-      if (V.ansicht === 'scan') neuZeichnenScan();
+      var umb = function (w, n) { w = pgNorm(w); n = pgNorm(n); if (w && n && w !== n) V.letzte = V.letzte.map(function (y) { return y === w ? n : y; }); };
+      (r.ergebnis || []).forEach(function (x) { umb(x.wunsch, x.id); });
+      (r.konflikte || []).forEach(function (c) { if (c.gleich && c.wunsch) umb(c.wunsch, c.id); });
+      var echt = (r.konflikte || []).filter(function (c) { return !c.gleich; }), bad = {};
+      echt.forEach(function (c) { bad[pgNorm(c.id)] = true; ngDazu(c.id, c.grund); });
+      /* Was jetzt gespeichert ist, fällt aus der Liste «Nicht gespeichert» */
+      teil.forEach(function (o) { var k = pgNorm(o.id || o.wunsch); if (k && !bad[k]) ngWeg(k); });
+      (r.ergebnis || []).forEach(function (x) { ngWeg(x.id); });
+      if (echt.length) { V.rueck = { art: 'stop', titel: 'Nicht gespeichert: ' + echt.map(function (c) { return c.id + ' (' + c.grund + ')'; }).join(', '), text: ' Steht oben in der roten Liste.' }; piep(false); }
+      if (r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) gebindeNeu();
+      else if (V.ansicht === 'scan') neuZeichnenScan();
       if (V.Q.length) senden();
     }).withFailureHandler(function (e) {
-      V.qLaeuft = false;
+      if (nr !== V.qNr) return;
+      clearTimeout(V.wTimer); V.qLaeuft = false;
       var m = String((e && e.message) || e).replace(/^Error:\s*/, '');
-      /* Durchgang inzwischen abgeschlossen: Schlange NICHT verwerfen, dauerhaft oben anzeigen */
-      if (/nicht im Scan|abgeschlossen/i.test(m)) { V.haengt = m; sichereQ(); melde(V.Q.length + ' Scans nicht gespeichert: ' + m, true); return; }
+      /* Durchgang inzwischen abgeschlossen oder verworfen: Schlange NICHT verwerfen, dauerhaft oben anzeigen */
+      if (/nicht im Scan|abgeschlossen|verworfen/i.test(m)) { V.haengt = m; sichereQ(); melde(V.Q.length + ' Scans nicht gespeichert: ' + m, true); piep(false); return; }
       melde('Speichern hat nicht geklappt, nächster Versuch in 5 Sekunden (' + m + ')', true);
       setTimeout(senden, 5000);
     }).api('zuordnen', [id, teil, K()]);
   }
-  /* Alle 20 Sekunden den Stand der anderen holen (wenn nichts wartet) */
-  setInterval(function () { if (V.ansicht === 'scan' && V.D && !V.Q.length && !V.qLaeuft && !V.haengt && document.visibilityState === 'visible') { google.script.run.withSuccessHandler(function (r) { if (V.D && !V.Q.length) { V.D.zuordnung = r.zuordnung; if (V.ansicht === 'scan' && document.activeElement && document.activeElement.id === 'scan') neuZeichnenScan(true); } }).withFailureHandler(function () {}).api('zuordnen', [V.D.id, [], K()]); } }, 20000);
+  /* Gebinde hat jemand anderes geändert: neu laden, Schlange darüberlegen. War das gewählte Gebinde weg, muss neu gewählt werden. */
+  function gebindeNeu() {
+    if (!V.D) return;
+    var id = V.D.id, akt = V.aktiv;
+    ruf('laden', [id], function (d) {
+      if (!V.D || V.D.id !== d.id) return;
+      setzeD(d); ueberlagere(V.D.zuordnung);
+      if (akt && !V.geb[akt]) { V.aktiv = ''; ablehnen('Das gewählte Gebinde gibt es nicht mehr.', ' Bitte ein Gebinde wählen.'); }
+      melde('Die Gebinde wurden geändert und neu geladen.');
+      if (V.ansicht === 'scan') zeichne();
+    });
+  }
+  /* Abschluss oder Verwerfen von einem anderen Gerät: Scan-Seite schliessen */
+  function statusGeaendert(status) {
+    melde('Der Durchgang ist jetzt «' + status + '». Scannen geht nicht mehr.', true); piep(false);
+    oeffne(V.D.id);
+  }
+  /* Alle 20 Sekunden den Stand der anderen holen (wenn nichts wartet). Eigene, nur lesende Abfrage ohne Sperre (Prüfung 24.10.2026). */
+  function abfrage() {
+    if (V.ansicht !== 'scan' || !V.D || V.Q.length || V.qLaeuft || V.haengt || document.visibilityState !== 'visible') return;
+    var id = V.D.id;
+    google.script.run.withSuccessHandler(function (r) {
+      V.abfrageFehler = 0;
+      if (!V.D || V.D.id !== id || V.Q.length || V.qLaeuft || V.ansicht !== 'scan') return;
+      if (r.status !== 'Scan') { statusGeaendert(r.status); return; }
+      V.D.zuordnung = r.zuordnung;
+      if (r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) { gebindeNeu(); return; }
+      var ae = document.activeElement;
+      if (!ae || ae.id === 'scan' || !/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) neuZeichnenScan(true);
+    }).withFailureHandler(function (e) {
+      V.abfrageFehler++;
+      if (V.abfrageFehler === 3) melde('Keine Verbindung zum Server (' + String((e && e.message) || e).replace(/^Error:\s*/, '') + '). Scans bleiben im Browser.', true);
+    }).api('stand', [id]);
+  }
+  setInterval(abfrage, 20000);
   function neuZeichnenScan(still) {
     if (V.ansicht !== 'scan') return;
     var fokus = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-preis');
@@ -445,12 +601,29 @@
   }
   var AC = null;
   function piep(gut) { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); var o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = gut ? 880 : 220; g.gain.value = .08; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + (gut ? .08 : .3)); } catch (e) { /* ohne Ton */ } }
-  function zumAbschluss() { if (V.Q.length) { if (V.haengt) { melde('Es gibt ungespeicherte Scans (oben). Zuerst klären.', true); return; } melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); return; } ruf('laden', [V.D.id], function (d) { setzeD(d); V.ansicht = 'abschluss'; zeichne(); }); }
+  function zumAbschluss() { if (V.Q.length) { if (V.haengt) { melde('Es gibt ungespeicherte Scans (oben). Zuerst klären.', true); piep(false); return; } melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; } ruf('laden', [V.D.id], function (d) { setzeD(d); V.ansicht = 'abschluss'; zeichne(); }); }
+  /* Falscher Durchgang (Prüfung 24.10.2026): verwerfen statt abschliessen. Stücke und Lagerorte sind danach wieder frei. Mit Scans nur Admins (prüft der Server). */
+  function verwerfen() {
+    var d = V.D; if (!d) return;
+    if (V.Q.length && !V.haengt) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; }
+    var n = Object.keys(d.zuordnung).filter(function (k) { return V.idx[k]; }).length;
+    if (!confirm('Durchgang ' + d.id + ' «' + d.name + '» verwerfen?\n\n' + (n ? n + ' gescannte Stücke werden NICHT übernommen (nur Admins). ' : 'Es ist noch nichts gescannt. ') + 'Stücke und Lagerorte sind danach wieder frei. Das lässt sich nicht rückgängig machen.')) return;
+    ruf('verwerfen', [d.id, K()], function () {
+      if (KAM.an) kameraAus();
+      weg('um-ng-' + d.id); if (V.qId === d.id) { V.Q = []; V.qId = ''; V.haengt = null; weg('um-q-' + d.id); }
+      zurStart(); melde('Durchgang ' + d.id + ' verworfen. Stücke und Lagerorte sind wieder frei.');
+    }, function (m) { melde(m, true); piep(false); });
+  }
 
   /* ---------- Kamera-Scan (Handy) ----------
-     Live: Kamera-Bild, alle 200 ms nach einem Strichcode suchen (BarcodeDetector, sonst ZXing). Gleicher Code erst nach 2.5 s wieder.
+     Live: Kamera-Bild, alle 200 ms nach einem Strichcode suchen (BarcodeDetector, sonst ZXing).
+     Sperren (Prüfung 24.10.2026, vorher «gleicher Code erst nach 2.5 s wieder», das buchte eine Puppe, die länger im Bild war, zweimal):
+      - Gleicher Code erst wieder, wenn er mindestens 1 s aus dem Bild war (KAM.sicht: Code → seit wann nicht mehr gesehen).
+      - Nach jedem Treffer 1,5 s alle Codes gesperrt. Ein Code, der zum eben gescannten Stück gehört (EAN und PG-Etikett desselben Stücks),
+        muss ebenfalls zuerst 1 s aus dem Bild. Ein bewusster Gebinde-Wechsel hebt nur die kurze Sperre auf.
      Geht die Live-Kamera nicht (z.B. keine Erlaubnis im Google-Rahmen), öffnet sich die Foto-Kamera des Handys: Foto machen, Code wird gelesen. */
-  var KAM = { an: false, foto: false, stream: null, det: null, zx: null, timer: null, letzte: '', zeit: 0 };
+  var KAM = { an: false, foto: false, stream: null, det: null, zx: null, timer: null, letzte: '', zeit: 0, sicht: {}, sperreBis: 0, letzteP: null };
+  var KAM_WEG_MS = 1000, KAM_SPERRE_MS = 1500;
   var ZX_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
   var FORMATE = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'];
   function istHandy() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer: coarse)').matches); }
@@ -485,10 +658,10 @@
     if (Date.now() - (KAM.tipp || 0) < 700) return;      // doppeltes Tippen
     KAM.tipp = Date.now();
     if (KAM.an) { kameraAus(); return; }
-    if (!K()) { V.rueck = { art: 'stop', titel: 'Bitte zuerst oben das Kürzel eintragen.' }; $('rueck').innerHTML = rueckHtml(); $('kuerzel').focus(); return; }
+    if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { fotoScan(); return; }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (st) {
-      KAM.stream = st; KAM.an = true; document.body.classList.add('kam');
+      KAM.stream = st; KAM.an = true; KAM.sicht = {}; KAM.sperreBis = 0; document.body.classList.add('kam');
       var k = $('kamera'); k.hidden = false;
       k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Code in den Rahmen.</b><button class="klein" data-a="kamera">Kamera aus</button></div>';
       var v = k.querySelector('video'); v.srcObject = st; var p = v.play(); if (p && p.catch) p.catch(function () {});
@@ -506,21 +679,49 @@
       if (!KAM.an) return;
       var weiter = function () { if (KAM.an) KAM.timer = setTimeout(los, 200); };
       if (!v.videoWidth) { weiter(); return; }
-      if (KAM.det) { KAM.det.detect(v).then(function (r) { if (r && r.length) treffer(r[0].rawValue); }).catch(function () { KAM.det = false; zxLaden(function () {}); }).then(weiter); return; }
+      if (KAM.det) {
+        KAM.det.detect(v).then(function (r) {
+          var l = (r || []).map(function (x) { return String(x.rawValue || '').trim(); }).filter(String);
+          kamBild(l); l.forEach(function (c) { treffer(c); });
+        }).catch(function () { KAM.det = false; zxLaden(function () {}); }).then(weiter);
+        return;
+      }
       if (!window.ZXing) { weiter(); return; }
       /* ZXing: nur den Streifen um den Rahmen lesen, das ist schneller und trifft besser */
       var w = v.videoWidth, h = v.videoHeight, sh = Math.round(h * 0.5);
       c.width = w; c.height = sh; c.getContext('2d').drawImage(v, 0, Math.round((h - sh) / 2), w, sh, 0, 0, w, sh);
-      var t = zxAusCanvas(c); if (t) treffer(t);
+      var t = zxAusCanvas(c); kamBild(t ? [t] : []); if (t) treffer(t);
       weiter();
     };
     los();
   }
+  /* Nach jeder Bild-Analyse: Codes, die gesperrt sind, aber nicht mehr im Bild, zählen als weg; nach 1 s weg sind sie wieder frei */
+  function kamBild(codes) {
+    var jetzt = Date.now();
+    Object.keys(KAM.sicht).forEach(function (c) {
+      var s = KAM.sicht[c];
+      if (codes.indexOf(c) > -1) s.weg = 0;
+      else { if (!s.weg) s.weg = jetzt; if (jetzt - s.weg >= KAM_WEG_MS) delete KAM.sicht[c]; }
+    });
+  }
+  /* Gehört der Code zum eben gescannten Stück? PG-Etikett mit dem gleichen Barcode, oder der Barcode dieses Stücks. */
+  function kamPartner(code) {
+    var p = KAM.letzteP; if (!p) return false;
+    var q = V.idx && V.idx[pgNorm(code)], b = bcKey(p.barcode);
+    if (q) return pgNorm(q.id) === pgNorm(p.id) || (!!b && bcKey(q.barcode) === b);
+    return !!b && bcKey(code) === b;
+  }
   function treffer(code) {
     code = String(code || '').trim();
     if (!code) return;
-    if (code === KAM.letzte && Date.now() - KAM.zeit < 2500) return;
-    KAM.letzte = code; KAM.zeit = Date.now();
+    var jetzt = Date.now(), s = KAM.sicht[code];
+    if (s) { s.weg = 0; return; }                                                      // noch im Bild oder weniger als 1 s weg
+    var nah = jetzt < KAM.sperreBis || !!(KAM.letzte && KAM.sicht[KAM.letzte]);
+    if (nah && kamPartner(code)) { KAM.sicht[code] = { weg: 0 }; return; }             // zweiter Code desselben Stücks (EAN und PG-Etikett)
+    if (jetzt < KAM.sperreBis) return;                                                 // eben ein anderes Stück: kurz warten, der Code kommt im nächsten Bild wieder
+    KAM.sicht[code] = { weg: 0 }; KAM.sperreBis = jetzt + KAM_SPERRE_MS; KAM.letzte = code; KAM.zeit = jetzt;
+    var q = V.idx ? (V.idx[pgNorm(code)] || (V.bar[bcKey(code)] || [])[0]) : null;
+    KAM.letzteP = { id: q ? q.id : '', barcode: q ? q.barcode : code };
     var el = $('scan'); if (!el) return;
     el.value = code; scanne();
     try { if (navigator.vibrate) navigator.vibrate(V.rueck && V.rueck.art === 'ok' ? 60 : [80, 60, 80]); } catch (e) { /* ohne */ }
@@ -545,7 +746,7 @@
     var fertig = function (code) {
       URL.revokeObjectURL(url); KAM.foto = false;
       if (code) { $('scan').value = code; scanne(); }
-      else { V.rueck = { art: 'warn', titel: 'Kein Strichcode erkannt.', text: ' Näher und scharf nochmals.' }; $('rueck').innerHTML = rueckHtml(); piep(false); }
+      else ablehnen('Kein Strichcode erkannt.', ' Näher und scharf nochmals.');
     };
     img.onload = function () {
       var zx = function () {
@@ -563,30 +764,37 @@
 
   /* ---------- 3 · Abschluss ---------- */
   function abschlussSeite() {
-    var d = V.D, fertig = d.status === 'Abgeschlossen', z = d.zuordnung, tot = 0;
-    var offen = d.bestand.filter(function (p) { return !z[norm(p.id)]; }).length;
+    var d = V.D, fertig = d.status === 'Abgeschlossen', verworfen = d.status === 'Verworfen', z = d.zuordnung, tot = 0;
+    var offen = d.bestand.filter(function (p) { return !z[pgNorm(p.id)]; }).length;
     var zeilen = d.gebinde.map(function (g) { var s = stand(g.id); tot += s.t; return '<tr><td><b>' + esc(g.name) + '</b></td><td><span class="etikett ' + g.art + '">' + esc(g.art === 'Verkauf' ? 'Verkauf · ' + g.abnehmer : g.art === 'Lager' ? 'Neue Palette' : 'Entsorgung') + '</span></td><td class="mono">' + esc(g.lagerort || '–') + '</td><td class="zahl">' + s.n + '</td><td class="zahl">' + chf(s.t) + '</td></tr>'; }).join('');
     var h = '<div class="schritte"><span>1 · Setup</span><span>2 · Scan</span><span class="an">3 · Abschluss</span></div>'
-      + '<div class="karte"><h2>' + (fertig ? 'Abgeschlossen' : 'Kontrolle') + '</h2><table><thead><tr><th>Gebinde</th><th>Art</th><th>Lagerort neu</th><th class="zahl">Stück</th><th class="zahl">Total</th></tr></thead><tbody>' + zeilen + '</tbody></table>'
-      + '<p style="margin-top:10px">' + (offen ? '<b>' + offen + ' nicht gescannt</b> · bleiben am alten Ort' : 'Alles zugeordnet') + '</p>';
-    if (!fertig) return h + '<div class="reihe"><button class="pink" data-a="abschliessen"' + (Object.keys(z).length ? '' : ' disabled') + '>Abschliessen</button><button data-a="zurueckScan">Zurück zum Scan</button></div>'
+      + '<div class="karte"><h2>' + (fertig ? 'Abgeschlossen' : verworfen ? 'Verworfen' : 'Kontrolle') + '</h2><table><thead><tr><th>Gebinde</th><th>Art</th><th>Lagerort neu</th><th class="zahl">Stück</th><th class="zahl">Total</th></tr></thead><tbody>' + zeilen + '</tbody></table>';
+    if (verworfen) return h + '<p style="margin-top:10px">Dieser Durchgang ist verworfen: nichts wird übernommen, Stücke und Lagerorte sind wieder frei.</p></div>';
+    h += '<p style="margin-top:10px">' + (offen ? '<b>' + offen + ' nicht gescannt</b> · bleiben am alten Ort und kommen als «' + NICHT_GEFUNDEN + '» in die Liste' : 'Alles zugeordnet') + '</p>';
+    if (!fertig) return h + '<div class="reihe"><button class="pink" data-a="abschliessen"' + (Object.keys(z).length ? '' : ' disabled') + '>Abschliessen</button><button data-a="zurueckScan">Zurück zum Scan</button><button data-a="verwerfen">Durchgang verwerfen</button></div>'
       + '</div>';
     var listen = d.listen ? d.listen.split('\n').map(function (l) { var i = l.indexOf(': '); return '<li>' + esc(l.slice(0, i)) + ': <a href="' + esc(l.slice(i + 2)) + '">Liste öffnen</a></li>'; }).join('') : '';
     var a = d.aenderungen, erl = a.filter(function (x) { return x.erledigt; }).length, abw = a.filter(function (x) { return /^ABWEICHUNG/.test(x.pruefung || ''); }).length;
     var akt = { 'Verkaufen': 'Lagerort auf das Gebinde setzen, dann im Return Tool «Lieferung erstellen» (setzt verkauft)', 'Lagerort ändern': 'Lagerort ändern', 'Entsorgen': 'Entsorgen' };
+    akt[NICHT_GEFUNDEN] = 'Beim Umpacken nicht gefunden: am alten Lagerort suchen, sonst im Return Tool klären. Keine Änderung nötig.';
     h += (listen ? '<h3 style="margin-top:14px">Listen</h3><ul>' + listen + '</ul>' : '') + '</div>'
       + '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Return Tool</h2><span class="still">' + erl + ' von ' + a.length + ' erledigt</span></div>'
       + '<div class="reihe" style="margin:12px 0"><button data-a="kopieren">Liste kopieren</button><span class="still">Im Return Tool eintragen, dann abhaken. Verkauf: Lagerort setzen → «Lieferung erstellen».</span></div>'
       + (abw ? '<div class="meldung stop" style="margin-bottom:10px"><span class="gross">' + abw + ' Abweichungen zum Return Tool</span> Vor dem Eintragen prüfen (gelb). Suchen über die ID, die Zeile ist nur ein Hinweis.</div>' : '')
       + '<table><thead><tr><th><input type="checkbox" data-a="alleErledigt"></th><th>ID</th><th>Bezeichnung</th><th>Aktion</th><th>Tab · Zeile (Hinweis)</th><th>Lagerort alt → neu</th><th class="zahl">VP alt</th><th class="zahl">Preis</th><th>Prüfung</th></tr></thead><tbody>'
-      + a.map(function (x) { return '<tr' + (x.erledigt ? ' style="opacity:.5"' : '') + '><td><input type="checkbox" data-erl="' + x.r + '"' + (x.erledigt ? ' checked' : '') + '></td><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td title="' + esc(akt[x.aktion] || '') + '">' + esc(x.aktion) + (x.abnehmer ? ' · ' + esc(x.abnehmer) : '') + '</td><td>' + esc(x.tab) + ' · ' + esc(x.zeile) + '</td><td class="mono">' + esc(x.alt) + ' → <b>' + esc(x.neu || (x.aktion === 'Entsorgen' ? 'Entsorgen' : '')) + '</b></td><td class="zahl">' + chf(x.vp) + '</td><td class="zahl"' + (Math.abs(x.preis - x.vp) > 0.004 ? ' style="background:var(--gelb)"' : '') + '>' + chf(x.preis) + '</td>'
-        + '<td' + (/^ABWEICHUNG/.test(x.pruefung || '') ? ' class="abw" style="background:var(--gelb)"' : '') + '>' + esc(x.pruefung || '') + '</td></tr>'; }).join('')
+      + a.map(function (x) {
+        var ng = x.aktion === NICHT_GEFUNDEN;
+        return '<tr' + (x.erledigt ? ' style="opacity:.5"' : '') + '><td><input type="checkbox" data-erl="' + x.r + '"' + (x.erledigt ? ' checked' : '') + '></td><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td title="' + esc(akt[x.aktion] || '') + '">' + (ng ? '<b>' + esc(x.aktion) + '</b>' : esc(x.aktion)) + (x.abnehmer ? ' · ' + esc(x.abnehmer) : '') + '</td><td>' + esc(x.tab) + ' · ' + esc(x.zeile) + '</td>'
+          + '<td class="mono">' + esc(x.alt) + (ng ? '' : ' → <b>' + esc(x.neu || (x.aktion === 'Entsorgen' ? 'Entsorgen' : '')) + '</b>') + '</td><td class="zahl' + (!(x.vp > 0) ? ' gelb' : '') + '">' + chf(x.vp) + '</td>'
+          + (ng ? '<td class="zahl">–</td>' : '<td class="zahl"' + (Math.abs(x.preis - x.vp) > 0.004 ? ' style="background:var(--gelb)"' : '') + '>' + chf(x.preis) + '</td>')
+          + '<td' + (/^ABWEICHUNG/.test(x.pruefung || '') ? ' class="abw" style="background:var(--gelb)"' : '') + '>' + esc(x.pruefung || '') + '</td></tr>';
+      }).join('')
       + '</tbody></table></div>';
     return h;
   }
   function abschliessen() {
-    var d = V.D, offen = d.bestand.filter(function (p) { return !d.zuordnung[norm(p.id)]; }).length;
-    if (!confirm('Durchgang ' + d.id + ' abschliessen?' + (offen ? '\n\n' + offen + ' Stücke sind in keinem Gebinde und bleiben, wo sie sind.' : '') + '\n\nDanach lässt sich nichts mehr scannen.')) return;
+    var d = V.D, offen = d.bestand.filter(function (p) { return !d.zuordnung[pgNorm(p.id)]; }).length;
+    if (!confirm('Durchgang ' + d.id + ' abschliessen?' + (offen ? '\n\n' + offen + ' Stücke sind in keinem Gebinde: Sie bleiben, wo sie sind, und kommen als «' + NICHT_GEFUNDEN + '» in die Liste.' : '') + '\n\nDanach lässt sich nichts mehr scannen.')) return;
     abschliessenSenden(false);
   }
   /* Kamen eben noch Zuordnungen anderer, fragt der Server zuerst nach (warnung) */
@@ -599,27 +807,35 @@
   }
   function zurueckScan() { V.ansicht = 'scan'; zeichne(); }
   function kopieren() {
-    var a = V.D.aenderungen, t = ['ID\tBezeichnung\tAktion\tAbnehmer\tTab\tZeile (Hinweis)\tLagerort alt\tLagerort neu\tVP alt\tPreis\tPrüfung'].concat(a.map(function (x) { return [x.id, x.name, x.aktion, x.abnehmer, x.tab, x.zeile, x.alt, x.neu, x.vp.toFixed(2), x.preis.toFixed(2), x.pruefung || ''].join('\t'); })).join('\n');
+    var a = V.D.aenderungen, t = ['ID\tBezeichnung\tAktion\tAbnehmer\tTab\tZeile (Hinweis)\tLagerort alt\tLagerort neu\tVP alt\tPreis\tPrüfung'].concat(a.map(function (x) { return [x.id, x.name, x.aktion, x.abnehmer, x.tab, x.zeile, x.alt, x.neu, x.vp.toFixed(2), x.aktion === NICHT_GEFUNDEN ? '' : x.preis.toFixed(2), x.pruefung || ''].join('\t'); })).join('\n');
     var ok = function () { melde(a.length + ' Zeilen kopiert.'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { melde('Kopieren ging nicht.', true); }); else melde('Kopieren ging nicht.', true);
   }
-  function erledigt(zeilen, wert) { ruf('erledigt', [V.D.id, zeilen, wert], function (a) { V.D.aenderungen = a; zeichne(); }); }
+  /* Erledigt mit PG-ID (Prüfung 24.10.2026): der Server prüft, dass Zeile und Stück zusammenpassen */
+  function erledigt(zeilen, wert) {
+    var l = (zeilen || []).map(function (r) { var x = V.D.aenderungen.filter(function (y) { return Number(y.r) === Number(r); })[0]; return x ? { r: x.r, id: x.id } : null; }).filter(Boolean);
+    ruf('erledigt', [V.D.id, l, wert], function (a) { V.D.aenderungen = a; zeichne(); }, function (m) { melde(m, true); piep(false); zeichne(); });
+  }
 
   /* ---------- Zeichnen und Ereignisse ---------- */
   function zeichne() {
     var m = $('main');
+    if (V.ansicht !== 'scan' && KAM.an) kameraAus();      // zuerst, sonst fiel die Abschluss-Seite bei laufender Kamera weg (Prüfung 24.10.2026)
     if (V.ansicht === 'start') { $('wo').textContent = ''; m.innerHTML = startSeite(); }
     else if (V.ansicht === 'setup') { $('wo').textContent = 'Neuer Durchgang'; m.innerHTML = setupSeite(); ortZahl(); }
     else if (V.ansicht === 'scan') { m.innerHTML = scanSeite(); if ($('scan') && !KAM.an && !istHandy()) $('scan').focus(); }
-    if (V.ansicht !== 'scan' && KAM.an) kameraAus();
     else if (V.ansicht === 'abschluss') m.innerHTML = abschlussSeite();
   }
   var A = { zurStart: zurStart, oeffne: oeffne, neuerDurchgang: neuerDurchgang, gebDazu: gebDazu, gebWeg: gebWeg, vorschlag: vorschlag, alleOrte: alleOrte, keineOrte: keineOrte, anlegen: anlegen,
     aktiv: aktiv, reiter: reiter, scanne: scanne, verschieben: verschieben, entfernen: entfernen, zumAbschluss: zumAbschluss, abschliessen: abschliessen, zurueckScan: zurueckScan, kopieren: kopieren,
-    bearbDazu: bearbDazu, bearbWeg: bearbWeg, bearbSpeichern: bearbSpeichern, kamera: kamera, qVerwerfen: qVerwerfen };
+    bearbDazu: bearbDazu, bearbWeg: bearbWeg, bearbSpeichern: bearbSpeichern, kamera: kamera, qVerwerfen: qVerwerfen, verwerfen: verwerfen, ngWeg: ngWeg, ngAlle: ngAlle };
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-a]');
-    if (b && A[b.getAttribute('data-a')] && b.tagName !== 'INPUT') { ev.preventDefault(); A[b.getAttribute('data-a')](b.getAttribute('data-v')); }
+    if (b && A[b.getAttribute('data-a')] && b.tagName !== 'INPUT') {
+      ev.preventDefault(); A[b.getAttribute('data-a')](b.getAttribute('data-v'));
+      /* Fokus nach jeder Aktion zurück ins Scanfeld (PC mit Hand-Scanner), ausser beim Bearbeiten der Gebinde (Prüfung 24.10.2026) */
+      if (V.reiter !== 'bearbeiten') fokusScan();
+    }
   });
   document.addEventListener('change', function (ev) {
     var t = ev.target;
@@ -629,9 +845,28 @@
     if (t.getAttribute('data-g') && t.tagName === 'SELECT') { if (V.ansicht === 'setup') { setupLesen(); zeichne(); } else { bearbLesen(); $('reiter-inhalt').innerHTML = reiterHtml(); } return; }
     if (t.getAttribute('data-erl')) { erledigt([Number(t.getAttribute('data-erl'))], t.checked); return; }
     if (t.getAttribute('data-a') === 'alleErledigt') { erledigt(V.D.aenderungen.map(function (x) { return x.r; }), t.checked); return; }
-    if (t.getAttribute('data-preis')) { preisSetzen(t.getAttribute('data-preis'), t.value); }
+    if (t.getAttribute('data-preis')) { preisSetzen(t.getAttribute('data-preis'), t.value); fokusScan(); }
   });
   document.addEventListener('input', function (ev) { if (ev.target.id === 's-filter') { V.setup.filter = ev.target.value; $('s-orte').innerHTML = ortHtml(); } });
+  /* Hand-Scanner (Prüfung 24.10.2026): tippt sehr schnell (unter 50 ms pro Zeichen) und schliesst mit Enter. Landet das in der Scan-Ansicht ausserhalb
+     des Scanfelds (Kürzel, Preisfeld, Knopf, nirgends), geht der Code ans Scanfeld und das andere Feld behält seinen alten Wert. */
+  var TS = { buf: '', t: 0, el: null, alt: null };
+  document.addEventListener('keydown', function (ev) {
+    var t = ev.target, jetzt = Date.now();
+    if (V.ansicht !== 'scan' || !$('scan') || (t && t.id === 'scan')) { TS.buf = ''; return; }
+    if (ev.key && ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      if (!TS.buf || jetzt - TS.t > 50) { TS.buf = ''; TS.el = t; TS.alt = t && t.tagName === 'INPUT' ? t.value : null; }
+      TS.buf += ev.key; TS.t = jetzt; return;
+    }
+    if (ev.key === 'Enter' && TS.buf.length >= 4 && jetzt - TS.t < 200) {
+      ev.preventDefault(); ev.stopPropagation();
+      var code = TS.buf; TS.buf = '';
+      if (TS.el && TS.el.tagName === 'INPUT' && TS.alt !== null) { TS.el.value = TS.alt; if (TS.el.id === 'kuerzel') merke('um-kuerzel', K()); }
+      $('scan').value = code; scanne(); fokusScan();
+      return;
+    }
+    TS.buf = '';
+  }, true);
   document.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Enter') return;
     var a = ev.target.getAttribute('data-enter');
@@ -646,7 +881,8 @@
   banner();
   window.UM = V;      // für Tests
   window.UMA = A;
-  window.UMK = { KAM: KAM, treffer: treffer, fotoLesen: fotoLesen, kameraAus: kameraAus };
+  window.UMK = { KAM: KAM, treffer: treffer, fotoLesen: fotoLesen, kameraAus: kameraAus, kamBild: kamBild };
+  window.UMF = { abfrage: abfrage, senden: senden, gebindeNeu: gebindeNeu };
 })();
 </script>
 </body>

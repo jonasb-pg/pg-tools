@@ -19,39 +19,48 @@
  *    offener Durchgänge. Ein neuer Lagerort, der irgendwo vorkommt, wird abgelehnt. Ähnliche Schreibweisen (KIDS-8 / KID-8) nur als Hinweis.
  *  - Ein Stück ist höchstens in einem offenen Durchgang. Barcode-Scans löst der Server in der Sperre auf (freies Stück dieser EAN).
  *  - Abschluss liest das Return Tool neu und markiert Abweichungen pro ID (Zeile nur als Hinweis).
+ * Prüfung 24.10.2026 (Version 2026-10-24.2)
+ *  - Jeder schreibende Weg prüft den Status in der Sperre nochmals (kein Scan nach dem Abschluss). Status «Verworfen» für falsche Durchgänge.
+ *  - IDs und Barcodes nach dem gemeinsamen Vertrag V3 (pgNorm_, bcKey_), Lagerorte ohne Trennzeichen verglichen (KID15 = KID-15).
+ *  - Barcode-Scans: Scan-Kennung dauerhaft in «Zuordnung» (Spalte «Scan-ID»); freie Stücke einer EAN mit verschiedenem VP oder Lagerort alt: PG-ID scannen.
+ *  - Liste von Hand wird gegen das Return Tool aufgelöst (unbekannte IDs abgelehnt) und beim Abschluss geprüft wie jede Quelle.
+ *  - Nicht gescannte Stücke kommen beim Abschluss als «Nicht gefunden – prüfen» in «Änderungen»; fremde Scans stehen im Log.
  */
 
-const VERSION = '2026-10-24.1';
+const VERSION = '2026-10-24.2';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
 const ABLAGE_ID = '1S3ErLO9WlDyCK2UfVEwNuBA9XFmuFMSK';                  // Drive-Ordner «00_Claude-Eingang» für die Abnehmer-Listen
-const QUELL_TABS = 'Stationär, Berner Brocki, Caritas, Heilsarmee, Online, Spenden';
+const QUELL_TABS = 'Stationär, Berner Brocki, Caritas, Heilsarmee, Online';                  // ohne «Spenden»: den Tab gibt es im Return Tool nicht (Vertrag V4)
+const QUELL_TABS_ALT = 'Stationär, Berner Brocki, Caritas, Heilsarmee, Online, Spenden';     // alte Vorgabe: «einrichten» ersetzt sie, solange sie unverändert ist
 const ARTEN = ['Verkauf', 'Lager', 'Entsorgung'];
 const REGELN = ['VP', 'Prozent', 'Null'];
+const NICHT_GEFUNDEN = 'Nicht gefunden – prüfen';      // Aktion in «Änderungen» für nicht gescannte Stücke (keine Änderung im Return Tool, sperrt nichts)
+const PREIS_MAX = 100000;                               // Preis ab hier: wohl ein Barcode im Preisfeld
 
 const KOPF = {
-  'Durchgänge': ['Durchgang', 'Name', 'Status', 'Quelle', 'Quell-Lagerorte', 'Erstellt am', 'Erstellt von', 'Abgeschlossen am', 'Abgeschlossen von', 'Listen'],
+  'Durchgänge': ['Durchgang', 'Name', 'Status', 'Quelle', 'Quell-Lagerorte', 'Erstellt am', 'Erstellt von', 'Abgeschlossen am', 'Abgeschlossen von', 'Listen', 'Verworfen am', 'Verworfen von'],
   'Gebinde': ['Durchgang', 'Gebinde', 'Name', 'Art', 'Abnehmer', 'Lagerort neu', 'Preisregel', 'Prozent'],
   'Bestand': ['Durchgang', 'PG-ID', 'Barcode', 'Bezeichnung', 'Kategorie', 'OVP', 'VP', 'Lagerort alt', 'Quelle Tab', 'Quelle Zeile'],
-  'Zuordnung': ['Durchgang', 'PG-ID', 'Gebinde', 'Preis', 'Zeit', 'Kürzel'],
+  'Zuordnung': ['Durchgang', 'PG-ID', 'Gebinde', 'Preis', 'Zeit', 'Kürzel', 'Scan-ID'],
   'Änderungen': ['Durchgang', 'PG-ID', 'Bezeichnung', 'Aktion', 'Gebinde', 'Abnehmer', 'Lagerort alt', 'Lagerort neu', 'VP alt', 'Preis', 'Return-Tool-Tab', 'Zeile', 'Erledigt', 'Prüfung'],
   'Log': ['Zeit', 'Person', 'Aktion', 'Durchgang', 'Detail'],
   'Einstellungen': ['Einstellung', 'Wert', 'Erklärung']
 };
 const EINST = [
   ['Return Tool ID', RT_ID, 'Aus diesem Sheet liest das Setup den Bestand. Das Tool schreibt dort nie.'],
-  ['Quell-Tabs', QUELL_TABS, 'Aus diesen Tabs des Return Tools wählt das Setup die Quelle, mit Komma getrennt. Belegte Lagerorte prüft das Tool in allen Tabs.'],
+  ['Quell-Tabs', QUELL_TABS, 'Aus diesen Tabs des Return Tools wählt das Setup die Quelle, mit Komma getrennt. Ein Tab braucht die Spalten ID, Bezeichnung und Lagerort. Belegte Lagerorte prüft das Tool in allen Tabs.'],
   ['Ablage-Ordner ID', ABLAGE_ID, 'In diesen Drive-Ordner legt der Abschluss die Liste pro Abnehmer.'],
-  ['Admins', '', 'E-Mail-Adressen, die einen abgeschlossenen Durchgang wieder öffnen dürfen. Leer = alle.']
+  ['Admins', '', 'E-Mail-Adressen, die einen abgeschlossenen Durchgang wieder öffnen und einen Durchgang mit Scans verwerfen dürfen. Leer = nur das Konto, unter dem das Tool läuft (Jonas).']
 ];
 const KATALOG = [
-  { tab: 'Durchgänge', art: 'arbeit', inhalt: 'Ein Durchgang pro Umpack-Aktion: Name, Status (Setup, Scan, Abgeschlossen), Quelle.' },
-  { tab: 'Gebinde', art: 'arbeit', inhalt: 'Die Ziel-Gebinde pro Durchgang: Verkauf an Abnehmer, neue Palette im Lager, Entsorgung, mit Preisregel.' },
-  { tab: 'Bestand', art: 'arbeit', inhalt: 'Die Stücke der Quelle beim Setup (Kopie aus dem Return Tool oder von Hand eingefügt).' },
-  { tab: 'Zuordnung', art: 'arbeit', inhalt: 'Welches Stück in welches Gebinde gescannt wurde. Preis leer = Preisregel des Gebindes.' },
-  { tab: 'Änderungen', art: 'arbeit', inhalt: 'Beim Abschluss: was im Return Tool zu ändern ist (Lagerort, Preis, verkauft, entsorgt). «Prüfung» = Abgleich mit dem Return Tool beim Abschluss (Schlüssel ID, Zeile nur Hinweis). «Erledigt» setzt ihr, wenn es eingetragen ist.' },
-  { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person.' },
+  { tab: 'Durchgänge', art: 'arbeit', inhalt: 'Ein Durchgang pro Umpack-Aktion: Name, Status (Scan, Abgeschlossen, Verworfen), Quelle. Verworfen = falscher Durchgang, Stücke und Lagerorte wieder frei.' },
+  { tab: 'Gebinde', art: 'arbeit', inhalt: 'Die Ziel-Gebinde pro Durchgang: Verkauf an Abnehmer, neue Palette im Lager, Entsorgung, mit Preisregel. Gelöschte Gebinde bleiben als «U-… (gelöscht)», ihre Nummer wird nie wieder vergeben.' },
+  { tab: 'Bestand', art: 'arbeit', inhalt: 'Die Stücke der Quelle beim Setup (Kopie aus dem Return Tool; eine Liste von Hand wird gegen das Return Tool aufgelöst). VP leer = im Return Tool leer oder unlesbar.' },
+  { tab: 'Zuordnung', art: 'arbeit', inhalt: 'Welches Stück in welches Gebinde gescannt wurde. Preis leer = Preisregel des Gebindes. «Scan-ID» = Kennung eines Barcode-Scans: eine Wiederholung bucht kein zweites Stück.' },
+  { tab: 'Änderungen', art: 'arbeit', inhalt: 'Beim Abschluss: was im Return Tool zu ändern ist (Lagerort, Preis, verkauft, entsorgt). «Nicht gefunden – prüfen» = nicht gescannt, am alten Lagerort suchen (keine Änderung). «Prüfung» = Abgleich mit dem Return Tool beim Abschluss (Schlüssel ID, Zeile nur Hinweis). «Erledigt» setzt ihr, wenn es eingetragen ist.' },
+  { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person, auch fremde Scans (Code nicht in der Quelle).' },
   { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Return Tool, Quell-Tabs, Ablage-Ordner, Admins.' }
 ];
 
@@ -73,15 +82,30 @@ function einrichten() {
       sh = leer ? leer.setName(n) : ss.insertSheet(n);
     }
     const k = KOPF[n], alt = sh.getLastColumn() ? sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String) : [];
-    k.forEach(function (name) { if (alt.indexOf(name) === -1) { alt.push(name); sh.getRange(1, alt.length).setValue(name); } });
+    /* Neue Spalten (z.B. «Scan-ID», «Verworfen am») hinten an bestehende Tabs anhängen; Daten bleiben, wo sie sind */
+    k.forEach(function (name) {
+      if (alt.indexOf(name) > -1) return;
+      alt.push(name);
+      if (alt.length > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), alt.length - sh.getMaxColumns());
+      sh.getRange(1, alt.length).setValue(name);
+    });
     if (n !== 'Einstellungen' && n !== 'Log') sh.getRange(1, 1, sh.getMaxRows(), alt.length).setNumberFormat('@');   // IDs, Barcodes, Preise als Text: nichts wird umgewandelt
   });
-  const e = ss.getSheetByName('Einstellungen'), da = e.getLastRow() > 1 ? e.getRange(2, 1, e.getLastRow() - 1, 1).getValues().map(function (r) { return String(r[0]).trim(); }) : [];
-  EINST.forEach(function (z) { if (da.indexOf(z[0]) === -1) e.appendRow([z[0], z[1] === undefined ? '' : z[1], z[2]]); });
+  const e = ss.getSheetByName('Einstellungen'), werte = e.getLastRow() > 1 ? e.getRange(2, 1, e.getLastRow() - 1, 3).getValues() : [];
+  const da = werte.map(function (r) { return String(r[0]).trim(); });
+  EINST.forEach(function (z) {
+    const i = da.indexOf(z[0]);
+    /* Admins neu: das Konto, das einrichtet (Vertrag V6: leer hiesse sonst «nur dieses Konto») */
+    if (i === -1) { e.appendRow([z[0], z[0] === 'Admins' ? (einrichter_() || ich_()) : (z[1] === undefined ? '' : z[1]), z[2]]); return; }
+    if (String(werte[i][2]) !== z[2]) e.getRange(i + 2, 3).setValue(z[2]);                                          // Erklärung nachführen, der Wert bleibt
+    if (z[0] === 'Quell-Tabs' && String(werte[i][1]).trim() === QUELL_TABS_ALT) e.getRange(i + 2, 2).setValue(QUELL_TABS);   // alte Vorgabe mit «Spenden» (V4)
+  });
   basisEinrichten_(ss, { name: 'Umpack Tool', version: VERSION, zweck: 'Paletten neu triagieren: Setup, Scan, Abschluss. Das Return Tool wird nur gelesen; was dort zu ändern ist, steht im Tab «Änderungen».' }, KATALOG,
     [['Regeln', ['Ein Durchgang: Setup (Quelle und Gebinde), Scan (jedes Stück in sein Gebinde), Abschluss (Listen und Änderungen).',
       'Preis 0 = verschenkt. Gebinde-Arten: Verkauf an Abnehmer, neue Palette im Lager, Entsorgung.',
-      'Die Änderungen im Return Tool trägt ihr nach dem Tab «Änderungen» ein und setzt «Erledigt». Verkauf: Lagerort auf das Gebinde setzen, dann «Lieferung erstellen».']]]);
+      'Die Änderungen im Return Tool trägt ihr nach dem Tab «Änderungen» ein und setzt «Erledigt». Verkauf: Lagerort auf das Gebinde setzen, dann «Lieferung erstellen».',
+      'Falscher Durchgang: «Durchgang verwerfen» (ohne Scans jede Person, mit Scans nur Admins). Stücke und Lagerorte sind danach wieder frei.',
+      'Nicht gescannte Stücke stehen nach dem Abschluss als «Nicht gefunden – prüfen» in «Änderungen»: am alten Lagerort suchen, dann «Erledigt».']]]);
   vergiss_();
   return 'ok';
 }
@@ -117,7 +141,13 @@ function schreib_(n, zeilen) {
   if (!zeilen.length) return;
   const sh = blatt_(n), kopf = lies_(n).kopf;
   const werte = zeilen.map(function (o) { return kopf.map(function (k) { return o[k] === undefined || o[k] === null ? '' : String(o[k]); }); });
-  sh.getRange(sh.getLastRow() + 1, 1, werte.length, kopf.length).setValues(werte);
+  const start = sh.getLastRow() + 1, ende = start + werte.length - 1, max = sh.getMaxRows();
+  /* Vertrag V2: Ein Tab hat nur getMaxRows() Zeilen (meist 1000). Vorher Zeilen anhängen, mit Textformat wie die bestehenden. */
+  if (ende > max) {
+    sh.insertRowsAfter(max, ende - max);
+    if (n !== 'Einstellungen' && n !== 'Log') sh.getRange(max + 1, 1, ende - max, kopf.length).setNumberFormat('@');
+  }
+  sh.getRange(start, 1, werte.length, kopf.length).setValues(werte);
   vergiss_(n);
 }
 /** Setzt einzelne Felder in bestehenden Zeilen: [{ _r, Feld: Wert }]. */
@@ -137,7 +167,7 @@ function setz_(n, aend) {
 function gesperrt_(f) {
   const l = LockService.getScriptLock();
   if (!l.tryLock(20000)) throw new Error('Gerade speichert jemand anderes. Bitte nochmals versuchen.');
-  try { vergiss_(); return f(); } finally { SpreadsheetApp.flush(); l.releaseLock(); }
+  try { vergiss_(); return f(); } finally { try { SpreadsheetApp.flush(); } catch (e) { /* Vertrag V1: Sperre trotzdem freigeben */ } l.releaseLock(); }
 }
 function einst_() {
   const e = {};
@@ -145,30 +175,65 @@ function einst_() {
   return e;
 }
 function ich_() { try { return Session.getActiveUser().getEmail() || ''; } catch (err) { return ''; } }
+/** Konto, unter dem das Tool läuft (Web-App «Ausführen als Jonas»; «einrichten» führt Jonas im Editor aus). */
+function einrichter_() { try { return Session.getEffectiveUser().getEmail() || ''; } catch (err) { return ''; } }
+/** Admin (Vertrag V6): steht in «Admins». Leere Liste = nur das Konto, unter dem das Tool läuft (die Person, die «einrichten» ausführt). */
+function istAdmin_(e) {
+  const l = String((e || einst_())['Admins'] || '').toLowerCase().split(/[,;\s]+/).filter(String), ich = ich_().toLowerCase();
+  if (!ich) return false;
+  return l.length ? l.indexOf(ich) > -1 : ich === einrichter_().toLowerCase();
+}
 function zeit_(d) { return Utilities.formatDate(d || new Date(), TZ, 'dd.MM.yyyy HH:mm:ss'); }
 function log_(aktion, durchgang, detail) {
   try { schreib_('Log', [{ 'Zeit': zeit_(), 'Person': ich_(), 'Aktion': aktion, 'Durchgang': durchgang || '', 'Detail': String(detail || '').slice(0, 500) }]); } catch (err) { /* Log darf nie stören */ }
 }
-/** Zahl aus Text: «1'234.50», «1,234.50», «1.234,50», «1234,50», «12.-». Das hintere Trennzeichen trennt die Rappen; «1,234» = 1234. */
-function zahl_(x) {
-  if (typeof x === 'number') return x;
-  let s = String(x == null ? '' : x).replace(/CHF/i, '').replace(/['’\s]/g, '').replace(/[.,]-$/, '');
-  if (!s) return 0;
+/**
+ * Zahl aus Text oder null (leer oder unlesbar): «1'234.50», «1,234.50», «1.234,50», «1234,50», «12.-», «15.–», «Fr. 12.50», «CHF 12», «ca. 20».
+ * Das hintere Trennzeichen trennt die Rappen; «1,234» = 1234.
+ */
+function zahlOderNull_(x) {
+  if (typeof x === 'number') return isFinite(x) ? x : null;
+  let s = String(x == null ? '' : x).trim().replace(/^ca\.?\s*/i, '').replace(/(CHF|SFr\.?|Fr\.?)/gi, '').replace(/['’\s]/g, '').replace(/[.,]?[-–—]+$/, '');
+  if (!s) return null;
   const p = s.lastIndexOf('.'), k = s.lastIndexOf(',');
   if (p > -1 && k > -1) s = p > k ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
   else if (k > -1) s = /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
   else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
   const n = Number(s);
-  return isFinite(n) ? n : 0;
+  return isFinite(n) ? n : null;
 }
+/** Zahl aus Text, leer oder unlesbar = 0 (für Summen). Wo 0 nicht stimmen darf (VP, Preis), zahlOderNull_ nehmen. */
+function zahl_(x) { const n = zahlOderNull_(x); return n === null ? 0 : n; }
 function rappen_(x) { return Math.round(Number(x) * 100) / 100; }
-function norm_(s) { return String(s == null ? '' : s).trim().toUpperCase(); }
-/** Lagerort zum Vergleichen: gross, ohne Leerzeichen. */
-function ortKey_(s) { return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ''); }
+/**
+ * ID zum Vergleichen (Vertrag V3): PG-ID «pg 0862», «PG'862», «PG862», «PG-0862» = «PG-862». AN-, RC-, RT-, ET- gleich (Präfix gross, Trenner und
+ * führende Nullen egal). Sonst trim + gross. Gespeichert wird die ID wie im Return Tool, verglichen immer so.
+ */
+function pgNorm_(s) {
+  const t = String(s == null ? '' : s).trim(), m = /^(PG|AN|RC|RT|ET)[\s'\-]?0*(\d+)$/i.exec(t);
+  return m ? m[1].toUpperCase() + '-' + m[2] : t.toUpperCase();
+}
+function norm_(s) { return pgNorm_(s); }          // alter Name, gleiche Regel
+/** Gültige ID (Quelle, Liste von Hand): nach V3 normalisiert der Form XX-123. */
+function idGueltig_(s) { return /^[A-Z]{2,4}-\d+$/.test(pgNorm_(s)); }
+/** Lagerort zum Vergleichen: gross, ohne Leerzeichen und Trennzeichen (KID-15 = KID15 = KID 15 = KID–15 = KID_15). Nie so speichern. */
+function ortKey_(s) { return String(s == null ? '' : s).toUpperCase().replace(/[\s\-–—_.\/]+/g, ''); }
+/** Lagerort zum Speichern und Anzeigen: gross, ohne Leerzeichen. */
+function ortName_(s) { return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ''); }
 /** Ähnliche Schreibweise, nur für Hinweise (nie zusammenlegen): KIDS-8 ~ KID-8, KID-08 ~ KID-8. */
-function ortAehnlich_(s) { const k = ortKey_(s), m = /^([A-Z]+?)S?-0*(\d+)$/.exec(k); return m ? m[1] + '-' + m[2] : k; }
-/** Barcode zum Vergleichen: ohne Apostroph und Leerzeichen, Ziffern ohne führende Nullen (UPC-A = EAN-13 mit 0 davor). */
-function bcKey_(s) { let b = String(s == null ? '' : s).replace(/^'/, '').replace(/\s+/g, '').toUpperCase(); if (/^\d+$/.test(b)) b = b.replace(/^0+/, ''); return b; }
+function ortAehnlich_(s) { const k = ortKey_(s), m = /^([A-Z]+?)S?0*(\d+)$/.exec(k); return m ? m[1] + '-' + m[2] : k; }
+/**
+ * Barcode zum Vergleichen (Vertrag V3): Apostroph, Leerzeichen, Bindestriche weg; GS1 «(01)» oder «01» vor 14 Ziffern weg;
+ * reine Ziffern ohne führende Nullen (UPC-A = EAN-13 mit 0 davor); Codes mit Buchstaben gross.
+ */
+function bcKey_(s) {
+  let b = String(s == null ? '' : s).replace(/['’\s\-]/g, '');
+  b = b.replace(/^\(01\)(?=\d{14}$)/, '');
+  if (/^01\d{14}$/.test(b)) b = b.slice(2);
+  return /^\d+$/.test(b) ? b.replace(/^0+/, '') : b.toUpperCase();
+}
+/** Liste kürzen für Meldungen: die ersten n, dann «und x weitere». */
+function kurz_(l, n) { n = n || 10; return l.slice(0, n).join(', ') + (l.length > n ? ' und ' + (l.length - n) + ' weitere' : ''); }
 /** Zeit «dd.MM.yyyy HH:mm:ss» (wie zeit_) in Millisekunden, sonst 0. */
 function zeitMs_(t) { const m = /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})/.exec(String(t || '')); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]) : 0; }
 
@@ -177,8 +242,8 @@ function zeitMs_(t) { const m = /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{
 /* ------------------------------------------------------------------ */
 
 function api(name, args) {
-  const f = { start: start, lagerorte: lagerorte, anlegen: anlegen, laden: laden, zuordnen: zuordnen, gebindeAendern: gebindeAendern,
-    scanStarten: scanStarten, abschliessen: abschliessen, erledigt: erledigt, wiederOeffnen: wiederOeffnen }[name];
+  const f = { start: start, lagerorte: lagerorte, anlegen: anlegen, laden: laden, zuordnen: zuordnen, stand: stand, gebindeAendern: gebindeAendern,
+    scanStarten: scanStarten, abschliessen: abschliessen, erledigt: erledigt, wiederOeffnen: wiederOeffnen, verwerfen: verwerfen }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   try { return f.apply(null, args || []); }
   catch (e) { log_('Fehler', '', name + ': ' + (e && e.message)); throw e; }
@@ -199,32 +264,42 @@ function start() {
 
 /**
  * Liest das Return Tool (nur lesen). Alle Tabs mit einer Spalte «Lagerort» in den ersten 15 Zeilen (auch Scanner ohne ID, Analyse, Archiv …).
- *  stuecke: Stücke der Quell-Tabs (mit ID, für die Quelle), orte: jeder vorkommende Lagerort (Schlüssel ortKey_) mit Anzahl pro Tab,
- *  ids: PG-ID → wo sie jetzt steht (alle Tabs mit ID), fehlend: Quell-Tabs, die fehlen oder keine Kopfzeile mit «ID» und «Lagerort» haben.
+ *  stuecke: Stücke der Quell-Tabs (mit gültiger ID, für die Quelle), orte: jeder vorkommende Lagerort (Schlüssel ortKey_) mit Anzahl pro Tab,
+ *  ids: ID (pgNorm_) → alle Zeilen mit dieser ID in allen Tabs (mit Angaben, archiv = Tab beginnt mit «Archiv»),
+ *  ohneId: Lagerort → Zeilen der Quell-Tabs mit Inhalt, aber ohne gültige ID (fallen nicht still heraus, das Setup zeigt sie),
+ *  fehlend: Quell-Tabs, die fehlen oder nicht lesbar sind (Vertrag V4: Kopfzeile ohne ID, Bezeichnung oder Lagerort).
  */
 function rtLesen_(e) {
-  const rt = SpreadsheetApp.openById(e['Return Tool ID'] || RT_ID), quell = {}, aus = { stuecke: [], orte: {}, ids: {}, fehlend: [] };
+  const rt = SpreadsheetApp.openById(e['Return Tool ID'] || RT_ID), quell = {}, aus = { stuecke: [], orte: {}, ids: {}, ohneId: {}, fehlend: [] };
   String(e['Quell-Tabs'] || QUELL_TABS).split(',').map(function (t) { return t.trim(); }).filter(String).forEach(function (t) { quell[t] = false; });
   rt.getSheets().forEach(function (sh) {
-    const tab = sh.getName(), istQuelle = Object.prototype.hasOwnProperty.call(quell, tab);
+    const tab = sh.getName(), istQuelle = Object.prototype.hasOwnProperty.call(quell, tab), archiv = /^archiv/i.test(tab);
     if (sh.getLastRow() < 2) { if (istQuelle) quell[tab] = true; return; }
     const v = sh.getDataRange().getValues();
     let k = -1;
     for (let i = 0; i < Math.min(v.length, 15); i++) { if (v[i].map(function (x) { return String(x).trim(); }).indexOf('Lagerort') > -1) { k = i; break; } }
     if (k < 0) return;
     const kopf = v[k].map(function (x) { return String(x).trim(); }), c = function (n) { return kopf.indexOf(n); };
-    if (istQuelle && c('ID') > -1) quell[tab] = true;
+    const lesbar = c('ID') > -1 && c('Bezeichnung') > -1, quelle = istQuelle && lesbar;
+    if (quelle) quell[tab] = true;
     for (let i = k + 1; i < v.length; i++) {
       const g = function (n) { return c(n) < 0 ? '' : v[i][c(n)]; };
-      const ort = String(g('Lagerort')).trim(), id = String(g('ID') || '').trim(), mitId = /^[A-Z]{2,4}-\d+$/i.test(id);
+      const ort = String(g('Lagerort')).trim(), id = String(g('ID') || '').trim(), name = String(g('Bezeichnung')).trim(), bc = String(g('Barcode')).replace(/^'/, '').trim();
       if (ort) {
         const ok = ortKey_(ort), o = aus.orte[ok] = aus.orte[ok] || { ort: ort, anzahl: 0, tabs: {} };
         o.anzahl++; o.tabs[tab] = (o.tabs[tab] || 0) + 1;
       }
-      if (!mitId) continue;
-      (aus.ids[norm_(id)] = aus.ids[norm_(id)] || []).push({ tab: tab, zeile: i + 1, ort: ort });
-      if (istQuelle) aus.stuecke.push({ id: id, barcode: String(g('Barcode')).replace(/^'/, '').trim(), name: String(g('Bezeichnung')).trim(), kat: String(g('Kategorie')).trim(),
-        ovp: zahl_(g('OVP')), vp: zahl_(g('VP')), ort: ort, tab: tab, zeile: i + 1 });
+      if (!idGueltig_(id)) {
+        if (quelle && (id || name || bc)) {
+          const o = ort || '(ohne Lagerort)';
+          (aus.ohneId[o] = aus.ohneId[o] || []).push((name || '(ohne Bezeichnung)') + (id ? ' «' + id + '»' : '') + ' · ' + tab + ' Zeile ' + (i + 1));
+        }
+        continue;
+      }
+      const vp = zahlOderNull_(g('VP'));
+      const st = { id: id, barcode: bc, name: name, kat: String(g('Kategorie')).trim(), ovp: zahl_(g('OVP')), vp: vp, ort: ort, tab: tab, zeile: i + 1, archiv: archiv };
+      (aus.ids[pgNorm_(id)] = aus.ids[pgNorm_(id)] || []).push(st);
+      if (quelle) aus.stuecke.push(st);
     }
   });
   Object.keys(quell).forEach(function (t) { if (!quell[t]) aus.fehlend.push(t); });
@@ -233,25 +308,31 @@ function rtLesen_(e) {
 
 /**
  * Belegte Lagerorte: alles im Return Tool und die «Lagerort neu» offener Durchgänge (nicht abgeschlossen, oder abgeschlossen mit noch
- * nicht eingetragenen Änderungen). ohne = Durchgang, dessen eigene Gebinde nicht zählen. Gibt { SCHLÜSSEL: 'wo belegt' } zurück.
+ * nicht eingetragenen Änderungen). ohne = Durchgang, dessen eigene Gebinde nicht zählen.
+ * Gibt { wo: { SCHLÜSSEL: 'wo belegt' }, name: { SCHLÜSSEL: 'Schreibweise' } } zurück (Schlüssel ortKey_, ohne Trennzeichen).
  */
 function belegt_(orte, ohne) {
-  const b = {};
+  const b = { wo: {}, name: {} };
   Object.keys(orte).forEach(function (k) {
     const o = orte[k];
-    b[k] = 'im Return Tool (' + Object.keys(o.tabs).map(function (t) { return t + ': ' + o.tabs[t]; }).join(', ') + ' Stück)';
+    b.wo[k] = 'im Return Tool (' + Object.keys(o.tabs).map(function (t) { return t + ': ' + o.tabs[t]; }).join(', ') + ' Stück)';
+    b.name[k] = ortName_(o.ort);
   });
   offeneGebinde_().forEach(function (g) {
     const k = ortKey_(g['Lagerort neu']);
-    if (k && String(g['Durchgang']) !== ohne && !b[k]) b[k] = 'im offenen Durchgang ' + g['Durchgang'] + ' (Gebinde «' + g['Name'] + '»)';
+    if (k && String(g['Durchgang']) !== ohne && !b.wo[k]) { b.wo[k] = 'im offenen Durchgang ' + g['Durchgang'] + ' (Gebinde «' + g['Name'] + '»)'; b.name[k] = ortName_(g['Lagerort neu']); }
   });
   return b;
 }
-/** Durchgänge, die noch etwas belegen: Status nicht «Abgeschlossen», oder Änderungen ohne «Erledigt». */
+/** Durchgänge, die noch etwas belegen: Status «Scan», oder abgeschlossen mit Änderungen ohne «Erledigt». «Verworfen» und «Nicht gefunden – prüfen» belegen nichts. */
 function offeneDurchgaenge_() {
   const offen = {}, aend = {};
-  lies_('Änderungen').z.forEach(function (r) { if (!String(r['Erledigt'] || '').trim()) aend[String(r['Durchgang'])] = true; });     // «U-… (zurückgenommen)» zählt nicht
-  lies_('Durchgänge').z.forEach(function (d) { const id = String(d['Durchgang']); if (String(d['Status']) !== 'Abgeschlossen') offen[id] = 'offen'; else if (aend[id]) offen[id] = 'abgeschlossen, Änderung noch nicht eingetragen'; });
+  lies_('Änderungen').z.forEach(function (r) { if (!String(r['Erledigt'] || '').trim() && String(r['Aktion']) !== NICHT_GEFUNDEN) aend[String(r['Durchgang'])] = true; });     // «U-… (zurückgenommen)» zählt nicht
+  lies_('Durchgänge').z.forEach(function (d) {
+    const id = String(d['Durchgang']), s = String(d['Status']);
+    if (s === 'Verworfen') return;
+    if (s !== 'Abgeschlossen') offen[id] = 'offen'; else if (aend[id]) offen[id] = 'abgeschlossen, Änderung noch nicht eingetragen';
+  });
   return offen;
 }
 function offeneGebinde_() {
@@ -261,46 +342,50 @@ function offeneGebinde_() {
 /** Prüft neue Lagerorte gegen die belegten. Belegt: Fehler. Ähnliche Schreibweise: Hinweis (Rückgabe). */
 function orteFrei_(gebinde, b) {
   const hinweise = [], aehnlich = {};
-  Object.keys(b).forEach(function (k) { (aehnlich[ortAehnlich_(k)] = aehnlich[ortAehnlich_(k)] || []).push(k); });
+  Object.keys(b.wo).forEach(function (k) { (aehnlich[ortAehnlich_(k)] = aehnlich[ortAehnlich_(k)] || []).push(k); });
   gebinde.forEach(function (g) {
     if (!g.lagerort) return;
     const k = ortKey_(g.lagerort);
-    if (b[k]) throw new Error('Der Lagerort «' + g.lagerort + '» ist schon belegt: ' + b[k] + '. Bitte einen freien wählen.');
+    if (b.wo[k]) throw new Error('Der Lagerort «' + g.lagerort + '» ist schon belegt' + (b.name[k] && b.name[k] !== g.lagerort ? ' (als «' + b.name[k] + '»)' : '') + ': ' + b.wo[k] + '. Bitte einen freien wählen.');
     const a = (aehnlich[ortAehnlich_(k)] || []).filter(function (x) { return x !== k; });
-    if (a.length) hinweise.push('«' + g.lagerort + '» ähnelt dem bestehenden Lagerort ' + a.slice(0, 3).join(', ') + '. Bitte prüfen.');
+    if (a.length) hinweise.push('«' + g.lagerort + '» ähnelt dem bestehenden Lagerort ' + a.slice(0, 3).map(function (x) { return b.name[x] || x; }).join(', ') + '. Bitte prüfen.');
   });
   return hinweise;
 }
-/** Stücke, die schon in einem offenen Durchgang sind: { PG-ID: 'U-0001 (offen)' }. */
+/** Stücke, die schon in einem offenen Durchgang sind: { PG-ID (pgNorm_): 'U-0001 (offen)' }. */
 function idsOffen_(ohne) {
   const offen = offeneDurchgaenge_(), aus = {};
   lies_('Bestand').z.forEach(function (p) { const d = String(p['Durchgang']); if (d !== ohne && offen[d] === 'offen') aus[norm_(p['PG-ID'])] = d + ' (offen)'; });
-  lies_('Änderungen').z.forEach(function (r) { const d = String(r['Durchgang']); if (d !== ohne && !String(r['Erledigt'] || '').trim() && offen[d]) aus[norm_(r['PG-ID'])] = d + ' (Änderung noch nicht im Return Tool eingetragen)'; });
+  lies_('Änderungen').z.forEach(function (r) {
+    const d = String(r['Durchgang']);
+    if (d !== ohne && !String(r['Erledigt'] || '').trim() && offen[d] && String(r['Aktion']) !== NICHT_GEFUNDEN) aus[norm_(r['PG-ID'])] = d + ' (Änderung noch nicht im Return Tool eingetragen)';
+  });
   return aus;
 }
 
-/** Setup: Lagerorte der Quell-Tabs mit Anzahl Stücke, die nächste freie Nummer pro Kürzel (über alle belegten Orte), fehlende Quell-Tabs. */
+/**
+ * Setup: Lagerorte der Quell-Tabs mit Anzahl Stücke und Anzahl Zeilen ohne gültige ID, die nächste freie Nummer pro Kürzel (über alle belegten Orte),
+ * fehlende Quell-Tabs. belegt = Schreibweisen der belegten Orte (der Browser vergleicht sie ohne Trennzeichen, wie ortKey_).
+ */
 function lagerorte() {
   const e = einst_(), rt = rtLesen_(e), je = {}, max = {};
-  rt.stuecke.forEach(function (p) {
-    const o = p.ort || '(ohne Lagerort)';
-    je[o] = je[o] || { ort: o, anzahl: 0, tabs: {} };
-    je[o].anzahl++; je[o].tabs[p.tab] = true;
-  });
+  const ort = function (o) { return je[o] = je[o] || { ort: o, anzahl: 0, ohneId: 0, tabs: {} }; };
+  rt.stuecke.forEach(function (p) { const o = ort(p.ort || '(ohne Lagerort)'); o.anzahl++; o.tabs[p.tab] = true; });
+  Object.keys(rt.ohneId).forEach(function (o) { ort(o).ohneId = rt.ohneId[o].length; });
   const b = belegt_(rt.orte, ''), aehnlich = {};
-  Object.keys(b).forEach(function (k) {
+  Object.keys(b.wo).forEach(function (k) {
     aehnlich[ortAehnlich_(k)] = true;
-    const m = /^([A-Z]+)-(\d{1,4})$/.exec(k);     // nur echte Palettennummern (im Return Tool stehen teils EANs als Lagerort, z.B. KID-4005176984105)
+    const m = /^([A-Z]+)(\d{1,4})$/.exec(k);     // nur echte Palettennummern (im Return Tool stehen teils EANs als Lagerort, z.B. KID-4005176984105)
     if (m) max[m[1]] = Math.max(max[m[1]] || 0, Number(m[2]));
   });
   const naechste = {};
   Object.keys(max).forEach(function (k) {
     let n = max[k] + 1;
-    while (b[k + '-' + n] || aehnlich[ortAehnlich_(k + '-' + n)]) n++;
+    while (b.wo[k + n] || aehnlich[ortAehnlich_(k + '-' + n)]) n++;
     naechste[k] = k + '-' + n;
   });
-  return { orte: Object.keys(je).sort(ortSort_).map(function (o) { return { ort: o, anzahl: je[o].anzahl, tabs: Object.keys(je[o].tabs).join(', ') }; }),
-    naechste: naechste, fehlend: rt.fehlend, belegt: Object.keys(b) };
+  return { orte: Object.keys(je).sort(ortSort_).map(function (o) { return { ort: o, anzahl: je[o].anzahl, ohneId: je[o].ohneId, tabs: Object.keys(je[o].tabs).join(', ') }; }),
+    naechste: naechste, fehlend: rt.fehlend, belegt: Object.keys(b.wo).map(function (k) { return b.name[k] || k; }) };
 }
 function ortSort_(a, b) {
   const x = /^([A-Z]+)-(\d+)$/i.exec(a), y = /^([A-Z]+)-(\d+)$/i.exec(b);
@@ -331,13 +416,39 @@ function manuellLesen_(text) {
   const c = function (namen) { for (let i = 0; i < namen.length; i++) { const j = kopf.indexOf(namen[i]); if (j > -1) return j; } return -1; };
   const ci = c(['id', 'pg-id', 'pgid']), cb = c(['barcode', 'ean']), cn = c(['bezeichnung', 'produkt', 'name']), cv = c(['vp', 'preis', 'vp chf']), co = c(['lagerort', 'ort', 'palette']), ck = c(['kategorie']), cov = c(['ovp', 'neupreis']);
   if (ci < 0) throw new Error('In der Kopfzeile fehlt die Spalte «ID» oder «PG-ID».');
-  const aus = [];
+  const aus = [], ohneId = [];
   zeilen.slice(1).forEach(function (z, i) {
     const t = felder_(z, trenn), g = function (j) { return j < 0 ? '' : String(t[j] === undefined ? '' : t[j]).trim(); };
-    if (!g(ci)) return;
+    if (!g(ci)) { if (t.some(function (x) { return String(x).trim(); })) ohneId.push(i + 2); return; }      // Zeile mit Inhalt, aber ohne ID: nicht still
     aus.push({ id: g(ci), barcode: g(cb), name: g(cn), kat: g(ck), ovp: zahl_(g(cov)), vp: zahl_(g(cv)), ort: g(co), tab: 'manuell', zeile: i + 2 });
   });
+  aus.ohneId = ohneId;
   return aus;
+}
+/**
+ * Liste von Hand gegen das Return Tool auflösen (Prüfung 24.10.2026): IDs nach V3 vergleichen, alle Angaben (ID wie im Return Tool, Barcode,
+ * Bezeichnung, VP, Lagerort, Tab, Zeile) aus dem Return Tool. Unbekannt, nur im Archiv oder mehrfach in Kanal-Tabs: Fehler mit Liste.
+ * Gibt { bestand, hinweise } zurück.
+ */
+function manuellAufloesen_(liste, rt) {
+  const unbekannt = [], archiv = [], mehrfach = [], abweichend = [], bestand = [], hinweise = [];
+  liste.forEach(function (z) {
+    const wo = rt.ids[pgNorm_(z.id)] || [], aktiv = wo.filter(function (w) { return !w.archiv; });
+    if (!wo.length) { unbekannt.push(z.id); return; }
+    if (!aktiv.length) { archiv.push(z.id); return; }
+    if (aktiv.length > 1) { mehrfach.push(z.id + ' (' + aktiv.map(function (w) { return w.tab + ' Zeile ' + w.zeile; }).join(', ') + ')'); return; }
+    const w = aktiv[0];
+    if (z.ort && ortKey_(z.ort) !== ortKey_(w.ort)) abweichend.push(z.id + ' ' + z.ort + ' → ' + (w.ort || 'leer'));
+    bestand.push(Object.assign({}, w));
+  });
+  const f = [];
+  if (unbekannt.length) f.push('nicht im Return Tool: ' + kurz_(unbekannt));
+  if (archiv.length) f.push('nur im Archiv (verkauft oder weg): ' + kurz_(archiv));
+  if (mehrfach.length) f.push('mehrfach im Return Tool: ' + kurz_(mehrfach, 5));
+  if (f.length) throw new Error('Liste von Hand: ' + f.join('; ') + '. Bitte die Liste korrigieren oder das Stück zuerst im Return Tool klären.');
+  if (abweichend.length) hinweise.push('Lagerort aus dem Return Tool übernommen (Liste wich ab): ' + kurz_(abweichend, 5) + '.');
+  if (liste.ohneId && liste.ohneId.length) hinweise.push('Liste: ' + liste.ohneId.length + ' Zeilen ohne ID übersprungen (Zeile ' + kurz_(liste.ohneId, 5) + ').');
+  return { bestand: bestand, hinweise: hinweise };
 }
 
 /** Prüft die Gebinde aus dem Setup. Gibt bereinigte Gebinde zurück. */
@@ -345,15 +456,15 @@ function gebindePruefen_(liste) {
   if (!Array.isArray(liste) || !liste.length) throw new Error('Bitte mindestens ein Gebinde anlegen.');
   const namen = {}, orte = {};
   return liste.map(function (g, i) {
-    const name = String(g.name || '').trim(), art = String(g.art || ''), ort = ortKey_(g.lagerort), regel = String(g.preisregel || 'VP');
+    const name = String(g.name || '').trim(), art = String(g.art || ''), ort = ortName_(g.lagerort), regel = String(g.preisregel || 'VP');
     if (!name) throw new Error('Gebinde ' + (i + 1) + ': Name fehlt.');
     if (namen[name.toLowerCase()]) throw new Error('Den Gebinde-Namen «' + name + '» gibt es doppelt.');
     namen[name.toLowerCase()] = true;
     if (ARTEN.indexOf(art) < 0) throw new Error('Gebinde «' + name + '»: Art fehlt.');
     if (art === 'Verkauf' && !String(g.abnehmer || '').trim()) throw new Error('Gebinde «' + name + '»: Abnehmer fehlt.');
     if (art !== 'Entsorgung' && !ort) throw new Error('Gebinde «' + name + '»: neuer Lagerort fehlt.');
-    if (art !== 'Entsorgung' && orte[ort]) throw new Error('Den Lagerort «' + ort + '» haben zwei Gebinde.');
-    if (art !== 'Entsorgung') orte[ort] = true;
+    if (art !== 'Entsorgung' && orte[ortKey_(ort)]) throw new Error('Den Lagerort «' + ort + '» haben zwei Gebinde.');
+    if (art !== 'Entsorgung') orte[ortKey_(ort)] = true;
     if (REGELN.indexOf(regel) < 0) throw new Error('Gebinde «' + name + '»: Preisregel fehlt.');
     const pz = Number(String(g.prozent || '').replace(',', '.'));
     if (regel === 'Prozent' && !(pz >= 0 && pz <= 100)) throw new Error('Gebinde «' + name + '»: Prozent zwischen 0 und 100 eintragen.');
@@ -365,33 +476,37 @@ function gebindePruefen_(liste) {
 /**
  * Setup speichern: legt den Durchgang an, kopiert den Bestand der Quelle und speichert die Gebinde. Danach ist der Durchgang bereit zum Scannen.
  * s = { name, quelle: 'rt' | 'manuell', lagerorte: [..], liste: 'Text', gebinde: [{ name, art, abnehmer, lagerort, preisregel, prozent }], kuerzel }
- * Das Return Tool wird auch bei einer Liste von Hand gelesen (belegte Lagerorte). Ist es nicht lesbar, bricht das Setup ab.
+ * Das Return Tool wird auch bei einer Liste von Hand gelesen (belegte Lagerorte, Auflösung der IDs). Ist es nicht lesbar, bricht das Setup ab.
  */
 function anlegen(s) {
   s = s || {};
   const name = String(s.name || '').trim();
   if (!name) throw new Error('Bitte dem Durchgang einen Namen geben.');
-  const gebinde = gebindePruefen_(s.gebinde), e = einst_();
+  const gebinde = gebindePruefen_(s.gebinde), e = einst_(), vorab = [];
   let rt;
   try { rt = rtLesen_(e); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
   let bestand;
-  if (s.quelle === 'manuell') bestand = manuellLesen_(s.liste);
-  else {
-    const orte = (s.lagerorte || []).map(String);
+  const orte = (s.lagerorte || []).map(String);
+  if (s.quelle === 'manuell') {
+    /* Prüfung 24.10.2026: Liste gegen das Return Tool auflösen (sonst wären Stücke, Lagerorte und Abschluss ungeprüft) */
+    const m = manuellAufloesen_(manuellLesen_(s.liste), rt);
+    bestand = m.bestand; m.hinweise.forEach(function (h) { vorab.push(h); });
+  } else {
     if (!orte.length) throw new Error('Bitte mindestens einen Quell-Lagerort wählen.');
     bestand = rt.stuecke.filter(function (p) { return orte.indexOf(p.ort || '(ohne Lagerort)') > -1; });
+    orte.forEach(function (o) { const l = rt.ohneId[o]; if (l && l.length) vorab.push(o + ': ' + l.length + ' Zeilen ohne ID oder mit ungültiger ID, nicht im Durchgang (' + kurz_(l, 3) + '). Bitte im Return Tool nachtragen.'); });
   }
-  if (!bestand.length) throw new Error('In der Quelle sind keine Stücke.');
+  if (!bestand.length) throw new Error('In der Quelle sind keine Stücke.' + (vorab.length ? ' ' + vorab.join(' ') : ''));
   const doppelt = {}, ids = {};
   bestand.forEach(function (p) { const k = norm_(p.id); if (ids[k]) doppelt[k] = true; ids[k] = true; });
   if (Object.keys(doppelt).length) throw new Error('Diese IDs stehen in der Quelle doppelt: ' + Object.keys(doppelt).slice(0, 10).join(', ') + '. Bitte zuerst im Return Tool klären.');
   /* Ein neuer Lagerort darf in der Quelle nicht schon vorkommen (sonst wären alte und neue Stücke gemischt). */
   const quellOrte = {};
   bestand.forEach(function (p) { quellOrte[ortKey_(p.ort)] = true; });
-  gebinde.forEach(function (g) { if (g.lagerort && quellOrte[g.lagerort]) throw new Error('Der neue Lagerort «' + g.lagerort + '» ist auch ein Quell-Lagerort. Bitte einen neuen wählen.'); });
+  gebinde.forEach(function (g) { if (g.lagerort && quellOrte[ortKey_(g.lagerort)]) throw new Error('Der neue Lagerort «' + g.lagerort + '» ist auch ein Quell-Lagerort. Bitte einen neuen wählen.'); });
   return gesperrt_(function () {
-    /* In der Sperre: Lagerorte gegen Return Tool und offene Gebinde, Stücke gegen offene Durchgänge */
-    const hinweise = orteFrei_(gebinde, belegt_(rt.orte, ''));
+    /* In der Sperre: Lagerorte gegen Return Tool und offene Gebinde, Stücke gegen offene Durchgänge (IDs nach V3 verglichen) */
+    const hinweise = vorab.concat(orteFrei_(gebinde, belegt_(rt.orte, '')));
     const offen = idsOffen_(''), schon = bestand.filter(function (p) { return offen[norm_(p.id)]; });
     if (schon.length) throw new Error('Diese Stücke sind schon in einem anderen Durchgang: ' + schon.slice(0, 10).map(function (p) { return p.id + ' in ' + offen[norm_(p.id)]; }).join(', ')
       + (schon.length > 10 ? ' und ' + (schon.length - 10) + ' weitere' : '') + '. Zuerst dort abschliessen und eintragen.');
@@ -399,41 +514,60 @@ function anlegen(s) {
     lies_('Durchgänge').z.forEach(function (r) { const m = /^U-(\d+)$/.exec(String(r['Durchgang'])); if (m) max = Math.max(max, Number(m[1])); });
     const id = 'U-' + String(max + 1).padStart(4, '0'), t = zeit_();
     schreib_('Durchgänge', [{ 'Durchgang': id, 'Name': name, 'Status': 'Scan', 'Quelle': s.quelle === 'manuell' ? 'Manuell' : 'Return Tool',
-      'Quell-Lagerorte': s.quelle === 'manuell' ? 'Liste' : (s.lagerorte || []).join(', '), 'Erstellt am': t, 'Erstellt von': ich_() + (s.kuerzel ? ' (' + s.kuerzel + ')' : '') }]);
-    schreib_('Gebinde', gebinde.map(function (g, i) {
-      return { 'Durchgang': id, 'Gebinde': id + '-G' + (i + 1), 'Name': g.name, 'Art': g.art, 'Abnehmer': g.abnehmer, 'Lagerort neu': g.lagerort, 'Preisregel': g.preisregel, 'Prozent': g.prozent };
-    }));
-    schreib_('Bestand', bestand.map(function (p) {
-      return { 'Durchgang': id, 'PG-ID': p.id, 'Barcode': p.barcode, 'Bezeichnung': p.name, 'Kategorie': p.kat, 'OVP': p.ovp || '', 'VP': p.vp, 'Lagerort alt': p.ort, 'Quelle Tab': p.tab, 'Quelle Zeile': p.zeile };
-    }));
+      'Quell-Lagerorte': s.quelle === 'manuell' ? 'Liste' : orte.join(', '), 'Erstellt am': t, 'Erstellt von': ich_() + (s.kuerzel ? ' (' + s.kuerzel + ')' : '') }]);
+    try {
+      schreib_('Gebinde', gebinde.map(function (g, i) {
+        return { 'Durchgang': id, 'Gebinde': id + '-G' + (i + 1), 'Name': g.name, 'Art': g.art, 'Abnehmer': g.abnehmer, 'Lagerort neu': g.lagerort, 'Preisregel': g.preisregel, 'Prozent': g.prozent };
+      }));
+      schreib_('Bestand', bestand.map(function (p) {
+        return { 'Durchgang': id, 'PG-ID': p.id, 'Barcode': p.barcode, 'Bezeichnung': p.name, 'Kategorie': p.kat, 'OVP': p.ovp || '', 'VP': p.vp === null || p.vp === undefined ? '' : p.vp,
+          'Lagerort alt': p.ort, 'Quelle Tab': p.tab, 'Quelle Zeile': p.zeile };
+      }));
+    } catch (err) {
+      /* Teil-Schreiben: Durchgang als «Verworfen» markieren, damit Stücke und Lagerorte nicht an einem halben Durchgang hängen bleiben */
+      try { setz_('Durchgänge', [{ _r: durchgang_(id)._r, 'Status': 'Verworfen', 'Verworfen am': zeit_(), 'Verworfen von': 'Tool (Setup abgebrochen)' }]); } catch (err2) { log_('Fehler', id, 'Setup abgebrochen, Verwerfen ging nicht: ' + (err2 && err2.message)); }
+      log_('Setup abgebrochen', id, String(err && err.message));
+      throw new Error('Das Setup liess sich nicht ganz speichern (' + (err && err.message) + '). Durchgang ' + id + ' ist verworfen, bitte nochmals anlegen.');
+    }
     const ohneBc = bestand.filter(function (p) { return !bcKey_(p.barcode); }).length;
     if (ohneBc) hinweise.push(ohneBc + ' Stücke ohne Barcode: nur per PG-ID-Etikett scannbar.');
-    if (s.quelle !== 'manuell' && rt.fehlend.length) hinweise.push('Quell-Tabs nicht gelesen: ' + rt.fehlend.join(', ') + '.');
+    const ohneVp = bestand.filter(function (p) { return !(Number(p.vp) > 0); });
+    if (ohneVp.length) hinweise.push(ohneVp.length + ' Stücke ohne VP (leer, 0 oder unlesbar): ' + kurz_(ohneVp.map(function (p) { return p.id; }), 5) + '. Preis nach Regel «VP» wäre 0, gelb markiert.');
+    if (s.quelle !== 'manuell' && rt.fehlend.length) hinweise.push('Quell-Tabs nicht gelesen: ' + rt.fehlend.join(', ') + ' (fehlen oder ohne Spalte ID, Bezeichnung, Lagerort).');
     log_('Durchgang angelegt', id, name + ' · ' + bestand.length + ' Stücke · ' + gebinde.map(function (g) { return g.name; }).join(', ') + (hinweise.length ? ' · ' + hinweise.join(' ') : ''));
     return Object.assign(laden(id), { hinweise: hinweise });
   });
 }
 
-/** Gebinde während des Scans ergänzen oder ändern (z.B. eine dritte Balu-Palette). Gebinde mit Stücken lassen sich nicht löschen. */
-function gebindeAendern(id, liste) {
+/**
+ * Gebinde während des Scans ergänzen oder ändern (z.B. eine dritte Balu-Palette). Gebinde mit Stücken lassen sich nicht löschen.
+ * stand = Gebinde-Stand, den der Browser gesehen hat (gebindeStand_). Hat inzwischen jemand anderes geändert: Fehler, neu laden.
+ */
+function gebindeAendern(id, liste, stand) {
   const d = durchgang_(id);
-  if (d['Status'] === 'Abgeschlossen') throw new Error('Der Durchgang ist abgeschlossen.');
+  if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   const neu = gebindePruefen_(liste);
   let rt;
   try { rt = rtLesen_(einst_()); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
   return gesperrt_(function () {
+    /* Prüfung 24.10.2026: Status in der Sperre nochmals (Abschluss oder Verwerfen kann dazwischen gekommen sein) */
+    const d2 = durchgang_(id);
+    if (String(d2['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d2['Status'] + ').');
+    if (stand && String(stand) !== gebindeStand_(id)) throw new Error('Inzwischen hat jemand anderes die Gebinde geändert. Bitte neu laden und nochmals ändern.');
     const alt = lies_('Gebinde').z.filter(function (g) { return String(g['Durchgang']) === id; }), belegt = {};
     lies_('Zuordnung').z.forEach(function (z) { if (String(z['Durchgang']) === id && String(z['Gebinde'])) belegt[String(z['Gebinde'])] = true; });
     const quellOrte = {};
     lies_('Bestand').z.forEach(function (p) { if (String(p['Durchgang']) === id) quellOrte[ortKey_(p['Lagerort alt'])] = true; });
-    neu.forEach(function (g) { if (g.lagerort && quellOrte[g.lagerort]) throw new Error('Der neue Lagerort «' + g.lagerort + '» ist auch ein Quell-Lagerort.'); });
+    neu.forEach(function (g) { if (g.lagerort && quellOrte[ortKey_(g.lagerort)]) throw new Error('Der neue Lagerort «' + g.lagerort + '» ist auch ein Quell-Lagerort.'); });
     /* Nur neue oder geänderte Lagerorte prüfen; die eigenen bisherigen Gebinde zählen nicht als belegt. */
     const bisher = {};
     alt.forEach(function (g) { bisher[ortKey_(g['Lagerort neu'])] = true; });
-    const hinweise = orteFrei_(neu.filter(function (g) { return g.lagerort && !bisher[g.lagerort]; }), belegt_(rt.orte, id));
+    const hinweise = orteFrei_(neu.filter(function (g) { return g.lagerort && !bisher[ortKey_(g.lagerort)]; }), belegt_(rt.orte, id));
     alt.forEach(function (g) { if (belegt[String(g['Gebinde'])] && !neu.some(function (n) { return n.id === String(g['Gebinde']); })) throw new Error('Das Gebinde «' + g['Name'] + '» hat schon Stücke und lässt sich nicht löschen.'); });
+    /* Nächste Nummer über alle Zeilen, auch gelöschte («U-0001 (gelöscht)»): eine Nummer wird nie wiederverwendet, ein veralteter Scan landet nie in einem anderen Gebinde */
     let max = 0;
-    alt.forEach(function (g) { const m = /-G(\d+)$/.exec(String(g['Gebinde'])); if (m) max = Math.max(max, Number(m[1])); });
+    const vor = id + '-G';
+    lies_('Gebinde').z.forEach(function (g) { const n = String(g['Gebinde']); if (n.indexOf(vor) === 0 && /^\d+$/.test(n.slice(vor.length))) max = Math.max(max, Number(n.slice(vor.length))); });
     const aend = [], dazu = [];
     neu.forEach(function (g) {
       const a = alt.filter(function (x) { return String(x['Gebinde']) === g.id; })[0];
@@ -470,10 +604,28 @@ function laden(id) {
       preisregel: String(g['Preisregel'] || 'VP'), prozent: g['Prozent'] === '' ? '' : Number(g['Prozent']) };
   });
   const bestand = lies_('Bestand').z.filter(function (p) { return String(p['Durchgang']) === id; }).map(function (p) {
-    return { id: String(p['PG-ID']), barcode: String(p['Barcode']), name: String(p['Bezeichnung']), kat: String(p['Kategorie']), vp: zahl_(p['VP']), ort: String(p['Lagerort alt']), tab: String(p['Quelle Tab']) };
+    const vp = zahl_(p['VP']);
+    return { id: String(p['PG-ID']), barcode: String(p['Barcode']), name: String(p['Bezeichnung']), kat: String(p['Kategorie']), vp: vp, vpFehlt: !(vp > 0), ort: String(p['Lagerort alt']), tab: String(p['Quelle Tab']) };
   });
   return { id: id, name: String(d['Name']), status: String(d['Status']), quelle: String(d['Quelle']), lagerorte: String(d['Quell-Lagerorte']),
-    listen: String(d['Listen'] || ''), gebinde: gebinde, bestand: bestand, zuordnung: zuordnungVon_(id), aenderungen: d['Status'] === 'Abgeschlossen' ? aenderungenVon_(id) : [] };
+    listen: String(d['Listen'] || ''), gebinde: gebinde, gebindeStand: gebindeStand_(id), bestand: bestand, zuordnung: zuordnungVon_(id),
+    aenderungen: d['Status'] === 'Abgeschlossen' ? aenderungenVon_(id) : [] };
+}
+/** Kurzer Fingerabdruck der Gebinde eines Durchgangs. Ändert jemand die Gebinde, merken es die anderen Handys bei der nächsten Abfrage (Prüfung 24.10.2026). */
+function gebindeStand_(id) {
+  const s = lies_('Gebinde').z.filter(function (g) { return String(g['Durchgang']) === id; })
+    .map(function (g) { return [g['Gebinde'], g['Name'], g['Art'], g['Abnehmer'], g['Lagerort neu'], g['Preisregel'], g['Prozent']].join('|'); }).join('\n');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36) + '.' + s.length;
+}
+/**
+ * Abfrage alle 20 Sekunden (Prüfung 24.10.2026): nur lesen, ohne Sperre, ohne Fehler bei abgeschlossenem Durchgang (keine Log-Flut).
+ * Liefert Status, Zuordnung und Gebinde-Stand: das Handy erfährt so Abschluss, Verwerfen und geänderte Gebinde.
+ */
+function stand(id) {
+  const d = durchgang_(id);
+  return { status: String(d['Status']), zuordnung: zuordnungVon_(id), gebindeStand: gebindeStand_(id) };
 }
 function zuordnungVon_(id) {
   const z = {};
@@ -488,16 +640,22 @@ function zuordnungVon_(id) {
 
 /**
  * Speichert Scans (aus der Warteschlange des Browsers). ops = [{ id: 'PG-…', gebinde: 'U-0001-G1' | '' (entfernen), preis: '' | Zahl, vorher: 'U-0001-G2' | '' }]
- * Barcode-Scan: { code: '4005…', wunsch: 'PG-…' (was der Browser angezeigt hat), gebinde, vorher: '' }. Der Server wählt in der Sperre ein noch freies Stück
- * dieser EAN aus der Quelle (den Wunsch, wenn er noch frei ist). Freie Stücke mit verschiedenem VP: Konflikt, PG-ID scannen.
+ * Barcode-Scan: { code: '4005…', wunsch: 'PG-…' (was der Browser angezeigt hat), gebinde, vorher: '', sid: Scan-Kennung }. Der Server wählt in der Sperre
+ * ein noch freies Stück dieser EAN aus der Quelle (den Wunsch, wenn er noch frei ist). Freie Stücke mit verschiedenem VP oder Lagerort alt: Konflikt, PG-ID scannen.
+ * Fremder Scan: { unbekannt: 'Code', bei: Gebinde } kommt nur ins Log.
  * vorher = das Gebinde, das der Browser beim Scannen gesehen hat. vorher '' auf ein schon zugeordnetes Stück ist immer ein Konflikt
- * (gleich = schon so gespeichert, vom gleichen Kürzel). Gibt den neuen Stand der Zuordnung zurück, dazu Konflikte und die aufgelösten Barcodes.
+ * (gleich = schon so gespeichert, vom gleichen Kürzel). Gibt den neuen Stand der Zuordnung zurück, dazu Konflikte, die aufgelösten Barcodes und den Gebinde-Stand.
  */
 function zuordnen(id, ops, kuerzel) {
   const d = durchgang_(id);
   if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   return gesperrt_(function () {
-    const z = zuordnungVon_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], ku = String(kuerzel || '').toUpperCase().slice(0, 4), gemerkt = {};
+    /* Prüfung 24.10.2026: Status in der Sperre nochmals lesen. Schliesst jemand ab, während dieses Handy auf die Sperre wartet, wird nichts mehr gebucht. */
+    const d2 = durchgang_(id);
+    if (String(d2['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d2['Status'] + ').');
+    if ((ops || []).length && lies_('Zuordnung').kopf.indexOf('Scan-ID') < 0) throw new Error('Spalte «Scan-ID» fehlt im Tab «Zuordnung». Bitte im Apps-Script-Projekt «einrichten» ausführen.');
+    const z = zuordnungVon_(id), sids = scanIds_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], fremd = [];
+    const ku = String(kuerzel || '').toUpperCase().slice(0, 4);
     lies_('Gebinde').z.forEach(function (g) { if (String(g['Durchgang']) === id) gebinde[String(g['Gebinde'])] = g; });
     lies_('Bestand').z.forEach(function (p) {
       if (String(p['Durchgang']) !== id) return;
@@ -507,58 +665,71 @@ function zuordnen(id, ops, kuerzel) {
     });
     const gName = function (g) { return gebinde[g] ? gebinde[g]['Name'] : 'kein Gebinde'; };
     (ops || []).forEach(function (o) {
+      if (!o) return;
+      if (o.unbekannt) { fremd.push(String(o.unbekannt).slice(0, 40) + (o.bei ? ' (bei ' + gName(o.bei) + ')' : '')); return; }
       if (!o.id && o.code) {
-        /* Wiederholter Barcode-Scan (Antwort nicht angekommen, Seite neu geladen): nicht ein zweites Stück derselben EAN buchen. */
-        const schon = scanSchon_(o.sid);
-        if (schon && z[norm_(schon)]) { konflikte.push({ id: schon, code: o.code, grund: 'schon gespeichert', gebinde: z[norm_(schon)].gebinde, gleich: true }); return; }
-        const wk = norm_(o.wunsch || '');
-        if (wk && z[wk] && z[wk].gebinde === o.gebinde && z[wk].kuerzel === ku) { konflikte.push({ id: o.wunsch, code: o.code, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return; }
+        if (o.sid) {
+          /* Scan-Kennung steht dauerhaft in «Zuordnung» (Spalte «Scan-ID»): eine Wiederholung (Antwort verloren, Wächter, Neuladen) bucht kein zweites Stück */
+          const schon = sids[sidKey_(o.sid)];
+          if (schon) { konflikte.push({ id: schon, code: o.code, wunsch: o.wunsch || '', grund: 'schon gespeichert', gebinde: z[norm_(schon)] ? z[norm_(schon)].gebinde : '', gleich: true }); return; }
+        } else {
+          /* Alte Seite ohne Scan-Kennung: Wunsch schon im gleichen Gebinde vom gleichen Kürzel = wohl eine Wiederholung (mit Kennung gilt das nicht, Prüfung 24.10.2026) */
+          const wk = norm_(o.wunsch || '');
+          if (wk && z[wk] && z[wk].gebinde === o.gebinde && z[wk].kuerzel === ku) { konflikte.push({ id: o.wunsch, code: o.code, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return; }
+        }
         const r = stueckZuCode_(o.code, bestand, proBc, z, o.wunsch);
-        if (r.fehler) { konflikte.push({ id: o.wunsch || o.code, code: o.code, grund: r.fehler }); return; }
+        if (r.fehler) { konflikte.push({ id: o.wunsch || o.code, code: o.code, grund: r.fehler }); if (r.fremd) fremd.push(String(o.code).slice(0, 40)); return; }
         o = Object.assign({}, o, { id: r.id, vorher: '' });
       }
       const k = norm_(o.id), jetzt = z[k] ? z[k].gebinde : '';
-      if (!bestand[k]) { konflikte.push({ id: o.id, grund: 'nicht in der Quelle' }); return; }
-      if (o.gebinde && !gebinde[o.gebinde]) { konflikte.push({ id: o.id, grund: 'Gebinde gibt es nicht' }); return; }
+      if (!bestand[k]) { konflikte.push({ id: o.id, grund: 'nicht in der Quelle' }); fremd.push(String(o.id).slice(0, 40)); return; }
+      if (o.gebinde && !gebinde[o.gebinde]) { konflikte.push({ id: o.id, grund: 'Gebinde gibt es nicht (mehr)' }); return; }
       if (o.vorher === '' && jetzt) {
         konflikte.push({ id: o.id, grund: 'schon in ' + gName(jetzt) + (z[k].kuerzel ? ' (' + z[k].kuerzel + ')' : ''), gebinde: jetzt, gleich: jetzt === o.gebinde && z[k].kuerzel === ku });
         return;
       }
       if (o.vorher !== undefined && String(o.vorher || '') !== jetzt && String(o.gebinde || '') !== jetzt) { konflikte.push({ id: o.id, grund: 'inzwischen von jemand anderem in ' + gName(jetzt) + ' gelegt', gebinde: jetzt }); return; }
-      const preis = o.preis === '' || o.preis === undefined || o.preis === null ? '' : rappen_(zahl_(o.preis));
-      if (preis !== '' && preis < 0) { konflikte.push({ id: o.id, grund: 'Preis kleiner als 0' }); return; }
+      const leer = o.preis === '' || o.preis === undefined || o.preis === null, pz = leer ? null : zahlOderNull_(o.preis), preis = leer ? '' : (pz === null ? NaN : rappen_(pz));
+      const pf = preisFehler_(preis, o.preis);
+      if (pf) { konflikte.push({ id: o.id, grund: pf }); return; }
       const pid = String(bestand[k]['PG-ID']);
-      neu.push({ 'Durchgang': id, 'PG-ID': pid, 'Gebinde': o.gebinde || '', 'Preis': preis, 'Zeit': t, 'Kürzel': ku });
+      neu.push({ 'Durchgang': id, 'PG-ID': pid, 'Gebinde': o.gebinde || '', 'Preis': preis, 'Zeit': t, 'Kürzel': ku, 'Scan-ID': o.code && o.sid ? sidKey_(o.sid) : '' });
       if (o.gebinde) z[k] = { gebinde: o.gebinde, preis: preis, zeit: t, kuerzel: ku }; else delete z[k];
-      if (o.code) { ergebnis.push({ code: o.code, wunsch: o.wunsch || '', id: pid, gebinde: o.gebinde }); if (o.sid) gemerkt[o.sid] = pid; }
+      if (o.code) { ergebnis.push({ code: o.code, wunsch: o.wunsch || '', id: pid, gebinde: o.gebinde }); if (o.sid) sids[sidKey_(o.sid)] = pid; }
     });
     schreib_('Zuordnung', neu);
-    scanMerken_(gemerkt);
-    return { zuordnung: z, konflikte: konflikte, ergebnis: ergebnis };
+    if (fremd.length) log_('Fremder Scan', id, (ku || '?') + ': ' + fremd.join(', ') + ' (nicht in der Quelle, zur Seite gelegt)');
+    return { zuordnung: z, konflikte: konflikte, ergebnis: ergebnis, gebindeStand: gebindeStand_(id), status: 'Scan' };
   });
 }
-/** Gespeicherte Barcode-Scans pro Scan-Kennung (12 Stunden), damit eine Wiederholung kein zweites Stück bucht. */
-function scanSchon_(sid) {
-  if (!sid) return '';
-  try { return CacheService.getScriptCache().get('scan:' + String(sid).slice(0, 40)) || ''; } catch (err) { return ''; }
+/** Scan-Kennungen der gespeicherten Barcode-Scans eines Durchgangs: { Scan-ID: PG-ID } (dauerhaft im Tab, kein Cache mit Ablaufzeit). */
+function scanIds_(id) {
+  const m = {};
+  lies_('Zuordnung').z.forEach(function (r) { const s = String(r['Scan-ID'] || ''); if (s && String(r['Durchgang']) === id) m[s] = String(r['PG-ID']); });
+  return m;
 }
-function scanMerken_(m) {
-  const k = Object.keys(m);
-  if (!k.length) return;
-  const o = {};
-  k.forEach(function (s) { o['scan:' + String(s).slice(0, 40)] = m[s]; });
-  try { CacheService.getScriptCache().putAll(o, 43200); } catch (err) { /* ohne Speicher bleibt der Schutz über das Gebinde */ }
+function sidKey_(s) { return String(s).slice(0, 40); }
+/** Preis plausibel (Prüfung 24.10.2026): lesbar, nicht negativ, unter CHF 100 000, keine 8–14 Ziffern (= Barcode ins Preisfeld gescannt). 0 = verschenkt bleibt erlaubt. */
+function preisFehler_(preis, roh) {
+  if (preis === '') return '';
+  if (/^\s*\d{8,14}\s*$/.test(String(roh))) return 'Preis sieht aus wie ein Barcode (' + String(roh).trim() + ')';
+  if (typeof preis !== 'number' || !isFinite(preis)) return 'Preis unlesbar (' + String(roh).slice(0, 20) + ')';
+  if (preis < 0) return 'Preis kleiner als 0';
+  if (preis >= PREIS_MAX) return 'Preis zu hoch (ab CHF 100 000)';
+  return '';
 }
-/** Barcode → freies Stück der Quelle. { id } oder { fehler }. */
+/** Barcode → freies Stück der Quelle. { id } oder { fehler, fremd }. Freie Stücke mit verschiedenem VP oder verschiedenem Lagerort alt: PG-ID verlangen. */
 function stueckZuCode_(code, bestand, proBc, z, wunsch) {
   if (bestand[norm_(code)]) return { id: String(bestand[norm_(code)]['PG-ID']) };          // PG-ID als Code
   const l = proBc[bcKey_(code)] || [];
-  if (!l.length) return { fehler: 'nicht in der Quelle' };
+  if (!l.length) return { fehler: 'nicht in der Quelle', fremd: true };
   const frei = l.filter(function (p) { return !z[norm_(p['PG-ID'])]; });
   if (!frei.length) return { fehler: 'alle ' + l.length + ' Stücke mit diesem Barcode sind schon zugeordnet, PG-ID scannen' };
-  const vp = {};
-  frei.forEach(function (p) { vp[rappen_(zahl_(p['VP']))] = true; });
+  const vp = {}, ort = {};
+  frei.forEach(function (p) { vp[rappen_(zahl_(p['VP']))] = true; ort[ortKey_(p['Lagerort alt'])] = String(p['Lagerort alt'] || '(leer)'); });
   if (Object.keys(vp).length > 1) return { fehler: 'mehrere freie Stücke mit diesem Barcode und verschiedenem VP, PG-ID scannen' };
+  /* Prüfung 24.10.2026: sonst stimmt «Lagerort alt» in den Änderungen nicht mit dem Stück in der Hand überein */
+  if (Object.keys(ort).length > 1) return { fehler: 'mehrere freie Stücke mit diesem Barcode aus verschiedenen Lagerorten (' + Object.keys(ort).map(function (k) { return ort[k]; }).join(', ') + '), PG-ID scannen' };
   const w = frei.filter(function (p) { return wunsch && norm_(p['PG-ID']) === norm_(wunsch); })[0];
   return { id: String((w || frei[0])['PG-ID']) };
 }
@@ -567,7 +738,7 @@ function stueckZuCode_(code, bestand, proBc, z, wunsch) {
 function scanStarten(id) {
   return gesperrt_(function () {
     const d = durchgang_(id);
-    if (String(d['Status']) === 'Abgeschlossen') throw new Error('Der Durchgang ist abgeschlossen.');
+    if (String(d['Status']) === 'Abgeschlossen' || String(d['Status']) === 'Verworfen') throw new Error('Der Durchgang ist ' + (String(d['Status']) === 'Verworfen' ? 'verworfen.' : 'abgeschlossen.'));
     setz_('Durchgänge', [{ _r: d._r, 'Status': 'Scan' }]);
     return laden(id);
   });
@@ -596,10 +767,12 @@ function kontrolle_(id) {
     const a = z[norm_(p['PG-ID'])];
     if (!a) return;
     if (!pro[a.gebinde]) { fehler.push(p['PG-ID'] + ': Gebinde gibt es nicht mehr.'); return; }
-    pro[a.gebinde].stuecke.push({ p: p, preis: preis_(pro[a.gebinde].g, zahl_(p['VP']), a.preis) });
+    const g = pro[a.gebinde].g, ausVp = (a.preis === '' || a.preis === undefined) && String(g['Art']) !== 'Entsorgung' && String(g['Preisregel'] || 'VP') !== 'Null';
+    pro[a.gebinde].stuecke.push({ p: p, preis: preis_(g, zahl_(p['VP']), a.preis), vpFehlt: ausVp && !(zahl_(p['VP']) > 0) });
   });
   if (!Object.keys(z).length) fehler.push('Es ist noch nichts gescannt.');
-  return { pro: pro, fehler: fehler, offen: bestand.filter(function (p) { return !z[norm_(p['PG-ID'])]; }).length };
+  const offen = bestand.filter(function (p) { return !z[norm_(p['PG-ID'])]; });
+  return { pro: pro, fehler: fehler, offen: offen.length, offenListe: offen };
 }
 
 /** Zuordnungen anderer (anderes Kürzel) in den letzten 2 Minuten. */
@@ -613,9 +786,11 @@ function spaeteScans_(id, kuerzel) {
   return Object.keys(aus).map(function (k) { return k + ' (' + aus[k] + ')'; });
 }
 
-/** Abgleich eines Stücks mit dem Return Tool beim Abschluss. Schlüssel ist die ID, nicht die Zeile. */
-function pruefungRt_(p, rt, ortNeu) {
-  if (!rt) return { text: 'nicht geprüft (Liste von Hand)' };
+/**
+ * Abgleich eines Stücks mit dem Return Tool beim Abschluss. Schlüssel ist die ID (V3), nicht die Zeile. Gilt für jede Quelle, auch die Liste von Hand.
+ * extra = weitere Abweichungen (VP fehlt, Stück auch in einem anderen offenen Durchgang).
+ */
+function pruefungRt_(p, rt, ortNeu, extra) {
   const wo = rt.ids[norm_(p['PG-ID'])] || [], f = [];
   if (!wo.length) f.push('nicht mehr im Return Tool');
   else if (wo.length > 1) f.push('steht ' + wo.length + '× im Return Tool (' + wo.map(function (w) { return w.tab + ' Zeile ' + w.zeile; }).join(', ') + ')');
@@ -624,28 +799,30 @@ function pruefungRt_(p, rt, ortNeu) {
     if (wo[0].tab !== String(p['Quelle Tab'])) f.push('jetzt im Tab «' + wo[0].tab + '»');
   }
   if (ortNeu && rt.orte[ortKey_(ortNeu)]) f.push('Lagerort neu «' + ortNeu + '» inzwischen im Return Tool belegt');
+  (extra || []).forEach(function (x) { f.push(x); });
   return { text: f.length ? 'ABWEICHUNG: ' + f.join('; ') : 'ok', tab: wo.length === 1 ? wo[0].tab : '', zeile: wo.length === 1 ? wo[0].zeile : '' };
 }
 
 /**
  * Abschluss: schreibt die Änderungsliste (was im Return Tool zu tun ist) und legt pro Abnehmer ein eigenes Sheet an.
- * Nicht zugeordnete Stücke bleiben, wo sie sind (keine Änderung). Das Return Tool wird nicht geschrieben (manueller Weg), aber neu gelesen:
- * Pro ID wird geprüft, ob «Lagerort alt» noch stimmt (Spalte «Prüfung»). Ist das Return Tool nicht lesbar, bricht der Abschluss ab.
+ * Nicht zugeordnete Stücke bleiben, wo sie sind (keine Änderung), stehen aber als «Nicht gefunden – prüfen» in der Liste. Das Return Tool wird nicht
+ * geschrieben (manueller Weg), aber neu gelesen, auch bei einer Liste von Hand: Pro ID wird geprüft, ob «Lagerort alt» noch stimmt (Spalte «Prüfung»).
+ * Ist das Return Tool nicht lesbar, bricht der Abschluss ab.
  * Kamen in den letzten 2 Minuten noch Zuordnungen anderer, kommt zuerst { warnung } zurück; mit bestaetigt = true wird trotzdem abgeschlossen.
  */
 function abschliessen(id, kuerzel, bestaetigt) {
   const d = durchgang_(id);
   if (String(d['Status']) === 'Abgeschlossen') throw new Error('Der Durchgang ist schon abgeschlossen.');
+  if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   const k = kontrolle_(id);
   if (k.fehler.length) throw new Error(k.fehler.join(' '));
   const e = einst_(), datum = Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy');
-  let rt = null;
-  if (String(d['Quelle']) !== 'Manuell') {
-    try { rt = rtLesen_(e); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, der Abschluss ist abgebrochen (' + (err && err.message) + '). Bitte später nochmals.'); }
-  }
+  let rt;
+  try { rt = rtLesen_(e); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, der Abschluss ist abgebrochen (' + (err && err.message) + '). Bitte später nochmals.'); }
   return gesperrt_(function () {
     const d2 = durchgang_(id);
     if (String(d2['Status']) === 'Abgeschlossen') throw new Error('Der Durchgang ist schon abgeschlossen.');
+    if (String(d2['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d2['Status'] + ').');
     if (!bestaetigt) {
       const spaet = spaeteScans_(id, kuerzel);
       if (spaet.length) return { warnung: 'In den letzten 2 Minuten haben andere noch zugeordnet: ' + spaet.join(', ') + '. Sind alle fertig und ist alles gespeichert?' };
@@ -656,11 +833,15 @@ function abschliessen(id, kuerzel, bestaetigt) {
     const abnehmer = {}, links = [];
     Object.keys(k2.pro).forEach(function (gid) { const x = k2.pro[gid]; if (String(x.g['Art']) === 'Verkauf' && x.stuecke.length) (abnehmer[String(x.g['Abnehmer'])] = abnehmer[String(x.g['Abnehmer'])] || []).push(x); });
     Object.keys(abnehmer).forEach(function (a) { const l = abnehmerListe_(e, datum, a, String(d2['Name']), abnehmer[a]); links.push(a + ': ' + l.url); l.hinweise.forEach(function (h) { hinweise.push(h); }); });
-    let abw = 0;
+    let abw = 0, ohneVp = 0;
+    const andere = idsOffen_(id);       // Stück zugleich in einem anderen offenen Durchgang (z.B. alte Daten mit anders geschriebener ID)
+    const auch = function (p) { const a = andere[norm_(p['PG-ID'])]; return a ? ['auch in ' + a] : []; };
     Object.keys(k2.pro).forEach(function (gid) {
       const x = k2.pro[gid], art = String(x.g['Art']);
       x.stuecke.forEach(function (s) {
-        const p = s.p, pr = pruefungRt_(p, rt, String(x.g['Lagerort neu'] || ''));
+        const p = s.p, extra = auch(p);
+        if (s.vpFehlt) { extra.push('VP fehlt oder ist 0 (Preis CHF ' + Number(s.preis).toFixed(2) + ' aus VP)'); ohneVp++; }
+        const pr = pruefungRt_(p, rt, String(x.g['Lagerort neu'] || ''), extra);
         if (/^ABWEICHUNG/.test(pr.text)) abw++;
         zeilen.push({ 'Durchgang': id, 'PG-ID': p['PG-ID'], 'Bezeichnung': p['Bezeichnung'],
           'Aktion': art === 'Verkauf' ? 'Verkaufen' : (art === 'Entsorgung' ? 'Entsorgen' : 'Lagerort ändern'),
@@ -668,11 +849,20 @@ function abschliessen(id, kuerzel, bestaetigt) {
           'VP alt': zahl_(p['VP']), 'Preis': s.preis, 'Return-Tool-Tab': pr.tab || p['Quelle Tab'], 'Zeile': pr.zeile || p['Quelle Zeile'], 'Erledigt': '', 'Prüfung': pr.text });
       });
     });
+    /* Prüfung 24.10.2026: nicht gescannte Stücke nicht still lassen, sondern als Aufgabe «Nicht gefunden – prüfen» (keine Änderung im Return Tool, sperrt nichts) */
+    k2.offenListe.forEach(function (p) {
+      const pr = pruefungRt_(p, rt, '', auch(p));
+      zeilen.push({ 'Durchgang': id, 'PG-ID': p['PG-ID'], 'Bezeichnung': p['Bezeichnung'], 'Aktion': NICHT_GEFUNDEN, 'Gebinde': '', 'Abnehmer': '',
+        'Lagerort alt': p['Lagerort alt'], 'Lagerort neu': '', 'VP alt': zahl_(p['VP']), 'Preis': '', 'Return-Tool-Tab': pr.tab || p['Quelle Tab'], 'Zeile': pr.zeile || p['Quelle Zeile'],
+        'Erledigt': '', 'Prüfung': pr.text });
+    });
+    if (k2.offen) hinweise.push(k2.offen + ' Stücke nicht gescannt: stehen als «' + NICHT_GEFUNDEN + '» in der Liste (am alten Lagerort suchen).');
+    if (ohneVp) hinweise.push(ohneVp + ' Stücke ohne VP: Preis 0 aus der Regel «VP», bitte prüfen (gelb).');
     if (abw) hinweise.unshift(abw + ' Abweichungen zum Return Tool: vor dem Eintragen prüfen (Spalte «Prüfung»).');
     zeilen.sort(function (a, b) { return String(a['Return-Tool-Tab']).localeCompare(String(b['Return-Tool-Tab'])) || Number(a['Zeile']) - Number(b['Zeile']); });
     schreib_('Änderungen', zeilen);
     setz_('Durchgänge', [{ _r: d2._r, 'Status': 'Abgeschlossen', 'Abgeschlossen am': zeit_(), 'Abgeschlossen von': ich_() + (kuerzel ? ' (' + kuerzel + ')' : ''), 'Listen': links.join('\n') }]);
-    log_('Abgeschlossen', id, zeilen.length + ' Änderungen · nicht zugeordnet ' + k2.offen + ' · ' + links.join(' | ') + (hinweise.length ? ' · ' + hinweise.join(' ') : ''));
+    log_('Abgeschlossen', id, (zeilen.length - k2.offen) + ' Änderungen · nicht gescannt ' + k2.offen + ' · ' + links.join(' | ') + (hinweise.length ? ' · ' + hinweise.join(' ') : ''));
     return Object.assign(laden(id), { hinweise: hinweise });
   });
 }
@@ -722,13 +912,28 @@ function aenderungenVon_(id) {
   });
 }
 
-/** Änderungen als im Return Tool eingetragen markieren (manueller Weg). zeilen = Zeilennummern im Tab «Änderungen». */
+/**
+ * Änderungen als im Return Tool eingetragen markieren (manueller Weg). zeilen = [{ r: Zeile im Tab «Änderungen», id: PG-ID }].
+ * Prüfung 24.10.2026: Die PG-ID muss zur Zeile passen. Sonst wird die Zeile über Durchgang und PG-ID gesucht (z.B. Tab von Hand sortiert);
+ * ist sie nicht eindeutig, wird nichts gesetzt. Nur Zeilennummern (veraltete Seite): Fehler, neu laden.
+ */
 function erledigt(id, zeilen, wert) {
   return gesperrt_(function () {
-    const ok = {};
-    lies_('Änderungen').z.forEach(function (r) { if (String(r['Durchgang']) === id) ok[r._r] = true; });
+    const proR = {}, proId = {}, aend = [], fehlt = [];
+    lies_('Änderungen').z.forEach(function (r) {
+      if (String(r['Durchgang']) !== id) return;
+      proR[r._r] = r; (proId[norm_(r['PG-ID'])] = proId[norm_(r['PG-ID'])] || []).push(r);
+    });
     const t = wert === false ? '' : zeit_() + ' ' + ich_();
-    setz_('Änderungen', (zeilen || []).filter(function (r) { return ok[r]; }).map(function (r) { return { _r: r, 'Erledigt': t }; }));
+    (zeilen || []).forEach(function (x) {
+      if (!x || typeof x !== 'object' || !x.id) throw new Error('Veraltete Ansicht: bitte die Seite neu laden und nochmals abhaken.');
+      const k = norm_(x.id), r = proR[Number(x.r)];
+      if (r && norm_(r['PG-ID']) === k) { aend.push({ _r: r._r, 'Erledigt': t }); return; }
+      const l = proId[k] || [];
+      if (l.length === 1) aend.push({ _r: l[0]._r, 'Erledigt': t }); else fehlt.push(x.id);
+    });
+    if (fehlt.length) throw new Error('In den Änderungen von ' + id + ' nicht eindeutig gefunden: ' + kurz_(fehlt) + '. Nichts gesetzt, bitte neu laden.');
+    setz_('Änderungen', aend);
     return aenderungenVon_(id);
   });
 }
@@ -738,12 +943,11 @@ function erledigt(id, zeilen, wert) {
  * bekommen aber «UNGÜLTIG» vor den Titel. Was dabei nicht klappt, kommt als Hinweis zurück.
  */
 function wiederOeffnen(id) {
-  const e = einst_(), admins = String(e['Admins'] || '').toLowerCase().split(/[,;\s]+/).filter(String);
-  if (admins.length && admins.indexOf(ich_().toLowerCase()) < 0) throw new Error('Nur für Admins.');
+  if (!istAdmin_()) throw new Error('Nur für Admins (Einstellung «Admins»).');
   return gesperrt_(function () {
     const d = durchgang_(id), hinweise = [];
     if (String(d['Status']) !== 'Abgeschlossen') throw new Error('Der Durchgang ist nicht abgeschlossen.');
-    if (aenderungenVon_(id).some(function (a) { return a.erledigt; })) throw new Error('Ein Teil der Änderungen ist im Return Tool schon eingetragen. Zuerst dort zurücknehmen und «Erledigt» leeren.');
+    if (aenderungenVon_(id).some(function (a) { return a.erledigt && a.aktion !== NICHT_GEFUNDEN; })) throw new Error('Ein Teil der Änderungen ist im Return Tool schon eingetragen. Zuerst dort zurücknehmen und «Erledigt» leeren.');
     String(d['Listen'] || '').split('\n').filter(String).forEach(function (l) {
       const i = l.indexOf(': '), wer = i > -1 ? l.slice(0, i) : l, url = i > -1 ? l.slice(i + 2) : l;
       try { const ss = SpreadsheetApp.openByUrl(url), n = String(ss.getName()); if (!/^UNGÜLTIG/.test(n)) ss.rename('UNGÜLTIG – ' + n); }
@@ -753,6 +957,28 @@ function wiederOeffnen(id) {
     setz_('Durchgänge', [{ _r: d._r, 'Status': 'Scan', 'Abgeschlossen am': '', 'Abgeschlossen von': '', 'Listen': '' }]);
     log_('Wieder geöffnet', id, 'alte Listen: ' + String(d['Listen'] || '–').replace(/\n/g, ' | ') + (hinweise.length ? ' · ' + hinweise.join(' ') : ''));
     return Object.assign(laden(id), { hinweise: hinweise });
+  });
+}
+
+/**
+ * Durchgang verwerfen (Prüfung 24.10.2026), z.B. falsche Quelle oder falsch angelegt: Status «Verworfen», Stücke und Lagerorte sind wieder frei.
+ * Die Zeilen bleiben als Verlauf. Nur im Scan; ein abgeschlossener Durchgang muss zuerst wieder geöffnet werden (Admin, prüft eingetragene Änderungen).
+ * Ohne Scans darf es jede Person, mit Scans nur ein Admin.
+ */
+function verwerfen(id, kuerzel) {
+  const e = einst_();
+  return gesperrt_(function () {
+    const d = durchgang_(id), s = String(d['Status']);
+    if (s === 'Verworfen') throw new Error('Der Durchgang ist schon verworfen.');
+    if (s === 'Abgeschlossen') throw new Error('Der Durchgang ist abgeschlossen. Ein Admin muss ihn zuerst wieder öffnen.');
+    if (lies_('Änderungen').z.some(function (r) { return String(r['Durchgang']) === id && String(r['Erledigt'] || '').trim() && String(r['Aktion']) !== NICHT_GEFUNDEN; })) {
+      throw new Error('Zu diesem Durchgang sind schon Änderungen im Return Tool eingetragen. Verwerfen geht nicht.');
+    }
+    const n = Object.keys(zuordnungVon_(id)).length;
+    if (n && !istAdmin_(e)) throw new Error('Im Durchgang sind schon ' + n + ' Stücke gescannt: nur ein Admin kann ihn verwerfen.');
+    setz_('Durchgänge', [{ _r: d._r, 'Status': 'Verworfen', 'Verworfen am': zeit_(), 'Verworfen von': ich_() + (kuerzel ? ' (' + kuerzel + ')' : '') }]);
+    log_('Verworfen', id, String(d['Name']) + ' · ' + n + ' Stücke waren gescannt, Stücke und Lagerorte wieder frei');
+    return laden(id);
   });
 }
 

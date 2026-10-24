@@ -9,7 +9,7 @@ D = {'id': 'U-0001', 'name': 'Kids → Balu', 'status': 'Scan', 'quelle': 'Retur
                  {'id': 'U-0001-G3', 'name': 'Weg', 'art': 'Entsorgung', 'abnehmer': '', 'lagerort': '', 'preisregel': 'Null', 'prozent': ''}],
      'bestand': [{'id': 'PG-1', 'barcode': '111', 'name': 'Lego Zug', 'kat': 'Kids', 'vp': 20, 'ort': 'KID-7', 'tab': 'Stationär'},
                  {'id': 'PG-2', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-7', 'tab': 'Stationär'},
-                 {'id': 'PG-3', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-12', 'tab': 'Stationär'}],
+                 {'id': 'PG-3', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-7', 'tab': 'Stationär'}],   # seit 24.10.2026 gleicher Lagerort: gleiche EAN aus verschiedenen Lagerorten verlangt die PG-ID (Prüfung 24.10.2026 Befund 4)
      'zuordnung': {}, 'aenderungen': []}
 stub = """<script>window.CALLS=[];window.D=%s;window.ZU={};
 window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){

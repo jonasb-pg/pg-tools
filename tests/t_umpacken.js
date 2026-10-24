@@ -119,17 +119,18 @@ assert.throws(() => c.abschliessen('U-0001'), /schon abgeschlossen/);
 /* Return Tool nie geschrieben */
 assert.strictEqual(RT.getSheetByName('Stationär').v[6][13], 'KID-7', 'Return Tool unverändert');
 
-/* Erledigt und Wiederöffnen */
-let e = j(c.erledigt('U-0001', [a[0].r], true));
+/* Erledigt und Wiederöffnen (seit 24.10.2026: Zeile mit PG-ID, Prüfung 24.10.2026 Befund 20) */
+let e = j(c.erledigt('U-0001', [{ r: a[0].r, id: a[0].id }], true));
 assert.ok(e[0].erledigt && !e[1].erledigt);
 assert.throws(() => c.wiederOeffnen('U-0001'), /schon eingetragen/);
-c.erledigt('U-0001', [a[0].r], false);
+c.erledigt('U-0001', [{ r: a[0].r, id: a[0].id }], false);
 assert.strictEqual(j(c.wiederOeffnen('U-0001')).status, 'Scan');
 assert.strictEqual(j(c.laden('U-0001')).aenderungen.length, 0);
 
-/* Manuelle Quelle (ohne Anbindung) */
-const m = j(c.anlegen({ name: 'Manuell', quelle: 'manuell', liste: 'ID\tBezeichnung\tVP\tLagerort\nPG-50\tRad\t30,50\tX-1\nPG-51\tHelm\t10\tX-1', gebinde: [{ name: 'Abnehmer A', art: 'Verkauf', abnehmer: 'A', lagerort: 'A-1', preisregel: 'VP' }] }));
-assert.ok(m.id === 'U-0002' && m.bestand.length === 2 && m.bestand[0].vp === 30.5 && m.quelle === 'Manuell');
+/* Manuelle Quelle: seit 24.10.2026 gegen das Return Tool aufgelöst (Prüfung 24.10.2026 Befund 6). Unbekannte IDs abgelehnt, Angaben aus dem Return Tool. */
+assert.throws(() => c.anlegen({ name: 'Manuell', quelle: 'manuell', liste: 'ID\tBezeichnung\tVP\tLagerort\nPG-50\tRad\t30,50\tX-1\nPG-51\tHelm\t10\tX-1', gebinde: [{ name: 'Abnehmer A', art: 'Verkauf', abnehmer: 'A', lagerort: 'A-1', preisregel: 'VP' }] }), /nicht im Return Tool: PG-50, PG-51/);
+const m = j(c.anlegen({ name: 'Manuell', quelle: 'manuell', liste: 'ID\tBezeichnung\tVP\tLagerort\npg 0004\tToaster\t30,50\tX-1', gebinde: [{ name: 'Abnehmer A', art: 'Verkauf', abnehmer: 'A', lagerort: 'A-1', preisregel: 'VP' }] }));
+assert.ok(m.id === 'U-0002' && m.bestand.length === 1 && m.bestand[0].id === 'PG-4' && m.bestand[0].vp === 18 && m.bestand[0].ort === 'HOM-3' && m.quelle === 'Manuell', JSON.stringify(m.bestand));
 assert.throws(() => c.anlegen({ name: 'M', quelle: 'manuell', liste: 'Bezeichnung\nRad', gebinde: geb.slice(0, 1) }), /ID/);
 assert.throws(() => c.anlegen({ name: 'M', quelle: 'manuell', liste: 'ID\nPG-1\npg-1', gebinde: geb.slice(0, 1) }), /doppelt/);
 

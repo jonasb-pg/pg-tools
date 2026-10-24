@@ -81,11 +81,11 @@ ok(r.analyse && r.startpreis === '40.00' && Number(r.neupreis) === 80 && r.statu
 r = c("starteListing('RC-0001')");
 ok(r.id === 'RC-0001' && r.startpreis === '15.00' && r.status === 'In Arbeit', 'RC neu gelistet');
 // RC als Hauptstück mit Bündel, dann auflösen
-r = c("buendelHinzu('RC-0001', 'PG-200')");
+r = c("buendelHinzu('RC-0001', 'PG-200', ['rt'])");   // 24.10.2026 (Prüfung 9): PG-200 steht nicht im Return Tool, nur mit Bestätigung
 ok(r.startpreis === '75.00', 'RC-Hauptstück mit Analyse-Stück: ' + r.startpreis);
 r = c("buendelLeeren('RC-0001')");
 ok(r.startpreis === '15.00' && Number(r.neupreis) === 30, 'RC-Hauptstück zurück: ' + r.startpreis + ' ' + r.neupreis);
-r = c("starteListing('PG-200')");
+r = c("starteListing('PG-200', false, ['rt'])");
 ok(r.sperrgut && r.klasse === 'Sperrgut B-Post bis 30 kg' && r.zustand === 'Neu und originalverpackt' && r.regal === 'Ricardo Offline', 'Sperrgut aus der Analyse, Regal Offline');
 r = c("markiereGelistet('PG-200', 'https://www.ricardo.ch/de/a/mixer-1234567890/')");
 ok(r.status === 'Gelistet' && r.regal === 'Ricardo Online', 'gelistet = Regal Ricardo Online');
@@ -102,7 +102,7 @@ ok(c('analyseListe()').length === 0 && c("suche('Kabel')").treffer.length === 1,
 let opens = 0; const altOpen = ctx.SpreadsheetApp.openById; ctx.SpreadsheetApp.openById = id => { if (id === 'RT') opens++; return altOpen(id); };
 for (const k of Object.keys(CACHE)) delete CACHE[k];
 c("suche('Kabel')"); const o1 = opens; c("suche('Kabel')");
-ok(o1 === 1 && opens === 1 && CACHE['rt:Online:n'], 'zweite Suche aus der gemerkten Kopie, ohne Return Tool zu öffnen');
+ok(o1 === 1 && opens === 1 && CACHE['rt1:Online:n'], 'zweite Suche aus der gemerkten Kopie, ohne Return Tool zu öffnen');
 RT.d.push(['PG-400', 'Lampe neu', '', 12, 20, 'C3', '']);
 ok(c("suche('Lampe neu')").treffer.length === 1, 'eben erfasstes Stück wird trotzdem gefunden (frisch nachgelesen)');
 const o3 = opens, t3 = c("suche('Lampe neu')"); ok(t3.treffer.length === 1 && opens === o3, 'danach wieder aus der Kopie, ohne Return Tool zu öffnen');

@@ -3,7 +3,7 @@
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const lies = function (p) { return fs.readFileSync(__dirname + '/../' + p, 'utf8'); };
 const ids = function (l) { return JSON.parse(JSON.stringify(l.map(function (t) { return t.id; }))); };
-const kopf = ['ID', 'Marke', 'Modell', 'Produktart', 'Teil', 'Teilart', 'Menge', 'Box', 'Status', 'Quelle', 'Erfasst am', 'Erfasst von', 'Verbraucht am', 'Verbraucht von', 'Bemerkung'];
+const kopf = ['ID', 'Marke', 'Modell', 'Produktart', 'Teil', 'Teilart', 'Menge', 'Box', 'Status', 'Quelle', 'Erfasst am', 'Erfasst von', 'Verbraucht am', 'Verbraucht von', 'Bemerkung', 'Kennung'];   // «Kennung» seit 2026-10-24.2
 const teil = function (id, m, mo, pa, t, box, menge) { return [id, m, mo, pa, t, '', menge || 1, box, 'im Lager', '', '', '', '', '', '']; };
 const tabs = {
   'Teile': [kopf, teil('ET-0001', "De'Longhi", 'ECAM22.110', 'Kaffeemaschine', 'Brühgruppe', 'B01'), teil('ET-0002', 'Dyson', 'V8', 'Staubsauger', 'Akku', 'B02'),
@@ -17,7 +17,7 @@ let inSperre = false, leseAusserhalb = 0, kostenKaputt = false;
 function sheet(n) {
   const v = tabs[n];
   return { getDataRange: function () { if (n === 'Teile' && !inSperre) leseAusserhalb++; return { getValues: function () { return v.map(function (z) { return z.slice(); }); } }; },
-    getLastColumn: function () { return v[0].length; }, getLastRow: function () { return v.length; },
+    getLastColumn: function () { return v[0].length; }, getLastRow: function () { return v.length; }, getMaxRows: function () { return 1000; },   // getMaxRows: Vertrag V2 (2026-10-24.2)
     getRange: function (r) {
       return { getValues: function () { return [v[0]]; },
         setValues: function (x) { if (n === 'Kosten' && kostenKaputt) throw new Error('Tab geschützt'); x.forEach(function (z) { v.push(z); }); },
@@ -32,7 +32,7 @@ const ctx = { console: { log: console.log, error: function (m) { fehlerLog.push(
   UrlFetchApp: { fetch: function () { return { getResponseCode: function () { return 200; }, getContentText: function () { return JSON.stringify({ stop_reason: 'end_turn', model: 'claude-haiku-5-5', usage: { input_tokens: 1000, output_tokens: 100 }, content: [{ type: 'text', text: '{"marke":"Philips","modell":"HD7462","produktart":"Kaffeemaschine"}' }] }); } }; } } };
 vm.createContext(ctx);
 vm.runInContext(lies('apps/ersatzteil/Code.gs'), ctx);
-assert.ok(/const VERSION = '2026-10-24\.1'/.test(lies('apps/ersatzteil/Code.gs')));
+assert.ok(/const VERSION = '2026-10-24\.2'/.test(lies('apps/ersatzteil/Code.gs')));
 
 /* M4: Marke ohne Leer-/Sonderzeichen; langes Modell trotz Markenabweichung mit Hinweis; Präfix erst ab 5 Zeichen */
 let s = ctx.suchen({ marke: 'Delonghi', modell: 'ECAM 22.110', produktart: 'Kaffeevollautomat' });

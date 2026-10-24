@@ -3,7 +3,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const lies = function (p) { return fs.readFileSync(__dirname + '/../' + p, 'utf8'); };
 const J = function (x) { return JSON.stringify(x); }, eq = function (a, b, m) { assert.strictEqual(J(a), J(b), m); };
 
-const kopf = ['ID', 'Marke', 'Modell', 'Produktart', 'Teil', 'Teilart', 'Menge', 'Box', 'Status', 'Quelle', 'Erfasst am', 'Erfasst von', 'Verbraucht am', 'Verbraucht von', 'Bemerkung'];
+const kopf = ['ID', 'Marke', 'Modell', 'Produktart', 'Teil', 'Teilart', 'Menge', 'Box', 'Status', 'Quelle', 'Erfasst am', 'Erfasst von', 'Verbraucht am', 'Verbraucht von', 'Bemerkung', 'Kennung'];   // «Kennung» seit 2026-10-24.2
 const tabs = {
   'Teile': [kopf,
     ['ET-0001', 'Philips', 'HD7462/20', 'Kaffeemaschine', 'Wassertank', 'Tank', 1, 'B12', 'im Lager', '', '', '', '', '', ''],
@@ -26,7 +26,7 @@ function sheet(n) {
 }
 const ctx = { console: console, SpreadsheetApp: { getActiveSpreadsheet: function () { return { getSheetByName: function (n) { return tabs[n] ? sheet(n) : null; } }; } },
   PropertiesService: { getScriptProperties: function () { return { getProperty: function () { return ''; } }; } }, LockService: { getScriptLock: function () { return { waitLock: function () {}, releaseLock: function () {} }; } },
-  Utilities: { formatDate: function () { return '17.10.2026 00:30:00'; } }, Session: { getActiveUser: function () { return { getEmail: function () { return 'test@pretty-good.ch'; } }; } },
+  Utilities: { formatDate: function () { return '17.10.2026 00:30:00'; } }, Session: { getActiveUser: function () { return { getEmail: function () { return 'test@pretty-good.ch'; } }; }, getEffectiveUser: function () { return { getEmail: function () { return 'test@pretty-good.ch'; } }; } },   // Konto des Tools: V6 (2026-10-24.2)
   UrlFetchApp: {}, HtmlService: {}, ScriptApp: {}, CacheService: {} };
 vm.createContext(ctx);
 vm.runInContext(lies('apps/ersatzteil/Code.gs') + '\n' + lies('apps/basis/Basis.gs') + '\n;this.__k = ERSATZTEIL_KATALOG; this.__s = SPALTEN;', ctx);

@@ -102,15 +102,43 @@
   function istUrl(u) { return /^https?:\/\//i.test(String(u || '')); }
 
   var START = null, OFFEN = {};
-  /* Einziger Weg zum Server. Solange ein Aufruf mit demselben Namen läuft, geht kein zweiter hinaus (Doppelklick). */
-  function ruf(name, args, ok, fehler) {
-    if (OFFEN[name]) return false;
-    OFFEN[name] = true; $('lade').hidden = false;
-    var fertig = function (f, x) { delete OFFEN[name]; $('lade').hidden = !Object.keys(OFFEN).length; f(x); };
+  /* Einziger Weg zum Server. Solange ein Aufruf mit demselben Schlüssel läuft (Vorgabe: der Funktionsname), geht kein zweiter hinaus (Doppelklick).
+     Gibt false zurück, wenn nichts hinausging: Der Aufrufer zeigt dann sichtbar «Bitte warten» (24.10.2026, vorher still verworfen). */
+  function ruf(name, args, ok, fehler, schluessel) {
+    var key = schluessel || name;
+    if (OFFEN[key]) return false;
+    OFFEN[key] = true; $('lade').hidden = false;
+    var fertig = function (f, x) { delete OFFEN[key]; $('lade').hidden = !Object.keys(OFFEN).length; f(x); };
     google.script.run.withSuccessHandler(function (x) { fertig(ok, x); })
       .withFailureHandler(function (e) { fertig(fehler || function (m) { melde(m, 'stop'); }, String((e && e.message) || e).replace(/^Error:\s*/, '')); })
       .api(name, args);
     return true;
+  }
+  /* Kennung pro Erfassung oder Entnahme: Kommt derselbe Auftrag nochmals beim Server an (Netzfehler, Neuladen), bucht er nicht doppelt. */
+  function neueKennung() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); }
+  function netzfehler(m) { return /network|netzwerk|http 0|timed? ?out|zeitüberschreitung|failed to fetch|connection/i.test(String(m)); }
+
+  /* Laufende Erfassung im Browser merken, bis der Server geantwortet hat. Wird die Seite währenddessen neu geladen, schickt der Start sie
+     mit derselben Kennung nochmals (kein Doppel) und meldet «ET-xxxx in Bxx». */
+  var SPEICHER_OFFEN = 'et-offen', SPEICHERT = null;
+  function merkeOffen(daten) { try { localStorage.setItem(SPEICHER_OFFEN, JSON.stringify({ daten: daten, zeit: Date.now() })); } catch (e) { /* ohne Speicher: kein Nachholen nach dem Neuladen */ } }
+  function vergissOffen() { try { localStorage.removeItem(SPEICHER_OFFEN); } catch (e) { /* ohne Speicher */ } }
+  function nachholen() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(SPEICHER_OFFEN) || 'null'); } catch (e) { o = null; }
+    if (!o || !o.daten || !o.daten.kennung) return;
+    var d = o.daten, was = (d.teil || 'Teil') + ', Box ' + (d.box || '?');
+    if (!(Date.now() - (o.zeit || 0) < 12 * 3600 * 1000)) { vergissOffen(); melde('Unklar, ob die Erfassung «' + was + '» gespeichert wurde. Bitte im Lager suchen.', 'warn'); return; }
+    SPEICHERT = { daten: d };
+    ruf('einlagern', [d], function (r) {
+      SPEICHERT = null; vergissOffen(); START.imLager = r.imLager; seiteStart();
+      melde((r.teil || d.teil) + ' liegt in Box ' + r.box + ' (' + r.id + '). Die letzte Erfassung ist gespeichert.', 'ok');
+    }, function (m) {
+      SPEICHERT = null;
+      if (netzfehler(m)) { melde('Die letzte Erfassung «' + was + '» ist noch nicht bestätigt (' + m + '). Beim nächsten Öffnen versucht es das Tool nochmals, ohne Doppel.', 'stop'); return; }
+      vergissOffen(); melde('Letzte Erfassung «' + was + '» nicht gespeichert: ' + m, 'stop');
+    });
+    melde('Die letzte Erfassung «' + was + '» wird abgeschlossen. Bitte warten.', 'warn');
   }
   function box(text, art) { return '<div class="meldung ' + (art || '') + '">' + text + '</div>'; }
   function melde(text, art) { var m = $('meldung'); if (m) { m.innerHTML = box(esc(text), art || 'warn'); m.scrollIntoView({ block: 'nearest' }); } else alert(text); }
@@ -123,8 +151,10 @@
   var FOTO_ZIEL = null;      // Funktion, die das gelesene Typenschild bekommt
   function foto(ziel) {
     if (!START.schluessel) { melde('Der Claude-Schlüssel fehlt im Tool. Bitte von Hand eintragen.', 'stop'); return; }
-    if (START.budgetVoll) { melde('Das KI-Budget für diesen Monat ist aufgebraucht. Bitte von Hand eintragen.', 'stop'); return; }
-    FOTO_ZIEL = ziel; $('kamera').value = ''; $('kamera').click();
+    if (START.budgetVoll) { melde((START.budgetHinweis || 'Das KI-Budget für diesen Monat ist aufgebraucht.') + ' Bitte von Hand eintragen.', 'stop'); return; }
+    var z0 = Z;
+    FOTO_ZIEL = function (d) { if (Z === z0) ziel(d); };       // inzwischen abgebrochen oder andere Seite: Antwort verwerfen
+    $('kamera').value = ''; $('kamera').click();
   }
   $('kamera').addEventListener('change', function () {
     var f = this.files && this.files[0];
@@ -133,7 +163,10 @@
     verkleinern(f, START.fotoBreite, function (dataUrl) {
       var v = $('vorschau'); if (v) { v.src = dataUrl; v.style.display = 'block'; }
       var b64 = dataUrl.split(',')[1];
-      if (!ruf('typenschild', [b64, 'image/jpeg'], function (r) { ziel(r); }, function (m) { melde(m, 'stop'); ziel(null); })) return;
+      if (!ruf('typenschild', [b64, 'image/jpeg'], function (r) { ziel(r); }, function (m) {
+        if (/KI-Budget/.test(m)) { START.budgetVoll = true; START.budgetHinweis = m; }
+        melde(m, 'stop');                                             // die Fehlermeldung bleibt stehen (vorher von «Nichts gelesen» überschrieben)
+      })) { melde('Das vorherige Foto wird noch gelesen. Bitte kurz warten.', 'warn'); return; }
       melde('Typenschild wird gelesen.', 'warn');
     });
   });
@@ -169,7 +202,8 @@
 
   /* Einlagern, Schritt 2: Prüfen. Felder vorausgefüllt vom Typenschild oder leer. */
   function seitePruefen(d) {
-    Z = Z || { marke: '', modell: '', produktart: '', teil: '', teilart: '', menge: 1, box: '', quelle: '' };
+    Z = Z || { marke: '', modell: '', produktart: '', teil: '', teilart: '', menge: 1, box: '', quelle: '', kennung: '' };
+    if ($('f-teil') && !Z.suche) lesen();         // Eingaben sichern, bevor die Seite neu aufgebaut wird (z.B. Teil getippt, während das Typenschild gelesen wird)
     if (d) { Z.marke = d.marke || Z.marke; Z.modell = d.modell || Z.modell; Z.produktart = d.produktart || Z.produktart; }
     kopf('Teil einlagern', d ? (d.marke || d.modell || d.produktart ? 'Typenschild gelesen' : 'Nichts lesbar: bitte tippen') : '');
     var feld = function (id, label, wert, liste) {
@@ -219,9 +253,10 @@
       + '<button class="knopf pink" id="speichern" data-a="speichern"' + (Z.box ? '' : ' disabled') + '>' + (Z.box ? 'In ' + esc(Z.box) + ' speichern' : 'Box wählen') + '</button>'
       + '<div class="fuss"><button class="link" data-a="zuPruefen">Zurück</button><button class="link rechts" data-a="start">Abbrechen</button></div></div>';
   }
+  function mengeMerken() { var f = $('f-menge'), m = f ? Number(f.value) : 0; if (m >= 1) Z.menge = Math.min(999, Math.round(m)); }   // getippte Menge vor dem Neuaufbau sichern
   function seiteFertig(r) {
     kopf('Gespeichert', r.imLager + ' Teile im Lager', r.id);
-    $('main').innerHTML = '<div class="karte"><p class="frage">' + esc(Z.teil) + ' liegt in Box ' + esc(r.box) + '.</p><p class="still">' + esc([Z.marke, Z.modell].filter(String).join(' ')) + ' · ' + esc(r.id) + '</p>'
+    $('main').innerHTML = '<div class="karte"><p class="frage">' + esc(r.teil || Z.teil) + ' liegt in Box ' + esc(r.box) + '.</p><p class="still">' + esc([Z.marke, Z.modell].filter(String).join(' ')) + ' · ' + esc(r.id) + (r.wiederholt ? ' · war schon gespeichert' : '') + '</p>'
       + '<button class="knopf pink" data-a="einFoto">Nächstes Teil fotografieren</button><button class="knopf" data-a="einHand">Nächstes von Hand</button>'
       + '<div class="fuss"><button class="link" data-a="start">Zur Startseite</button></div></div>';
   }
@@ -229,6 +264,7 @@
   /* Suche: Typenschild oder tippen, Treffer in Gruppen, dann Online-Suche. */
   function seiteSuche(d) {
     Z = Z && Z.suche ? Z : { suche: true, marke: '', modell: '', produktart: '', text: '', teil: '', treffer: null, online: null };
+    if ($('s-teil')) Z.teil = $('s-teil').value.trim();         // Teil getippt, während das Typenschild gelesen wird: bleibt stehen
     if (d) { Z.marke = d.marke || ''; Z.modell = d.modell || ''; Z.produktart = d.produktart || ''; Z.text = [Z.marke, Z.modell].filter(String).join(' '); }
     kopf('Teil suchen', d ? (Z.text ? 'Gelesen: ' + Z.text : 'Nichts lesbar: bitte tippen') : '');
     $('main').innerHTML = '<div class="karte">'
@@ -245,12 +281,19 @@
     if (Z.online) zeichneOnline(Z.online);
     if (d && Z.text) suchen();
   }
-  function suchen() {
+  /* Laufende Nummer pro Lagersuche: Antworten einer früheren Suche (oder einer anderen Seite) werden verworfen. still = Meldung stehen lassen (nach «Genommen»). */
+  var SUCH_NR = 0;
+  function suchen(still) {
+    if (!Z || !Z.suche || !$('s-text')) return;
     Z.text = $('s-text').value.trim();
     var s = Z.marke || Z.modell ? { marke: Z.marke, modell: Z.modell, produktart: Z.produktart } : { text: Z.text };
     if (Z.text !== [Z.marke, Z.modell].filter(String).join(' ')) { Z.marke = ''; Z.modell = ''; s = { text: Z.text }; }   // von Hand geändert: Freitext
     if (!Z.text) { melde('Bitte etwas eingeben oder ein Typenschild fotografieren.', 'warn'); return; }
-    ruf('suchen', [s], function (r) { Z.treffer = r; $('meldung').innerHTML = ''; zeichneTreffer(r); });
+    var nr = ++SUCH_NR, z0 = Z;
+    ruf('suchen', [s], function (r) {
+      if (nr !== SUCH_NR || Z !== z0 || !$('treffer')) return;
+      Z.treffer = r; if (!still) $('meldung').innerHTML = ''; zeichneTreffer(r);
+    }, function (m) { if (nr === SUCH_NR && Z === z0) melde(m, 'stop'); }, 'suchen#' + nr);
   }
   function zeichneTreffer(r) {
     var gruppen = [['passend', 'Passend'], ['serie', 'Gleiche Serie, prüfen'], ['marke', 'Gleiche Marke'], ['produktart', 'Gleiche Produktart'], ['text', 'Treffer']];
@@ -264,18 +307,42 @@
     $('treffer').innerHTML = n ? h : box('Nichts im Lager.', 'warn');
     $('sub').textContent = n ? n + ' im Lager' : 'Nichts im Lager';
   }
+  /* «Genommen»: gesperrt wird pro Teil, nicht pro Funktion (zwei verschiedene Teile kurz nacheinander gehen beide hinaus). Die Kennung bleibt nach
+     einem Fehler stehen: Ein zweiter Klick auf dasselbe Teil ist dann eine Wiederholung und zieht nicht doppelt ab. */
+  var WEG_KENNUNG = {};
   function weg(id) {
+    if (OFFEN['verbraucht:' + id]) { melde(id + ' wird gerade gebucht. Bitte warten.', 'warn'); return; }
     if (!confirm('Teil ' + id + ' als genommen markieren?')) return;
-    ruf('verbraucht', [id], function (r) { melde(r.rest > 0 ? 'Eine Einheit genommen, ' + r.rest + ' bleiben.' : id + ' ist raus.', 'ok'); START.imLager = Math.max(0, START.imLager - 1); if (Z && Z.suche) suchen(); });
+    var k = WEG_KENNUNG[id] = WEG_KENNUNG[id] || neueKennung(), z0 = Z;
+    ruf('verbraucht', [id, k], function (r) {
+      delete WEG_KENNUNG[id];
+      if (r.rest <= 0) START.imLager = Math.max(0, START.imLager - 1);
+      melde(r.rest > 0 ? id + ': eine Einheit genommen, ' + r.rest + ' bleiben.' : id + ' ist raus.', 'ok');
+      if (Z === z0) suchen(true);
+    }, function (m) { melde(id + ': ' + m + (netzfehler(m) ? ' Nochmals «Genommen» ist sicher, es wird nicht doppelt abgezogen.' : ''), 'stop'); }, 'verbraucht:' + id);
   }
+  /* Online-Suche: laufende Nummer pro Suche. Eine Antwort, die nicht mehr zur Seite passt (andere Suche, anderes Gerät), wird verworfen.
+     Marke und Modell aus dem Suchfeld gelten nur für diesen Aufruf (Z.marke/Z.modell bleiben, sonst sucht die nächste Lagersuche falsch). */
+  var ONLINE = { nr: 0, z: null, laeuft: false };
   function online() {
+    if (!Z || !$('s-teil')) return;
     Z.teil = $('s-teil').value.trim(); Z.text = $('s-text').value.trim();
-    if (!Z.marke && !Z.modell) {                                   // getippt statt fotografiert: erstes Wort Marke, Rest Modell
-      var w = Z.text.split(/\s+/); Z.marke = w[0] || ''; Z.modell = w.slice(1).join(' ');
-    }
+    var marke = Z.marke, modell = Z.modell;
+    if (Z.text !== [Z.marke, Z.modell].filter(String).join(' ')) { marke = ''; modell = ''; }   // Suchfeld von Hand geändert (z.B. Typenschild korrigiert): es gilt das Suchfeld
+    if (!marke && !modell) { var w = Z.text.split(/\s+/); marke = w[0] || ''; modell = w.slice(1).join(' '); }   // getippt: erstes Wort Marke, Rest Modell
     if (!Z.teil) { $('online').innerHTML = box('Bitte angeben, welches Teil gesucht wird.', 'warn'); $('s-teil').focus(); return; }
-    if (!ruf('onlineSuche', [{ marke: Z.marke, modell: Z.modell, produktart: Z.produktart, teil: Z.teil }], function (r) { $('online-knopf').disabled = false; Z.online = r; zeichneOnline(r); },
-      function (m) { $('online-knopf').disabled = false; $('online').innerHTML = box(esc(m), 'stop'); })) return;
+    if (!marke && !modell) { $('online').innerHTML = box('Bitte oben Marke und Modell tippen oder das Typenschild fotografieren.', 'warn'); $('s-text').focus(); return; }
+    if (ONLINE.laeuft && ONLINE.z === Z) { $('online').innerHTML = box('Die Online-Suche läuft schon. Bitte warten, das dauert bis zu einer Minute.', 'warn'); return; }
+    var nr = ++ONLINE.nr, z0 = Z;
+    ONLINE.laeuft = true; ONLINE.z = Z;
+    var passt = function () { if (nr === ONLINE.nr) ONLINE.laeuft = false; return nr === ONLINE.nr && Z === z0 && !!$('online'); };
+    ruf('onlineSuche', [{ marke: marke, modell: modell, produktart: Z.produktart, teil: Z.teil }], function (r) {
+      if (!passt()) return;
+      $('online-knopf').disabled = false; Z.online = r; zeichneOnline(r);
+    }, function (m) {
+      if (!passt()) return;
+      $('online-knopf').disabled = false; $('online').innerHTML = box(esc(m), 'stop');
+    }, 'onlineSuche#' + nr);
     $('online-knopf').disabled = true; $('online').innerHTML = box('Die KI sucht in den Shops. Das dauert bis zu einer Minute.', 'warn');
   }
   function zeichneOnline(r) {
@@ -293,7 +360,8 @@
   /* ---------- Aktionen ---------- */
   var AKT = {
     start: function () { seiteStart(); },
-    einFoto: function () { Z = null; seitePruefen(null); foto(function (d) { if (d) seitePruefen(d); else melde('Nichts gelesen. Bitte von Hand eintragen oder neues Foto.', 'warn'); }); },
+    /* Neues Foto auf der Seite «Prüfen» behält, was getippt ist (Teil, Woher); das Foto füllt Marke, Modell und Produktart, wo es sie lesen kann */
+    einFoto: function () { if (!($('f-teil') && Z && !Z.suche)) Z = null; seitePruefen(null); foto(function (d) { if (d) seitePruefen(d); else melde('Nichts gelesen. Bitte von Hand eintragen oder neues Foto.', 'warn'); }); },
     einHand: function () { Z = null; seitePruefen(null); },
     teilart: function (b) { $('f-teil').value = b.dataset.v; $('teilarten').querySelectorAll('button').forEach(function (x) { x.classList.toggle('an', x === b); }); },
     zuBox: function () {
@@ -302,21 +370,45 @@
       if (!Z.marke && !Z.produktart) { melde('Bitte mindestens Marke oder Produktart angeben.', 'warn'); $('f-marke').focus(); return; }
       seiteBox();
     },
-    zuPruefen: function () { seitePruefen(null); },
-    box: function (b) { Z.box = b.dataset.v; seiteBox(); },
+    zuPruefen: function () { mengeMerken(); seitePruefen(null); },
+    box: function (b) { mengeMerken(); Z.box = b.dataset.v; seiteBox(); },
     menge: function (b) { Z.menge = Number(b.dataset.v); seiteBox(); },
     boxNeu: function () {
+      mengeMerken();
       var pa = Z.produktart || prompt('Produktart der neuen Box?'); if (!pa) return;
-      ruf('boxNeu', [pa, ''], function (r) { START.boxen = r.boxen; Z.box = r.box; seiteBox(); melde('Box ' + r.box + ' angelegt. Nummer mit Marker auf die Box schreiben.', 'ok'); });
+      var z0 = Z;
+      if (!ruf('boxNeu', [pa, ''], function (r) {
+        START.boxen = r.boxen;
+        if (Z !== z0 || !$('speichern')) { melde('Box ' + r.box + ' angelegt.', 'ok'); return; }
+        Z.box = r.box; seiteBox(); melde('Box ' + r.box + ' angelegt. Nummer mit Marker auf die Box schreiben.', 'ok');
+      })) melde('Die neue Box wird schon angelegt. Bitte warten.', 'warn');
     },
+    /* Speichern: Kennung pro Erfassung (neu, sobald sich der Inhalt ändert). Solange der Server arbeitet, ist die Navigation gesperrt;
+       die Erfassung steht bis zur Antwort im Browser (Neuladen → nachholen). */
     speichern: function () {
-      var m = Number($('f-menge').value); if (m >= 1) Z.menge = Math.round(m);
+      mengeMerken();
       if (!Z.box) return;
-      if (!ruf('einlagern', [{ marke: Z.marke, modell: Z.modell, produktart: Z.produktart, teil: Z.teil, teilart: Z.teilart, menge: Z.menge, box: Z.box, quelle: Z.quelle }], function (r) {
+      if (SPEICHERT) { melde('Wird schon gespeichert. Bitte warten.', 'warn'); return; }
+      var daten = { marke: Z.marke, modell: Z.modell, produktart: Z.produktart, teil: Z.teil, teilart: Z.teilart, menge: Z.menge, box: Z.box, quelle: Z.quelle };
+      var inhalt = JSON.stringify(daten);
+      if (!Z.kennung || Z.kennungInhalt !== inhalt) { Z.kennung = neueKennung(); Z.kennungInhalt = inhalt; }
+      daten.kennung = Z.kennung;
+      var z0 = Z;
+      SPEICHERT = { daten: daten }; merkeOffen(daten);
+      var los = ruf('einlagern', [daten], function (r) {
+        SPEICHERT = null; vergissOffen();
         try { localStorage.setItem('et-box', r.box); } catch (e) { /* ohne Speicher */ }
-        START.imLager = r.imLager; $('speichern').disabled = false; seiteFertig(r);
-      }, function (msg) { $('speichern').disabled = false; melde(msg, 'stop'); })) return;
-      $('speichern').disabled = true;
+        START.imLager = r.imLager;
+        if (Z === z0 && $('speichern')) seiteFertig(r);
+        else melde((r.teil || daten.teil) + ' liegt in Box ' + r.box + ' (' + r.id + ').', 'ok');
+      }, function (msg) {
+        SPEICHERT = null; vergissOffen();
+        if (/ist voll/.test(msg)) START.boxen.forEach(function (b) { if (b.box === daten.box) b.status = 'voll'; });   // im Sheet inzwischen voll
+        if (Z === z0 && $('speichern')) { if (/ist voll/.test(msg)) Z.box = ''; seiteBox(); }
+        melde(msg + (netzfehler(msg) ? ' Nochmals «Speichern» ist sicher: Das Teil wird nicht doppelt erfasst.' : ''), 'stop');
+      });
+      if (!los) { SPEICHERT = null; vergissOffen(); melde('Wird schon gespeichert. Bitte warten.', 'warn'); return; }
+      $('speichern').disabled = true; $('speichern').textContent = 'Wird gespeichert …';
     },
     suchFoto: function () { Z = { suche: true, marke: '', modell: '', produktart: '', text: '', teil: '', treffer: null, online: null }; seiteSuche(null); foto(function (d) { if (d) seiteSuche(d); else melde('Nichts gelesen. Bitte tippen.', 'warn'); }); },
     suchHand: function () { Z = null; seiteSuche(null); $('s-text').focus(); },
@@ -327,6 +419,7 @@
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-a]');
     if (!b || b.disabled || !AKT[b.dataset.a]) return;
+    if (SPEICHERT) { melde('Wird gespeichert. Bitte warten, bis die Box bestätigt ist.', 'warn'); return; }   // Abbrechen/Zurück während des Speicherns
     AKT[b.dataset.a](b);
   });
   document.addEventListener('keydown', function (e) {
@@ -335,7 +428,7 @@
   });
 
   $('main').innerHTML = '<div class="karte"><p class="still">Lädt.</p></div>';
-  ruf('startDaten', [], function (s) { START = s; seiteStart(); }, function (m) { $('main').innerHTML = '<div class="karte">' + box(esc(m), 'stop') + '</div>'; });
+  ruf('startDaten', [], function (s) { START = s; seiteStart(); nachholen(); }, function (m) { $('main').innerHTML = '<div class="karte">' + box(esc(m), 'stop') + '</div>'; });
 })();
 </script>
 </body>

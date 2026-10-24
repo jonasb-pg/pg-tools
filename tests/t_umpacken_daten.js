@@ -61,14 +61,14 @@ vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/umpac
 vm.runInContext('basisEinrichten_ = function () { return []; };', c);
 c.einrichten();
 const j = (x) => JSON.parse(JSON.stringify(x));
-assert.strictEqual(c.start().version, '2026-10-24.1');
+assert.strictEqual(c.start().version, '2026-10-24.2');   // Prüfung 24.10.2026
 
 /* S1 / M1: nächste Palette über alle Tabs (Scanner ohne ID, Analyse, Archiv), fehlende Quell-Tabs */
 let o = j(c.lagerorte());
 assert.strictEqual(o.naechste.HOM, 'HOM-46', 'Scanner hat HOM-45: nächste HOM-46 (vorher HOM-4)');
 assert.strictEqual(o.naechste.KID, 'KID-16', 'KID-13 (Analyse), KID-14 (Archiv) belegt, KID-15 ähnelt KIDS-15: KID-16');
 assert.ok(o.belegt.indexOf('HOM-45') > -1 && o.belegt.indexOf('KID-13') > -1, 'belegt enthält Scanner und Analyse');
-assert.deepStrictEqual(o.fehlend, ['Berner Brocki', 'Caritas', 'Heilsarmee', 'Online', 'Spenden'], 'fehlende Quell-Tabs werden gemeldet');
+assert.deepStrictEqual(o.fehlend, ['Berner Brocki', 'Caritas', 'Heilsarmee', 'Online'], 'fehlende Quell-Tabs werden gemeldet (Vorgabe seit 24.10.2026 ohne «Spenden», Vertrag V4)');
 assert.ok(!o.orte.some(x => x.ort === 'HOM-45' || x.ort === 'KID-13'), 'Quelle nur aus Quell-Tabs mit ID');
 
 const lager = (ort) => [{ name: 'Neu', art: 'Lager', lagerort: ort, preisregel: 'VP' }];

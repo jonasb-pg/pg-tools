@@ -9,7 +9,7 @@ D = {'id': 'U-0001', 'name': 'Kids → Balu', 'status': 'Scan', 'quelle': 'Retur
                  {'id': 'U-0001-G3', 'name': 'Weg', 'art': 'Entsorgung', 'abnehmer': '', 'lagerort': '', 'preisregel': 'Null', 'prozent': ''}],
      'bestand': [{'id': 'PG-1', 'barcode': '111', 'name': 'Lego Zug', 'kat': 'Kids', 'vp': 20, 'ort': 'KID-7', 'tab': 'Stationär'},
                  {'id': 'PG-2', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-7', 'tab': 'Stationär'},
-                 {'id': 'PG-3', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-12', 'tab': 'Stationär'}],
+                 {'id': 'PG-3', 'barcode': '222', 'name': 'Puppe', 'kat': 'Kids', 'vp': 12.5, 'ort': 'KID-7', 'tab': 'Stationär'}],   # seit 24.10.2026 gleicher Lagerort: gleiche EAN aus verschiedenen Lagerorten verlangt die PG-ID (Prüfung 24.10.2026 Befund 4)
      'zuordnung': {}, 'aenderungen': []}
 stub = """<script>window.CALLS=[];window.D=%s;window.ZU={};
 window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
@@ -58,6 +58,7 @@ with sync_playwright() as p:
     s.evaluate("SIEHT.push('222')"); s.wait_for_timeout(500)
     ok(s.evaluate("ZU['PG-2'] && ZU['PG-2'].gebinde") == 'U-0001-G2' and 'Kids neu' in s.text_content('#kam-text'), 'Barcode 222 → erstes freies Stück in Kids neu')
     if len(sys.argv) > 1 and sys.argv[1].endswith('.png'): s.screenshot(path=sys.argv[1])   # nur Bildpfade (python3 a.py b.py übergibt sonst b.py)
+    s.wait_for_timeout(1300)   # seit 24.10.2026: nach jedem Treffer 1,5 s alle Codes gesperrt (Prüfung 24.10.2026 Befund 5)
     s.evaluate("SIEHT.push('999')"); s.wait_for_timeout(500)
     ok('nicht in der Quelle' in s.text_content('#kam-text') and 'stop' in s.get_attribute('#kam-text', 'class'), 'Unbekannter Code: rote Meldung in der Kamera-Leiste')
     s.click('#kamera button[data-a=kamera]'); s.wait_for_timeout(200)
