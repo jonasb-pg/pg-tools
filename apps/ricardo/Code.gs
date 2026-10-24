@@ -1996,8 +1996,10 @@ function zurueckschreiben_(sh, rows, indizes, breite, gleich) {
 /** Listings haben mehrere Zeilen pro Nummer: dieselbe Zeile ist die mit demselben «Angelegt am» (ändert sich nie). */
 function gleichListing_(sh, rows) {
   const c = col_('Angelegt am');
+  let spalte = null;                                                         // Spalte einmal lesen (unter der Sperre ändert sie sich nicht), nicht Zelle für Zelle
   return function (i, j) {
-    const x = rows[i][c - 1], y = sh.getRange(j + 2, c).getValue();        // immer im Sheet nachsehen: an Zeile i kann jetzt eine andere Zeile derselben Nummer stehen
+    if (!spalte) { const n = sh.getLastRow() - 1; spalte = n > 0 ? sh.getRange(2, c, n, 1).getValues() : []; }
+    const x = rows[i][c - 1], y = (spalte[j] || [''])[0];                  // immer im Sheet nachsehen: an Zeile i kann jetzt eine andere Zeile derselben Nummer stehen
     return x instanceof Date && y instanceof Date ? x.getTime() === y.getTime() : String(x) === String(y);
   };
 }

@@ -53,7 +53,7 @@ with sync_playwright() as p:
     # ---------- Befund 13: Text vom Server nie im onclick ----------
     s.evaluate("zeige('aufgaben')"); s.wait_for_timeout(200)
     inner = s.inner_html('#a-liste')
-    ok('alert(' not in inner.replace('data-a=', '').split('onclick')[0] or ('onclick' not in inner), '13: «Zu erledigen» ohne onclick mit Text')
+    ok('data-akt=' in inner, '13: «Zu erledigen» mit data-akt statt Text im onclick')
     ok(all('alert' not in seg for seg in inner.split('onclick=')[1:]), '13: kein onclick enthält Server-Text')
     s.click('#a-liste .aufgabe:nth-child(2) button.haupt-knopf'); s.wait_for_timeout(100)
     ok(s.evaluate('OFFEN.length') == 0 and not err and not dialoge, '13: böser Link wird nicht geöffnet, kein Skript ausgeführt')
