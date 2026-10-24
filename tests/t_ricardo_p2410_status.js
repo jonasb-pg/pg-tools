@@ -174,7 +174,7 @@ S.E.d.push(['Etiketten-Format', 'ZPL']); S.neu(); S.c('cfgVergessen_()');
 ok(S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false, true)").labelDefinition.imageFileType === 'ZPL2', 'E1: Einstellung ZPL und Seite kann ZPL: ZPL2, 200 dpi');
 ok(S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false)").labelDefinition.imageFileType === 'PDF', 'NR1: Seite ohne Angabe (alte Seite): PDF, auch bei Einstellung ZPL');
 let e = S.c("etikette('9001', false, false, ['zpl', 'pdf'])");
-ok(e.typ === 'zpl' && e.daten === 'XlhBXkZPNTBeRlNeWFo=' && e.name === 'Etikette 9001.zpl' && e.sendung === '99.60.1' && S.vz('9001')['Sendungsnummer'] === '99.60.1', 'E1: Etikette als ZPL-Datei, Sendungsnummer gespeichert');
+ok(e.typ === 'zpl' && e.daten === 'XlhBXkZPNTBeRlNeWFo=' && e.name === 'Etikette 9001.zpl2' && e.sendung === '99.60.1' && S.vz('9001')['Sendungsnummer'] === '99.60.1', 'E1: Etikette als ZPL-Datei, Sendungsnummer gespeichert');
 wirft(() => S.c("etikette('9002')"), /^Bitte bestätigen: Für PG-101 gibt es schon eine Etikette \(Sendung 99\.00\.1\)/, '18: zweite Etikette nur mit Bestätigung');
 ok(anfragen.length === 1, '18: ohne Bestätigung keine Anfrage an die Post');
 S.CACHE['etikette:9001'] = '1';

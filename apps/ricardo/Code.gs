@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-24.4';
+const VERSION = '2026-10-24.5';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -3994,7 +3994,8 @@ function etikette(nr, vorschau, neu, formate) {
     } finally { try { cache.remove(merker); } catch (e2) { /* läuft nach 2 Minuten ab */ } }
   }
   /* E1: die Oberfläche druckt ZPL direkt (Zebra Browser Print) oder lädt die Datei herunter, kein neuer Tab */
-  return { nr: nr, sendung: r.sendungsnummer, daten: r.daten, typ: r.typ, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.' + r.typ, warnungen: r.warnungen,
+  return { nr: nr, sendung: r.sendungsnummer, daten: r.daten, typ: r.typ, pdf: r.pdf, name: (vorschau ? 'Muster ' : 'Etikette ') + nr + '.' + (r.typ === 'zpl' ? 'zpl2' : r.typ),   // .zpl2 wie im Post-Login: öffnet das AVGK Print Tool (.zpl öffnet unter Windows einen Medienplayer)
+    warnungen: r.warnungen,
     nichtGespeichert: !!r.nichtGespeichert, produkt: przl_(klasse).join('+') };
 }
 /** Verkauf mit dieser Nummer, frisch gelesen (in einer Sperre), mit _zeile. */
