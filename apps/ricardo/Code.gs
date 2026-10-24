@@ -2904,7 +2904,11 @@ function api(lang, name, args) {
   let r;
   const t0 = Date.now();
   try { r = f.apply(null, args || []); }
-  catch (e) { const m = String(e.message || e); throw new Error(LANG === 'en' ? enMitKuerzel_(m) : m); }
+  catch (e) {
+    let m = String(e.message || e);
+    if (/^Lock timeout/i.test(m)) m = 'Das Tool ist gerade beschäftigt (eine andere Speicherung läuft noch). Bitte gleich nochmals versuchen.';   // Prüfung 10: nie die rohe Meldung
+    throw new Error(LANG === 'en' ? enMitKuerzel_(m) : m);
+  }
   finally {
     /* Langsame Aufrufe festhalten (ein Schreibzugriff): So sieht man im Log, wo das Tool bremst. */
     const ms = Date.now() - t0;
@@ -2981,7 +2985,6 @@ const EN_REGELN = [
   [/^Retoure (\S+) ist bereits abgeschlossen\.$/, 'Return $1 is already closed.'],
   [/^Dieser Schritt ist bereits erledigt\.$/, 'This step is already done.'],
   [/^Bitte einen Rückzahlungsbetrag eingeben\.$/, 'Please enter a refund amount.'],
-  [/^Die Datei konnte nicht erzeugt werden \(Fehler (\d+)\)\. Die Daten stehen im Tab «(.+)»\.$/, 'The file could not be created (error $1). The data is in the tab "$2".'],
   [/^Nur für Admins\. Deine Adresse \((.*)\) steht nicht in der Einstellung «Admins»\.$/, 'Admins only. Your address ($1) is not listed in the setting "Admins".'],
   [/^Das Sheet passt nicht zu dieser Version \(Tab «(.+)»\)\..*$/, 'The sheet does not match this version (tab "$1"). Please run the function "einrichten" in the Apps Script editor.'],
   [/^Bitte einen Namen mit mindestens 3 Zeichen eingeben\.$/, 'Please enter a name with at least 3 characters.'],
@@ -2999,7 +3002,7 @@ const EN_REGELN = [
   [/^Listing nicht gestartet: Der Status im Matchmaker.*\((.*)\)$/, 'Listing not started: the status in Matchmaker (ANALYSE TOOL) could not be set to "Ricardo". Please try again. ($1)'],
   [/^Das Listing von (\S+) wurde eben geändert\. Bitte nochmals versuchen\.$/, 'The listing of $1 was just changed. Please try again.'],
   [/^Nur Stücke mit PG-ID\. Bitte zuerst im Return Tool erfassen\.$/, 'Only items with a PG-ID. Please record the item in the Return Tool first.'],
-  [/^«Unverkauft» ist gesperrt: Verkauf (.+) ist keinem Listing zugeordnet und könnte zu (\S+) gehören\..*$/, '"Unsold" is blocked: sale $1 is not assigned to a listing and could belong to $2. Resolve it first (import the sales report or cancel it in Admin).'],
+  [/^«Unverkauft» ist gesperrt: Verkauf (.+) ist keinem Listing zugeordnet und könnte zu (\S+) gehören\..*$/, '"Unsold" is blocked: sale $1 is not assigned to a listing and could belong to $2. Resolve it first (import the sales report, assign or cancel it in Admin).'],
   [/^Bitte bestätigen: (\d+) Verkäufe sind keinem Listing zugeordnet\..*$/, 'Please confirm: $1 sales are not assigned to a listing. Set "Unsold" only if none of them belongs to this item.'],
   [/^Bitte bestätigen: Der Preis des Verkaufs ist unbekannt\. Rückzahlung CHF (\S+) trotzdem erfassen\?$/, 'Please confirm: the price of the sale is unknown. Record refund CHF $1 anyway?'],
   [/^Bitte bestätigen: Die Rückzahlung \(CHF (\S+)\) ist mehr als Preis und Porto \(CHF (\S+)\), z\.B\. Rückporto\?$/, 'Please confirm: the refund (CHF $1) is more than price and postage (CHF $2), e.g. return postage?'],
@@ -3008,6 +3011,66 @@ const EN_REGELN = [
   [/^Tab «(.+)» nicht lesbar: (.*)$/, 'Tab "$1" not readable: $2'],
   [/^Möglicherweise dasselbe Stück wie (.+)$/, 'Possibly the same item as $1'],
   [/^Steht im Return Tool auch im Tab «(.+)»$/, 'Also in the Return Tool tab "$1"'],
+  /* Prüfung 20 (24.10.2026): bisher unübersetzte und neue Meldungen */
+  [/^Diese Funktion läuft nur im Apps-Script-Editor oder als Auslöser\.$/, 'This function only runs in the Apps Script editor or as a trigger.'],
+  [/^Tab «(.+)»: Spalte (\S+) heisst «(.*)», erwartet wird «(.*)»\..*$/, 'Tab "$1": column $2 is called "$3", expected "$4". The header row was changed by hand, please restore it.'],
+  [/^Im ANALYSE TOOL hat der Tab «(.+)» nicht die erwarteten Spalten.*$/, 'In the ANALYSE TOOL the tab "$1" does not have the expected columns (PG-ID, Titel, Artikelbeschrieb).'],
+  [/^Tab «(.+)» fehlt$/, 'Tab "$1" is missing'],
+  [/^Spalten «PG-ID» und «Status» fehlen$/, 'Columns "PG-ID" and "Status" are missing'],
+  [/^(\S+) steht nicht mehr im Tab «(.+)»$/, '$1 is no longer in the tab "$2"'],
+  [/^Status im Matchmaker ist jetzt «(.*?)»(, das Stück wurde geholt)?$/, function (m, a, g) { return 'Status in Matchmaker is now "' + a + '"' + (g ? ', the item was picked up' : ''); }],
+  [/^(\S+) wurde im Matchmaker geholt \(Auftrag «(.*)»\)\..*$/, '$1 was picked up in Matchmaker (request "$2"). The item is assigned and does not go on Ricardo.'],
+  [/^(\S+) (?:gehört zum Bündel (\S+), das «(.+?)» ist|ist «(.+?)») und noch keinen Entscheid hat\..*$/, function (m, id, b, s1, s2) {
+    return id + (b ? ' belongs to bundle ' + b + ', which is "' + st_(s1) + '"' : ' is "' + st_(s2) + '"') + ' and has no decision yet. Decide first: "Relist", "Other channel" or "Disposal" (routine "Listing", list "not sold").'; }],
+  [/^(\S+) ist bereits «(.+?)»\. Ein neues Listing geht erst.*$/, function (m, id, a) { return id + ' is already "' + st_(a) + '". A new listing is only possible once the item is free again.'; }],
+  [/^Bündel nicht ergänzt: Der Status im Matchmaker.*\((.*)\)$/, 'Bundle not extended: the status in Matchmaker (ANALYSE TOOL) could not be set to "Ricardo". Please try again. ($1)'],
+  [/^Laufzeit: bitte eine ganze Zahl von 1 bis 30 Tagen eintragen\.$/, 'Duration: please enter a whole number from 1 to 30 days.'],
+  [/^Listing (\S+) ist «(.+?)» und kann nicht als gelistet gespeichert werden\.(.*)$/, function (m, id, a, rest) { return 'Listing ' + id + ' is "' + st_(a) + '" and cannot be saved as listed.' + (rest ? ' It is already listed with another Ricardo link.' : ''); }],
+  [/^Das Tool ist gerade beschäftigt.*$/, 'The tool is busy right now (another save is still running). Please try again in a moment.'],
+  [/^Zahlung ist schon erfasst \((.*)\)\.$/, 'Payment is already recorded ($1).'],
+  [/^Versenden geht erst, wenn der Verkauf gepackt und bezahlt ist \(Status: «(.+)»\)\.$/, function (m, a) { return 'Shipping is only possible once the sale is packed and paid (status: "' + st_(a) + '").'; }],
+  [/^Die Zahlung ist noch nicht erfasst\.$/, 'The payment has not been recorded yet.'],
+  [/^Die Datei konnte nicht erzeugt werden \(Fehler (\S+)\)\. Die Daten stehen im Tab «(.+)»\.$/, 'The file could not be created (error $1). The data is in the tab "$2".'],
+  [/^Schlüssel fehlt \(Script-Eigenschaft ANTHROPIC_API_KEY\)$/, 'Key missing (script property ANTHROPIC_API_KEY)'],
+  [/^Bitte zuerst etwas hineinschreiben\.$/, 'Please write something first.'],
+  [/^Die Zeile wurde im Sheet verschoben\. Bitte die Seite neu laden\.$/, 'The row was moved in the sheet. Please reload the page.'],
+  [/^Listing (\S+) ist «(.+?)» und lässt sich nicht löschen\..*$/, function (m, id, a) { return 'Listing ' + id + ' is "' + st_(a) + '" and cannot be deleted. Deleting is only possible for "In progress", "Ready" and free statuses (Discarded, Unsold, Cancelled, Return closed).'; }],
+  [/^Verkauf (\S+) ist schon storniert\.$/, 'Sale $1 is already cancelled.'],
+  [/^Dieser Verkauf ist bezahlt\. Storno nur über eine Retoure\.$/, 'This sale is paid. Cancellation only via a return.'],
+  [/^Verkauf ist «(.+)» und kann hier nicht storniert werden\.$/, function (m, a) { return 'Sale is "' + st_(a) + '" and cannot be cancelled here.'; }],
+  [/^Bitte die PG-ID des Stücks eingeben\.$/, 'Please enter the PG-ID of the item.'],
+  [/^Verkauf (\S+) ist schon (\S+) zugeordnet\.$/, 'Sale $1 is already assigned to $2.'],
+  [/^Verkauf (\S+) ist «(.+)» und lässt sich nicht mehr zuordnen\.$/, function (m, n, a) { return 'Sale ' + n + ' is "' + st_(a) + '" and can no longer be assigned.'; }],
+  [/^Zuordnung nicht möglich: (.*)\.$/, function (m, g) { return 'Assignment not possible: ' + en_(g) + '.'; }],
+  [/^Das Stück ist vergeben \(Entscheid «(.+)»\)$/, function (m, a) { return 'The item is assigned (decision "' + a + '")'; }],
+  [/^Das Stück ist schon «(.+?)»(?: \(Verkauf (\S+)\))?$/, function (m, a, n) { return 'The item is already "' + st_(a) + '"' + (n ? ' (sale ' + n + ')' : ''); }],
+  [/^(\S+) steht in einem anderen Listing \(Status «(.+)»\)$/, function (m, id, a) { return id + ' is in another listing (status "' + st_(a) + '")'; }],
+  [/^(\S+) ist Teil des Bündels (\S+) \(Status «(.+)»\)$/, function (m, id, b, a) { return id + ' is part of bundle ' + b + ' (status "' + st_(a) + '")'; }],
+  [/^(\S+) ist vergeben \(Entscheid «(.+)»\)$/, '$1 is assigned (decision "$2")'],
+  [/^Bitte bestätigen: Verkauf (\S+) \(Artikel-Nr (.*)\) passt zu keinem Ricardo-Link von (\S+)\. Trotzdem zuordnen\?$/, 'Please confirm: sale $1 (article no. $2) does not match any Ricardo link of $3. Assign anyway?'],
+  [/^Die Einstellung «(.+)» muss eine Zahl von (\S+) bis (\S+) sein\.$/, 'The setting "$1" must be a number from $2 to $3.'],
+  [/^Unbekannter Entscheid\.$/, 'Unknown decision.'],
+  [/^Bitte bestätigen: (\S+) kam als «Defekt» zurück\..*$/, 'Please confirm: $1 came back as "Defective". Relist only if the item has been repaired and checked. "Checked", title and description are cleared and must be done again.'],
+  [/^Unbekannter Ablauf\.$/, 'Unknown routine.'],
+  [/^Keine Bankdaten erhalten\.$/, 'No bank data received.'],
+  [/^Keine Zahlung ausgewählt\.$/, 'No payment selected.'],
+  [/^Das Stück ist «(.+)», nicht unverkauft\.$/, function (m, a) { return 'The item is "' + st_(a) + '", not unsold.'; }],
+  [/^Verkauf ist «(.+)»\.$/, function (m, a) { return 'Sale is "' + st_(a) + '".'; }],
+  [/^Bitte bestätigen: Für (\S+) gibt es schon eine Etikette \(Sendung (.*)\)\..*$/, 'Please confirm: $1 already has a label (tracking no. $2). A new label has a new tracking number; do not use the old one any more. Create a new label?'],
+  [/^Für Verkauf (\S+) wird gerade eine Etikette erstellt\..*$/, 'A label is being created for sale $1 right now. Please wait a moment and reload the list.'],
+  [/^Verkauf (\S+) nicht mehr gefunden$/, 'Sale $1 no longer found'],
+  [/^Adresse fehlt\. Sie kommt mit dem Verkaufsbericht: zuerst den Bericht einlesen\.$/, 'Address missing. It comes with the sales report: import the report first.'],
+  [/^Post-Zugang fehlt: .*$/, 'Swiss Post access missing: enter the script properties POST_CLIENT_ID and POST_CLIENT_SECRET.'],
+  [/^Post-Anmeldung abgelehnt \((\S+)\): (.*)$/, 'Swiss Post login rejected ($1): $2'],
+  [/^Post hat keine Etikette geliefert \((\S+)\): (.*)$/, 'Swiss Post did not deliver a label ($1): $2'],
+  [/^Claude-Antwort unvollständig$/, 'Claude answer incomplete'],
+  [/^Claude (\S+): (.*)$/, 'Claude error $1: $2'],
+  /* Rückfragen beim Start und im Bündel (Vertrag V5, Prüfung 3, 9, Z5); das Kürzel am Ende hängt enMitKuerzel_ wieder an */
+  [/^Bitte bestätigen: Das Archiv des Return Tools konnte nicht geprüft werden \((.*)\)\. Nur listen, wenn (\S+) sicher an Lager ist\.$/, 'Please confirm: the Return Tool archive could not be checked ($1). Only list $2 if it is surely in stock.'],
+  [/^Bitte bestätigen: (\S+) liegt im Matchmaker für Auftrag «(.*)»\. Dort nicht verkauft und jetzt auf Ricardo\?$/, 'Please confirm: $1 is in Matchmaker for request "$2". Not sold there and now on Ricardo?'],
+  [/^Bitte bestätigen: (\S+) ist analysiert, steht im Return Tool aber im Tab «(.+?)»(?: \(Lagerort «(.*)»\))?\..*$/, function (m, id, tab, ort) { return 'Please confirm: ' + id + ' is analysed, but the Return Tool has it in the tab "' + tab + '"' + (ort ? ' (location "' + ort + '")' : '') + '. Only list it if the item is meant for Ricardo. Afterwards change the channel to "Online" in the Return Tool.'; }],
+  [/^Bitte bestätigen: (\S+) wurde im Return Tool nicht gefunden \(in keinem Kanal-Tab und nicht im Archiv(.*)\)\..*$/, 'Please confirm: $1 was not found in the Return Tool (in no channel tab and not in the archive$2). Only list it if the item is surely in stock.'],
+  [/^Bitte bestätigen: (\S+) liegt in der Analyse \(Lagerort «Analyse» im Tab «(.+)»\) und ist noch nicht analysiert\..*$/, 'Please confirm: $1 is in the analysis (location "Analyse" in the tab "$2") and has not been analysed yet. Only list it if it will not be analysed any more.'],
 ];
 function en_(s) {
   for (let i = 0; i < EN_REGELN.length; i++) if (EN_REGELN[i][0].test(s)) return s.replace(EN_REGELN[i][0], EN_REGELN[i][1]);
