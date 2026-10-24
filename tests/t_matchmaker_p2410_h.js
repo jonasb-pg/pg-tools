@@ -163,6 +163,6 @@ module.exports = { umgebung, rt, rtTab, z, zs, P, auftrag, kennung, KOPF, KRT, A
 
 if (require.main === module) {
   const env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF] } });
-  assert.strictEqual(env.lauf('VERSION'), '2026-10-24.3');
+  assert.strictEqual(env.lauf('VERSION'), '2026-10-24.4');
   console.log('t_matchmaker_p2410_h ok (Testgerüst)');
 }

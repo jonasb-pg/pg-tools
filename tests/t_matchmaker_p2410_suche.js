@@ -32,48 +32,43 @@ assert.ok(env.rot() && /1 Suchaufträge wurden während der Suche neu erfasst od
 env.c.sucheAlles();
 assert.ok(/^Art: Velo/.test(profil(env, 4)) && /PG-3/.test(env.zelle(4, 5)), 'zweiter Lauf: Velo richtig: ' + profil(env, 4));
 
-/* ---------- Befund 3: neuer Auftrag und geänderter Auftrag im Tageslauf gegen den ganzen Bestand ---------- */
+/* ---------- Entscheid Jonas 24.10.2026, 15:00: Tagesläufe prüfen NUR die Stücke des Tages; der Rest über «Ganzer Bestand» ---------- */
 env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster')] }, rt: lager() });
 mm = env.mm();
 env.c.sucheAlles();
 assert.ok(/PG-1/.test(env.zelle(4, 5)), 'Lauf 1');
-/* a) neuer Auftrag «Wasserkocher» (PG-2 liegt seit 20.10. im Lager), dann «heute erfasst» */
+/* a) neuer Auftrag «Wasserkocher» (PG-2 liegt seit 20.10. im Lager): «heute erfasst» prüft ihn NICHT gegen den alten Bestand */
 mm.v.push(['Wasserkocher', '', 40, '', '', '', '', '', false, '']);
 env.c.onEdit(env.ev(mm, 5, 1));
 env.paare = 0;
 env.c.sucheHeute();
-assert.ok(/PG-2/.test(env.zelle(5, 5)), 'Befund 3a: neuer Auftrag findet altes Stück im Tageslauf: ' + env.zeile(5));
-assert.strictEqual(env.paare, 1, 'nur das neue Paar an Claude (Toaster hat sein Urteil)');
-assert.ok(/dazu jedes Paar ohne Urteil im ganzen Bestand/.test(env.status()) && /bisherige Treffer behalten/.test(env.status()), env.status());
-/* b) «Mehr Infos» beim Toaster korrigiert: Profil leer, neue Kennung, im Tageslauf wieder gegen den ganzen Bestand */
-mm.v[3][1] = 'egal welche Farbe';
-env.c.onEdit(env.ev(mm, 4, 2));
-assert.ok(env.zelle(4, 5) === '' && profil(env, 4) === '', 'onEdit leert Profil und Treffer');
+assert.strictEqual(env.paare, 0, 'Tageslauf: kein Paar mit altem Stück an Claude');
+assert.ok(!/PG-2/.test(env.zelle(5, 5)), 'Tageslauf findet altes Stück nicht: ' + env.zeile(5));
+assert.ok(/PG-1/.test(env.zelle(4, 5)), 'bisheriger Treffer bleibt stehen: ' + env.zeile(4));
+assert.ok(/An diesem Tag wurde nichts erfasst/.test(env.status()) && /bisherige Treffer behalten/.test(env.status()) && !/ganzen Bestand \(/.test(env.status()), env.status());
+/* b) «Ganzer Bestand» findet ihn */
 env.paare = 0;
-env.c.sucheHeute();
-assert.ok(/PG-1/.test(env.zelle(4, 5)), 'Befund 3b: Treffer nach Textkorrektur wieder da: ' + env.zeile(4));
-assert.strictEqual(env.paare, 1);
-assert.ok(!env.rot(), 'nichts offen: Status nicht rot: ' + env.status());
+env.c.sucheAlles();
+assert.ok(/PG-2/.test(env.zelle(5, 5)) && env.paare === 1, 'Ganzer Bestand: neuer Auftrag findet altes Stück: ' + env.zeile(5));
 
-/* Reihenfolge im Tageslauf: zuerst die Stücke des Tages (Limit 1 Paar pro Lauf) */
-const Q1 = QUELLE.replace(/const PAARE_PRO_LAUF = \d+;/, 'const PAARE_PRO_LAUF = 1;');
-env = umgebung({ quelle: Q1, mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster')] },
+/* c) Stück von heute wird im Tageslauf geprüft, das alte nicht (auch nicht in einem zweiten Lauf) */
+env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster')] },
   rt: rt([z('PG-1', ALT, 'Dualit Toaster', '111', '', 50, 'HOM-1'), z('PG-9', HEUTE, 'Severin Toaster', '999', '', 20, 'HOM-9')]) });
 env.c.sucheHeute();
-assert.deepStrictEqual(env.gefragt, ['Severin Toaster'], 'zuerst das Stück von heute');
-assert.ok(env.rot() && /Noch 1 Paare offen – bitte nochmals starten\./.test(env.status()), env.status());
+assert.deepStrictEqual(env.gefragt, ['Severin Toaster'], 'nur das Stück von heute');
+assert.ok(/PG-9/.test(env.zelle(4, 5)) && !/PG-1/.test(env.zelle(4, 5)) && /1 Stück an diesem Tag erfasst und geprüft/.test(env.status()), env.status());
 env.c.sucheHeute();
-assert.deepStrictEqual(env.gefragt, ['Severin Toaster', 'Dualit Toaster'], 'dann das alte Stück');
-assert.ok(!/Paare offen/.test(env.status()) && /PG-1/.test(env.zelle(4, 5)) && /PG-9/.test(env.zelle(4, 5)));
+assert.deepStrictEqual(env.gefragt, ['Severin Toaster'], 'zweiter Tageslauf fragt nichts Altes nach');
 
-/* ---------- Befund 11: Stück vom Donnerstag, Tagesläufe nur am Freitag «heute» und am Samstag «heute»: wird trotzdem geprüft ---------- */
+/* d) Stück vom Donnerstag: «heute» am Samstag prüft es nicht, «Ganzer Bestand» schon */
 env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster')] }, rt: lager() });
 env.c.sucheAlles();
 env.RT.getSheetByName('Stationär').v.push(z('PG-4', '22.10.2026', 'Toaster Philips', '444', '', 20, 'HOM-4'));
 env.paare = 0;
-env.c.sucheHeute();                      // 24.10.: das Stück vom 22.10. ist nicht «heute»
-assert.ok(/PG-4/.test(env.zelle(4, 5)) && env.paare === 1, 'Befund 11: verpasster Tag nachgeholt: ' + env.zeile(4));
-assert.ok(/An diesem Tag wurde nichts erfasst, dazu jedes Paar ohne Urteil im ganzen Bestand/.test(env.status()), env.status());
+env.c.sucheHeute();
+assert.ok(!/PG-4/.test(env.zelle(4, 5)) && env.paare === 0, 'Tageslauf: Stück vom 22.10. nicht geprüft');
+env.c.sucheAlles();
+assert.ok(/PG-4/.test(env.zelle(4, 5)) && env.paare === 1, 'Ganzer Bestand holt es: ' + env.zeile(4));
 
 /* ---------- Befund 8a: Claude nummeriert die Urteile ab 1: verwerfen, nichts beim Nachbarn ---------- */
 const lager8 = () => rt([z('PG-1', ALT, 'Dualit Toaster', '111', '', 50, 'HOM-1'), z('PG-2', ALT, 'Dualit Toaster Zubehoer Sandwichzange', '222', '', 10, 'HOM-2'),
@@ -112,7 +107,7 @@ assert.ok(/^Art: Toaster/.test(profil(env, 4)) && /^Art: Velo/.test(profil(env, 
 
 /* ---------- Befund 14: ein Profil ohne «Suchwörter:» blockiert nur diesen Auftrag ---------- */
 env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster'), auftrag('Wasserkocher', 'Art: Wasserkocher\nMuss: –\nSuchworte: wasserkocher')] }, rt: lager() });
-env.c.sucheHeute();
+env.c.sucheAlles();   // Tageslauf prüft seit 24.10. nur Stücke des Tages
 assert.deepStrictEqual(env.alerts, [], 'Befund 14: kein Abbruch: ' + env.alerts.join(' | '));
 assert.ok(/PG-1/.test(env.zelle(4, 5)), 'Toaster trotzdem durchsucht');
 assert.ok(env.rot() && /1 Suchaufträge haben im Suchprofil keine Zeile «Suchwörter: …»/.test(env.status()) && /Zeile 5 «Wasserkocher»/.test(env.status()), env.status());

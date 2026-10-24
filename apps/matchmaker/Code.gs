@@ -42,8 +42,8 @@
  *   aus dem Ereignis (die kann sich inzwischen verschoben haben). «Aus Analyse» geht mit nach «Erledigt» und wieder zurück (Vertrag V5).
  * - Suchprofile und Ergebnis werden in der Sperre geschrieben, in die Zeile, in der der Auftrag JETZT steht (Profil: gleicher Text und
  *   Suchprofil leer; Ergebnis: gleiche Kennung). Was während der Suche neu erfasst oder geändert wurde, bleibt leer und steht rot im Status.
- * - Tagesläufe prüfen zuerst die Stücke des Tages, dann jedes Paar ohne Urteil im ganzen Bestand (neue oder geänderte Aufträge, Wochenende,
- *   vergessene Tage). Paare mit Urteil kosten nichts; begrenzt durch PAARE_PRO_LAUF und die Zeitbremse.
+ * - Tagesläufe («heute/gestern erfasst») prüfen NUR die Stücke dieses Tages (Entscheid Jonas 24.10.2026, 15:00). Bisherige Treffer bleiben
+ *   stehen. Alles andere (neue oder geänderte Aufträge gegen den alten Bestand, verpasste Tage) prüft «Ganzer Bestand».
  * - Zusätzlich ausgeschlossen: Ricardo Tool «Listings» (nicht frei oder Entsorgung, auch Bündel), Umpack Tool «Änderungen» (ohne «Erledigt»,
  *   Verkaufen/Entsorgen) und Stücke unter «Aus Analyse» bei geholten Aufträgen. «Ricardo Offline» im ANALYSE TOOL, im Ricardo Tool aber frei
  *   mit «Anderer Kanal»: wieder frei. IDs werden normalisiert verglichen (pgNorm_, Vertrag V3). Nicht lesbare Quelle: Status rot.
@@ -62,7 +62,7 @@
  * - Der Status steht in der Zeile über der Kopfzeile (ohne freie Zeile: als Hinweis unten rechts).
  */
 
-const VERSION = '2026-10-24.3';
+const VERSION = '2026-10-24.4';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -374,14 +374,14 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
   const speicher = ladeUrteile_(ss);
   const heuteKey = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   /* Offen = ohne Urteil (auch kein altes über die Bezeichnung). Gleicher Schlüssel nur einmal (sonst doppelt bezahlt).
-     Im Tageslauf zuerst die Stücke des Tages, dann alle übrigen Paare ohne Urteil (neue/geänderte Aufträge, verpasste Tage). Dann begrenzt. */
+     Im Tageslauf nur die Stücke des Tages (Entscheid Jonas 24.10.2026). Dann begrenzt. */
   const doppelt = {};
   const alleOffen = paare.filter(function (x) {
     if (urteilFuer_(speicher, auftraege[x.a], produkte[x.p])) return false;
     const k = schluessel_(auftraege[x.a], produkte[x.p]);
     if (doppelt[k]) return false;
     doppelt[k] = true;
-    x.prio = tag && !produkte[x.p].neu ? 1 : 0;
+    if (tag && !produkte[x.p].neu) return false;     // Tageslauf: nur Stücke dieses Tages (Entscheid Jonas 24.10.2026)
     return true;
   }).sort(reihenfolge_);
   const offen = alleOffen.slice(0, PAARE_PRO_LAUF);
@@ -412,8 +412,8 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
   const neuStueck = bestand.stuecke.filter(function (it) { return it.neu; }).length;
   let text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · ';
   if (!tag) text += bestand.stuecke.length + ' Stück durchsucht';
-  else text += (neuStueck ? neuStueck + ' Stück an diesem Tag erfasst' : 'An diesem Tag wurde nichts erfasst') +
-    ', dazu jedes Paar ohne Urteil im ganzen Bestand (' + bestand.stuecke.length + ' Stück, bisherige Treffer behalten)';
+  else text += (neuStueck ? neuStueck + ' Stück an diesem Tag erfasst und geprüft' : 'An diesem Tag wurde nichts erfasst') +
+    ' (bisherige Treffer behalten; neue Suchaufträge gegen den ganzen Bestand: «Ganzer Bestand»)';
   text += ' · ' + mitTreffer + ' von ' + auftraege.length + ' Suchaufträgen mit Treffer.';
   if (neuGeprueft) text += ' ' + neuGeprueft + ' Paare neu von Claude geprüft.';
   if (weg.analyse) text += ' ' + weg.analyse + ' Stück mit Ergebnis im ANALYSE TOOL (Matchmaker, Ricardo, nicht reusable) weggelassen.';
@@ -441,7 +441,7 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
   return text;
 }
 
-function reihenfolge_(x, y) { return (x.prio || 0) - (y.prio || 0) || x.a - y.a || x.p - y.p; }
+function reihenfolge_(x, y) { return x.a - y.a || x.p - y.p; }
 
 // ---------- Sheet einrichten ----------
 /** Kopfzeile = erste Zeile (bis Zeile 12) mit einer Zelle «Gesucht»; alter Aufbau: Spalte A «Produkt …», B «Product …». 0, wenn keine. */
