@@ -1,7 +1,7 @@
 import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
 """Umpack Tool, Prüfung 24.10.2026 Befund 5: Kamera bucht für ein Stück nie zwei. Gleicher Code erst nach 1 s aus dem Bild wieder,
 nach jedem Treffer 1,5 s alle Codes gesperrt, EAN und PG-Etikett desselben Stücks zählen einmal. Uhr im Browser gesteuert (Date.now),
-Bilder über UMK.kamBild, Treffer über UMK.treffer. Erfundene Daten. Lauf: python3 tests/t_umpacken_p2410_kamera.py"""
+Bilder über UMK.kamBild, Treffer über UMK.treffer. Seit 24.10.2026: Scan zuerst, dann Gebinde tippen (gebucht wird erst beim Tippen). Erfundene Daten. Lauf: python3 tests/t_umpacken_p2410_kamera.py"""
 import json
 from playwright.sync_api import sync_playwright
 html0 = open('../apps/umpacken/Index.html', encoding='utf8').read()
@@ -42,48 +42,65 @@ def bild(s, *codes): s.evaluate("UMK.kamBild(%s)" % json.dumps(list(codes)))
 def treffer(s, code): s.evaluate("UMK.treffer(%s)" % json.dumps(code)); s.wait_for_timeout(40)
 def gebucht(s): s.wait_for_timeout(60); return [o for x in s.evaluate(OPS) for o in x]
 
+# Scan zuerst, dann Ziel (24.10.2026): ein Treffer lässt das Stück warten, gebucht wird erst mit dem Tippen aufs Gebinde
+def tippe(s, gid='G1'): s.click('.gebinde-wahl button[data-a=ziel][data-v="%s"]' % gid); s.wait_for_timeout(40)
+wartet = lambda s: s.evaluate("UM.wartet && UM.wartet.p.id")
+
 with sync_playwright() as p:
-    # Puppe 2.6 s im Bild (Bilder alle 200 ms): ein Stück
+    # Puppe 2.6 s im Bild (Bilder alle 200 ms): ein Stück. Gleich nach dem ersten Treffer getippt: weitere Treffer lassen kein zweites Stück warten
     b, s, err = seite(p)
     treffer(s, '222')
+    ok(wartet(s) == 'PG-2' and gebucht(s) == [], 'B5 Treffer 222: PG-2 wartet, vor dem Tippen nichts gebucht')
+    tippe(s)
     for i in range(13): zeit(s, 200); bild(s, '222'); treffer(s, '222')
-    ok(gebucht(s) == ['bc:222'], 'B5 dieselbe Puppe 2.6 s im Bild: ein Stück ' + json.dumps(gebucht(s)))
+    ok(gebucht(s) == ['bc:222'] and wartet(s) is None, 'B5 dieselbe Puppe 2.6 s im Bild: ein Stück, kein zweites wartet ' + json.dumps(gebucht(s)))
     # ohne Bilder dazwischen (Prüfungs-Fall U2): auch nach 2.6 s nicht nochmals
     b.close(); b, s, err = seite(p)
-    treffer(s, '222'); zeit(s, 2600); treffer(s, '222')
-    ok(gebucht(s) == ['bc:222'], 'B5 gleicher Code ohne Bild dazwischen nach 2.6 s: nicht nochmals')
-    # weg aus dem Bild: dieselbe EAN zählt seit dem Nach-Review 24.10.2026 erst nach 3 s wieder (vorher 1 s), dann mit Hinweis
+    treffer(s, '222'); tippe(s); zeit(s, 2600); treffer(s, '222')
+    ok(gebucht(s) == ['bc:222'] and wartet(s) is None, 'B5 gleicher Code ohne Bild dazwischen nach 2.6 s: nicht nochmals')
+    # weg aus dem Bild: dieselbe EAN zählt seit dem Nach-Review 24.10.2026 erst nach 3 s wieder (vorher 1 s)
     for i in range(6): zeit(s, 200); bild(s)
     treffer(s, '222')
-    ok(gebucht(s) == ['bc:222'], 'B5 nach 1.2 s aus dem Bild: dieselbe EAN noch nicht (3 s)')
+    ok(gebucht(s) == ['bc:222'] and wartet(s) is None, 'B5 nach 1.2 s aus dem Bild: dieselbe EAN noch nicht (3 s)')
     for i in range(16): zeit(s, 200); bild(s)
     treffer(s, '222')
-    ok(gebucht(s) == ['bc:222', 'bc:222'] and 'zweites Stück derselben EAN' in s.text_content('#rueck'), 'B5 nach 3.2 s aus dem Bild: zweite Puppe zählt, mit Hinweis')
+    # Der frühere Hinweis «zweites Stück derselben EAN» (KAM.eanZahl, nur bei art 'ok') kommt mit «Scan zuerst, dann Ziel» nicht mehr:
+    # der Scan bucht nicht, und das Tippen ist ein bewusster Entscheid. Geprüft wird darum: die zweite Puppe wartet und wird erst mit dem Tippen gebucht.
+    ok(wartet(s) == 'PG-3' and gebucht(s) == ['bc:222'], 'B5 nach 3.2 s aus dem Bild: zweite Puppe (PG-3) wartet')
+    tippe(s)
+    ok(gebucht(s) == ['bc:222', 'bc:222'] and s.evaluate("ZU['PG-3'].gebinde") == 'G1', 'B5 zweite Puppe nach dem Tippen gebucht')
     # EAN und PG-Etikett desselben Stücks (Prüfungs-Fall U7): ein Stück, auch wenn beide länger im Bild sind
     b.close(); b, s, err = seite(p)
     treffer(s, '222'); zeit(s, 30); treffer(s, 'PG-3')
+    ok(wartet(s) == 'PG-2' and 'liegen gelassen' not in s.text_content('#rueck'), 'B5 PG-Etikett desselben Stücks gleich nach der EAN: PG-2 wartet weiter, nichts liegen gelassen')
+    tippe(s)
     for i in range(12): zeit(s, 200); bild(s, '222', 'PG-3'); treffer(s, 'PG-3'); treffer(s, '222')
-    ok(gebucht(s) == ['bc:222'] and s.evaluate("Object.keys(UM.D.zuordnung).length") == 1, 'B5 EAN und PG-Etikett desselben Stücks, 2.4 s im Bild: ein Stück ' + json.dumps(gebucht(s)))
-    # anderes Stück während der Sperre: kommt nach 1.5 s, wenn es noch im Bild ist
+    ok(gebucht(s) == ['bc:222'] and s.evaluate("Object.keys(UM.D.zuordnung).length") == 1 and wartet(s) is None, 'B5 EAN und PG-Etikett desselben Stücks, 2.4 s im Bild: ein Stück ' + json.dumps(gebucht(s)))
+    # anderes Stück während der Sperre: kommt nach 1.5 s, wenn es noch im Bild ist (ohne Tippen dazwischen)
     b.close(); b, s, err = seite(p)
     treffer(s, '111'); zeit(s, 300); bild(s, '555'); treffer(s, '555')
-    ok(gebucht(s) == ['bc:111'], 'B5 anderes Stück 0.3 s danach: noch gesperrt')
+    ok(wartet(s) == 'PG-1' and gebucht(s) == [], 'B5 anderes Stück 0.3 s danach: noch gesperrt, PG-1 wartet weiter')
     zeit(s, 1300); bild(s, '555'); treffer(s, '555')
-    ok(len(gebucht(s)) == 2, 'B5 nach 1.6 s: anderes Stück gebucht ' + json.dumps(gebucht(s)))
+    ok(wartet(s) == 'PG-5' and 'liegen gelassen: PG-1' in s.text_content('#rueck'), 'B5 nach 1.6 s: anderes Stück erkannt, PG-1 liegen gelassen')
+    tippe(s)
+    ok(gebucht(s) == ['bc:555'], 'B5 nach dem Tippen: anderes Stück gebucht ' + json.dumps(gebucht(s)))
     # EAN abgelehnt (gleiche EAN aus zwei Lagerorten → «PG-ID-Etikett scannen»): das Etikett im selben Bild zählt sofort; der abgelehnte Code piept nicht dauernd
     b.close(); b, s, err = seite(p)
     treffer(s, '444')
-    ok('PG-ID-Etikett' in s.text_content('#rueck') and gebucht(s) == [], 'B5 EAN 444 aus KID-7 und KID-12: abgelehnt, nichts gebucht')
+    ok('PG-ID-Etikett' in s.text_content('#rueck') and gebucht(s) == [] and wartet(s) is None, 'B5 EAN 444 aus KID-7 und KID-12: abgelehnt, nichts gebucht')
     zeit(s, 30); treffer(s, 'PG-7')
-    ok(gebucht(s) == ['PG-7'], 'B5 verlangtes PG-Etikett im selben Bild: sofort gebucht ' + json.dumps(gebucht(s)))
+    ok(wartet(s) == 'PG-7' and gebucht(s) == [], 'B5 verlangtes PG-Etikett im selben Bild: sofort erkannt, wartet aufs Gebinde')
+    tippe(s)
+    ok(gebucht(s) == ['PG-7'], 'B5 PG-7 nach dem Tippen gebucht ' + json.dumps(gebucht(s)))
     n = s.evaluate("CALLS.length"); zeit(s, 200); bild(s, '444', 'PG-7'); treffer(s, '444')
     ok(s.evaluate("CALLS.length") == n and gebucht(s) == ['PG-7'] and s.evaluate("UM.rueck.art") == 'ok', 'B5 abgelehnter Code im Bild: keine neue Meldung (✅ von PG-7 bleibt stehen)')
-    # bewusster Gebinde-Wechsel hebt die kurze Sperre auf
+    # bewusstes Tippen aufs Gebinde hebt die kurze Sperre auf (vorher: Gebinde-Wechsel)
     b.close(); b, s, err = seite(p)
-    treffer(s, '111'); zeit(s, 300)
-    s.click('button[data-a=aktiv][data-v="G2"]'); s.wait_for_timeout(60)
+    treffer(s, '111'); tippe(s, 'G1'); zeit(s, 300)
     treffer(s, '555')
-    ok(len(gebucht(s)) == 2 and s.evaluate("ZU['PG-5'].gebinde") == 'G2', 'B5 Gebinde gewechselt: nächstes Stück sofort')
+    ok(wartet(s) == 'PG-5', 'B5 nach dem Tippen: nächstes Stück sofort erkannt')
+    tippe(s, 'G2')
+    ok(len(gebucht(s)) == 2 and s.evaluate("ZU['PG-1'].gebinde") == 'G1' and s.evaluate("ZU['PG-5'].gebinde") == 'G2', 'B5 nächstes Stück ins andere Gebinde gebucht')
     ok(not err, 'keine JS-Fehler ' + str(err))
     b.close()
 print('t_umpacken_p2410_kamera ok' if not fehler else '%d Fehler' % fehler); raise SystemExit(1 if fehler else 0)

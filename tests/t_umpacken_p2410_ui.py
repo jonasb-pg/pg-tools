@@ -1,6 +1,6 @@
 import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
 """Umpack Tool, Prüfung 24.10.2026 (Version 2026-10-24.2): Regressionstests Oberfläche (Index.html, google.script.run gestubbt).
-Befunde 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 20. Kamera (Befund 5): tests/t_umpacken_p2410_kamera.py. Erfundene Daten.
+Befunde 2, 3, 4, 8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 20. Seit 24.10.2026: Scan zuerst, dann Gebinde tippen; Anlegen/Gebinde speichern gesperrt, solange der Server arbeitet. Kamera (Befund 5): tests/t_umpacken_p2410_kamera.py. Erfundene Daten.
 Lauf: python3 tests/t_umpacken_p2410_ui.py"""
 import json, sys
 from playwright.sync_api import sync_playwright
@@ -16,7 +16,7 @@ D = {'id': 'U-0001', 'name': 'Kids', 'status': 'Scan', 'quelle': 'Return Tool', 
 AEND = [{'r': 2, 'id': 'PG-1', 'name': 'Lego', 'aktion': 'Lagerort ändern', 'gebinde': 'Kids neu', 'abnehmer': '', 'alt': 'KID-7', 'neu': 'KID-20', 'vp': 20, 'preis': 20, 'tab': 'Stationär', 'zeile': '7', 'erledigt': '', 'pruefung': 'ok'},
         {'r': 3, 'id': 'PG-6', 'name': 'Kreisel', 'aktion': 'Lagerort ändern', 'gebinde': 'Kids neu', 'abnehmer': '', 'alt': 'KID-7', 'neu': 'KID-20', 'vp': 0, 'preis': 0, 'tab': 'Stationär', 'zeile': '12', 'erledigt': '', 'pruefung': 'ABWEICHUNG: VP fehlt oder ist 0 (Preis CHF 0.00 aus VP)'},
         {'r': 4, 'id': 'PG-5', 'name': 'Ball', 'aktion': 'Nicht gefunden – prüfen', 'gebinde': '', 'abnehmer': '', 'alt': 'KID-12', 'neu': '', 'vp': 10, 'preis': 0, 'tab': 'Stationär', 'zeile': '11', 'erledigt': '', 'pruefung': 'ok'}]
-stub = """<script>window.CALLS=[];window.D=%s;window.AEND=%s;window.ZU={};window.MODUS='ok';window.WARTET=[];window.KONF={};window.UMMAP={};window.STATUS='Scan';window.GSTAND='a';window.PIEPS=[];
+stub = """<script>window.CALLS=[];window.D=%s;window.AEND=%s;window.ZU={};window.MODUS='ok';window.WARTET=[];window.KONF={};window.UMMAP={};window.STATUS='Scan';window.GSTAND='a';window.PIEPS=[];window.HALT=[];
 window.AudioContext=function(){this.currentTime=0;this.destination={};};
 window.AudioContext.prototype.createOscillator=function(){return {frequency:{value:0},connect:function(){},start:function(){PIEPS.push(this.frequency.value)},stop:function(){}};};
 window.AudioContext.prototype.createGain=function(){return {gain:{value:0},connect:function(){}};};
@@ -39,6 +39,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
     r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf,ergebnis:erg,gebindeStand:GSTAND};}
   ok&&ok(r);};
   if(name==='zuordnen'&&(MODUS==='verzoegert'||MODUS==='haengen')&&args[1].length){WARTET.push(antw);return;}
+  if(name==='anlegen'||name==='gebindeAendern'){HALT.push({ok:function(){ok&&ok(JSON.parse(JSON.stringify(D)))},fail:function(m){fail&&fail({message:m})}});return;}
   setTimeout(antw,5);}}})})()}};</script>""" % (json.dumps(D), json.dumps(AEND))
 html = html0.replace('<head>', '<head>' + stub, 1)
 fehler = 0
@@ -58,6 +59,11 @@ def seite(p, ls=None, breit=False, oeffnen=True):
     return b, s, err
 def scan(s, code, warte=80):
     s.fill('#scan', code); s.press('#scan', 'Enter'); s.wait_for_timeout(warte)
+# Scan zuerst, dann Ziel (24.10.2026): gebucht wird erst mit dem Tippen aufs Gebinde
+def tippe(s, gid='U-0001-G1', warte=80):
+    s.click('.gebinde-wahl button[data-a=ziel][data-v="%s"]' % gid); s.wait_for_timeout(warte)
+def buche(s, code, gid='U-0001-G1', warte=80):
+    scan(s, code, 30); tippe(s, gid, warte)
 OPS = "CALLS.filter(function(c){return c[0]==='zuordnen'&&c[1][1].length}).map(function(c){return c[1][1].map(function(o){return o.unbekannt?('?'+o.unbekannt):(o.id||('bc:'+o.code+'>'+o.wunsch))+(o.gebinde===''?'-weg':'')+(o.preis!==undefined&&o.preis!==''?'@'+o.preis:'')})})"
 ops = lambda s: s.evaluate(OPS)
 flach = lambda s: [o for x in ops(s) for o in x]
@@ -68,8 +74,10 @@ with sync_playwright() as p:
     # Befund 2: nach «nicht im Scan» keine ✅ mehr, sondern rot + tiefer Ton + rote Liste; auch Entfernen/Verschieben/Preis
     b, s, err = seite(p)
     s.evaluate("MODUS='fehler:Der Durchgang ist nicht im Scan (Status: Abgeschlossen).'")
-    scan(s, 'PG-1', 150)
+    buche(s, 'PG-1', warte=150)
     scan(s, 'PG-3')
+    ok(s.evaluate("UM.Q.length") == 1 and 'Jetzt das Gebinde tippen' in s.text_content('#rueck'), 'B2 Scan allein bucht nichts (Schlange unverändert)')
+    tippe(s)
     r = s.text_content('#rueck')
     ok('✅' not in r and 'NICHT gespeichert: PG-3' in r and rot(s) and letzterPiep(s) == 220, 'B2 Scan nach «nicht im Scan»: rot, tiefer Ton, kein ✅ (' + r.strip()[:70] + ')')
     ok('PG-3' in s.text_content('#ng-platz') and 'nochmals scannen' in s.text_content('#ng-platz'), 'B2 abgelehnter Scan steht in der roten Liste')
@@ -80,7 +88,7 @@ with sync_playwright() as p:
     # Befund 3: Entfernen direkt nach einem Barcode-Scan wartet auf die Antwort; danach trifft es das aufgelöste Stück
     b, s, err = seite(p, breit=True)
     s.evaluate("MODUS='verzoegert'; UMMAP={'PG-2':'PG-3'}")
-    scan(s, '222')
+    buche(s, '222')
     s.click('#reiter-inhalt button[data-a=entfernen][data-v="PG-2"]'); s.wait_for_timeout(80)
     ok('NICHT entfernt' in s.text_content('#rueck') and s.evaluate("UM.Q.length") == 1 and letzterPiep(s) == 220, 'B3 Entfernen auf ausstehenden Barcode-Scan: abgelehnt, rot')
     s.evaluate("MODUS='ok'; WARTET.shift()()"); s.wait_for_timeout(120)
@@ -92,14 +100,14 @@ with sync_playwright() as p:
     # Befund 4: gleiche EAN aus verschiedenen Lagerorten → PG-ID verlangen, nichts gesendet
     b, s, err = seite(p)
     scan(s, '444')
-    ok('verschiedenen Lagerorten (KID-7, KID-12)' in s.text_content('#rueck') and rot(s) and not ops(s), 'B4 EAN 444 aus KID-7 und KID-12: rot, PG-ID verlangt, nichts gesendet')
+    ok('verschiedenen Lagerorten (KID-7, KID-12)' in s.text_content('#rueck') and rot(s) and not ops(s) and s.evaluate("UM.wartet") is None, 'B4 EAN 444 aus KID-7 und KID-12: rot, PG-ID verlangt, nichts gesendet')
     b.close()
 
     # Befund 8: während des Speicherns keinen anderen Durchgang öffnen; dessen Schlange bleibt ganz
     alt = json.dumps([{'id': 'PG-2', 'gebinde': 'U-0001-G1', 'preis': '', 'vorher': ''}, {'id': 'PG-4', 'gebinde': 'U-0001-G1', 'preis': '', 'vorher': ''}])
     b, s, err = seite(p, {'um-q-U-0002': alt})
     s.evaluate("MODUS='verzoegert'")
-    scan(s, 'PG-1')
+    buche(s, 'PG-1')
     s.click('#ungespeichert button[data-a=oeffne][data-v="U-0002"]'); s.wait_for_timeout(100)
     geladen = s.evaluate("CALLS.filter(function(c){return c[0]==='laden'&&c[1][0]==='U-0002'}).length")
     ok(geladen == 0 and 'noch gespeichert' in s.text_content('#toast'), 'B8 Öffnen während des Speicherns gesperrt')
@@ -110,17 +118,21 @@ with sync_playwright() as p:
     ok(an2 == [['PG-2', 'PG-4']], 'B8 danach U-0002 öffnen: beide Scans nachgespeichert ' + json.dumps(an2))
     b.close()
 
-    # Befund 9: anderes Gerät ändert die Gebinde → neu laden; gewähltes Gebinde gelöscht → neu wählen
+    # Befund 9: anderes Gerät ändert die Gebinde → neu laden; gelöschtes Gebinde lässt sich nicht mehr tippen
+    # (seit 24.10.2026 kein «aktives» Gebinde mehr: Scan zuerst, dann Gebinde tippen)
     b, s, err = seite(p)
-    s.click('button[data-a=aktiv][data-v="U-0001-G2"]'); s.wait_for_timeout(80)
     s.evaluate("GSTAND='b'; D.gebinde=D.gebinde.slice(0,1)")
-    scan(s, 'PG-1', 200)
+    buche(s, 'PG-1', 'U-0001-G2', 200)
     nl = s.evaluate("CALLS.filter(function(c){return c[0]==='laden'}).length")
-    ok(nl == 2 and s.locator('.gebinde-wahl button').count() == 1 and s.evaluate("UM.aktiv") == '', 'B9 Gebinde-Stand geändert: neu geladen, gelöschtes Gebinde nicht mehr gewählt')
+    ok(nl == 2 and s.locator('.gebinde-wahl button').count() == 1 and s.locator('.gebinde-wahl button[data-v="U-0001-G2"]').count() == 0, 'B9 Gebinde-Stand geändert: neu geladen, gelöschtes Gebinde nicht mehr zum Tippen da')
     scan(s, 'PG-2')
-    ok('Gebinde wählen' in s.text_content('#rueck') and rot(s) and flach(s) == ['PG-1'], 'B9 ohne gewähltes Gebinde: rot, nichts gebucht')
+    s.evaluate("UMA.ziel('U-0001-G2')"); s.wait_for_timeout(80)          # veralteter Knopf (z.B. noch in der Kamera-Leiste)
+    ok(flach(s) == ['PG-1'] and s.evaluate("UM.wartet && UM.wartet.p.id") == 'PG-2', 'B9 gelöschtes Gebinde getippt: nichts gebucht, PG-2 wartet weiter')
+    ok('gibt es nicht mehr' in s.text_content('#rueck'), 'B9 gelöschtes Gebinde getippt: rote Meldung')
     s.evaluate("GSTAND='c'"); s.evaluate("UMF.abfrage()"); s.wait_for_timeout(150)
     ok(s.evaluate("CALLS.filter(function(c){return c[0]==='laden'}).length") == 3, 'B9 Abfrage merkt geänderte Gebinde auch ohne Scan')
+    s.evaluate("var k=document.createElement('div');k.innerHTML='<b id=kam-text></b><div id=kam-ziele></div>';document.getElementById('kamera').appendChild(k);UMF.gebindeNeu()"); s.wait_for_timeout(150)
+    ok(s.locator('#kam-ziele button').count() == 1, 'B9 Kamera-Leiste nach neu geladenen Gebinden nachgeführt: ' + str(s.locator('#kam-ziele button').count()))
     b.close()
 
     # Befund 10: Durchgang verwerfen; Verworfene auf der Startseite getrennt und nur ansehbar
@@ -135,7 +147,7 @@ with sync_playwright() as p:
 
     # Befund 11: Barcode ins Preisfeld, Hand-Scanner im Kürzel-Feld, Fokus weg
     b, s, err = seite(p, breit=True)
-    scan(s, 'PG-1', 150)
+    buche(s, 'PG-1', warte=150)
     inp = s.locator('#reiter-inhalt input[data-preis="PG-1"]')
     inp.click(); inp.fill('4005176984105'); inp.press('Enter'); s.wait_for_timeout(120)
     ok(not any('@' in o for o in flach(s)) and 'Preis NICHT gespeichert' in s.text_content('#rueck') and letzterPiep(s) == 220, 'B11 EAN im Preisfeld: rot, nicht gesendet ' + json.dumps(ops(s)))
@@ -143,23 +155,25 @@ with sync_playwright() as p:
     ok(flach(s)[-1] == 'PG-1@99999', 'B11 Preis 99 999 geht')
     s.click('#kuerzel'); s.keyboard.type('4005176984105'); s.keyboard.press('Enter'); s.wait_for_timeout(150)
     ok(s.input_value('#kuerzel') == 'AA' and 'nicht in der Quelle' in s.text_content('#rueck'), 'B11 Hand-Scanner ins Kürzel-Feld: Kürzel bleibt «AA», Code geht ans Scanfeld')
-    scan(s, 'PG-2', 150)
+    buche(s, 'PG-2', warte=150)
     s.click('#reiter-inhalt button[data-a=entfernen][data-v="PG-2"]'); s.wait_for_timeout(120)
     ok(s.evaluate("document.activeElement.id") == 'scan', 'B11 Fokus nach «Entfernen» wieder im Scanfeld')
     s.evaluate("document.activeElement.blur()")
     s.keyboard.type('PG-3'); s.keyboard.press('Enter'); s.wait_for_timeout(150)
+    ok(s.evaluate("UM.wartet && UM.wartet.p.id") == 'PG-3', 'B11 Hand-Scan ohne Fokus: PG-3 wartet aufs Gebinde')
+    tippe(s, warte=150)
     ok(flach(s)[-1] == 'PG-3', 'B11 Hand-Scan ohne Fokus landet trotzdem im Scan ' + json.dumps(ops(s)))
     b.close()
 
     # Befund 12: Konflikt vom Server bleibt in der roten Liste (auch nach Neuladen), bis gespeichert oder erledigt
     b, s, err = seite(p)
     s.evaluate("KONF={'PG-2':'inzwischen von jemand anderem in Balu 1 gelegt','PG-1':'schon in Balu 1 (BB)'}")
-    scan(s, 'PG-2', 150); scan(s, 'PG-1', 150); scan(s, 'PG-4', 150)
+    buche(s, 'PG-2', warte=150); buche(s, 'PG-1', warte=150); buche(s, 'PG-4', warte=150)
     t = s.text_content('#ng-platz')
     ok('PG-2' in t and 'PG-1' in t and 'jemand anderem' in t and 'PG-4' not in t, 'B12 Konflikte in der roten Liste, gespeicherte nicht')
     s.reload(); s.wait_for_timeout(150); s.click('button[data-a=oeffne][data-v="U-0001"]'); s.wait_for_timeout(150)
     ok('PG-2' in s.text_content('#ng-platz'), 'B12 rote Liste bleibt nach Neuladen')
-    scan(s, 'PG-2', 150)          # nach dem Neuladen kennt der Stub keine Konflikte mehr: PG-2 wird gespeichert
+    buche(s, 'PG-2', warte=150)          # nach dem Neuladen kennt der Stub keine Konflikte mehr: PG-2 wird gespeichert
     ok('PG-2' not in s.text_content('#ng-platz') and 'PG-1' in s.text_content('#ng-platz'), 'B12 nochmals gescannt und gespeichert: fällt aus der Liste')
     s.click('#ng-platz button[data-a=ngWeg][data-v="PG-1"]'); s.wait_for_timeout(80)
     ok(s.text_content('#ng-platz').strip() == '' and s.evaluate("localStorage.getItem('um-ng-U-0001')") is None, 'B12 «Erledigt» leert die Liste')
@@ -180,7 +194,7 @@ with sync_playwright() as p:
     s.click('button[data-a=oeffne][data-v="U-0001"]'); s.wait_for_timeout(120)
     s.click('button[data-a=reiter][data-v=offen]'); s.wait_for_timeout(50)
     ok(s.locator('#reiter-inhalt td.gelb').count() == 1, 'B16 Stück ohne VP gelb')
-    scan(s, 'PG-1', 150)
+    buche(s, 'PG-1', warte=150)
     s.click('button[data-a=zumAbschluss]'); s.wait_for_timeout(150)
     s.click('button[data-a=abschliessen]'); s.wait_for_timeout(200)
     zeilen = s.locator('main table').nth(1).locator('tbody tr')
@@ -201,7 +215,7 @@ with sync_playwright() as p:
 
     # Befund 19: Kamera an + «Zum Abschluss» zeichnet die Abschluss-Seite
     b, s, err = seite(p)
-    scan(s, 'PG-1', 150)
+    buche(s, 'PG-1', warte=150)
     s.evaluate("UMK.KAM.an=true")
     s.click('button[data-a=zumAbschluss]'); s.wait_for_timeout(150)
     ok(s.evaluate("UM.ansicht") == 'abschluss' and 'Kontrolle' in s.text_content('main') and s.locator('#scan').count() == 0 and not s.evaluate("UMK.KAM.an"), 'B19 Kamera aus, Abschluss-Seite sichtbar')
@@ -210,15 +224,39 @@ with sync_playwright() as p:
     # Befund 20: Wächter gibt Senden nach Zeitüberschreitung frei; späte Antwort kürzt die Schlange nicht doppelt
     b, s, err = seite(p)
     s.evaluate("UM.waechter=300; MODUS='haengen'")
-    scan(s, 'PG-1', 50)
+    buche(s, 'PG-1', warte=50)
     s.wait_for_timeout(450)
     s.evaluate("clearTimeout(UM.wTimer); UM.waechter=60000")      # zweiten Wächter anhalten, damit die Reihenfolge der Antworten eindeutig ist
-    scan(s, 'PG-2', 50)
+    buche(s, 'PG-2', warte=50)
     ok(ops(s) == [['PG-1'], ['PG-1']] and s.evaluate("UM.Q.length") == 2, 'B20 Wächter: nach 300 ms nochmals gesendet, Scans bleiben ' + json.dumps(ops(s)))
     s.evaluate("MODUS='ok'; WARTET.shift()()"); s.wait_for_timeout(80)
     ok(s.evaluate("UM.Q.length") == 2, 'B20 späte Antwort der alten Anfrage zählt nicht')
     s.evaluate("WARTET.shift()()"); s.wait_for_timeout(200)
     ok(s.evaluate("UM.Q.length") == 0 and ops(s) == [['PG-1'], ['PG-1'], ['PG-2']] and s.evaluate("Object.keys(ZU).sort().join()") == 'PG-1,PG-2', 'B20 danach alles gespeichert, nichts verloren ' + json.dumps(ops(s)))
+    ok(not err, 'keine JS-Fehler ' + str(err))
+    b.close()
+
+    # 24.10.2026: «Durchgang anlegen» und «Gebinde speichern» gesperrt, solange der Server arbeitet (kein Doppelklick = zwei Durchgänge)
+    b, s, err = seite(p, oeffnen=False)
+    s.click('button[data-a=neuerDurchgang]'); s.wait_for_timeout(150)
+    s.click('.orte label input'); s.wait_for_timeout(30)
+    s.locator('.geb-zeile').first.locator('[data-g=name]').fill('Neu')
+    s.click('button[data-a=anlegen]'); s.wait_for_timeout(80)
+    kn = s.locator('button[data-a=anlegen]')
+    ok(kn.is_disabled() and 'Wird gespeichert' in kn.text_content(), 'Anlegen: Knopf gesperrt «Wird gespeichert …», solange der Server arbeitet')
+    s.evaluate("UMA.anlegen()"); s.wait_for_timeout(80)
+    ok(s.evaluate("CALLS.filter(function(c){return c[0]==='anlegen'}).length") == 1 and 'wird schon angelegt' in s.text_content('#toast'), 'Anlegen nochmals während es läuft: «Der Durchgang wird schon angelegt», kein zweiter Aufruf')
+    s.evaluate("HALT.shift().ok()"); s.wait_for_timeout(150)
+    ok(s.evaluate("UM.ansicht") == 'scan' and s.is_visible('#scan') and 'angelegt' in s.text_content('#toast'), 'Anlegen fertig: Scan-Seite')
+    s.click('button[data-a=reiter][data-v=bearbeiten]'); s.wait_for_timeout(80)
+    s.click('button[data-a=bearbSpeichern]'); s.wait_for_timeout(80)
+    kn = s.locator('button[data-a=bearbSpeichern]')
+    ok(kn.is_disabled() and 'Wird gespeichert' in kn.text_content(), 'Gebinde speichern: Knopf gesperrt, solange der Server arbeitet')
+    s.evaluate("UMA.bearbSpeichern()"); s.wait_for_timeout(80)
+    ok(s.evaluate("CALLS.filter(function(c){return c[0]==='gebindeAendern'}).length") == 1, 'Gebinde speichern nochmals während es läuft: kein zweiter Aufruf')
+    s.evaluate("HALT.shift().fail('Die Gebinde hat inzwischen jemand anderes geändert.')"); s.wait_for_timeout(100)
+    kn = s.locator('button[data-a=bearbSpeichern]')
+    ok(not kn.is_disabled() and kn.text_content() == 'Gebinde speichern' and 'jemand anderes' in s.text_content('#toast'), 'Gebinde speichern abgelehnt: Knopf wieder frei, Meldung rot')
     ok(not err, 'keine JS-Fehler ' + str(err))
     b.close()
 print('t_umpacken_p2410_ui ok' if not fehler else '%d Fehler' % fehler); raise SystemExit(1 if fehler else 0)

@@ -389,7 +389,7 @@
      (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen. */
   function scanne() {
     var el = $('scan'), code = norm(el.value); el.value = ''; if (!KAM.an && !KAM.foto) el.focus();
-    V.scanErg = null;            // Ergebnis für die Kamera: { p, art: 'ok' | 'schon', bc } (Nach-Review 24.10.2026)
+    V.scanErg = null;            // Ergebnis für die Kamera: { p, art: 'warte' (Scan) | 'ok' (getippt), bc } (24.10.2026)
     if (!code) return;
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     if (!d0()) return;
@@ -421,7 +421,7 @@
   }
   /* Gebinde getippt: das wartende Stück dorthin (neu oder verschoben). */
   function ziel(id) {
-    var g = V.geb[id]; if (!g) return;
+    var g = V.geb[id]; if (!g) { ablehnen('Dieses Gebinde gibt es nicht mehr.', ' Bitte ein anderes tippen.'); zeichne(); return; }
     KAM.sperreBis = 0;
     var w = V.wartet;
     if (!w) { ablehnen('Zuerst ein Stück scannen.', ' Dann das Gebinde tippen.'); return; }
@@ -598,11 +598,10 @@
   /* Gebinde hat jemand anderes geändert: neu laden, Schlange darüberlegen. War das gewählte Gebinde weg, muss neu gewählt werden. */
   function gebindeNeu() {
     if (!V.D) return;
-    var id = V.D.id, akt = V.aktiv;
+    var id = V.D.id;
     ruf('laden', [id], function (d) {
       if (!V.D || V.D.id !== d.id) return;
       setzeD(d); ueberlagere(V.D.zuordnung);
-      if (akt && !V.geb[akt]) { V.aktiv = ''; ablehnen('Das gewählte Gebinde gibt es nicht mehr.', ' Bitte ein Gebinde wählen.'); }
       melde('Die Gebinde wurden geändert und neu geladen.');
       if (V.ansicht === 'scan') zeichne();
     });
@@ -779,7 +778,7 @@
          Eine EAN bucht erst nach 3 s Abwesenheit wieder (Nach-Review 24.10.2026: Erkennungslücke von 1 s buchte ein zweites Stück). */
       KAM.letzteP = { id: e.p.id, barcode: e.p.barcode };
       if (kamEan(code)) KAM.sicht[code].ms = KAM_EAN_WEG_MS;
-      if (e.art === 'schon') KAM.sperreBis = 0;                                        // nichts gebucht: andere Codes sofort
+      if (e.art === 'schon' || (e.art === 'warte' && V.D && V.D.zuordnung[pgNorm(e.p.id)])) KAM.sperreBis = 0;   // Stück schon zugeordnet: andere Codes sofort
       var bk = bcKey(e.p.barcode), n = 0;
       if (e.art === 'ok' && bk) n = KAM.eanZahl[bk] = (KAM.eanZahl[bk] || 0) + 1;
       if (e.art === 'ok' && e.bc && n > 1 && V.rueck) {
@@ -797,8 +796,10 @@
   function kamText() {
     var t = $('kam-text'); if (!t) return;
     var r = V.rueck, w = V.wartet;
-    t.className = w ? 'warn' : r ? (r.art === 'warte' ? 'warn' : r.art) : '';
-    t.textContent = w ? '➜ ' + w.p.id + ' · ' + w.p.name + ': Gebinde tippen' : (r && KAM.letzte ? r.titel : 'Stück in den Rahmen, dann Gebinde tippen.');
+    /* Ablehnung (rot) geht vor dem wartenden Stück: sonst sieht man in der Kamera-Leiste nur den tiefen Ton */
+    var rot = r && r.art === 'stop';
+    t.className = rot ? 'stop' : w ? 'warn' : r ? (r.art === 'warte' ? 'warn' : r.art) : '';
+    t.textContent = rot ? r.titel + (w ? ' · wartet noch: ' + w.p.id : '') : w ? '➜ ' + w.p.id + ' · ' + w.p.name + ': Gebinde tippen' : (r && KAM.letzte ? r.titel : 'Stück in den Rahmen, dann Gebinde tippen.');
     /* Gebinde auch in der Kamera-Leiste: scannen und tippen, ohne zu scrollen (Jonas 24.10.2026) */
     var zl = $('kam-ziele');
     if (zl && V.D) { zl.className = 'kam-ziele' + (w ? ' bereit' : ''); zl.innerHTML = V.D.gebinde.map(function (g) { return '<button class="klein" data-a="ziel" data-v="' + esc(g.id) + '">' + esc(g.name) + '</button>'; }).join(''); }
@@ -893,7 +894,7 @@
     if (V.ansicht !== 'scan' && KAM.an) kameraAus();      // zuerst, sonst fiel die Abschluss-Seite bei laufender Kamera weg (Prüfung 24.10.2026)
     if (V.ansicht === 'start') { $('wo').textContent = ''; m.innerHTML = startSeite(); }
     else if (V.ansicht === 'setup') { $('wo').textContent = 'Neuer Durchgang'; m.innerHTML = setupSeite(); ortZahl(); }
-    else if (V.ansicht === 'scan') { m.innerHTML = scanSeite(); if ($('scan') && !KAM.an && !istHandy()) $('scan').focus(); }
+    else if (V.ansicht === 'scan') { m.innerHTML = scanSeite(); if ($('scan') && !KAM.an && !istHandy()) $('scan').focus(); kamText(); }   // Kamera-Leiste mit den aktuellen Gebinden
     else if (V.ansicht === 'abschluss') m.innerHTML = abschlussSeite();
   }
   var A = { zurStart: zurStart, oeffne: oeffne, neuerDurchgang: neuerDurchgang, gebDazu: gebDazu, gebWeg: gebWeg, vorschlag: vorschlag, alleOrte: alleOrte, keineOrte: keineOrte, anlegen: anlegen,
