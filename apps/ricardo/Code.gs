@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-24.1';
+const VERSION = '2026-10-24.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -186,6 +186,7 @@ function einrichten() {
   SpreadsheetApp.openById(cfg_('Return Tool ID')).getName();
   SpreadsheetApp.openById(cfg_('Analyse Tool ID') || ANALYSE_ID).getName();
   mailsEinrichten_();
+  vorratEinrichten_();
   log_('Einrichten', '', 'Aufbau geprüft');
   try { SpreadsheetApp.getUi().alert('Ricardo Tool ist eingerichtet.'); } catch (err) { /* ohne UI aufgerufen */ }
 }
@@ -316,6 +317,7 @@ const DOKU = [
     'Web-App zeigt Code als Text: Code.gs und Index.html wurden vertauscht eingefügt.',
     'Änderung ist nicht sichtbar: Es wurde keine neue Version bereitgestellt (Versionsnummer unten links prüfen).',
     'Suche findet nichts: Einstellungen «Return Tool ID», «Such-Tabs» und «Hinweis-Tabs» prüfen. Im Return Tool muss die Kopfzeile in den ersten 12 Zeilen die Spalten Bezeichnung und ID (Tab «Scanner»: Barcode) enthalten (weiter: Barcode, Link, Kategorie, OVP, VP, Lagerort, Spezifikationen, Erfasst). VP ist der Startpreis, OVP der Neupreis.',
+    'Suche langsam (über 5 s): Der Auslöser «suchVorrat» (alle 5 Minuten, 06 bis 21 Uhr) hält die Kopien des Return Tools und der Analyse bereit. Unter Auslöser prüfen, ob er läuft; sonst «einrichten» ausführen. Ausserhalb dieser Zeiten dauert die erste Suche bis 30 s.',
     'Meldung «Return Tool: Den Tab … gibt es nicht» oder «… fehlt die Kopfzeile»: Ein Tab wurde im Return Tool umbenannt oder gelöscht. Einstellung «Such-Tabs» bzw. «Hinweis-Tabs» anpassen (Admin › Einstellungen).',
     'Texte kommen nur noch als Bausteine: Tab «Log» nach «KI-Fehler» durchsuchen. Meist ist das Guthaben leer, der Schlüssel ungültig oder das Modell in den Einstellungen nicht mehr verfügbar.',
     'Verkaufsbericht wird abgelehnt: Ricardo hat das Format geändert. Erwartet wird CSV mit Semikolon und den Spalten Order ID, Article ID, ArticleTitle, ReferenceNumber, EndDate, Selling Price, ShippingCost, Buyer…, DeliveryDescription, ShippingStatus (Funktion importVerkaeufe).',
@@ -391,7 +393,10 @@ function startDaten() {
  *   archiv  = Tabs «Archiv …» (nur anzeigen, gesperrt), eigene = Zeilen im Tab «Listings», die keine Quelle mehr kennt (RC-…, AN-…, alte PG-…).
  * Gleiche EAN aus verschiedenen Quellen mit verschiedener Nummer: Warnung «möglicherweise dasselbe Stück».
  */
-function suche(q, frisch) {
+function suche(q) {
+  try { return sucheIntern_(q, false); } finally { VORRAT = null; }
+}
+function sucheIntern_(q, frisch) {
   q = String(q || '').trim();
   if (q.length < 3) return { treffer: [], andere: [], archiv: [], eigene: [], hinweis: 'Bitte mindestens 3 Zeichen eingeben oder eine EAN scannen.' };
   const src = rtQuelle_(), passt = matcher_(q), listings = listingsIndex_(), ana = {}, aktiv = {}, lesefehler = [];
@@ -401,8 +406,9 @@ function suche(q, frisch) {
     return r;
   };
   const treffer = [], andere = [], archiv = [], eigene = [];
-  leseAnalyse_(frisch).filter(passt).forEach(function (r) { ana[idNorm_(r.id)] = true; treffer.push(mitStatus(r, 'analyse')); });
   const tabs = rtTabs_(src, frisch);
+  if (!VORRAT) vorratLaden_(tabs.such.concat(tabs.hinweis, tabs.archiv));
+  leseAnalyse_(frisch, true).filter(passt).forEach(function (r) { ana[idNorm_(r.id)] = true; treffer.push(mitStatus(r, 'analyse')); });
   /* Review 24.10.2026: Beim zweiten Durchgang (nichts gefunden) nur Such-Tabs und Analyse frisch, Hinweis- und Archiv-Tabs aus der Kopie */
   [[tabs.such, treffer, true], [tabs.hinweis, andere, false]].forEach(function (p) {
     p[0].forEach(function (tab) {
@@ -424,7 +430,7 @@ function suche(q, frisch) {
     eigene.push(r);
   });
   /* Nichts gefunden mit der gemerkten Kopie: vielleicht wurde das Stück eben erst im Return Tool erfasst. Dann einmal frisch lesen. */
-  if (!frisch && !treffer.length && !andere.length && !archiv.length && !/^(RC|AN)[\s'\-]?\d+$/i.test(q)) return suche(q, true);   // RC-, AN-: stehen nie im Return Tool
+  if (!frisch && !treffer.length && !andere.length && !archiv.length && !/^(RC|AN)[\s'\-]?\d+$/i.test(q)) return sucheIntern_(q, true);   // RC-, AN-: stehen nie im Return Tool
   warnungen_(treffer.concat(andere, archiv, eigene));
   return { treffer: treffer.slice(0, 40), andere: andere.slice(0, 40), archiv: archiv.slice(0, 20), eigene: eigene.slice(0, 20),
     mehr: treffer.length > 40 || andere.length > 40 || archiv.length > 20 || eigene.length > 20,
@@ -476,7 +482,7 @@ function rtQuelle_() {
 function rtTabs_(src, frisch) {
   const such = liste_(cfg_('Such-Tabs')), hinweis = liste_(cfg_('Hinweis-Tabs')).filter(function (t) { return such.indexOf(t) === -1; });
   let namen = frisch ? null : gepacktLesen_('rt:tabs');
-  if (!namen) { namen = src.tab().getSheets().map(function (s) { return s.getName(); }); gepacktMerken_('rt:tabs', namen, 600); }
+  if (!namen) { namen = src.tab().getSheets().map(function (s) { return s.getName(); }); gepacktMerken_('rt:tabs', namen, NAMEN_MERKEN_SEK); }
   return { such: such, hinweis: hinweis,
     archiv: namen.filter(function (n) { return String(n).indexOf(ARCHIV_PRAEFIX) === 0 && such.indexOf(n) === -1 && hinweis.indexOf(n) === -1; }) };
 }
@@ -493,16 +499,74 @@ function quelleSicher_(src, tab, frisch, meldungen, hart) {
     return [];
   }
 }
+/*
+ * Tempo (24.10.2026, Jonas: «viel zu langsam»): Das Return Tool ganz zu lesen dauert rund 25 s (Stationär allein 5 s, die Archive 9 s).
+ * Darum hält der Auslöser «suchVorrat» (alle 5 Minuten, 06 bis 21 Uhr) die Kopien im Zwischenspeicher frisch, und die Suche liest alle
+ * Kopien mit zwei Zugriffen (vorratLaden_). Such-Tabs werden ganz gemerkt; Hinweis- und Archiv-Tabs schlank (nur was die Suche zeigt).
+ * Wer listet, bekommt immer frische Angaben: Start und Bündel lesen das Return Tool frisch, eine schlanke Kopie gilt dort nie.
+ */
+const RT_MERKEN_SEK = 1800, ARCHIV_MERKEN_SEK = 10800, NAMEN_MERKEN_SEK = 21600, ANALYSE_LANG_SEK = 900;
+let VORRAT = null;                                                        // Kopien, die die laufende Suche schon geholt hat
+/** such, hinweis oder archiv: bestimmt, wie viel und wie lange das Tool von einem Tab merkt. */
+function tabArt_(tab) {
+  if (String(tab).indexOf(ARCHIV_PRAEFIX) === 0) return 'archiv';
+  return liste_(cfg_('Such-Tabs')).indexOf(tab) !== -1 ? 'such' : 'hinweis';
+}
+/** Nur die Felder, die Suche, Warnungen und «ähnliche Stücke» brauchen. */
+function schlank_(r) {
+  return { id: r.id, name: r.name, ean: r.ean, eanNorm: r.eanNorm, link: r.link, ort: r.ort, vp: r.vp, erfasst: r.erfasst, tab: r.tab, schlank: true };
+}
 /**
- * Ein Tab des Return Tools, gemerkt für 10 Minuten (gepackt im Zwischenspeicher, in Stücken zu 90 KB). Das Return Tool bei jeder Suche ganz zu lesen,
- * dauert Sekunden. frisch = true liest neu und merkt es sich wieder. Passt die Kopie nicht in den Zwischenspeicher, wird jedes Mal gelesen.
+ * Ein Tab des Return Tools aus dem Zwischenspeicher (gepackt, in Stücken zu 90 KB). frisch = true liest neu und merkt es sich wieder.
+ * Gibt beim frischen Lesen immer die ganzen Zeilen zurück. Passt die Kopie nicht in den Zwischenspeicher, wird jedes Mal gelesen.
  */
 function quelleGemerkt_(src, tab, frisch) {
-  const key = 'rt:' + tab;
-  if (!frisch) { const alt = gepacktLesen_(key); if (alt) return alt; }
+  const key = 'rt:' + tab, art = tabArt_(tab);
+  if (!frisch) {
+    const alt = VORRAT && VORRAT[key] ? VORRAT[key] : gepacktLesen_(key);
+    if (alt) return alt;
+  }
   const rows = leseQuelle_(src.tab(tab), tab);
-  gepacktMerken_(key, rows, 600);
+  const kopie = art === 'such' ? rows : rows.map(schlank_);
+  gepacktMerken_(key, kopie, art === 'archiv' ? ARCHIV_MERKEN_SEK : RT_MERKEN_SEK);
+  if (VORRAT) VORRAT[key] = kopie;
   return rows;
+}
+/** Holt die Kopien mehrerer Tabs mit zwei Zugriffen auf den Zwischenspeicher (statt zwei pro Tab). Fehlt eine, liest quelleGemerkt_ sie selbst. */
+function vorratLaden_(tabs) {
+  VORRAT = {};
+  try {
+    const c = CacheService.getScriptCache(), keys = tabs.map(function (t) { return 'rt:' + t; });
+    const anz = c.getAll(keys.map(function (k) { return k + ':n'; })), teile = [];
+    keys.forEach(function (k) { const n = Number(anz[k + ':n']); for (let i = 0; i < n; i++) teile.push(k + ':' + i); });
+    const da = teile.length ? c.getAll(teile) : {};
+    keys.forEach(function (k) {
+      const n = Number(anz[k + ':n']);
+      if (!(n > 0)) return;
+      const st = []; for (let i = 0; i < n; i++) { if (!da[k + ':' + i]) return; st.push(da[k + ':' + i]); }
+      try { VORRAT[k] = JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(st.join('')), 'application/x-gzip')).getDataAsString()); } catch (e) { /* neu lesen */ }
+    });
+  } catch (e) { /* ohne Vorrat: jeder Tab einzeln */ }
+}
+
+/**
+ * Auslöser alle 5 Minuten (06 bis 21 Uhr): hält die Kopien für die Suche frisch. Analyse und Such-Tabs jedes Mal,
+ * Hinweis-Tabs alle 10 Minuten, Archive jede Stunde. Liest nur, schreibt nichts ausser in den Zwischenspeicher.
+ */
+function suchVorrat() {
+  const h = Number(Utilities.formatDate(new Date(), TZ, 'H'));
+  if (h < 6 || h >= 21) return;
+  const c = CacheService.getScriptCache(), src = rtQuelle_(), t = rtTabs_(src, true);
+  const lies = function (tab) { try { quelleGemerkt_(src, tab, true); } catch (e) { console.warn('suchVorrat ' + tab + ': ' + e.message); } };
+  ANALYSE_FRISCH = null;                                                  // nie eine Kopie aus einem früheren Lauf
+  try { leseAnalyse_(true); } catch (e) { console.warn('suchVorrat Analyse: ' + e.message); }
+  t.such.forEach(lies);
+  if (!c.get('vorrat:hinweis')) { t.hinweis.forEach(lies); c.put('vorrat:hinweis', '1', 540); }
+  if (!c.get('vorrat:archiv')) { t.archiv.forEach(lies); c.put('vorrat:archiv', '1', 3300); }
+}
+/** Teil von «einrichten»: Auslöser für suchVorrat (einmal) und die Kopien gleich füllen. */
+function vorratEinrichten_() {
+  if (!ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'suchVorrat'; })) ScriptApp.newTrigger('suchVorrat').timeBased().everyMinutes(5).create();
 }
 /** Grössere Daten gepackt im Zwischenspeicher (in Stücken zu 90 KB). null, wenn nichts oder nichts Brauchbares da ist. */
 function gepacktLesen_(key) {
@@ -608,12 +672,15 @@ function leseQuelle_(src, tab) {
  */
 const ANALYSE_MERKEN_SEK = 60;
 let ANALYSE_FRISCH = null;
-function leseAnalyse_(frisch) {
+/* lang = true (nur Suche): sonst die Kopie des Auslösers «suchVorrat» (höchstens 15 Minuten). Ein Stück, das darin fehlt, findet die Suche
+   im Return Tool oder im zweiten, frischen Durchgang; der Start liest die Analyse immer frisch (findeAnalyse_). */
+function leseAnalyse_(frisch, lang) {
   if (ANALYSE_FRISCH) return JSON.parse(JSON.stringify(ANALYSE_FRISCH));    // eigene Kopie: Aufrufer ändern die Objekte
   const key = 'ana:' + VERSION;
-  if (!frisch) { const alt = gepacktLesen_(key); if (alt) return alt; }
+  if (!frisch) { const alt = gepacktLesen_(key) || (lang ? gepacktLesen_('ana-lang:' + VERSION) : null); if (alt) return alt; }
   ANALYSE_FRISCH = leseAnalyseFrisch_();
   gepacktMerken_(key, ANALYSE_FRISCH, ANALYSE_MERKEN_SEK);
+  gepacktMerken_('ana-lang:' + VERSION, ANALYSE_FRISCH, ANALYSE_LANG_SEK);
   return JSON.parse(JSON.stringify(ANALYSE_FRISCH));
 }
 function leseAnalyseFrisch_() {
@@ -762,7 +829,9 @@ function findeQuelle_(id, auchAndere, nurFrisch) {
     });
     return q;
   };
-  return nurFrisch ? such(true) : (such(false) || such(true));          // nicht in der gemerkten Kopie: frisch nachsehen
+  if (nurFrisch) return such(true);
+  const gemerkt = such(false);
+  return gemerkt && !gemerkt.schlank ? gemerkt : such(true);             // nicht (ganz) in der gemerkten Kopie: frisch nachsehen
 }
 /** Tab «Archiv …» des Return Tools, in dem das Stück steht (frisch gelesen), sonst ''. */
 function imArchiv_(id, meldungen) {
@@ -863,7 +932,7 @@ function aehnlicheStuecke(q) {
   if (q.length < 3) return { kandidaten: [] };
   const z = q.replace(/[\s-]/g, ''), gs1 = /^\(01\)\s*(\d{14})/.exec(q);
   const d = gs1 || /^\d{6,14}$/.test(z) ? { ean: gs1 ? gs1[1] : z } : /^https?:\/\//i.test(q) ? { link: q } : { name: q };
-  return { kandidaten: freiKandidaten_(d, false) };
+  try { return { kandidaten: freiKandidaten_(d, false) }; } finally { VORRAT = null; }
 }
 
 /** Galaxus- bzw. Digitec-Artikelnummer aus einem Link (letzte Zahl ab 5 Stellen im Pfad), sonst ''. */
@@ -907,8 +976,9 @@ function freiKandidaten_(d, frisch) {
     gesehen[k] = true;
     out.push({ id: r.id || '', name: r.name, tab: r.tab || '', ort: r.ort || '', status: r.status || '', quelle: quelle, grund: g.join(', '), ean: r.ean || '', archiv: String(r.tab || '').indexOf(ARCHIV_PRAEFIX) === 0 });
   };
-  leseAnalyse_(frisch).forEach(function (r) { nimm(r, 'Analyse'); });
+  leseAnalyse_(frisch, true).forEach(function (r) { nimm(r, 'Analyse'); });
   const src = rtQuelle_(), t = rtTabs_(src, frisch);
+  if (!frisch && !VORRAT) vorratLaden_(t.such.concat(t.hinweis, t.archiv));
   t.such.concat(t.hinweis, t.archiv).forEach(function (tab) { quelleSicher_(src, tab, frisch, null, false).forEach(function (r) { nimm(r, 'Return Tool'); }); });
   listingsZeilen_().forEach(function (r) { nimm(r, 'Listings'); });
   /* Treffer per EAN, Nummer oder Link zuerst, dann nach Name */
