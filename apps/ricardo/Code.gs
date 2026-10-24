@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-24.2';
+const VERSION = '2026-10-24.3';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -408,7 +408,8 @@ function sucheIntern_(q, frisch) {
   const treffer = [], andere = [], archiv = [], eigene = [];
   const tabs = rtTabs_(src, frisch);
   if (!VORRAT) vorratLaden_(tabs.such.concat(tabs.hinweis, tabs.archiv));
-  leseAnalyse_(frisch, true).filter(passt).forEach(function (r) { ana[idNorm_(r.id)] = true; treffer.push(mitStatus(r, 'analyse')); });
+  /* Analyse immer aus der Kopie (höchstens 5 Minuten alt, Auslöser suchVorrat): frisch lesen kostet 3 s. Der Start liest sie ohnehin frisch. */
+  leseAnalyse_(false, true).filter(passt).forEach(function (r) { ana[idNorm_(r.id)] = true; treffer.push(mitStatus(r, 'analyse')); });
   /* Review 24.10.2026: Beim zweiten Durchgang (nichts gefunden) nur Such-Tabs und Analyse frisch, Hinweis- und Archiv-Tabs aus der Kopie */
   [[tabs.such, treffer, true], [tabs.hinweis, andere, false]].forEach(function (p) {
     p[0].forEach(function (tab) {
