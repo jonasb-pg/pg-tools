@@ -52,10 +52,13 @@ with sync_playwright() as p:
     b.close(); b, s, err = seite(p)
     treffer(s, '222'); zeit(s, 2600); treffer(s, '222')
     ok(gebucht(s) == ['bc:222'], 'B5 gleicher Code ohne Bild dazwischen nach 2.6 s: nicht nochmals')
-    # weg aus dem Bild für mind. 1 s, dann wieder: zweite Puppe zählt
+    # weg aus dem Bild: dieselbe EAN zählt seit dem Nach-Review 24.10.2026 erst nach 3 s wieder (vorher 1 s), dann mit Hinweis
     for i in range(6): zeit(s, 200); bild(s)
     treffer(s, '222')
-    ok(gebucht(s) == ['bc:222', 'bc:222'], 'B5 nach 1.2 s aus dem Bild: zweite Puppe zählt')
+    ok(gebucht(s) == ['bc:222'], 'B5 nach 1.2 s aus dem Bild: dieselbe EAN noch nicht (3 s)')
+    for i in range(16): zeit(s, 200); bild(s)
+    treffer(s, '222')
+    ok(gebucht(s) == ['bc:222', 'bc:222'] and 'zweites Stück derselben EAN' in s.text_content('#rueck'), 'B5 nach 3.2 s aus dem Bild: zweite Puppe zählt, mit Hinweis')
     # EAN und PG-Etikett desselben Stücks (Prüfungs-Fall U7): ein Stück, auch wenn beide länger im Bild sind
     b.close(); b, s, err = seite(p)
     treffer(s, '222'); zeit(s, 30); treffer(s, 'PG-3')

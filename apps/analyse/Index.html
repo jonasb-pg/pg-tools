@@ -657,6 +657,7 @@
     'sp.fehler': ['«{0}» konnte nicht gespeichert werden: {1} Die Analyse liegt unter «Pausiert», dort geht es weiter.', '«{0}» could not be saved: {1} The analysis is under «Paused», continue there.'],
     'sp.offen': ['Es fehlt noch etwas.', 'Something is still missing.'], 'sp.noch': ['Dieses Stück wird gerade gespeichert.', 'This item is being saved right now.'],
     'sp.konflikt': ['{0} ist schon analysiert ({1}, {2}). Diese Analyse ist nicht gespeichert und liegt unter «Pausiert». Bitte am Stück prüfen, dann abbrechen oder Jonas melden.', '{0} has already been analysed ({1}, {2}). This analysis was not saved and is under «Paused». Please check the item, then cancel or tell Jonas.'],
+    'hb.sicherNeu': ['Das Handbuch ist gelesen und nennt eigene Sicherheitspunkte. Bitte die Sicherheit nochmals prüfen, die übrigen Antworten bleiben.', 'The manual has been read and lists its own safety points. Please check safety again, the other answers stay.'],
     'sp.neu': ['Die Angaben zum Produkt haben sich geändert (z.B. Handbuch gelesen, neue Recherche). Bitte diese Schritte neu bestätigen: {0}.', 'The product details have changed (e.g. manual read, new research). Please confirm these steps again: {0}.'],
     'tab.zweiter': ['Das Analyse Tool ist in diesem Browser noch in einem anderen Tab offen. Bitte nur in einem Tab arbeiten, sonst wird es unübersichtlich.', 'The Analyse Tool is also open in another tab of this browser. Please work in one tab only.'],
     'such.etikett': ['Bitte die PG-ID auf dem Etikett mit der Liste vergleichen und das richtige Stück starten.', 'Please compare the PG-ID on the label with the list and start the right item.'],
@@ -1190,6 +1191,30 @@
     AN.d.handbuch = x || { status: 'Fehler', themen: {} };
     AN.hb = hbBereit(AN.d.handbuch) ? 'ok' : (AN.d.handbuch.status === 'kein Handbuch' ? null : 'fehler');
     sichern(); zeichneAnalyse();
+    if (hbBereit(AN.d.handbuch)) hbUeberblick(id);
+  }
+  /*
+   * Nachprüfung 24.10.2026 (Befund 2): Ein gelesenes Handbuch ändert auf dem Server die Sicherheitspunkte (aus dem Handbuch statt aus der Recherche).
+   * Ohne neuen Überblick im Browser wiese der Server den Abschluss zurück («Sicherheit neu bestätigen»). Darum gleich jetzt den neuen Überblick holen und
+   * die Antworten nach Namen umstellen (umstellen). Ist die Person schon weiter als «Sicherheit», geht es dort weiter, mit Hinweis; sonst bleibt sie, wo sie ist.
+   */
+  function hbUeberblick(id) {
+    google.script.run.withSuccessHandler(function (nd) {
+      if (!AN || AN.d.produkt.id !== id || !nd || !nd.ablauf || !nd.funktion) return;
+      var od = AN.d, nam = function (l) { return JSON.stringify((l || []).map(String)); };
+      if (nam(od.sicher) === nam(nd.sicher)) return;                            // nichts, worauf sich Antworten beziehen, hat sich geändert
+      var war = AN.i, j = -1;
+      for (var k = war; k < od.ablauf.length && j < 0; k++) j = nd.ablauf.indexOf(od.ablauf[k]);   // wo die Person im neuen Ablauf steht
+      if (j < 0) j = Math.max(0, nd.ablauf.indexOf('entscheid'));
+      var gate = AN.gate, hb = AN.d.handbuch;
+      umstellen(AN, nd);
+      AN.d.handbuch = hb;
+      var zurueck = AN.i < j;                                                     // erster geänderter Schritt liegt hinter der Person
+      if (!zurueck) { AN.i = j; AN.gate = gate; }
+      LAUF.urteil = null; LAUF.urteilBild = '';
+      sichern(); zeichneAnalyse();
+      if (zurueck) melde(t('hb.sicherNeu'), true);
+    }).withFailureHandler(function () { /* dann merkt es der Abschluss (Schritte neu bestätigen) */ }).api(L, 'starteAnalyse', [id]);
   }
   /* Nach einem Neuladen während des Lesens: alle 10 Sekunden nachfragen, bis die Zeile im Handbuch-Sheet nicht mehr «Hochgeladen» heisst. */
   function hbWarten() {

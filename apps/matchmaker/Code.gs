@@ -865,21 +865,22 @@ function leseErledigt_() {
     const sh = SpreadsheetApp.openById(ANALYSE_ID).getSheetByName(ANALYSE_TAB);
     if (!sh) return { ids: {}, fehler: 'Tab «' + ANALYSE_TAB + '» fehlt' };
     const v = sh.getDataRange().getValues(), kopf = (v[0] || []).map(function (x) { return String(x).trim(); });
-    const c = { id: kopf.indexOf('PG-ID'), regal: kopf.indexOf('Regal'), reusable: kopf.indexOf('Reusable') };
+    const c = { id: kopf.indexOf('PG-ID'), regal: kopf.indexOf('Regal'), reusable: kopf.indexOf('Reusable'), ende: kopf.indexOf('Ende') };
     if (c.id < 0 || c.regal < 0 || c.reusable < 0) return { ids: {}, fehler: 'Spalten PG-ID, Regal oder Reusable fehlen im Tab «' + ANALYSE_TAB + '»' };
-    const letzte = {}, ids = {};
+    const letzte = {}, ids = {}, tage = {};
     for (let i = 1; i < v.length; i++) {
       const roh = String(v[i][c.id] || '').trim();
-      if (roh) letzte[pgNorm_(roh)] = { regal: String(v[i][c.regal] || '').trim(), reusable: String(v[i][c.reusable] || '').trim() };
+      if (roh) letzte[pgNorm_(roh)] = { regal: String(v[i][c.regal] || '').trim(), reusable: String(v[i][c.reusable] || '').trim(), tag: c.ende > -1 ? (tag_(v[i][c.ende], TZ) || '') : '' };
     }
+    Object.keys(letzte).forEach(function (id) { if (letzte[id].tag) tage[id] = letzte[id].tag; });   // Nachprüfung (Befund 4): Tag der letzten Analyse je Stück
     Object.keys(letzte).forEach(function (id) {
       const x = letzte[id];
       if (ERLEDIGT_REGALE.indexOf(x.regal) > -1) ids[id] = x.regal;
       else if (x.reusable === 'Nein') ids[id] = 'nicht reusable';
     });
-    return { ids: ids, fehler: '' };
+    return { ids: ids, tage: tage, fehler: '' };
   } catch (e) {
-    return { ids: {}, fehler: String(e && e.message || e).slice(0, 120) };
+    return { ids: {}, tage: {}, fehler: String(e && e.message || e).slice(0, 120) };
   }
 }
 
@@ -947,7 +948,7 @@ function leseUmpack_() {
  * Tab «Erledigt» (dieses Sheet): Kennungen der geholten Aufträge (ihre Urteile bleiben beim Aufräumen) und die Stücke unter «Aus Analyse».
  * Ohne Tab: leer. Kopfzeile verschoben: fehler (dann wird nicht aufgeräumt und nichts über «Erledigt» ausgeschlossen).
  */
-function leseErledigtTab_(ss) {
+function leseErledigtTab_(ss, tage) {
   const aus = { kennungen: {}, ids: {}, fehler: '' };
   const sh = ss.getSheetByName(TAB_ERLEDIGT);
   if (!sh || sh.getLastRow() < 2) return aus;
@@ -958,7 +959,7 @@ function leseErledigtTab_(ss) {
       if (g) aus.kennungen[kennung_({ gesucht: g, infos: String(r[ke['Mehr Infos'] - 1] || '').replace(/\s+/g, ' ').trim(), profil: String(r[ke['Suchprofil'] - 1] || '').trim() })] = true;
       if (ke['Aus Analyse']) zellen.push(r[ke['Aus Analyse'] - 1]);
     });
-    aus.ids = ausAnalyseIds_(zellen);
+    aus.ids = ausAnalyseIds_(zellen, tage);
   } catch (e) { aus.fehler = String(e && e.message || e).slice(0, 160); }
   return aus;
 }
@@ -967,22 +968,29 @@ function leseErledigtTab_(ss) {
  * Vermerke «<ID> · …» (eine Zeile pro Eintrag, vom Analyse Tool) in den Zellen «Aus Analyse» geholter Aufträge. Pro Zelle zählt je ID die letzte Zeile;
  * «nicht geklappt» oder «Ricardo» heben auf. Ausgeschlossen ist eine ID, die ein geholter Auftrag noch hält (gleich wie mmVermerkIds_ im Analyse Tool, Vertrag V5).
  */
-function ausAnalyseIds_(zellen) {
+function ausAnalyseIds_(zellen, tage) {
   const ids = {};
   zellen.forEach(function (t) {
     const letzte = {};
     String(t == null ? '' : t).split(/\r?\n/).forEach(function (l) {
       const m = /^\s*([A-Za-z]{2}[\s'\-]?\d+)\s*·/.exec(l);
-      if (m) letzte[pgNorm_(m[1])] = !/nicht geklappt|ricardo/i.test(l);
+      if (!m) return;
+      const d = l.split(/·\s*Fotos:/)[0].match(/\d{1,2}\.\d{1,2}\.\d{4}/g);
+      letzte[pgNorm_(m[1])] = { aktiv: !/nicht geklappt|ricardo/i.test(l), tag: d ? (tag_(d[d.length - 1], TZ) || '') : '' };
     });
-    Object.keys(letzte).forEach(function (k) { if (letzte[k]) ids[k] = true; });
+    /* Nachprüfung (Befund 4): Wurde das Stück NACH dem Vermerk nochmals analysiert (Retoure, tage = Tag der letzten Analyse im ANALYSE TOOL),
+       gilt der alte Vermerk nicht mehr. Gleich wie mmGeholt_ im Analyse Tool. Ohne Datum: wie bisher ausgeschlossen. */
+    Object.keys(letzte).forEach(function (k) {
+      const x = letzte[k];
+      if (x.aktiv && !(tage && tage[k] && x.tag && tage[k] > x.tag)) ids[k] = true;
+    });
   });
   return ids;
 }
 
 /** Alle Ausschlüsse: { ids: { normalisierte ID: 'analyse' | 'ricardo' | 'umpack' | 'geholt' }, fehler: { analyse, ricardo, umpack, erledigt } }. */
 function ausschluesse_(ss) {
-  const an = leseErledigt_(), ric = leseRicardo_(), um = leseUmpack_(), erl = leseErledigtTab_(ss), ids = {};
+  const an = leseErledigt_(), ric = leseRicardo_(), um = leseUmpack_(), erl = leseErledigtTab_(ss, an.tage), ids = {};
   Object.keys(an.ids).forEach(function (k) {
     if (an.ids[k] === 'Ricardo Offline' && ric.frei[k]) return;     // auf Ricardo unverkauft, Entscheid «Anderer Kanal»: wieder frei
     ids[k] = 'analyse';

@@ -1455,6 +1455,7 @@ function abholen_() {
     const schluessel = {};
     lies_('Produkte').z.forEach(function (p) { if (String(p['Recherche-Batch']) === id && p['Recherche-Status'] === 'Läuft') schluessel[String(p['Recherche-Schlüssel'])] = 1; });
     const dieses = function (p, k) { return String(p['Recherche-Batch']) === id && p['Recherche-Status'] === 'Läuft' && String(p['Recherche-Schlüssel']) === k; };
+    let nochmal = false;                                                       // Befund 5: vorübergehend nicht geschrieben → Batch bleibt «Läuft», nächster Abgleich schreibt
     Object.keys(schluessel).forEach(function (k) {
       try {
         const n = gesperrt_(function () {
@@ -1468,12 +1469,18 @@ function abholen_() {
         }, ['Produkte']);
         if (n > 0) fertig += n; else fehler -= n;
       } catch (err) {
+        /* Nachprüfung (Befund 5): Die Antwort ist brauchbar, nur das Schreiben ging schief (Sheets-API, Sperre). Nicht «Fehler» setzen (die bezahlte Antwort
+           wäre verloren), sondern Produkt und Batch auf «Läuft» lassen: Der nächste Abgleich holt die Ergebnisse nochmals und schreibt. Die Kosten stehen
+           schon (erfasst), sie werden nicht doppelt gebucht. Erst nach ABHOLEN_VERSUCHE Fehlschlägen dieses Produkts: «Fehler». */
+        const v = abholenFehlschlag_(id, k);
+        log_('Recherche-Fehler', k, 'Recherche nicht geschrieben (Versuch ' + v + ' von ' + ABHOLEN_VERSUCHE + '): ' + err.message);
+        if (v < ABHOLEN_VERSUCHE) { nochmal = true; return; }
         fehler++;
-        log_('Recherche-Fehler', k, 'Recherche nicht geschrieben: ' + err.message);
         try { gesperrt_(function () { const st = {}; lies_('Produkte').z.forEach(function (p) { if (dieses(p, k)) st[p._r] = 'Fehler'; }); setz_('Produkte', 'Recherche-Status', st); }); }
         catch (err2) { log_('Recherche-Fehler', k, 'Status nicht gesetzt: ' + err2.message); }
       }
     });
+    if (nochmal) return;                                                      // Batch bleibt «Läuft»
     gesperrt_(function () {
       const zb2 = lies_('Batches').z.filter(function (x) { return String(x['Batch-ID']) === id; })[0], s = {}, t = {};   // Zeile frisch und per Batch-ID
       if (!zb2) return;
@@ -1482,6 +1489,20 @@ function abholen_() {
     });
   });
   return { fertig: fertig, fehler: fehler };
+}
+/** Befund 5: Wie oft das Schreiben der Recherche eines Produkts aus einem Batch schon scheiterte (Script-Eigenschaft, 24 h). Zählt mit und gibt den neuen Stand zurück. */
+const ABHOLEN_VERSUCHE = 3;
+function abholenFehlschlag_(id, k) {
+  const p = PropertiesService.getScriptProperties(), name = 'ABHOLEN_FEHL', jetzt = Date.now();
+  let m = {};
+  try { m = JSON.parse(p.getProperty(name) || '{}') || {}; } catch (err) { m = {}; }
+  Object.keys(m).forEach(function (x) { if (!(jetzt - (m[x].t || 0) < 86400000)) delete m[x]; });
+  const s = id + '|' + k, n = ((m[s] && m[s].n) || 0) + 1;
+  m[s] = { n: n, t: jetzt };
+  let txt = JSON.stringify(m);
+  if (txt.length > 8000) { const nur = {}; nur[s] = m[s]; txt = JSON.stringify(nur); }                  // Script-Eigenschaft: höchstens 9 KB
+  try { p.setProperty(name, txt); } catch (err) { return ABHOLEN_VERSUCHE; }                             // ohne Zähler lieber «Fehler» als endlos
+  return n;
 }
 /**
  * H5 (24.10.2026): Prüft eine Antwort der Recherche, bevor etwas gelöscht oder geschrieben wird. Falsche Typen (z.B. «"testmittel": "keine"» statt Liste)
@@ -2624,7 +2645,17 @@ function mmSpalten_(kopf, pflicht) {
   (pflicht || []).forEach(function (n) { if (name[n] === undefined || name[n] < 0) throw new Error('Spalte «' + n + '» fehlt im Matchmaker Sheet.'); });
   return sp;
 }
+/** Befund 3: Teilt das Echo der KI («gesucht», normiert) ein Wort mit dem Gesucht-Text? Gleich, Wortanfang oder gleiche erste 4 Buchstaben (Tippfehler), ab 3 Zeichen. */
+function mmEchoAehnlich_(g, gesucht) {
+  const w = function (x) { return norm_(x).split(' ').filter(function (y) { return y.length >= 3; }); }, b = w(gesucht);
+  return w(g).some(function (x) { return b.some(function (y) { return x === y || x.indexOf(y) === 0 || y.indexOf(x) === 0 || (x.length >= 4 && y.length >= 4 && x.slice(0, 4) === y.slice(0, 4)); }); });
+}
 function mmSchluessel_(a) { return norm_(a.gesucht) + '|' + norm_(a.mehr); }
+/**
+ * Nachprüfung 24.10.2026 (Befund 1): Passt ein gespeicherter Schlüssel zum Auftrag? Bis Version 2026-10-24.1 fand das Tool «Mehr Infos (…)» nicht,
+ * der Schlüssel war darum «gesucht|». Solche Schlüssel stehen noch in «Analysen» (Stand.mm) und im Browser (AN.mm, Pausiert, Speichern): Sie gelten weiter.
+ */
+function mmSchluesselGleich_(a, s) { s = String(s == null ? '' : s); return s === mmSchluessel_(a) || s === norm_(a.gesucht) + '|'; }
 /**
  * Vertrag V5 (24.10.2026): Stücke im Vermerk «Aus Analyse» eines Auftrags. Eine Zeile pro Eintrag, «<ID> · …». Je ID zählt die letzte Zeile;
  * eine Zeile mit «nicht geklappt» oder «Ricardo» hebt auf. Gibt { idKey: true (reserviert) | false (aufgehoben) } zurück.
@@ -2636,6 +2667,26 @@ function mmVermerkIds_(text) {
     if (m) aus[idKey_(m[1])] = !/nicht geklappt|ricardo/i.test(z);
   });
   return aus;
+}
+/**
+ * Nachprüfung (Befund 4): wie mmVermerkIds_, dazu das Datum der zählenden Zeile (letzte Zeile je ID): { idKey: { aktiv, tag: 'yyyy-MM-dd' oder '' } }.
+ * Das Datum ist das letzte «dd.MM.yyyy» der Zeile vor «· Fotos:» (der Vermerk endet mit dem Tag des Abschlusses).
+ */
+function mmVermerkTage_(text) {
+  const aus = {};
+  String(text || '').split('\n').forEach(function (z) {
+    const m = /^\s*([A-Za-z]{2}[\s'\-]?\d+)\s*·/.exec(z);
+    if (!m) return;
+    const d = z.split(/·\s*Fotos:/)[0].match(/\d{1,2}\.\d{1,2}\.\d{4}/g);
+    aus[idKey_(m[1])] = { aktiv: !/nicht geklappt|ricardo/i.test(z), tag: d ? tagKey_(d[d.length - 1]) : '' };
+  });
+  return aus;
+}
+/** Datum (Date oder «d.M.yyyy …») als «yyyy-MM-dd» zum Vergleichen, sonst ''. */
+function tagKey_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+  const m = /^\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(String(v == null ? '' : v));
+  return m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : '';
 }
 /** Hat ein Auftrag ein anderes Stück als pg reserviert? (Z5/Z8: dann ist er für dieses Stück nicht frei.) Gibt die ID zurück oder ''. */
 function mmFremd_(a, pg) {
@@ -2650,8 +2701,14 @@ function mmErwaehnt_(a, pg) { return Object.prototype.hasOwnProperty.call(a.ids 
  * meins = true: einen Auftrag, in dem pg schon steht, zuerst (Vermerk «nicht geklappt» beim alten Auftrag). Aufträge mit fremder Reservierung nie.
  */
 function mmFinde_(liste, mm, pg, meins) {
-  const gleich = liste.filter(function (a) { return mmSchluessel_(a) === String(mm.schluessel); });
-  if (meins) { const m = gleich.filter(function (a) { return mmErwaehnt_(a, pg); })[0]; if (m) return m; }
+  const gleich = liste.filter(function (a) { return mmSchluesselGleich_(a, mm.schluessel); });
+  if (meins) {
+    const m = gleich.filter(function (a) { return mmErwaehnt_(a, pg); })[0];
+    if (m) return m;
+    /* Befund 1: Der Vermerk mit pg zeigt den Auftrag sicher, auch wenn der Schlüssel nicht (mehr) passt: der eine Auftrag, der pg noch reserviert. */
+    const k = idKey_(pg), res = liste.filter(function (a) { const ids = a.ids || mmVermerkIds_(a.aus); return ids[k] === true; });
+    if (res.length === 1) return res[0];
+  }
   const frei = gleich.filter(function (a) { return !mmFremd_(a, pg); });
   const genau = frei.filter(function (a) { return a.zeile === Number(mm.zeile); })[0];
   if (genau) return genau;
@@ -2674,7 +2731,7 @@ function matchmaker(id, ident, aus) {
     /* M6: Beim Wiedereinstieg fällt nur der alte Auftrag weg (der mit diesem Stück im Vermerk), nicht jeder gleich lautende. Ohne Vermerk wie bisher alle gleichen. */
     const wegAuftrag = {};
     weg.forEach(function (s) {
-      const gleich = alle.filter(function (a) { return mmSchluessel_(a) === s; }), meine = gleich.filter(function (a) { return mmErwaehnt_(a, pg); });
+      const gleich = alle.filter(function (a) { return mmSchluesselGleich_(a, s); }), meine = gleich.filter(function (a) { return mmErwaehnt_(a, pg); });
       (meine.length ? meine : gleich).forEach(function (a) { wegAuftrag[a.zeile] = 1; });
     });
     liste = alle.filter(function (a) { return !wegAuftrag[a.zeile] && !mmFremd_(a, pg); });
@@ -2704,10 +2761,16 @@ function matchmaker(id, ident, aus) {
     if (!t || typeof t !== 'object') return;
     let a = liste[Number(t.nr) - 1];
     const u = String(t.urteil || '').toLowerCase(), g = norm_(t.gesucht);
-    /* N3 (24.10.2026): Nummer und Gesucht müssen zusammenpassen (die KI zählte im Beispiel ab 0). Sonst der eine Auftrag mit diesem Gesucht, oder keiner. */
-    if (g && (!a || norm_(a.gesucht) !== g)) {
-      const per = liste.filter(function (x) { return norm_(x.gesucht) === g; });
-      a = per.length === 1 ? per[0] : null;
+    /* N3 (24.10.2026): Nummer und Gesucht müssen zusammenpassen (die KI zählte im Beispiel ab 0). Nachprüfung (Befund 3): «passen» heisst nicht wortgleich.
+       Die KI kürzt, korrigiert Tippfehler oder hängt «| Mehr Infos …» an. Darum: Steht «gesucht» wortgleich bei genau einem Auftrag, gilt dieser.
+       Sonst bleibt die Nummer, wenn das Echo ein Wort mit ihrem Auftrag teilt (mmEchoAehnlich_). Sonst der eine Auftrag, dem das Echo ähnelt, oder keiner. */
+    if (g && !(a && norm_(a.gesucht) === g)) {
+      const gleich = liste.filter(function (x) { return norm_(x.gesucht) === g; });
+      if (gleich.length === 1) a = gleich[0];
+      else if (!(a && mmEchoAehnlich_(g, a.gesucht))) {
+        const per = liste.filter(function (x) { return mmEchoAehnlich_(g, x.gesucht); });
+        a = per.length === 1 ? per[0] : null;
+      }
       if (!a) log_('Matchmaker-Hinweis', id, 'Treffer verworfen, Nummer ' + t.nr + ' passt nicht zu «' + String(t.gesucht).slice(0, 80) + '»');
     }
     if (!a || da[a.zeile] || (u !== 'passt' && u !== 'ähnlich' && u !== 'aehnlich')) return;
@@ -3024,6 +3087,11 @@ function abschliessen(d) {
     const ana = lies_('Analysen').z, r = laufZeile_(ana, pg, lauf, kuerzel, d.start);
     return r ? ergebnisAus_(r) : { konflikt: konfliktInfo_(ana, pg) };
   }
+  /* Nachprüfung (Befund 6): Derselbe Wiedereinstieg kommt nochmals (Antwort verloren)? Dann nur das Ergebnis, bevor mmPruefen_ den eigenen Vermerk als «nicht geklappt» liest. */
+  if (nachMm) {
+    const r0 = lies_('Analysen').z.filter(function (y) { return idKey_(y['PG-ID']) === idKey_(pg); }).pop();
+    if (r0 && String(r0['Lauf-ID'] || '') === lauf) return ergebnisAus_(r0);
+  }
   const u = ueberblickSpeicher_(p, e), bz = bezugPruefen_(d, u);
   if (bz.neu) { log_('Überblick geändert', pg, 'Schritte neu bestätigen: ' + bz.neu.join(', ')); return { ueberblickNeu: true, d: u, neu: bz.neu }; }
   d = bz.d;
@@ -3152,13 +3220,14 @@ function mmPruefen_(d, pg) {
   if (!d.stand || !d.stand.s) throw new Error('Der gespeicherte Stand der Analyse fehlt.');
   /* Der Auftrag muss im Matchmaker Sheet noch offen sein (Schlüssel aus Gesucht + Mehr Infos). Läuft ausserhalb der Sperre.
      24.10.2026: genau dieser Auftrag (M6), nicht schon für ein anderes Stück reserviert (Z5/Z8), und nicht der, bei dem dieses Stück schon nicht geklappt hat. */
-  const liste = mmAuftraege_(einst_()).liste, gleich = liste.filter(function (a) { return mmSchluessel_(a) === String(m.schluessel); });
+  const liste = mmAuftraege_(einst_()).liste, gleich = liste.filter(function (a) { return mmSchluesselGleich_(a, m.schluessel); });     // Befund 1: auch der alte Schlüssel «gesucht|»
   if (!gleich.length) throw new Error('Der Suchauftrag ist im Matchmaker Sheet nicht mehr offen.');
   const a = mmFinde_(liste, m, pg);
   if (!a) throw new Error('Der Suchauftrag ist schon für ' + (mmFremd_(gleich[0], pg) || 'ein anderes Stück') + ' reserviert.');
   const ids = a.ids || mmVermerkIds_(a.aus), k = idKey_(pg);
   if (Object.prototype.hasOwnProperty.call(ids, k) && (ids[k] === false || d.nachMm === true)) throw new Error('Dieser Suchauftrag hat schon nicht geklappt.');
-  return { gesucht: String(m.gesucht).trim().slice(0, 200), mehr: String(m.mehr || '').trim().slice(0, 300), limit: zahl_(m.limit), hinweis: String(m.hinweis || '').slice(0, 120), schluessel: String(m.schluessel).slice(0, 600),
+  return { gesucht: String(m.gesucht).trim().slice(0, 200), mehr: String(m.mehr || a.mehr || '').trim().slice(0, 300), limit: zahl_(m.limit), hinweis: String(m.hinweis || '').slice(0, 120),
+    schluessel: mmSchluessel_(a).slice(0, 600),                                // Befund 1: gespeichert wird der Schlüssel von heute
     zeile: a.zeile, dup: a.dup };
 }
 
@@ -3475,16 +3544,28 @@ function mmGeholt_(e) {
     if (c < 0) {
       const m = einmalProTag_('mm-erledigt', ['ohne «Aus Analyse»']);
       if (m.length) log_('Abgleich-Hinweis', '', 'Matchmaker Sheet, Tab «Erledigt»: Spalte «Aus Analyse» fehlt (Matchmaker-Script noch nicht nachgeführt). «Geholt» wird nicht übertragen.');
-    } else for (let i = k + 1; i < v.length; i++) { const ids = mmVermerkIds_(v[i][c]); Object.keys(ids).forEach(function (x) { if (ids[x]) geholt[x] = 1; }); }
+    } else for (let i = k + 1; i < v.length; i++) {
+      /* Befund 4: je ID das späteste Datum eines Vermerks, der bei einem geholten Auftrag noch zählt ('' = ohne Datum, zählt immer) */
+      const t = mmVermerkTage_(v[i][c]);
+      Object.keys(t).forEach(function (x) { if (t[x].aktiv && (geholt[x] === undefined || (geholt[x] !== '' && (t[x].tag === '' || t[x].tag > geholt[x])))) geholt[x] = t[x].tag; });
+    }
   }
+  /* Befund 4: Geholt ist ein Eintrag nur, wenn der Vermerk des geholten Auftrags nicht älter ist als der Eintrag («Analysiert am»). Kommt ein geholtes Stück als
+     Retoure zurück und liegt neu für einen anderen Auftrag im Matchmaker, gilt der alte Vermerk für den neuen Eintrag nicht. */
+  const geholtFuer = function (r) {
+    const g = geholt[idKey_(r['PG-ID'])];
+    if (g === undefined) return false;
+    const a = tagKey_(r['Analysiert am']);
+    return g === '' || a === '' || g >= a;
+  };
   mmAuftraege_(e).liste.forEach(function (a) { Object.keys(a.ids || {}).forEach(function (x) { if (a.ids[x]) offen[x] = 1; }); });
   if (!Object.keys(geholt).length && !lies_('Matchmaker').z.some(function (r) { return String(r['Status']) === 'Geholt'; })) return {};
   const geaendert = gesperrt_(function () {
     const st = {}, l = [];
     lies_('Matchmaker').z.forEach(function (r) {
       const id = idKey_(r['PG-ID']), s = String(r['Status']);
-      if (s === 'Offen' && geholt[id]) { st[r._r] = 'Geholt'; l.push(r['PG-ID'] + ' → Geholt'); }
-      else if (s === 'Geholt' && !geholt[id] && offen[id]) { st[r._r] = 'Offen'; l.push(r['PG-ID'] + ' → Offen (zurück in der Liste)'); }
+      if (s === 'Offen' && geholtFuer(r)) { st[r._r] = 'Geholt'; l.push(r['PG-ID'] + ' → Geholt'); }
+      else if (s === 'Geholt' && !geholtFuer(r) && offen[id]) { st[r._r] = 'Offen'; l.push(r['PG-ID'] + ' → Offen (zurück in der Liste)'); }
     });
     setz_('Matchmaker', 'Status', st);
     return l;

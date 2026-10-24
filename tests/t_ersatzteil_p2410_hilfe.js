@@ -5,8 +5,8 @@
    Direkt ausgeführt prüft die Datei nur sich selbst. */
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const REPO = __dirname + '/../';
-const CODE = fs.readFileSync(REPO + 'apps/ersatzteil/Code.gs', 'utf8');
-const HTML = fs.readFileSync(REPO + 'apps/ersatzteil/Index.html', 'utf8');
+const CODE = fs.readFileSync(process.env.ET_CODE || (REPO + 'apps/ersatzteil/Code.gs'), 'utf8');        // ET_CODE / ET_HTML: Gegenprobe gegen einen anderen Stand
+const HTML = fs.readFileSync(process.env.ET_HTML || (REPO + 'apps/ersatzteil/Index.html'), 'utf8');
 
 const KOPF_TEILE = ['ID', 'Marke', 'Modell', 'Produktart', 'Teil', 'Teilart', 'Menge', 'Box', 'Status', 'Quelle', 'Erfasst am', 'Erfasst von', 'Verbraucht am', 'Verbraucht von', 'Bemerkung', 'Kennung'];
 function teil(id, m, mo, pa, t, box, menge, status) { return [id, m, mo, pa, t, '', menge === undefined ? 1 : menge, box, status || 'im Lager', '', '', '', '', '', '', '']; }
