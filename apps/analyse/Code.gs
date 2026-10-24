@@ -161,6 +161,10 @@ const TEIL_SHOPS = [
   'ASWO | | https://aswoshop.aswo.com/app/?shop=513 | Nur mit Login, das Tool kann hier nicht suchen. Versand- und Verpackungskosten pro Bestellung: Bestellungen sammeln.'].join('\n');
 /* Matchmaker: Pro Produkt prüft die KI nach der Identität alle offenen Suchaufträge im Matchmaker Sheet. Ein Treffer «passt» ist Pflicht: Das Stück geht ins Regal «Matchmaker». */
 const MM_SHEET = '1xxlT767Eqc7Y0OREu4fVM-LYWyJ2tSbfz52z0SS8L1w';
+/* Feedback aus der Oberfläche: seit 24.10.2026 zentral im Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS), Tab «Feedback», für alle Tools (Entscheid Jonas).
+   Die Spalte «Tool» zeigt, woher es kommt. Der eigene Tab «Feedback» wird nicht mehr beschrieben (bleibt, bis Jonas ihn löscht). */
+const FB_SHEET = '1iGyQrvX3MFPEFzpI4K8kCm4bdI5MpL1mPKr8bipFX-Q', FB_TAB = 'Feedback', FB_TOOL = 'Analyse Tool';
+const FB_KOPF = ['Zeit', 'Tool', 'Person', 'PG-ID', 'Bereich', 'Feedback', 'Status'];
 const MM_ANWEISUNG = 'Du prüfst für Pretty Good, ob ein geprüftes Produkt zu offenen Suchaufträgen von Kundinnen und Kunden passt. Pro Auftrag gibt es «Gesucht», «Mehr Infos» und, wenn vorhanden, ein Suchprofil (Art, Muss, Wunsch, Nicht). '
   + '«passt» heisst: gleiche Produktart und alle Muss-Punkte erfüllt. Eine genannte Marke oder ein genanntes Modell ist Pflicht, ausser «Mehr Infos» lockert das. '
   + '«ähnlich» heisst: gleiche Produktart, aber ein Wunsch oder ein weicher Punkt weicht ab. Zubehör, Ersatzteile und andere Produktarten passen nie. Das Limit (Preis) zählt nicht. Mehr als gewünscht ist keine Abweichung. '
@@ -195,6 +199,7 @@ const NEUE_EINSTELLUNGEN = [
   ['Ricardo-Schlusssatz', 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.', 'Steht am Ende jedes Artikelbeschriebs. Keine Domain verwenden. Gleicher Satz wie «Schlusssatz» im Ricardo Tool. Stand 17.10.2026.'],
   ['Matchmaker-Schlusssatz', '', 'Steht am Ende jedes Artikelbeschriebs für den Matchmaker. Leer = kein Schlusssatz (Entscheid Jonas 21.10.2026).'],
   ['Handbuch-Suche', HANDBUCH_SUCHE, 'So sucht die KI ein Handbuch, wenn es weder im Ordner noch bei Icecat noch in der Recherche eines gibt. Das JSON-Format nicht ändern, das Tool liest es aus.'],
+  ['Feedback-Sheet ID', FB_SHEET, 'Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS): Hierhin schreibt das Tool jedes Feedback aus der Oberfläche, mit der Spalte «Tool». Gleiches Sheet für alle Tools.'],
   ['Matchmaker-Sheet ID', MM_SHEET, 'Aus diesem Sheet (Tab «Matchmaker») liest das Tool die offenen Suchaufträge. Beim Auftrag schreibt es in die Spalte «Aus Analyse», wenn ein Stück ins Regal «Matchmaker» kommt.'],
   ['KI-Modell Matchmaker', 'claude-sonnet-5-5', 'Mit diesem Modell prüft das Tool jedes Produkt gegen alle offenen Suchaufträge.'],
   ['Matchmaker-Anweisung', MM_ANWEISUNG, 'Nach diesen Regeln entscheidet die KI «passt» oder «ähnlich». «Passt» ist Pflicht: Das Stück geht ins Regal «Matchmaker».']
@@ -220,8 +225,6 @@ const LISTEN_WEG = ['Zielkanal', 'Funktion', 'Optik', 'Prüfblock', 'Gilt für']
 const PRODUKTE_WEG = ['CH-Fixadapter (Import)', 'Zielkanal'];      // Spalten in «Produkte», die der Ablauf nicht mehr braucht
 const NAMEN = ['Score_Quellentyp', 'Score_Quellentyp_Punkte', 'Score_Modelltreffer', 'Score_Modelltreffer_Punkte', 'Score_Zweitquelle',
   'Score_Bestaetigt', 'Score_Abzug_Variante', 'Score_Gruen', 'Score_Gelb'];
-/* Tab «Feedback»: was den Leuten in der Analyse fehlt oder sie stört. «Status» pflegt Jonas von Hand (Neu, Erledigt). */
-const FEEDBACK_KOPF = ['Zeit', 'Kürzel', 'PG-ID', 'Schritt', 'Feedback', 'Status'];
 /* Tab «Bestellliste»: Teile für Reparaturen, die warten (Regal «Reparatur»). Eine Person bestellt gebündelt und setzt «Status» von Hand. */
 const BESTELL_KOPF = ['Zeit', 'PG-ID', 'Produkt', 'Was', 'Teil', 'Teilenummer', 'Shop', 'Preis CHF', 'Link', 'Kürzel', 'Status'];
 const BESTELL_STATUS = ['Offen', 'Bestellt', 'Da'];
@@ -244,7 +247,6 @@ const SPALTEN = {
   'Prüfschritte': ['Analyse-Nr', 'PG-ID', 'Nr', 'Block', 'Schritt', 'Herkunft Schritt', 'Ergebnis', 'Bemerkung', 'Zeit', 'Kürzel'],
   'Testmittel': ['Testmittel', 'Vorhanden'],
   'Testmittel-Log': ['Zeit', 'PG-ID', 'Testmittel', 'Art', 'Kürzel'],
-  'Feedback': FEEDBACK_KOPF,
   'Bestellliste': BESTELL_KOPF,
   'Testkonten': TESTKONTEN_KOPF,
   'Ricardo': RICARDO_KOPF,
@@ -380,7 +382,7 @@ function en_(s) {
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function blatt_(n) {
   let s = ss_().getSheetByName(n);
-  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Feedback': FEEDBACK_KOPF, 'Ricardo': RICARDO_KOPF, 'Matchmaker': MATCHMAKER_KOPF, 'Bestellliste': BESTELL_KOPF, 'Testkonten': TESTKONTEN_KOPF }[n];
+  const kopfNeu = { 'Kosten': KOSTEN_KOPF, 'Ricardo': RICARDO_KOPF, 'Matchmaker': MATCHMAKER_KOPF, 'Bestellliste': BESTELL_KOPF, 'Testkonten': TESTKONTEN_KOPF }[n];
   if (!s && kopfNeu) {                                               // kamen nach der ersten Einrichtung dazu: werden beim ersten Gebrauch angelegt
     s = gesperrt_(function () {
       const neu = ss_().getSheetByName(n) || ss_().insertSheet(n);
@@ -515,7 +517,7 @@ const VORLADEN = {
   kennzahlen: ['Einstellungen', 'Analysen', 'Log'],
   ersatzteile: ['Einstellungen', 'Ersatzteile', 'Bestellliste', 'Produkte'],
   bestellliste: ['Einstellungen', 'Bestellliste'],
-  feedbackListe: ['Einstellungen', 'Feedback'],
+  feedbackListe: ['Einstellungen'],
   warteschlange: ['Einstellungen', 'Produkte', 'Stufen'],
   vorab: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
   uebernehmen: ['Einstellungen', 'Produkte'],
@@ -3495,16 +3497,41 @@ function mmGeholt_(e) {
 /* Feedback                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Hält ein Feedback aus der Oberfläche im Tab «Feedback» fest. Läuft eine Analyse, kommen PG-ID und Schritt dazu. */
+/** Hält ein Feedback aus der Oberfläche im Sheet «FEEDBACK TOOLS» fest (Spalte «Tool» = Analyse Tool). Läuft eine Analyse, kommen PG-ID und Schritt dazu. */
 function feedback(text, kuerzel, id, schritt) {
   text = String(text || '').trim().slice(0, 2000);
   if (!text) throw new Error('Bitte zuerst etwas hineinschreiben.');
-  blatt_('Feedback');                                                // legt den Tab beim ersten Mal an
-  gesperrt_(function () {
-    schreib_('Feedback', [{ 'Zeit': zeit_(), 'Kürzel': txt_(String(kuerzel || '').toUpperCase().slice(0, 4)), 'PG-ID': txt_(String(id || '').slice(0, 20)),
-      'Schritt': SCHRITTE[schritt] || '', 'Feedback': txt_(text), 'Status': 'Neu' }]);
-  });
+  const b = fbBlatt_(), z = [];
+  for (let i = 0; i < b.breite; i++) z.push('');
+  z[b.sp['Zeit']] = new Date();
+  z[b.sp['Tool']] = FB_TOOL;
+  z[b.sp['Person']] = txt_(String(kuerzel || '').toUpperCase().slice(0, 4));
+  z[b.sp['PG-ID']] = txt_(String(id || '').slice(0, 20));
+  z[b.sp['Bereich']] = SCHRITTE[schritt] || '';
+  z[b.sp['Feedback']] = txt_(text);
+  z[b.sp['Status']] = 'Neu';
+  b.sh.appendRow(z);                                                 // appendRow ist atomar: mehrere Tools schreiben ins selbe Sheet, eine Sperre über Projekte gibt es nicht
   return true;
+}
+/** Tab «Feedback» im Sheet «FEEDBACK TOOLS» mit den Spalten nach Namen. Nicht erreichbar oder Spalte fehlt: laut melden, nichts still verlieren. */
+function fbBlatt_() {
+  const id = String(einst_()['Feedback-Sheet ID'] || FB_SHEET).trim();
+  let sh;
+  try { sh = SpreadsheetApp.openById(id).getSheetByName(FB_TAB); }
+  catch (err) { throw new Error('Das Sheet «FEEDBACK TOOLS» ist nicht erreichbar (' + ((err && err.message) || err) + '). Bitte Jonas melden.'); }
+  if (!sh) throw new Error('Im Sheet «FEEDBACK TOOLS» fehlt der Tab «Feedback». Bitte Jonas melden.');
+  const kopf = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (x) { return String(x).trim(); }), sp = {};
+  FB_KOPF.forEach(function (k) { sp[k] = kopf.indexOf(k); });
+  const fehlt = FB_KOPF.filter(function (k) { return sp[k] < 0; });
+  if (fehlt.length) throw new Error('Im Sheet «FEEDBACK TOOLS», Tab «Feedback», fehlen die Spalten: ' + fehlt.join(', ') + '. Bitte Jonas melden.');
+  return { sh: sh, sp: sp, breite: kopf.length };
+}
+/** Zeilen dieses Tools (Spalte «Tool»), mit Zeilennummer im Sheet. */
+function fbZeilen_(b) {
+  const n = b.sh.getLastRow() - 1;
+  if (n < 1) return [];
+  return b.sh.getRange(2, 1, n, b.breite).getValues().map(function (z, i) { return { r: i + 2, z: z }; })
+    .filter(function (x) { return String(x.z[b.sp['Tool']]).trim() === FB_TOOL && String(x.z[b.sp['Feedback']]).trim(); });
 }
 
 /* ------------------------------------------------------------------ */
@@ -3846,20 +3873,20 @@ function bestellStatus(r, id, status, kuerzel) {
 
 function feedbackListe() {
   if (!istAdmin_()) throw new Error('Nur für Admins.');
-  blatt_('Feedback');
-  return lies_('Feedback').z.map(function (r) {
-    return { r: r._r, zeit: r['Zeit'] instanceof Date ? zeit_(r['Zeit']) : String(r['Zeit']), kuerzel: String(r['Kürzel'] || ''), id: String(r['PG-ID'] || ''), schritt: String(r['Schritt'] || ''),
-      text: String(r['Feedback'] || ''), status: String(r['Status'] || 'Neu') };
-  }).filter(function (x) { return x.text; }).reverse();
+  const b = fbBlatt_(), s = b.sp;
+  return fbZeilen_(b).map(function (x) {
+    const z = x.z;
+    return { r: x.r, zeit: z[s['Zeit']] instanceof Date ? zeit_(z[s['Zeit']]) : String(z[s['Zeit']]), kuerzel: String(z[s['Person']] || ''), id: String(z[s['PG-ID']] || ''),
+      schritt: String(z[s['Bereich']] || ''), text: String(z[s['Feedback']] || ''), status: String(z[s['Status']] || 'Neu') };
+  }).reverse();
 }
 function feedbackStatus(r, text, status) {
   if (!istAdmin_()) throw new Error('Nur für Admins.');
   if (['Neu', 'Erledigt'].indexOf(status) < 0) throw new Error('Unbekannter Status.');
-  gesperrt_(function () {
-    const z = lies_('Feedback').z.filter(function (x) { return x._r === Number(r) && String(x['Feedback']).slice(0, 40) === String(text).slice(0, 40); })[0];
-    if (!z) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
-    const w = {}; w[z._r] = status; setz_('Feedback', 'Status', w);
-  });
+  const b = fbBlatt_(), z = Number(r);
+  const x = fbZeilen_(b).filter(function (y) { return y.r === z && String(y.z[b.sp['Feedback']]).slice(0, 40) === String(text).slice(0, 40); })[0];
+  if (!x) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
+  b.sh.getRange(z, b.sp['Status'] + 1).setValue(status);
   return feedbackListe();
 }
 
@@ -3909,7 +3936,7 @@ const ANALYSE_KATALOG = [
   { tab: 'Ricardo', art: 'arbeit', inhalt: 'Ein Stück pro Zeile, das in der Analyse auf Ricardo geht: Titel, Artikelbeschrieb, Zustand, Startpreis, Versand, Link zum Foto-Ordner. Das Ricardo Tool liest von hier.' },
   { tab: 'Bestellliste', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Ersatzteile für Stücke im Regal «Reparatur». «Status» (Offen, Bestellt, Da) setzt die Person, die gebündelt bestellt.' },
   { tab: 'Testkonten', art: 'arbeit', inhalt: 'Testkonten für Geräte mit App und Konto, mit Logindaten. Gepflegt in der Oberfläche unter «Infrastruktur». Für das Analyse-Team sichtbar.' },
-  { tab: 'Feedback', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Rückmeldungen der Analyseleute aus dem Tool. «Status» (Neu, Erledigt) pflegt Jonas.' },
+  { tab: 'Feedback', art: 'protokoll', wer: 'Tool (bis 24.10.2026)', inhalt: 'Alt: Rückmeldungen bis 24.10.2026, wird nicht mehr beschrieben. Neue Feedbacks stehen im Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS), Spalte «Tool». Kann gelöscht werden.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion und jeder Fehler mit Zeit und Person. Erste Anlaufstelle, wenn etwas unklar ist.' },
   { tab: 'Kosten', art: 'protokoll', inhalt: 'Jeder KI-Aufruf mit Modell, Tokens, Websuchen und Kosten in USD. Grundlage für das KI-Budget.' },
   { tab: 'Testmittel-Log', art: 'protokoll', inhalt: 'Jede Nennung eines Testmittels: benötigt oder gefehlt.' },
@@ -3943,7 +3970,7 @@ function einrichten() {
   if (!istAdmin_(null, true)) throw new Error('Nur für Admins.');
   vergissAlle_();
   gesperrt_(function () { umbau_(ss); });
-  ['Kosten', 'Feedback', 'Ricardo', 'Matchmaker', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
+  ['Kosten', 'Ricardo', 'Matchmaker', 'Bestellliste', 'Testkonten'].forEach(function (n) { blatt_(n); });   // Tabs, die sonst erst beim ersten Gebrauch entstehen
   Object.keys(SPALTEN).forEach(function (n) {
     const s = ss.getSheetByName(n);
     if (!s) { fehler.push('Tab «' + n + '» fehlt'); return; }

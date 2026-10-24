@@ -402,10 +402,13 @@
         if (Z === z0 && $('speichern')) seiteFertig(r);
         else melde((r.teil || daten.teil) + ' liegt in Box ' + r.box + ' (' + r.id + ').', 'ok');
       }, function (msg) {
-        SPEICHERT = null; vergissOffen();
+        SPEICHERT = null;
+        /* Netzfehler: offen, ob der Server gespeichert hat. Die Erfassung bleibt im Browser wie in nachholen(): Neuladen holt sie mit derselben Kennung nach (Nach-Review 24.10.2026) */
+        var netz = netzfehler(msg);
+        if (!netz) vergissOffen();
         if (/ist voll/.test(msg)) START.boxen.forEach(function (b) { if (b.box === daten.box) b.status = 'voll'; });   // im Sheet inzwischen voll
         if (Z === z0 && $('speichern')) { if (/ist voll/.test(msg)) Z.box = ''; seiteBox(); }
-        melde(msg + (netzfehler(msg) ? ' Nochmals «Speichern» ist sicher: Das Teil wird nicht doppelt erfasst.' : ''), 'stop');
+        melde(msg + (netz ? ' Nochmals «Speichern» ist sicher: Das Teil wird nicht doppelt erfasst.' : ''), 'stop');
       });
       if (!los) { SPEICHERT = null; vergissOffen(); melde('Wird schon gespeichert. Bitte warten.', 'warn'); return; }
       $('speichern').disabled = true; $('speichern').textContent = 'Wird gespeichert …';

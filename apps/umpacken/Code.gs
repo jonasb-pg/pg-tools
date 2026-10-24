@@ -38,6 +38,7 @@ const ARTEN = ['Verkauf', 'Lager', 'Entsorgung'];
 const REGELN = ['VP', 'Prozent', 'Null'];
 const NICHT_GEFUNDEN = 'Nicht gefunden – prüfen';      // Aktion in «Änderungen» für nicht gescannte Stücke (keine Änderung im Return Tool, sperrt nichts)
 const PREIS_MAX = 100000;                               // Preis ab hier: wohl ein Barcode im Preisfeld
+const SID_OHNE = '-';                                   // «Scan-ID» von Zeilen ohne Barcode-Scan (PG-ID, Verschieben, Entfernen, Preis). Leer = Zeile von vor 2026-10-24.2
 
 const KOPF = {
   'Durchgänge': ['Durchgang', 'Name', 'Status', 'Quelle', 'Quell-Lagerorte', 'Erstellt am', 'Erstellt von', 'Abgeschlossen am', 'Abgeschlossen von', 'Listen', 'Verworfen am', 'Verworfen von'],
@@ -58,7 +59,7 @@ const KATALOG = [
   { tab: 'Durchgänge', art: 'arbeit', inhalt: 'Ein Durchgang pro Umpack-Aktion: Name, Status (Scan, Abgeschlossen, Verworfen), Quelle. Verworfen = falscher Durchgang, Stücke und Lagerorte wieder frei.' },
   { tab: 'Gebinde', art: 'arbeit', inhalt: 'Die Ziel-Gebinde pro Durchgang: Verkauf an Abnehmer, neue Palette im Lager, Entsorgung, mit Preisregel. Gelöschte Gebinde bleiben als «U-… (gelöscht)», ihre Nummer wird nie wieder vergeben.' },
   { tab: 'Bestand', art: 'arbeit', inhalt: 'Die Stücke der Quelle beim Setup (Kopie aus dem Return Tool; eine Liste von Hand wird gegen das Return Tool aufgelöst). VP leer = im Return Tool leer oder unlesbar.' },
-  { tab: 'Zuordnung', art: 'arbeit', inhalt: 'Welches Stück in welches Gebinde gescannt wurde. Preis leer = Preisregel des Gebindes. «Scan-ID» = Kennung eines Barcode-Scans: eine Wiederholung bucht kein zweites Stück.' },
+  { tab: 'Zuordnung', art: 'arbeit', inhalt: 'Welches Stück in welches Gebinde gescannt wurde. Preis leer = Preisregel des Gebindes. «Scan-ID» = Kennung eines Barcode-Scans: eine Wiederholung bucht kein zweites Stück («-» = ohne Barcode-Scan, leer = Zeile von vor Version 2026-10-24.2).' },
   { tab: 'Änderungen', art: 'arbeit', inhalt: 'Beim Abschluss: was im Return Tool zu ändern ist (Lagerort, Preis, verkauft, entsorgt). «Nicht gefunden – prüfen» = nicht gescannt, am alten Lagerort suchen (keine Änderung). «Prüfung» = Abgleich mit dem Return Tool beim Abschluss (Schlüssel ID, Zeile nur Hinweis). «Erledigt» setzt ihr, wenn es eingetragen ist.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person, auch fremde Scans (Code nicht in der Quelle).' },
   { tab: 'Einstellungen', art: 'einstellung', inhalt: 'Return Tool, Quell-Tabs, Ablage-Ordner, Admins.' }
@@ -658,7 +659,7 @@ function zuordnen(id, ops, kuerzel) {
     const d2 = durchgang_(id);
     if (String(d2['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d2['Status'] + ').');
     if ((ops || []).length && lies_('Zuordnung').kopf.indexOf('Scan-ID') < 0) throw new Error('Spalte «Scan-ID» fehlt im Tab «Zuordnung». Bitte im Apps-Script-Projekt «einrichten» ausführen.');
-    const z = zuordnungVon_(id), sids = scanIds_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], fremd = [];
+    const z = zuordnungVon_(id), sids = scanIds_(id), zSid = letzteScanId_(id), gebinde = {}, bestand = {}, proBc = {}, t = zeit_(), neu = [], konflikte = [], ergebnis = [], fremd = [];
     const ku = String(kuerzel || '').toUpperCase().slice(0, 4);
     lies_('Gebinde').z.forEach(function (g) { if (String(g['Durchgang']) === id) gebinde[String(g['Gebinde'])] = g; });
     lies_('Bestand').z.forEach(function (p) {
@@ -672,14 +673,19 @@ function zuordnen(id, ops, kuerzel) {
       if (!o) return;
       if (o.unbekannt) { fremd.push(String(o.unbekannt).slice(0, 40) + (o.bei ? ' (bei ' + gName(o.bei) + ')' : '')); return; }
       if (!o.id && o.code) {
+        /* Wunsch-Regel: Wunsch schon im gleichen Gebinde vom gleichen Kürzel = wohl eine Wiederholung */
+        const wk = norm_(o.wunsch || ''), wunschSchon = !!(wk && z[wk] && z[wk].gebinde === o.gebinde && z[wk].kuerzel === ku);
         if (o.sid) {
           /* Scan-Kennung steht dauerhaft in «Zuordnung» (Spalte «Scan-ID»): eine Wiederholung (Antwort verloren, Wächter, Neuladen) bucht kein zweites Stück */
           const schon = sids[sidKey_(o.sid)];
           if (schon) { konflikte.push({ id: schon, code: o.code, wunsch: o.wunsch || '', grund: 'schon gespeichert', gebinde: z[norm_(schon)] ? z[norm_(schon)].gebinde : '', gleich: true }); return; }
-        } else {
-          /* Alte Seite ohne Scan-Kennung: Wunsch schon im gleichen Gebinde vom gleichen Kürzel = wohl eine Wiederholung (mit Kennung gilt das nicht, Prüfung 24.10.2026) */
-          const wk = norm_(o.wunsch || '');
-          if (wk && z[wk] && z[wk].gebinde === o.gebinde && z[wk].kuerzel === ku) { konflikte.push({ id: o.wunsch, code: o.code, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return; }
+          /* Übergang (Nach-Review 24.10.2026): Seiten vor 2026-10-24.2 schickten die Kennung schon mit, der alte Server merkte sie sich aber nur im Cache.
+             Hat die gültige Zeile des Wunsch-Stücks keine «Scan-ID» (= vom alten Server geschrieben), gilt die Wunsch-Regel trotz Kennung.
+             Zeilen dieses Servers haben immer eine «Scan-ID» (SID_OHNE für PG-ID, Verschieben, Entfernen, Preis): ein echter zweiter EAN-Scan bleibt gültig (Befund 3). */
+          if (wunschSchon && !zSid[wk]) { konflikte.push({ id: o.wunsch, code: o.code, wunsch: o.wunsch, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return; }
+        } else if (wunschSchon) {
+          /* Alte Seite ohne Scan-Kennung (mit Kennung gilt die Regel nur für alte Zeilen, Prüfung 24.10.2026) */
+          konflikte.push({ id: o.wunsch, code: o.code, grund: 'schon gespeichert', gebinde: o.gebinde, gleich: true }); return;
         }
         const r = stueckZuCode_(o.code, bestand, proBc, z, o.wunsch);
         if (r.fehler) { konflikte.push({ id: o.wunsch || o.code, code: o.code, grund: r.fehler }); if (r.fremd) fremd.push(String(o.code).slice(0, 40)); return; }
@@ -697,7 +703,9 @@ function zuordnen(id, ops, kuerzel) {
       const pf = preisFehler_(preis, o.preis);
       if (pf) { konflikte.push({ id: o.id, grund: pf }); return; }
       const pid = String(bestand[k]['PG-ID']);
-      neu.push({ 'Durchgang': id, 'PG-ID': pid, 'Gebinde': o.gebinde || '', 'Preis': preis, 'Zeit': t, 'Kürzel': ku, 'Scan-ID': o.code && o.sid ? sidKey_(o.sid) : '' });
+      const sidNeu = o.code && o.sid ? sidKey_(o.sid) : SID_OHNE;
+      neu.push({ 'Durchgang': id, 'PG-ID': pid, 'Gebinde': o.gebinde || '', 'Preis': preis, 'Zeit': t, 'Kürzel': ku, 'Scan-ID': sidNeu });
+      zSid[k] = sidNeu;
       if (o.gebinde) z[k] = { gebinde: o.gebinde, preis: preis, zeit: t, kuerzel: ku }; else delete z[k];
       if (o.code) { ergebnis.push({ code: o.code, wunsch: o.wunsch || '', id: pid, gebinde: o.gebinde }); if (o.sid) sids[sidKey_(o.sid)] = pid; }
     });
@@ -709,7 +717,13 @@ function zuordnen(id, ops, kuerzel) {
 /** Scan-Kennungen der gespeicherten Barcode-Scans eines Durchgangs: { Scan-ID: PG-ID } (dauerhaft im Tab, kein Cache mit Ablaufzeit). */
 function scanIds_(id) {
   const m = {};
-  lies_('Zuordnung').z.forEach(function (r) { const s = String(r['Scan-ID'] || ''); if (s && String(r['Durchgang']) === id) m[s] = String(r['PG-ID']); });
+  lies_('Zuordnung').z.forEach(function (r) { const s = String(r['Scan-ID'] || ''); if (s && s !== SID_OHNE && String(r['Durchgang']) === id) m[s] = String(r['PG-ID']); });
+  return m;
+}
+/** «Scan-ID» der jeweils letzten Zeile pro Stück: { PG-ID (pgNorm_): Scan-ID }. Leer = Zeile von vor 2026-10-24.2 (Übergang, Nach-Review 24.10.2026). */
+function letzteScanId_(id) {
+  const m = {};
+  lies_('Zuordnung').z.forEach(function (r) { if (String(r['Durchgang']) === id) m[norm_(r['PG-ID'])] = String(r['Scan-ID'] === undefined || r['Scan-ID'] === null ? '' : r['Scan-ID']).trim(); });
   return m;
 }
 function sidKey_(s) { return String(s).slice(0, 40); }
@@ -800,7 +814,8 @@ function pruefungRt_(p, rt, ortNeu, extra) {
   else if (wo.length > 1) f.push('steht ' + wo.length + '× im Return Tool (' + wo.map(function (w) { return w.tab + ' Zeile ' + w.zeile; }).join(', ') + ')');
   else {
     if (ortKey_(wo[0].ort) !== ortKey_(p['Lagerort alt'])) f.push('Lagerort jetzt «' + (wo[0].ort || 'leer') + '» statt «' + p['Lagerort alt'] + '»');
-    if (wo[0].tab !== String(p['Quelle Tab'])) f.push('jetzt im Tab «' + wo[0].tab + '»');
+    /* «manuell» = Liste von Hand, angelegt vor 2026-10-24.2 (ohne Tab aus dem Return Tool): kein Tab-Vergleich, sonst wäre jede Zeile eine Abweichung (Nach-Review 24.10.2026) */
+    if (String(p['Quelle Tab']) !== 'manuell' && wo[0].tab !== String(p['Quelle Tab'])) f.push('jetzt im Tab «' + wo[0].tab + '»');
   }
   if (ortNeu && rt.orte[ortKey_(ortNeu)]) f.push('Lagerort neu «' + ortNeu + '» inzwischen im Return Tool belegt');
   (extra || []).forEach(function (x) { f.push(x); });
@@ -856,6 +871,7 @@ function abschliessen(id, kuerzel, bestaetigt) {
     /* Prüfung 24.10.2026: nicht gescannte Stücke nicht still lassen, sondern als Aufgabe «Nicht gefunden – prüfen» (keine Änderung im Return Tool, sperrt nichts) */
     k2.offenListe.forEach(function (p) {
       const pr = pruefungRt_(p, rt, '', auch(p));
+      if (/^ABWEICHUNG/.test(pr.text)) abw++;          // auch «Nicht gefunden – prüfen» zählt im Hinweis (Nach-Review 24.10.2026)
       zeilen.push({ 'Durchgang': id, 'PG-ID': p['PG-ID'], 'Bezeichnung': p['Bezeichnung'], 'Aktion': NICHT_GEFUNDEN, 'Gebinde': '', 'Abnehmer': '',
         'Lagerort alt': p['Lagerort alt'], 'Lagerort neu': '', 'VP alt': zahl_(p['VP']), 'Preis': '', 'Return-Tool-Tab': pr.tab || p['Quelle Tab'], 'Zeile': pr.zeile || p['Quelle Zeile'],
         'Erledigt': '', 'Prüfung': pr.text });

@@ -23,8 +23,7 @@ const V_COLS = ['Verkauf-Nr', 'Artikel-Nr', 'PG-ID', 'Titel', 'Verkauft am', 'KW
 // Posteingang: was aus den Ricardo-Mails zu erledigen ist (Fragen, Nachrichten, Preisvorschläge, Hinweise). ID = Gmail-Nachricht
 const I_COLS = ['ID', 'Eingang', 'Art', 'Status', 'Artikel-Nr', 'Verkauf-Nr', 'PG-ID', 'Titel', 'Von', 'Text', 'Betrag CHF', 'Preis CHF', 'Frist',
   'Empfehlung', 'Entwurf', 'Link', 'Erledigt am', 'Erledigt von'];
-// Feedback aus der Web-App (Knopf «Feedback»), Status pflegt der Admin
-const F_COLS = ['Zeit', 'Person', 'Bereich', 'Feedback', 'Status'];
+// Feedback: seit 24.10.2026 im Sheet «FEEDBACK TOOLS» (FB_SHEET weiter unten), der alte Tab «Feedback» (TAB_F) wird nicht mehr beschrieben
 const MAIL_KONTO = 'MAIL_KONTO', MAIL_STAND = 'MAIL_STAND', MAIL_START = 'MAIL_START', MAIL_LETZTE = 'MAIL_LETZTE', MAIL_UNECHT = 'MAIL_UNECHT';
 const MAIL_RUECKBLICK_MS = 3600000;        // jede Abfrage schaut eine Stunde zurück: Mails kommen nicht immer in der richtigen Reihenfolge an
 const MAIL_WARNUNG_STUNDEN = 6;            // tagsüber so lange keine Ricardo-Mail: Warnung unter «Zu erledigen»
@@ -55,6 +54,10 @@ const REGAL_STATUS = { 'In Arbeit': 'Regal Offline', 'Bereit': 'Regal Offline', 
 const REGAL_VORGABE = { 'Regal Offline': 'Ricardo Offline', 'Regal Online': 'Ricardo Online', 'Regal Unpaid': 'Ricardo Unpaid' };
 const SCHLUSSSATZ = 'Bei unseren Auktionen handelt es sich um Neuware und Second-Hand-Artikel von verschiedenen Schweizer Händlern. Auf alle Produkte gewähren wir eine Garantie von 30 Tagen.';
 const ANALYSE_ID = '1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM', ANALYSE_TAB = 'Ricardo';
+/* Feedback aus der Web-App: seit 24.10.2026 zentral im Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS), Tab «Feedback», für alle Tools (Entscheid Jonas).
+   Die Spalte «Tool» zeigt, woher es kommt. Der eigene Tab «Feedback» wird nicht mehr beschrieben (bleibt, bis Jonas ihn löscht). */
+const FB_SHEET = '1iGyQrvX3MFPEFzpI4K8kCm4bdI5MpL1mPKr8bipFX-Q', FB_TAB = 'Feedback', FB_TOOL = 'Ricardo Tool';
+const FB_KOPF = ['Zeit', 'Tool', 'Person', 'PG-ID', 'Bereich', 'Feedback', 'Status'];
 // Status, in denen ein Stück wieder frei ist und neu gelistet werden kann
 const FREI = ['Abgebrochen', 'Unverkauft', 'Storniert', 'Retour abgeschlossen'];
 // 24.10.2026: Mit diesen Entscheiden ist das Stück vergeben (nicht mehr frei für Ricardo), auch wenn der Status frei wäre
@@ -80,6 +83,7 @@ const ARCHIV_MUSTER = /^archiv/i, RT_TAB_ANALYSE = 'Analyse', RT_TAB_SCANNER = '
 function istArchiv_(tab) { return ARCHIV_MUSTER.test(String(tab || '').trim()); }
 const DEFAULTS = [
   ['Return Tool ID', '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E', 'Wird nur gelesen, nie beschrieben'],
+  ['Feedback-Sheet ID', FB_SHEET, 'Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS): Hierhin schreibt das Tool jedes Feedback aus der Web-App, mit der Spalte «Tool». Gleiches Sheet für alle Tools'],
   ['Analyse Tool ID', ANALYSE_ID, 'ANALYSE TOOL: Tab «Ricardo» mit den analysierten Stücken (Titel, Beschrieb, Zustand, Preis, Versand, Fotos). Wird nur gelesen, nie beschrieben'],
   ['Such-Tabs', 'Online', 'Tabs im Return Tool, aus denen gelistet werden darf (Komma-getrennt)'],
   ['Hinweis-Tabs', HINWEIS_TABS, 'Übrige Kanal-Tabs im Return Tool. Werden immer mitdurchsucht und mit Tab und Lagerort angezeigt. Listen nur nach Bestätigung («Trotzdem listen»). Neue Kanal-Tabs (Spalten ID und Bezeichnung) und «Scanner» sucht das Tool auch ohne Eintrag hier mit. Tabs «Archiv …» sucht das Tool selbst, Treffer dort sind gesperrt. Fehlt ein Tab, der hier steht, meldet die Suche einen Fehler.'],
@@ -189,10 +193,6 @@ function einrichten() {
   if (!pe) pe = ss.insertSheet(TAB_I);
   kopf_(pe, I_COLS, 0, []);
   textSpalten_(pe, I_COLS, I_TEXT);
-
-  let fb = ss.getSheetByName(TAB_F);
-  if (!fb) fb = ss.insertSheet(TAB_F);
-  kopf_(fb, F_COLS, 0, []);
 
   let lg = ss.getSheetByName(TAB_LOG);
   if (!lg) {
@@ -367,7 +367,7 @@ const RICARDO_KATALOG = [
   { tab: 'Verkäufe', art: 'arbeit', inhalt: 'Ein Verkauf pro Zeile aus Mails und Verkaufsbericht: Käufer, Adresse, Zahlung, Versand.' },
   { tab: 'Posteingang', art: 'arbeit', inhalt: 'Fragen, Nachrichten und Preisvorschläge aus den Ricardo-Mails («Zu erledigen»).' },
   { tab: 'Retouren', art: 'arbeit', inhalt: 'Ein Garantiefall pro Zeile mit Grund und Rückzahlung.' },
-  { tab: 'Feedback', art: 'arbeit', wer: 'Tool und Mensch', inhalt: 'Rückmeldungen aus der Web-App. «Status» (Neu, Erledigt) setzt der Admin im Tool.' },
+  { tab: 'Feedback', art: 'protokoll', wer: 'Tool (bis 24.10.2026)', inhalt: 'Alt: Rückmeldungen bis 24.10.2026, wird nicht mehr beschrieben. Neue Feedbacks stehen im Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS), Spalte «Tool». Kann gelöscht werden.' },
   { tab: 'Wochenübersicht', art: 'arbeit', inhalt: 'Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.' },
   { tab: 'Post-Adressen', art: 'hilfe', inhalt: 'Zwischenablage für den Excel-Export an die Post, wird nach jedem Export geleert.', kopf: 0 },
@@ -3233,25 +3233,53 @@ function kennzahlenRechnen_(listings, verkaeufe, retouren, jetzt, von, bis, lauf
 function feedback(text, bereich) {
   text = String(text || '').trim().slice(0, 2000);
   if (!text) throw new Error('Bitte zuerst etwas hineinschreiben.');
-  const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(TAB_F);
-  if (!sh) { sh = ss.insertSheet(TAB_F); kopf_(sh, F_COLS, 0, []); }
-  sh.appendRow([new Date(), nutzer_(), String(bereich || '').slice(0, 40), text.replace(/^[=+\-@]/, "'$&"), 'Neu']);
+  const b = fbBlatt_(), z = [];
+  for (let i = 0; i < b.breite; i++) z.push('');
+  z[b.sp['Zeit']] = new Date();
+  z[b.sp['Tool']] = FB_TOOL;
+  z[b.sp['Person']] = nutzer_();
+  z[b.sp['Bereich']] = String(bereich || '').slice(0, 40).replace(/^[=+\-@]/, "'$&");
+  z[b.sp['Feedback']] = text.replace(/^[=+\-@]/, "'$&");
+  z[b.sp['Status']] = 'Neu';
+  b.sh.appendRow(z);                                                 // appendRow ist atomar: mehrere Tools schreiben ins selbe Sheet, eine Sperre über Projekte gibt es nicht
   return true;
+}
+/** Tab «Feedback» im Sheet «FEEDBACK TOOLS» mit den Spalten nach Namen. Nicht erreichbar oder Spalte fehlt: laut melden, nichts still verlieren. */
+function fbBlatt_() {
+  const id = String(cfg_('Feedback-Sheet ID') || FB_SHEET).trim();
+  let sh;
+  try { sh = SpreadsheetApp.openById(id).getSheetByName(FB_TAB); }
+  catch (err) { throw new Error('Das Sheet «FEEDBACK TOOLS» ist nicht erreichbar (' + ((err && err.message) || err) + '). Bitte Jonas melden.'); }
+  if (!sh) throw new Error('Im Sheet «FEEDBACK TOOLS» fehlt der Tab «Feedback». Bitte Jonas melden.');
+  const kopf = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (x) { return String(x).trim(); }), sp = {};
+  FB_KOPF.forEach(function (k) { sp[k] = kopf.indexOf(k); });
+  const fehlt = FB_KOPF.filter(function (k) { return sp[k] < 0; });
+  if (fehlt.length) throw new Error('Im Sheet «FEEDBACK TOOLS», Tab «Feedback», fehlen die Spalten: ' + fehlt.join(', ') + '. Bitte Jonas melden.');
+  return { sh: sh, sp: sp, breite: kopf.length };
+}
+/** Zeilen dieses Tools (Spalte «Tool»), mit Zeilennummer im Sheet. */
+function fbZeilen_(b) {
+  const n = b.sh.getLastRow() - 1;
+  if (n < 1) return [];
+  return b.sh.getRange(2, 1, n, b.breite).getValues().map(function (z, i) { return { r: i + 2, z: z }; })
+    .filter(function (x) { return String(x.z[b.sp['Tool']]).trim() === FB_TOOL && String(x.z[b.sp['Feedback']]).trim(); });
 }
 function feedbackListe() {
   pruefeAdmin_();
-  return objekte_(TAB_F, F_COLS).map(function (r) {
-    return { r: r._r, zeit: r['Zeit'] instanceof Date ? Utilities.formatDate(r['Zeit'], TZ, 'dd.MM.yyyy HH:mm') : String(r['Zeit']), person: String(r['Person'] || ''),
-      bereich: String(r['Bereich'] || ''), text: String(r['Feedback'] || ''), status: String(r['Status'] || 'Neu') };
-  }).filter(function (x) { return x.text; }).reverse();
+  const b = fbBlatt_(), s = b.sp;
+  return fbZeilen_(b).map(function (x) {
+    const z = x.z;
+    return { r: x.r, zeit: z[s['Zeit']] instanceof Date ? Utilities.formatDate(z[s['Zeit']], TZ, 'dd.MM.yyyy HH:mm') : String(z[s['Zeit']]), person: String(z[s['Person']] || ''),
+      bereich: String(z[s['Bereich']] || ''), text: String(z[s['Feedback']] || ''), status: String(z[s['Status']] || 'Neu') };
+  }).reverse();
 }
 function feedbackStatus(r, text, status) {
   pruefeAdmin_();
   if (['Neu', 'Erledigt'].indexOf(status) < 0) throw new Error('Unbekannter Status.');
-  const sh = SpreadsheetApp.getActive().getSheetByName(TAB_F), z = Number(r);
-  if (!sh || z < 2 || z > sh.getLastRow() || String(sh.getRange(z, 4).getValue()).slice(0, 40) !== String(text).slice(0, 40)) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
-  sh.getRange(z, F_COLS.indexOf('Status') + 1).setValue(status);
+  const b = fbBlatt_(), z = Number(r);
+  const x = fbZeilen_(b).filter(function (y) { return y.r === z && String(y.z[b.sp['Feedback']]).slice(0, 40) === String(text).slice(0, 40); })[0];
+  if (!x) throw new Error('Die Zeile wurde im Sheet verschoben. Bitte die Seite neu laden.');
+  b.sh.getRange(z, b.sp['Status'] + 1).setValue(status);
   return feedbackListe();
 }
 

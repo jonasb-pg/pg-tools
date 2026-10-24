@@ -374,6 +374,7 @@
      (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen. */
   function scanne() {
     var el = $('scan'), code = norm(el.value); el.value = ''; if (!KAM.an && !KAM.foto) el.focus();
+    V.scanErg = null;            // Ergebnis für die Kamera: { p, art: 'ok' | 'schon', bc } (Nach-Review 24.10.2026)
     if (!code) return;
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     var g = V.geb[V.aktiv];
@@ -389,13 +390,14 @@
     }
     if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Zur Seite legen.'); fremdMelden(code, g.id); return; }
     var a = z[pgNorm(p.id)];
-    if (a && a.gebinde === g.id) { V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return; }
+    if (a && a.gebinde === g.id) { V.scanErg = { p: p, art: 'schon' }; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return; }
     if (a) {
       V.rueck = { art: 'stop', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. NICHT verschoben. ',
         knopf: '<div class="reihe" style="margin-top:8px"><button class="pink klein" data-a="verschieben" data-v="' + esc(p.id) + '">Nach ' + esc(g.name) + ' verschieben</button></div>' };
       $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return;
     }
     if (!setze(p, g.id, '', '', bc)) return;          // abgelehnt: setze meldet rot
+    V.scanErg = { p: p, art: 'ok', bc: !!bc };
     V.rueck = { art: 'ok', titel: '✅ ' + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + ' (aus ' + p.ort + ')' };
     piep(true); neuZeichnenScan();
   }
@@ -622,9 +624,13 @@
       - Gleicher Code erst wieder, wenn er mindestens 1 s aus dem Bild war (KAM.sicht: Code → seit wann nicht mehr gesehen).
       - Nach jedem Treffer 1,5 s alle Codes gesperrt. Ein Code, der zum eben gescannten Stück gehört (EAN und PG-Etikett desselben Stücks),
         muss ebenfalls zuerst 1 s aus dem Bild. Ein bewusster Gebinde-Wechsel hebt nur die kurze Sperre auf.
+     Nach-Review 24.10.2026 (eine Erkennungslücke von 1 s buchte bei einer EAN mit mehreren freien Stücken ein zweites Stück):
+      - Eine EAN, die ein Stück gebucht oder erkannt hat (auch als zweiter Code desselben Stücks), muss 3 s aus dem Bild sein, bevor sie wieder bucht.
+        Bucht sie dann, steht «zweites Stück derselben EAN» in der Meldung. Andere Codes und PG-Etiketten bleiben bei 1 s (kein langsamerer Wechsel).
+      - «Schon in diesem Gebinde» (Stück erkannt, nichts gebucht): dieses Stück bleibt das Partner-Stück, sein zweiter Code bucht nicht.
      Geht die Live-Kamera nicht (z.B. keine Erlaubnis im Google-Rahmen), öffnet sich die Foto-Kamera des Handys: Foto machen, Code wird gelesen. */
-  var KAM = { an: false, foto: false, stream: null, det: null, zx: null, timer: null, letzte: '', zeit: 0, sicht: {}, sperreBis: 0, letzteP: null };
-  var KAM_WEG_MS = 1000, KAM_SPERRE_MS = 1500;
+  var KAM = { an: false, foto: false, stream: null, det: null, zx: null, timer: null, letzte: '', zeit: 0, sicht: {}, sperreBis: 0, letzteP: null, eanZahl: {} };
+  var KAM_WEG_MS = 1000, KAM_EAN_WEG_MS = 3000, KAM_SPERRE_MS = 1500;
   var ZX_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
   var FORMATE = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'];
   function istHandy() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer: coarse)').matches); }
@@ -662,7 +668,7 @@
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { fotoScan(); return; }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (st) {
-      KAM.stream = st; KAM.an = true; KAM.sicht = {}; KAM.sperreBis = 0; document.body.classList.add('kam');
+      KAM.stream = st; KAM.an = true; KAM.sicht = {}; KAM.sperreBis = 0; KAM.eanZahl = {}; document.body.classList.add('kam');
       var k = $('kamera'); k.hidden = false;
       k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Code in den Rahmen.</b><button class="klein" data-a="kamera">Kamera aus</button></div>';
       var v = k.querySelector('video'); v.srcObject = st; var p = v.play(); if (p && p.catch) p.catch(function () {});
@@ -696,15 +702,18 @@
     };
     los();
   }
-  /* Nach jeder Bild-Analyse: Codes, die gesperrt sind, aber nicht mehr im Bild, zählen als weg; nach 1 s weg sind sie wieder frei */
+  /* Nach jeder Bild-Analyse: Codes, die gesperrt sind, aber nicht mehr im Bild, zählen als weg; nach 1 s weg (EAN eines erkannten Stücks: 3 s) sind sie wieder frei */
   function kamBild(codes) {
     var jetzt = Date.now();
     Object.keys(KAM.sicht).forEach(function (c) {
       var s = KAM.sicht[c];
       if (codes.indexOf(c) > -1) s.weg = 0;
-      else { if (!s.weg) s.weg = jetzt; if (jetzt - s.weg >= KAM_WEG_MS) delete KAM.sicht[c]; }
+      else { if (!s.weg) s.weg = jetzt; if (jetzt - s.weg >= (s.ms || KAM_WEG_MS)) delete KAM.sicht[c]; }
     });
   }
+  /* EAN (kein PG-Etikett) der Quelle: kann mehrere Stücke meinen, darum nach einem Treffer 3 s statt 1 s aus dem Bild */
+  function kamEan(code) { return !!V.idx && !V.idx[pgNorm(code)] && !!(V.bar && V.bar[bcKey(code)]); }
+  function kamMerk(code) { KAM.sicht[code] = { weg: 0, ms: kamEan(code) ? KAM_EAN_WEG_MS : KAM_WEG_MS }; }
   /* Gehört der Code zum eben gescannten Stück? PG-Etikett mit dem gleichen Barcode, oder der Barcode dieses Stücks. */
   function kamPartner(code) {
     var p = KAM.letzteP; if (!p) return false;
@@ -716,18 +725,33 @@
     code = String(code || '').trim();
     if (!code) return;
     var jetzt = Date.now(), s = KAM.sicht[code];
-    if (s) { s.weg = 0; return; }                                                      // noch im Bild oder weniger als 1 s weg
+    if (s) { s.weg = 0; return; }                                                      // noch im Bild oder weniger als 1 s (EAN eines erkannten Stücks: 3 s) weg
     var nah = jetzt < KAM.sperreBis || !!(KAM.letzte && KAM.sicht[KAM.letzte]);
-    if (nah && kamPartner(code)) { KAM.sicht[code] = { weg: 0 }; return; }             // zweiter Code desselben Stücks (EAN und PG-Etikett)
+    if (nah && kamPartner(code)) { kamMerk(code); return; }                            // zweiter Code desselben Stücks (EAN und PG-Etikett)
     if (jetzt < KAM.sperreBis) return;                                                 // eben ein anderes Stück: kurz warten, der Code kommt im nächsten Bild wieder
-    KAM.sicht[code] = { weg: 0 }; KAM.sperreBis = jetzt + KAM_SPERRE_MS; KAM.letzte = code; KAM.zeit = jetzt;
+    KAM.sicht[code] = { weg: 0, ms: KAM_WEG_MS }; KAM.sperreBis = jetzt + KAM_SPERRE_MS; KAM.letzte = code; KAM.zeit = jetzt;
     var q = V.idx ? (V.idx[pgNorm(code)] || (V.bar[bcKey(code)] || [])[0]) : null;
     KAM.letzteP = { id: q ? q.id : '', barcode: q ? q.barcode : code };
     var el = $('scan'); if (!el) return;
     el.value = code; scanne();
-    /* Nicht gebucht (abgelehnt, schon im Gebinde): keine Sperre für andere Codes, sonst ginge das verlangte PG-Etikett im selben Bild verloren.
-       Der abgelehnte Code selbst bleibt gesperrt, bis er 1 s aus dem Bild war (kein Dauerpiepen). */
-    if (!V.rueck || V.rueck.art !== 'ok') { KAM.letzteP = null; KAM.sperreBis = 0; }
+    var e = V.scanErg;
+    if (e && (e.art === 'ok' || e.art === 'schon')) {
+      /* Stück erkannt (gebucht oder schon in diesem Gebinde): es bleibt das Partner-Stück, sein zweiter Code bucht nicht.
+         Eine EAN bucht erst nach 3 s Abwesenheit wieder (Nach-Review 24.10.2026: Erkennungslücke von 1 s buchte ein zweites Stück). */
+      KAM.letzteP = { id: e.p.id, barcode: e.p.barcode };
+      if (kamEan(code)) KAM.sicht[code].ms = KAM_EAN_WEG_MS;
+      if (e.art === 'schon') KAM.sperreBis = 0;                                        // nichts gebucht: andere Codes sofort
+      var bk = bcKey(e.p.barcode), n = 0;
+      if (e.art === 'ok' && bk) n = KAM.eanZahl[bk] = (KAM.eanZahl[bk] || 0) + 1;
+      if (e.art === 'ok' && e.bc && n > 1 && V.rueck) {
+        V.rueck.art = 'warn'; V.rueck.titel += ' · ⚠️ ' + (n === 2 ? 'zweites' : n + '.') + ' Stück derselben EAN';
+        if ($('rueck')) $('rueck').innerHTML = rueckHtml();
+      }
+    } else {
+      /* Nicht gebucht (abgelehnt): keine Sperre für andere Codes, sonst ginge das verlangte PG-Etikett im selben Bild verloren.
+         Der abgelehnte Code selbst bleibt gesperrt, bis er 1 s aus dem Bild war (kein Dauerpiepen). */
+      KAM.letzteP = null; KAM.sperreBis = 0;
+    }
     try { if (navigator.vibrate) navigator.vibrate(V.rueck && V.rueck.art === 'ok' ? 60 : [80, 60, 80]); } catch (e) { /* ohne */ }
     kamText();
   }
