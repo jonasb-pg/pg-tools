@@ -276,7 +276,7 @@ const DOKU = [
     'Das Tool veröffentlicht nichts bei Ricardo und überweist kein Geld. Es führt nur Buch.',
     'Der Claude-Schlüssel steht nur in den Script-Eigenschaften, nie im Code, nie im Sheet, nie in einem Chat.',
     'Texte ohne Domains und Kontaktangaben. Garantie: 30 Tage. Versand nur per Post.',
-    'Storno = unbezahlten, nicht versendeten Verkauf stornieren (Täglich oder Admin-Teil). Bezahlte Verkäufe nur über eine Retoure. Retoure = verkauftes Stück kommt auf Garantie zurück, Geld geht zurück.'
+    'Storno = nicht versendeten Verkauf stornieren (unbezahlt: Täglich oder Admin-Teil; bezahlt: nur Admin-Teil mit Rückfrage, die Rückzahlung kommt als Aufgabe unter «Zu erledigen»). Versendete Verkäufe nur über eine Retoure. Retoure = verkauftes Stück kommt auf Garantie zurück, Geld geht zurück.'
   ]],
   ['TECHNIK', [
     'Google Apps Script, an dieses Sheet gebunden (Erweiterungen > Apps Script). Zwei Dateien: Code.gs (Server, beginnt mit /**) und Index.html (Oberfläche, beginnt mit <!DOCTYPE html>).',
@@ -297,7 +297,7 @@ const DOKU = [
   ]],
   ['STATUS LISTING', [
     'In Arbeit > Bereit (alles vollständig) > Gelistet (Ricardo-Link gespeichert) > Verkauft (Verkaufsbericht) > Versendet (Zahlung bestätigt).',
-    '«Gelistet» geht nur aus «In Arbeit» oder «Bereit». Gilt nur ein Angebotslink der Form ricardo.ch/…/a/…-<Artikel-Nr>; Zusätze nach «?» oder «#» fallen weg. Derselbe Link nochmals (zweiter Klick) ändert nichts; eine Artikel-Nr, die schon bei einem anderen Stück steht, wird abgelehnt.',
+    '«Gelistet» geht nur aus «In Arbeit» oder «Bereit». Gilt nur ein Angebotslink der Form ricardo.ch/…/a/…-<Artikel-Nr>; Zusätze nach «?» oder «#» fallen weg. Derselbe Link nochmals (zweiter Klick) ändert nichts; eine Artikel-Nr, die schon bei einem anderen Stück steht, wird abgelehnt. Ein falsch eingefügter Link lässt sich bei «Gelistet» mit Rückfrage ersetzen (der alte Link gilt dann nicht mehr für dieses Stück).',
     'Frei für ein neues Listing sind: Abgebrochen, Retour abgeschlossen, Unverkauft und Storniert, diese beiden aber erst nach dem Entscheid (Neu listen, Anderer Kanal, Entsorgung). «Neu listen» arbeitet auf derselben Zeile. Ein neues Listing legt eine neue Zeile an, die alte bleibt als Verlauf.',
     'Retourniert: Retoure läuft. Retour abgeschlossen: Geld zurück, bei Ricardo storniert und Entscheid für das Stück getroffen (Neu listen, Anderer Kanal, Entsorgung). «Neu listen» nach einer Retoure: «geprüft», Titel und Beschrieb werden geleert, das Stück muss neu geprüft und beschrieben werden (Status «In Arbeit»). Bei Grund «Defekt» nur mit Bestätigung.',
     'Nummern: PG-… kommt aus dem Return Tool bzw. der Analyse (Spalte «Analyse-Nr»). Entscheid Jonas 24.10.2026: Nur Stücke mit PG-ID kommen ins Tool, neue RC-Nummern (ohne Inventar) gibt es nicht mehr. Bestehende RC-Listings bleiben gültig und lassen sich weiter verkaufen, bündeln und neu listen. Findet die Suche nichts, zeigt sie ähnliche Stücke (EAN, Name, Galaxus-Link) als Hilfe. RT-0001 sind Retouren.',

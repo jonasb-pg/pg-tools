@@ -6,8 +6,12 @@ vm.runInContext("CFG = { 'Post Frankierlizenz': '11112222', 'Post Absender': 'Fi
 const a = JSON.parse(JSON.stringify(c.postAnfrage_({ id: 'V-1', vorname: 'Eva', nachname: 'Muster', strasse: 'Testgasse', nr: '5a', plz: 3011, ort: 'Bern', przl: 'PRI', gramm: 1234.4 }, true)));
 assert.strictEqual(a.frankingLicense, '11112222');
 assert.deepStrictEqual(a.customer, { name1: 'Firma AG', street: 'Musterweg 1', zip: '3000', city: 'Bern', country: 'CH' });
-/* Prüfung 24.10.2026, E1: Standard ist ZPL für den Etikettendrucker (200 dpi); Einstellung «Etiketten-Format» = PDF wie bisher */
-assert.deepStrictEqual(a.labelDefinition, { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'ZPL2', imageResolution: 200, printPreview: true });
+/* Nach-Review 24.10.2026: Vorgabe PDF (auch ohne Einstellung); ZPL nur mit Einstellung «ZPL» und zplOk (Seite kann ZPL) */
+assert.deepStrictEqual(a.labelDefinition, { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'PDF', imageResolution: 300, printPreview: true });
+vm.runInContext("CFG['Etiketten-Format'] = 'ZPL';", c);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(c.postAnfrage_({ id: 'V-1', nachname: 'Muster', plz: 3011, ort: 'Bern' }, true, true))).labelDefinition,
+  { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'ZPL2', imageResolution: 200, printPreview: true });
+assert.strictEqual(c.postAnfrage_({ id: 'V-1', nachname: 'Muster', plz: 3011, ort: 'Bern' }, true).labelDefinition.imageFileType, 'PDF');
 vm.runInContext("CFG['Etiketten-Format'] = 'PDF';", c);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(c.postAnfrage_({ id: 'V-1', nachname: 'Muster', plz: 3011, ort: 'Bern' }, false))).labelDefinition,
   { labelLayout: 'A6', printAddresses: 'RECIPIENT_AND_CUSTOMER', imageFileType: 'PDF', imageResolution: 300, printPreview: false });

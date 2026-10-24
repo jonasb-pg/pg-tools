@@ -16,7 +16,7 @@ const vorher = new Date(2026, 9, 20, 10, 0);
 S.listing(Object.assign({ 'PG-ID': 'PG-100', 'Status': 'Gelistet', 'Ricardo-Link': L1, 'Gelistet am': vorher, 'Laufzeit Tage': 6 }, KOMPLETT));
 let r = S.c("markiereGelistet('PG-100', 'https://ricardo.ch/de/a/toaster-1111111111?utm_source=app', 9)");
 ok(r.status === 'Gelistet' && S.zeile('PG-100')['Gelistet am'] === vorher && S.zeile('PG-100')['Laufzeit Tage'] === 6 && !S.log(/^Gelistet/), '1: zweiter Klick (gleiche Artikel-Nr, andere Schreibweise) ändert nichts');
-wirft(() => S.c("markiereGelistet('PG-100', '" + L2 + "')"), /ist «Gelistet» .*schon mit einem anderen Ricardo-Link gelistet/, '1: schon gelistet, anderer Link: Fehler (sonst zwei Angebote live)');
+wirft(() => S.c("markiereGelistet('PG-100', '" + L2 + "')"), /^Bitte bestätigen: PG-100 ist schon mit dem Ricardo-Link .*Link ersetzen/, '1 (Nach-Review 5): schon gelistet, anderer Link: nur mit Rückfrage (sonst zwei Angebote live)');
 S = sandbox();
 S.listing(Object.assign({ 'PG-ID': 'PG-100', 'Status': 'Bereit', 'Ricardo-Link': L1, 'Entscheid unverkauft': 'Neu listen' }, KOMPLETT));
 r = S.c("markiereGelistet('PG-100', '" + L2 + "?utm_campaign=20261024#x')");
@@ -56,14 +56,14 @@ S.verkauf({ 'Verkauf-Nr': '9004', 'PG-ID': 'PG-100', 'Status': 'Bezahlt und vers
 S.verkauf({ 'Verkauf-Nr': '9006', 'PG-ID': 'PG-102', 'Status': 'Wartet auf Zahlung', 'Bezahlt am': new Date() });
 S.verkauf({ 'Verkauf-Nr': '9005', 'PG-ID': 'PG-101', 'Status': 'Zu packen', 'Strasse': 'Testweg' });
 S.verkauf({ 'Verkauf-Nr': '9007', 'Status': 'Storniert' });
-wirft(() => S.c("adminLoescheVerkauf(2, '9004')"), /ist bezahlt\. Storno nur über eine Retoure/, '5: bezahlt und versendet: kein Storno');
+wirft(() => S.c("adminLoescheVerkauf(2, '9004')"), /ist bezahlt und versendet\. Storno nur über eine Retoure/, '5: bezahlt und versendet: kein Storno');
 ok(S.zeile('PG-100')['Status'] === 'Versendet' && S.vz('9004')['Status'] === 'Bezahlt und versendet', '5: nichts geändert');
 wirft(() => S.c("adminLoescheVerkauf(3, '9006')"), /ist bezahlt/, '5: bezahlt, noch nicht versendet: auch nur über Retoure');
 wirft(() => S.c("adminLoescheVerkauf(5, '9007')"), /schon storniert/, '5: schon storniert');
 S.c("adminLoescheVerkauf(4, '9005')");
 ok(S.vz('9005')['Status'] === 'Storniert' && S.vz('9005')['Strasse'] === '' && S.zeile('PG-101')['Status'] === 'Storniert' && S.zeile('PG-101')['Entscheid unverkauft'] === '', '5: unbezahlt storniert, Stück wartet auf den Entscheid');
 const ad = S.c("adminSuche('')");
-ok(ad.verkaeufe.find(v => v.nr === '9004').storno === false && ad.verkaeufe.find(v => v.nr === '9006').storno === false && ad.listings.find(l => l.id === 'PG-100').loeschbar === false, '5: adminSuche sagt der Oberfläche, was löschbar ist');
+ok(ad.verkaeufe.find(v => v.nr === '9004').storno === false && ad.verkaeufe.find(v => v.nr === '9006').storno === true && ad.listings.find(l => l.id === 'PG-100').loeschbar === false, '5: adminSuche sagt der Oberfläche, was löschbar ist');
 
 /* ---------- Befund 7: «Unverkauft» ohne Entscheid nicht neu starten ---------- */
 S = sandbox();
@@ -167,9 +167,13 @@ S.verkauf({ 'Verkauf-Nr': '9002', 'PG-ID': 'PG-101', 'Status': 'Zu packen', 'Nac
 let anfragen = [];
 S.ctx.ANFRAGEN = anfragen;
 S.c("postEtiketteAnfrage_ = function (a) { ANFRAGEN.push(a); if (ANFRAGEN.danach) ANFRAGEN.danach(); return { sendungsnummer: '99.60.' + ANFRAGEN.length, daten: 'XlhBXkZPNTBeRlNeWFo=', typ: String(a.labelDefinition.imageFileType).indexOf('ZPL') === 0 ? 'zpl' : 'pdf', pdf: '', warnungen: '' }; }");
-const ld = S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false)").labelDefinition;
-ok(ld.imageFileType === 'ZPL2' && ld.imageResolution === 200 && ld.labelLayout === 'A6', 'E1: Vorgabe ZPL2, 200 dpi, A6 (wie im Post-Login)');
-let e = S.c("etikette('9001')");
+/* Nach-Review 24.10.2026 (1): Vorgabe PDF; ZPL nur mit Einstellung «ZPL» UND wenn die Seite ZPL kann */
+const ld = S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false, true)").labelDefinition;
+ok(ld.imageFileType === 'PDF' && ld.imageResolution === 300, 'E1/NR1: Vorgabe PDF, auch wenn die Einstellung fehlt');
+S.E.d.push(['Etiketten-Format', 'ZPL']); S.neu(); S.c('cfgVergessen_()');
+ok(S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false, true)").labelDefinition.imageFileType === 'ZPL2', 'E1: Einstellung ZPL und Seite kann ZPL: ZPL2, 200 dpi');
+ok(S.c("postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, false)").labelDefinition.imageFileType === 'PDF', 'NR1: Seite ohne Angabe (alte Seite): PDF, auch bei Einstellung ZPL');
+let e = S.c("etikette('9001', false, false, ['zpl', 'pdf'])");
 ok(e.typ === 'zpl' && e.daten === 'XlhBXkZPNTBeRlNeWFo=' && e.name === 'Etikette 9001.zpl' && e.sendung === '99.60.1' && S.vz('9001')['Sendungsnummer'] === '99.60.1', 'E1: Etikette als ZPL-Datei, Sendungsnummer gespeichert');
 wirft(() => S.c("etikette('9002')"), /^Bitte bestätigen: Für PG-101 gibt es schon eine Etikette \(Sendung 99\.00\.1\)/, '18: zweite Etikette nur mit Bestätigung');
 ok(anfragen.length === 1, '18: ohne Bestätigung keine Anfrage an die Post');
@@ -187,8 +191,9 @@ ok(ld2.imageFileType === 'PDF' && ld2.imageResolution === 300 && ld2.printPrevie
 S = sandbox();
 S.CACHE['post-token-DCAPI_BARCODE_READ'] = 'tok';
 S.urlAntwort = () => ({ getResponseCode: () => 200, getContentText: () => JSON.stringify({ item: { identCode: '99.60.7', label: ['XlhBXlha'], warnings: null } }) });
-const pe = S.c("postEtiketteAnfrage_(postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, true))");
+S.E.d.push(['Etiketten-Format', 'ZPL']); S.neu(); S.c('cfgVergessen_()');
+const pe = S.c("postEtiketteAnfrage_(postAnfrage_({ id: 'x', nachname: 'M', plz: '3000', ort: 'Bern' }, true, true))");
 ok(pe.typ === 'zpl' && pe.daten === 'XlhBXlha' && pe.sendungsnummer === '99.60.7' && pe.pdf === '' && S.fetch.length === 1 && /generateAddressLabel/.test(S.fetch[0].url), 'E1: ZPL-Antwort ausgewertet (gestubbt, kein Netz)');
-ok(S.E.d.length > 0 && S.c("DEFAULTS.some(function (d) { return d[0] === 'Etiketten-Format' && d[1] === 'ZPL'; })"), 'E1: «einrichten» legt die Einstellung «Etiketten-Format» (ZPL) an');
+ok(S.E.d.length > 0 && S.c("DEFAULTS.some(function (d) { return d[0] === 'Etiketten-Format' && d[1] === 'PDF'; })"), 'E1/NR1: «einrichten» legt die Einstellung «Etiketten-Format» mit PDF an');
 
 h.ende();

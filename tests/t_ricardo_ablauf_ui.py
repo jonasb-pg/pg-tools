@@ -123,7 +123,7 @@ with sync_playwright() as p:
     ok(not [x for x in A() if x[0] == 'adressePruefen'] and 'Testa Beispiel' in s.text_content('#f-schritte'), 'Keine Adressprüfung bei der Post, Adresse angezeigt')
     s.evaluate("window.DL = []; HTMLAnchorElement.prototype.click = function () { DL.push(this.download); }")   # Zusatz E1: herunterladen statt neuer Tab
     s.click('#f-schritte button:text-is("Etikette drucken")'); s.wait_for_timeout(200)
-    ok(['etikette', ['50000002']] in A() and 'Etikette 50000002.pdf' in s.evaluate('DL') and not any(u.startswith('blob:') for u in s.evaluate('OFFEN')) and 'Nochmals drucken' in s.text_content('#f-schritte'), 'Etikette gedruckt (PDF heruntergeladen, kein neuer Tab)')
+    ok(['etikette', ['50000002', False, False, ['zpl', 'pdf']]] in A() and 'Etikette 50000002.pdf' in s.evaluate('DL') and not any(u.startswith('blob:') for u in s.evaluate('OFFEN')) and 'Nochmals drucken' in s.text_content('#f-schritte'), 'Etikette gedruckt (PDF heruntergeladen, kein neuer Tab)')
     s.click('#f-aktion'); s.wait_for_timeout(200)
     ok('Matchmaker' in s.text_content('.f-tun'), 'Packen-Schritt')
     s.click('#f-aktion'); s.wait_for_timeout(200)

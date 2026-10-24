@@ -137,7 +137,7 @@ with sync_playwright() as p:
       return Promise.resolve({ ok: true, text: function () { return Promise.resolve(''); } }); }; 0""")
     s.click('#f-schritte button:text-is("Etikette drucken")'); s.wait_for_timeout(300)
     f = s.evaluate('FETCH')
-    ok(rufe('etikette')[-1] == ['50000002'] and len(f) == 2 and f[0][0] == 'https://127.0.0.1:9101/default?type=printer' and f[1][0] == 'https://127.0.0.1:9101/write' and f[1][1] == 'POST', 'E1 a: Zebra Browser Print gefunden, Etikette gesendet')
+    ok(rufe('etikette')[-1] == ['50000002', False, False, ['zpl', 'pdf']] and len(f) == 2 and f[0][0] == 'https://127.0.0.1:9101/default?type=printer' and f[1][0] == 'https://127.0.0.1:9101/write' and f[1][1] == 'POST', 'E1 a: Zebra Browser Print gefunden, Etikette gesendet')
     body = json.loads(f[1][2])
     ok(body['device']['uid'] == 'z1' and body['data'] == '^XA^FO50^FS^XZ' and s.evaluate('DL.length') == 0 and 'gedruckt (Zebra)' in s.text_content('#hinweis') and s.evaluate('OFFEN.length') == 0, 'E1 a: ZPL-Text an den Drucker, kein Download, kein neuer Tab')
     ok('Nochmals drucken' in s.text_content('#f-schritte') and 'Neue Etikette' in s.text_content('#f-schritte') and 'Datei' in s.text_content('#f-schritte'), 'E1: «Nochmals drucken», «Datei» und «Neue Etikette»')
@@ -160,7 +160,7 @@ with sync_playwright() as p:
     s.click('#f-schritte button:text-is("Neue Etikette")'); s.wait_for_timeout(150)
     ok(s.is_visible('#dialog') and 'schon eine Etikette' in s.inner_text('#dialog-text'), '18: neue Etikette nur nach Rückfrage des Servers')
     s.click('#dialog-ja'); s.wait_for_timeout(2000)
-    ok(rufe('etikette')[-1] == ['50000002', False, True], '18: nach Ja mit Bestätigung')
+    ok(rufe('etikette')[-1] == ['50000002', False, True, ['zpl', 'pdf']], '18: nach Ja mit Bestätigung (Nach-Review 1: mit Formaten)')
     # PDF: herunterladen statt neuer Tab
     s.evaluate("H.etikette = function () { return { ok: { nr: '50000002', sendung: '99.60.2', daten: 'JVBERi0xLjQK', typ: 'pdf', name: 'Etikette 50000002.pdf' } }; }; DL = []")
     s.evaluate("etikette('50000002')"); s.wait_for_timeout(300)
