@@ -172,3 +172,8 @@ Eine Zeile pro Entscheid von Jonas. Neueste unten. Ersetzt ein Entscheid einen f
   - AN-Nummer: Maximum über «Produkte» und «Analysen».
   - Vorfall 24.10. 00:02–00:07: Runde 1 stand 5 Minuten gespeichert im Editor; der Trigger (läuft mit dem gespeicherten Code, nicht mit der Bereitstellung) holte 28 Stücke. Editor zurückgesetzt. **Lehre: Code erst speichern, wenn er online gehen darf; Trigger nutzen immer den gespeicherten Stand.**
 - **24.10.2026, 00:28, Jonas: «Alle, die reinkommen, müssen eine PG-ID haben, sonst kommen sie nicht rein.»** Analyse Tool: «Stück ohne Inventar» abgeschaltet (Link entfernt, Server lehnt ab; Schalter OHNE_INVENTAR im Code). Bestehende AN-Stücke bleiben analysierbar. Ricardo Tool: keine neuen RC-Listings.
+- **24.10.2026, 09:30–09:53, eingespielt nach «Go alle» (Jonas).** Editor-Stand vorher per Prüfsumme gegen Git geprüft, Patch eingespielt, Prüfsumme danach geprüft.
+  - Ersatzteil Tool 2026-10-24.1: Version 2 (09:34).
+  - Umpack Tool 2026-10-24.1: einrichten 09:38, Version 5 (09:41). Scan-Handys einmal neu laden.
+  - Matchmaker 2026-10-24.2 (gebundenes Script, live beim Speichern; Stand vorher war 6de2bbe, die Audit-Änderungen vom 23.10. waren noch nicht drin). Lauf «ganzer Bestand» 09:45: 7147 Stück, 42 von 71 Suchaufträgen mit Treffer, 60 Stück aus dem ANALYSE TOOL weggelassen, keine offenen Paare. Tab «Urteile» hat Spalte G «Produkt-Schlüssel».
+  - Ricardo Tool 2026-10-24.1: einrichten 09:49 («Frühere Links» da, Hinweis-Tabs = Stationär, Analyse, Berner Brocki, Caritas, Heilsarmee, Scanner), Version 28 (09:50). Test: Suche PG-21102 = 1 Treffer aus der Analyse; Unsinn-Name = «Nicht gefunden … zuerst im Return Tool erfassen», keine Lesefehler. Suche dauert 15–30 s (liest alle Tabs inkl. Archiv), beobachten.
