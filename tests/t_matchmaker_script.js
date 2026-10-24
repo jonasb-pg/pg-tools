@@ -84,7 +84,7 @@ vm.runInContext(QUELLE, c);
 const mm = MM.getSheetByName('Matchmaker'), U = MM.getSheetByName('Urteile');
 const zelle = (r, col) => String(mm.v[r - 1][col - 1] || '');
 const status = () => String(mm.v[1][0]);
-assert.ok(/const VERSION = '2026-10-24\.4'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
+assert.ok(/const VERSION = '2026-10-24\.5'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
 
 /* Lauf 1: ganzer Bestand */
 paareGeprueft = 0;
@@ -108,17 +108,16 @@ assert.ok(!U.v.slice(2).some(r => r[2] === 'Toaster Rot'), 'altes Urteil «Toast
 assert.strictEqual(paareGeprueft, 4, 'nur Paare ohne Urteil an Claude (PG-1, PG-2, Scanner, PG-3), nicht PG-5 (PG-4 ausgeschlossen)');
 assert.ok(/PG-5/.test(p1), 'PG-5 über das alte Urteil in «Passt»: ' + p1);
 
-/* Lauf 2: heute erfasst. PG-6 neu, PG-3 verkauft. Bisherige Treffer bleiben, verschwundene fallen weg, nur Neues geht an Claude. */
+/* Lauf 2: heute erfasst. PG-6 neu, PG-3 verkauft. Seit 24.10.2026 (Entscheid Jonas): Tageslauf zeigt nur Stücke dieses Tages, nur Neues geht an Claude. */
 RT.getSheetByName('Stationär').v.push(z('PG-6', heute, 'Toaster Neu', '777', '', 35, 'HOM-4'));
 RT.getSheetByName('Stationär').v.splice(8, 1);      // PG-3
 paareGeprueft = 0;
 c.sucheHeute();
 p1 = zelle(4, 5);
-assert.ok(/PG-6/.test(p1) && /PG-1\b|\+ \d weitere/.test(p1), 'M5: neue Treffer ergänzt, alte behalten: ' + p1);
-assert.ok(/PG-1\b/.test(p1) && /PG-5/.test(p1) && !/weitere/.test(p1) && /ohne ID \(Scanner\)/.test(ae1()), 'drei Treffer unter «Passt» (PG-1, PG-5, PG-6), Scanner unter «Ähnlich» (Z12)');
+assert.ok(/PG-6/.test(p1) && !/PG-1\b/.test(p1) && !/PG-5/.test(p1), 'Tageslauf: nur der Treffer von heute (PG-6): ' + p1);
 assert.strictEqual(zelle(5, 5), '', 'M5: Treffer auf PG-3 (nicht mehr im Bestand) entfernt');
 assert.strictEqual(paareGeprueft, 1, 'nur das neue Stück wurde geprüft');
-assert.ok(/bisherige Treffer behalten/.test(status()), status());
+assert.ok(/nur Stücke dieses Tages/.test(status()), status());
 
 /* Lauf 3: ANALYSE TOOL nicht lesbar: sichtbarer Hinweis, nichts still */
 analyseKaputt = true;

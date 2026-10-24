@@ -44,12 +44,13 @@ env.paare = 0;
 env.c.sucheHeute();
 assert.strictEqual(env.paare, 0, 'Tageslauf: kein Paar mit altem Stück an Claude');
 assert.ok(!/PG-2/.test(env.zelle(5, 5)), 'Tageslauf findet altes Stück nicht: ' + env.zeile(5));
-assert.ok(/PG-1/.test(env.zelle(4, 5)), 'bisheriger Treffer bleibt stehen: ' + env.zeile(4));
-assert.ok(/An diesem Tag wurde nichts erfasst/.test(env.status()) && /bisherige Treffer behalten/.test(env.status()) && !/ganzen Bestand \(/.test(env.status()), env.status());
+assert.ok(!/PG-1/.test(env.zeile(4)), 'Tageslauf zeigt keinen Treffer auf altes Stück: ' + env.zeile(4));
+assert.ok(/An diesem Tag wurde nichts erfasst/.test(env.status()) && /nur Stücke dieses Tages/.test(env.status()) && !/ganzen Bestand \(/.test(env.status()), env.status());
 /* b) «Ganzer Bestand» findet ihn */
 env.paare = 0;
 env.c.sucheAlles();
 assert.ok(/PG-2/.test(env.zelle(5, 5)) && env.paare === 1, 'Ganzer Bestand: neuer Auftrag findet altes Stück: ' + env.zeile(5));
+assert.ok(/PG-1/.test(env.zelle(4, 5)), 'Ganzer Bestand zeigt den alten Treffer wieder (gespeichertes Urteil)');
 
 /* c) Stück von heute wird im Tageslauf geprüft, das alte nicht (auch nicht in einem zweiten Lauf) */
 env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], KOPF, auftrag('Toaster')] },
@@ -135,22 +136,22 @@ assert.ok(/PG-2/.test(env.zelle(4, 5)), 'Severin passt (Urteil mit Schlüssel vo
 const k = kennung('Toaster', '', P('Toaster'));
 /* a) ältere Hand-Zeile (Datum vor dem Urteil mit Schlüssel): das Urteil mit Schlüssel gilt */
 env.U().v.push([k, 'Toaster', 'Severin Toaster', 'nein', 'von Hand', '23.10.2026', '']);
-env.c.sucheHeute();
+env.c.sucheAlles();
 assert.ok(/PG-2/.test(env.zelle(4, 5)), 'ältere Hand-Zeile gewinnt nicht');
 /* b) Hand-Zeile ohne Datum: gewinnt nicht */
 env.U().v.push([k, 'Toaster', 'Severin Toaster', 'nein', 'von Hand', '', '']);
-env.c.sucheHeute();
+env.c.sucheAlles();
 assert.ok(/PG-2/.test(env.zelle(4, 5)), 'Hand-Zeile ohne Datum gewinnt nicht');
 /* c) Hand-Zeile vom selben Tag, weiter unten: gewinnt */
 env.U().v.push([k, 'Toaster', 'Severin Toaster', 'nein', 'von Hand', HEUTE, '']);
 env.paare = 0;
-env.c.sucheHeute();
+env.c.sucheAlles();
 assert.ok(!/PG-2/.test(env.zeile(4)) && /PG-1/.test(env.zelle(4, 5)), 'Befund 16: neuere Hand-Korrektur ohne Schlüssel gilt: ' + env.zeile(4));
 assert.strictEqual(env.paare, 0, 'nichts neu bezahlt');
 /* d) Hand-Zeile von morgen («ähnlich»): gewinnt, auch über eine spätere Zeile mit Schlüssel vom Vortag */
 env.U().v.push([k, 'Toaster', 'Dualit Toaster', 'ähnlich', 'Farbe prüfen', '25.10.2026', '']);
 env.U().v.push([k, 'Toaster', 'Dualit Toaster', 'passt', '', '23.10.2026', 'dualit toaster|bc:111']);
-env.c.sucheHeute();
+env.c.sucheAlles();
 assert.ok(!/PG-1/.test(env.zelle(4, 5)) && /PG-1/.test(env.zelle(4, 6)) && /Farbe prüfen/.test(env.zelle(4, 6)), 'neuste Zeile gilt (Datum): ' + env.zeile(4));
 
 console.log('t_matchmaker_p2410_suche ok');

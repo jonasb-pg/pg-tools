@@ -42,8 +42,8 @@
  *   aus dem Ereignis (die kann sich inzwischen verschoben haben). «Aus Analyse» geht mit nach «Erledigt» und wieder zurück (Vertrag V5).
  * - Suchprofile und Ergebnis werden in der Sperre geschrieben, in die Zeile, in der der Auftrag JETZT steht (Profil: gleicher Text und
  *   Suchprofil leer; Ergebnis: gleiche Kennung). Was während der Suche neu erfasst oder geändert wurde, bleibt leer und steht rot im Status.
- * - Tagesläufe («heute/gestern erfasst») prüfen NUR die Stücke dieses Tages (Entscheid Jonas 24.10.2026, 15:00). Bisherige Treffer bleiben
- *   stehen. Alles andere (neue oder geänderte Aufträge gegen den alten Bestand, verpasste Tage) prüft «Ganzer Bestand».
+ * - Tagesläufe («heute/gestern erfasst») prüfen und zeigen NUR die Stücke dieses Tages (Entscheid Jonas 24.10.2026, 15:00/15:12).
+ *   Treffer auf ältere Stücke verschwinden aus Passt/Ähnlich; ihre Urteile bleiben gespeichert, «Ganzer Bestand» zeigt sie ohne Kosten wieder.
  * - Zusätzlich ausgeschlossen: Ricardo Tool «Listings» (nicht frei oder Entsorgung, auch Bündel), Umpack Tool «Änderungen» (ohne «Erledigt»,
  *   Verkaufen/Entsorgen) und Stücke unter «Aus Analyse» bei geholten Aufträgen. «Ricardo Offline» im ANALYSE TOOL, im Ricardo Tool aber frei
  *   mit «Anderer Kanal»: wieder frei. IDs werden normalisiert verglichen (pgNorm_, Vertrag V3). Nicht lesbare Quelle: Status rot.
@@ -62,7 +62,7 @@
  * - Der Status steht in der Zeile über der Kopfzeile (ohne freie Zeile: als Hinweis unten rechts).
  */
 
-const VERSION = '2026-10-24.4';
+const VERSION = '2026-10-24.5';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -401,8 +401,8 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
   }
   const aufgeraeumt = modus === 'alles' ? urteileAufraeumen_(ss, sh, auftraege) : '';
 
-  // 4. Ergebnis: alle Paare mit gespeichertem Urteil «passt/ähnlich» auf Produkte im Bestand (behält im Tageslauf die bisherigen Treffer)
-  const treffer = trefferPaare_(auftraege, produkte, paare, speicher);
+  // 4. Ergebnis: Paare mit gespeichertem Urteil «passt/ähnlich» auf Produkte im Bestand; im Tageslauf nur Stücke dieses Tages (Entscheid Jonas 24.10.2026)
+  const treffer = trefferPaare_(auftraege, produkte, paare, speicher).filter(function (x) { return !tag || produkte[x.p].neu; });
   const zeilen = ergebnisZeilen_(auftraege, produkte, treffer, speicher);
   let mitTreffer = 0;
   zeilen.forEach(function (w) { if (w[0] || w[1]) mitTreffer++; });
@@ -413,7 +413,7 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
   let text = 'Stand ' + jetzt_() + ' · ' + bereich + ' · ';
   if (!tag) text += bestand.stuecke.length + ' Stück durchsucht';
   else text += (neuStueck ? neuStueck + ' Stück an diesem Tag erfasst und geprüft' : 'An diesem Tag wurde nichts erfasst') +
-    ' (bisherige Treffer behalten; neue Suchaufträge gegen den ganzen Bestand: «Ganzer Bestand»)';
+    ' (nur Stücke dieses Tages; ältere Stücke und neue Suchaufträge gegen den ganzen Bestand: «Ganzer Bestand»)';
   text += ' · ' + mitTreffer + ' von ' + auftraege.length + ' Suchaufträgen mit Treffer.';
   if (neuGeprueft) text += ' ' + neuGeprueft + ' Paare neu von Claude geprüft.';
   if (weg.analyse) text += ' ' + weg.analyse + ' Stück mit Ergebnis im ANALYSE TOOL (Matchmaker, Ricardo, nicht reusable) weggelassen.';
