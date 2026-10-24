@@ -1,7 +1,7 @@
 /* Ricardo Tool, Prüfung 24.10.2026: gemeinsame Sandbox für die Tests t_ricardo_p2410_*.js (Mock-Sheets, Return Tool, ANALYSE TOOL, Dienste).
    Erfundene Daten, keine Netzwerkzugriffe. Direkt aufgerufen tut die Datei nichts. */
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '../apps/ricardo/Code.gs'), 'utf8');
+const src = fs.readFileSync(process.env.RICARDO_CODE || path.join(__dirname, '../apps/ricardo/Code.gs'), 'utf8');   // RICARDO_CODE: anderen Stand prüfen (z.B. den alten)
 let fehler = 0;
 const ok = (b, m) => { if (!b) { fehler++; console.log('FEHLER', m); } else console.log('ok', m); };
 const wirft = (f, re, m) => { let t = ''; try { f(); } catch (e) { t = e.message; } ok(re.test(t), m + (t ? ' [' + t.slice(0, 220) + ']' : ' [kein Fehler]')); return t; };
@@ -72,7 +72,12 @@ function sandbox(opt) {
   const ctx = {
     console, Date, Math, JSON, Object, String, Number, Array, RegExp, Error, isNaN, parseFloat, Buffer, Promise,
     SpreadsheetApp: { getActive: () => ({ getSheetByName: n => ({ Listings: S.L, Einstellungen: S.E, Versand: S.V, Log: S.LOG, 'Verkäufe': S.VK, Posteingang: S.PE, Retouren: S.RE })[n] || null }),
-      openById: id => { if (id === 'RT') S.oeffnen++; if (id === 'AT') S.atOeffnen = (S.atOeffnen || 0) + 1; return ext[id]; }, flush: () => { S.flush++; } },
+      openById: id => {
+        if (id === 'RT') S.oeffnen++;
+        if (id === 'AT') S.atOeffnen = (S.atOeffnen || 0) + 1;
+        if (S.gesperrt > 0) S.externInSperre = (S.externInSperre || 0) + 1;     // Prüfung 10: externe Tabellen nie in der Sperre öffnen
+        return ext[id];
+      }, flush: () => { S.flush++; } },
     LockService: { getScriptLock: () => ({ waitLock() { if (S.sperreBesetzt) throw new Error('Lock timeout: another process was holding the lock for too long.'); S.gesperrt++; S.sperrenMax = Math.max(S.sperrenMax, S.gesperrt); },
       tryLock() { if (S.sperreBesetzt) return false; S.gesperrt++; return true; }, releaseLock() { S.gesperrt--; } }) },
     Session: { getActiveUser: () => ({ getEmail: () => S.aktiv }), getEffectiveUser: () => ({ getEmail: () => S.besitzer }) },

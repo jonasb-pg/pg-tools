@@ -1,6 +1,6 @@
 # Datenmodell
 
-<!-- Automatisch erzeugt mit tools/gen.py aus apps/analyse/Code.gs (Version 2026-10-16.7). Nicht von Hand ändern. -->
+<!-- Automatisch erzeugt mit tools/gen.py aus apps/analyse/Code.gs (Version 2026-10-24.2). Nicht von Hand ändern. -->
 
 
 Sheet **ANALYSE TOOL** `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM`. Spaltennamen sind Schlüssel: Der Code liest und schreibt nach Name, nicht nach Position. `einrichten()` prüft, ob alle Spalten da sind.
@@ -17,6 +17,7 @@ Sheet **ANALYSE TOOL** `1jhmq1JoyM6Xor33pM77AmOixbvqKuGzfFX-js9PdIrM`. Spaltenna
 | Bestellliste | reparaturPause | Startseite (Teil-Status), Besteller:in | 1 Zeile pro Teil; Status von Hand |
 | Testkonten |  |  |  |
 | Ricardo | abschliessen (kanal ricardo) | Ricardo Tool (geplant: Maske) | 1 Zeile pro Inserat |
+| Matchmaker |  |  |  |
 | Ersatzteile | ersatzteilSuche | ersatzteile, «Später reparieren» | 1 Zeile pro Angebot |
 | Quellen-Log | Recherche | Analyse der Quellen | 1 Zeile pro Quelle und Recherche |
 | Batches | Abgleich | Abgleich | 1 Zeile pro Batch der Claude Batch API |
@@ -48,6 +49,8 @@ Zusätzlich angelegt bei Bedarf: «Kosten» (jeder KI-Aufruf), «Bestellliste»,
 | 12 | Recherche-Status |
 | 13 | Recherche-Batch |
 | 14 | Analyse-Status |
+| 15 | Übernommen am |
+| 16 | Reparatur-Stand |
 
 ## Recherche
 
@@ -111,6 +114,9 @@ Zusätzlich angelegt bei Bedarf: «Kosten» (jeder KI-Aufruf), «Bestellliste»,
 | 32 | Regal |
 | 33 | Matchmaker-Auftrag |
 | 34 | Stand |
+| 35 | Dauer Analyse Min |
+| 36 | Dauer Verkauf Min |
+| 37 | Lauf-ID |
 
 ## Prüfschritte
 
@@ -207,6 +213,29 @@ Zusätzlich angelegt bei Bedarf: «Kosten» (jeder KI-Aufruf), «Bestellliste»,
 | 15 | Kürzel |
 | 16 | Analysiert am |
 | 17 | Status |
+
+## Matchmaker
+
+| # | Spalte |
+|---|---|
+| 1 | PG-ID |
+| 2 | Analyse-Nr |
+| 3 | Bezeichnung |
+| 4 | EAN |
+| 5 | Suchauftrag |
+| 6 | Titel |
+| 7 | Artikelbeschrieb |
+| 8 | Zustand |
+| 9 | Grade |
+| 10 | Preis CHF |
+| 11 | Neupreis CHF |
+| 12 | Versandklasse |
+| 13 | Versand CHF |
+| 14 | Foto-Ordner |
+| 15 | Fotos |
+| 16 | Kürzel |
+| 17 | Analysiert am |
+| 18 | Status |
 
 ## Ersatzteile
 

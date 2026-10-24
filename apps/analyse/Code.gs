@@ -1211,7 +1211,8 @@ function rtKanalErkennen_(ss) {
   const neu = erkannt.filter(function (n) { return alle.indexOf(n) < 0 && RT_KANAL_TABS.indexOf(n) < 0; });
   if (neu.length) { const m = einmalProTag_('rt-neu', neu); if (m.length) log_('Abgleich-Hinweis', '', 'Neuer Kanal-Tab im Return Tool, wird jetzt mitgelesen: ' + m.join(', ')); }
   if (weg.length) { const m = einmalProTag_('rt-weg', weg); if (m.length) log_('Abgleich-Hinweis', '', 'Kanal-Tab nicht mehr im Return Tool (gelöscht oder umbenannt): ' + m.join(', ') + '. In diesem Lauf fällt nichts heraus.'); }
-  if (p) try { p.setProperty('RT_KANAL_BEKANNT', JSON.stringify(erkannt.concat(kaputt).slice(0, 60))); } catch (err) { /* nicht kritisch */ }
+  const merken = JSON.stringify(erkannt.concat(kaputt).slice(0, 60));
+  if (p && merken !== JSON.stringify(bekannt)) try { p.setProperty('RT_KANAL_BEKANNT', merken); } catch (err) { /* nicht kritisch */ }
   RT_KANAL_MEMO = erkannt.concat(kaputt, weg).filter(function (n, i, a) { return a.indexOf(n) === i; });
   return RT_KANAL_MEMO.slice();
 }

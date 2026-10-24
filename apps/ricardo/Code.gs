@@ -1997,8 +1997,7 @@ function zurueckschreiben_(sh, rows, indizes, breite, gleich) {
 function gleichListing_(sh, rows) {
   const c = col_('Angelegt am');
   return function (i, j) {
-    if (i === j) return true;
-    const x = rows[i][c - 1], y = sh.getRange(j + 2, c).getValue();
+    const x = rows[i][c - 1], y = sh.getRange(j + 2, c).getValue();        // immer im Sheet nachsehen: an Zeile i kann jetzt eine andere Zeile derselben Nummer stehen
     return x instanceof Date && y instanceof Date ? x.getTime() === y.getTime() : String(x) === String(y);
   };
 }

@@ -802,6 +802,7 @@
   }
   function schlangeAnzeige() { var n = SCHLANGE.length; $('schlange').hidden = !n; $('schlange').textContent = t('q.speichert', n); }
   /* Prüfung 10: «gerade beschäftigt» (Sperre) ist kein Netzfehler. Es wird mit sichtbarem Hinweis wiederholt, danach die Box mit «Nochmals». */
+  var BESCHAEFTIGT_MS = 5000;                                         // Wartezeit vor dem nächsten Versuch (mal Versuch)
   function beschaeftigt(m) { return /gerade beschäftigt|is busy right now|lock timeout/i.test(m); }
   function netzfehler(m) { return !beschaeftigt(m) && /network|netzwerk|failed to fetch|timeout|zeitüberschreitung|verbindung|connection|xhr/i.test(m); }
   function schlangeWeiter() {
@@ -820,7 +821,7 @@
       messe(j.name, t0, false);
       var m = String((e && e.message) || e).replace(/^Error:\s*/, '');
       if (netzfehler(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; setTimeout(schlangeWeiter, 2000 * j.versuche); return; }
-      if (beschaeftigt(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; $('schlange').hidden = false; $('schlange').textContent = t('q.beschaeftigt', 5 * j.versuche); setTimeout(schlangeWeiter, 5000 * j.versuche); return; }
+      if (beschaeftigt(m) && j.versuche < 3) { j.versuche++; SCHLANGE_LAEUFT = false; $('schlange').hidden = false; $('schlange').textContent = t('q.beschaeftigt', Math.round(BESCHAEFTIGT_MS * j.versuche / 1000)); setTimeout(schlangeWeiter, BESCHAEFTIGT_MS * j.versuche); return; }
       fertig();
       (j.opt.keys || []).forEach(function (k) { if (!PEND[k]) delete ERLEDIGT[k]; });   // der Fall kommt zurück in die Liste
       schlangeFehler(j, m);

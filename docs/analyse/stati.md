@@ -4,16 +4,18 @@
 
 | Wert | Bedeutung | Gesetzt von |
 |---|---|---|
-| `Offen` | in der Warteschlange | Abgleich (neu aus Return Tool), `ohneInventar`, Abgleich (wieder im Return Tool) |
-| `Entfällt` | nicht mehr im Return-Tool-Tab «Analyse» | Abgleich |
-| `Reparatur` | pausiert, liegt im Regal «Reparatur» | `reparaturPause` |
-| `Erledigt` | Analyse abgeschlossen | `abschliessen` |
+| `Offen` | in der Warteschlange | Abgleich (neu aus Return Tool), `uebernehmen`, Abgleich (wieder im Return Tool), `uebernehmen(id, 'retoure')` (Retoure, seit 24.10.2026) |
+| `Entfällt` | nicht mehr im Return Tool (Tab «Analyse» oder Lagerort «Analyse» in einem Kanal-Tab) | Abgleich; nie, wenn ein Kanal-Tab nicht lesbar war oder die Zeile keine Bezeichnung hat |
+| `Reparatur` | pausiert, liegt im Regal «Reparatur»; Stand in Spalte «Reparatur-Stand» (seit 24.10.2026) | `reparaturPause` |
+| `Erledigt` | Analyse abgeschlossen | `abschliessen` (zuletzt, nach allen anderen Zeilen) |
 
 ```text
 Offen <--> Entfällt
 Offen --> Reparatur --> Erledigt
-Offen --> Erledigt
+Offen --> Erledigt --(Retoure, «Neu analysieren» mit Rückfrage)--> Offen   (neue Analyse-Nr, die alte bleibt)
 ```
+
+Ein erledigtes Stück, das im Return Tool (wieder) in der Analyse steht und «Reusable» leer hat, ändert den Status nicht von selbst. Nach einem Tag steht es im Log und im Admin («wieder im Tab Analyse»).
 
 ## Produkte.Recherche-Status
 
@@ -42,6 +44,16 @@ Geplante Ricardo-Regale (Ricardo Tool): `Ricardo Online` (gelistet), `Ricardo Un
 |---|---|
 | `Offline` | `abschliessen` |
 | weitere (Online, Unpaid, …) | Ricardo Tool, noch nicht gebaut |
+
+## Matchmaker.Status (Tab «Matchmaker» im ANALYSE TOOL)
+
+| Wert | Bedeutung | Gesetzt von |
+|---|---|---|
+| `Offen` | liegt im Regal «Matchmaker», Kundschaft hat es noch nicht geholt | `abschliessen` (Kanal Matchmaker); `mmGeholt_`, wenn der Auftrag zurück in die Liste kommt |
+| `Geholt` | der Suchauftrag ist im Matchmaker Sheet «Geholt» (Tab «Erledigt», Stück im Vermerk «Aus Analyse»). Das Stück ist vergeben | `mmGeholt_` im Abgleich (seit 24.10.2026, Vertrag V5), nur aus `Offen` |
+| `Nicht geklappt` | Wiedereinstieg: der Auftrag hat nicht geklappt | `abschliessen` (nachMm) über `mmStatus_`, nur aus `Offen` |
+| `Ricardo` | im Ricardo Tool nach Matchmaker gestartet | Ricardo Tool |
+| `Auf Ricardo` | der Abgleich hat nachgeführt (Regal «Ricardo Offline», Vermerk) | `mmNachRicardo_`, nur Zeilen, die in der Sperre noch `Ricardo` heissen |
 
 ## Bestellliste.Status (Dropdown)
 

@@ -8,6 +8,18 @@ Technische Doku (Code, Datenmodell, Stati, Prompts, APIs, Entscheid-Log): GitHub
 
 Ein Schritt pro Bildschirm. Der Server legt pro Produkt fest, welche Schritte es gibt, und fällt das Urteil. Die Analyse-Person triagiert nicht. Nichts wird defekt verkauft. Die Schrittleiste ist anklickbar, abschliessen geht erst, wenn alle Pflichtschritte erledigt sind.
 
+## Start: Stück finden (Stand 24.10.2026)
+
+| Eingabe | Was passiert |
+|---|---|
+| PG-ID scannen oder eintippen | Passt sie genau zu einem offenen Stück, startet die Analyse sofort. |
+| Barcode scannen oder Name eingeben | Immer eine Liste: PG-ID auf dem Etikett vergleichen und das richtige Stück starten. Weitere Stücke mit diesem Barcode im Return Tool stehen darunter («Übernehmen und analysieren»). |
+| Stück nicht in der Warteschlange | Treffer im Return Tool mit PG-ID übernehmen. Erledigte Stücke: «Retoure? Neu analysieren» (mit Rückfrage, neue Analyse, die alte bleibt). |
+| Stück schon von jemand anderem analysiert | Die eigene Analyse wird nicht gespeichert, sie liegt unter «Pausiert» mit Kürzel und Zeit der ersten Analyse. Am Stück prüfen, dann abbrechen oder Jonas melden. |
+| Angaben zum Produkt haben sich geändert (z.B. Handbuch gelesen) | Die Analyse liegt unter «Pausiert» und geht beim geänderten Schritt weiter; Antworten bleiben, wo die Namen gleich sind. |
+
+Nur in einem Browser-Tab arbeiten (ein zweites Tab zeigt eine Warnung).
+
 ## Schritte
 
 | Nr. | Schritt | Inhalt | Entfällt wenn |

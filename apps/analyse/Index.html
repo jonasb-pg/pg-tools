@@ -1039,11 +1039,12 @@
     if (AN && AN.seit) { var jetzt = Date.now(); AN.aktiv += jetzt - AN.seit; AN.seit = jetzt; }
     var alt = null;
     try { alt = JSON.parse(lies('at-lauf') || 'null'); } catch (e) { alt = null; }
-    var fremd = alt && alt.d && alt.d.produkt && alt.s && alt.tab && alt.tab !== TAB_ID && (!AN || alt.lauf !== AN.lauf);
-    if (fremd && !AN) return;
-    if (fremd) { zuPausiert(alt, K, ''); zweiterTab(); }
-    if (AN) AN.tab = TAB_ID;
-    merke('at-lauf', AN ? JSON.stringify(AN) : null);
+    var gueltig = !!(alt && alt.d && alt.d.produkt && alt.s);
+    var meins = gueltig && (alt.tab === TAB_ID || (!!AN && ((alt.lauf && alt.lauf === AN.lauf) || (!alt.lauf && alt.start === AN.start && alt.d.produkt.id === AN.d.produkt.id))));
+    if (!AN) { if (!gueltig || meins) merke('at-lauf', null); return; }        // die Analyse eines anderen Tabs bleibt stehen
+    if (gueltig && !meins) { zuPausiert(alt, K, ''); if (alt.tab) zweiterTab(); }
+    AN.tab = TAB_ID;
+    merke('at-lauf', JSON.stringify(AN));
   }
   /* Eine Analyse unter «Pausiert» legen (ersetzt einen Eintrag mit derselben Lauf-ID oder demselben Stück und Kürzel). Gibt false zurück, wenn der Speicher voll ist. */
   function zuPausiert(a, k, fehler) {
@@ -2424,6 +2425,10 @@
   (function () {
     var logo = $('logo'), ohneLogo = function () { logo.hidden = true; $('wort').hidden = false; }, lauf = null;
     try { lauf = JSON.parse(lies('at-lauf')); } catch (e) { /* nicht lesbar: wird unten verworfen */ }
+    /* M5: Gehört die laufende Analyse einem anderen Tab, das gerade offen ist (Puls jünger als 7 s), bleibt sie dort: Dieses Tab beginnt leer. */
+    var puls = null;
+    try { puls = JSON.parse(lies('at-tab') || 'null'); } catch (e) { puls = null; }
+    var imAnderenTab = !!(lauf && lauf.tab && puls && puls.id === lauf.tab && puls.id !== TAB_ID && Date.now() - puls.t < 7000);
     if (lies('at-lang') === 'en') L = 'en';
     /* Das Kürzel gilt nur für heute: Am nächsten Tag meldet man sich neu an, damit die Schicht beginnt. Eine laufende Analyse behält es. */
     K = lies('at-kuerzel-tag') === heute() || lauf ? (lies('at-kuerzel') || '') : '';
@@ -2485,7 +2490,8 @@
       einmal = true;
       /* N6 (24.10.2026): Eine laufende Analyse bleibt auch nach einer neuen Version (früher verworfen, wenn VERSION nicht passte; die alte Konstante wurde nie erhöht).
          Passt der Überblick nicht mehr, merkt es der Server beim Abschluss an den Namen der Schritte. */
-      if (lauf && lauf.d && lauf.d.produkt && lauf.s) { AN = lauf; if (!AN.lauf) AN.lauf = neuLauf(); AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; sichern(); zeichneAnalyse(); }
+      if (imAnderenTab) { /* läuft im anderen Tab weiter */ }
+      else if (lauf && lauf.d && lauf.d.produkt && lauf.s) { AN = lauf; if (!AN.lauf) AN.lauf = neuLauf(); AN.seit = AN.seit ? Date.now() : null; if (AN.mm && AN.mm.laeuft) AN.mm = null; sichern(); zeichneAnalyse(); }
       else merke('at-lauf', null);      // ein Abgleich, der beim Neuladen lief, startet neu
       if (!K) { $('start').hidden = false; $('kuerzel').focus(); } else if (!AN) $('q').focus();
     };
