@@ -9,7 +9,7 @@ Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Pa
 1. **Setup**: Name, Quelle (Lagerorte aus dem Return Tool lesen oder Liste von Hand einfügen), Ziel-Gebinde.
    Gebinde-Arten: Verkauf an Abnehmer (Liste pro Abnehmer, gilt als verkauft), neue Palette im Lager (nur Lagerort neu), Entsorgung (Preis 0).
    Preisregel pro Gebinde: VP, % vom VP, 0 (gratis); pro Stück überschreibbar. Vorschlag für die nächste freie Palette pro Kürzel (z.B. KID-13).
-2. **Scan**: Gebinde wählen, PG-ID oder Barcode scannen. Der Browser entscheidet sofort (✅ nur, wenn der Scan in der Warteschlange ist; ⚠️ schon zugeordnet / verschieben; ❌ rot mit tiefem Ton bei jeder Ablehnung), gespeichert wird im Hintergrund (Warteschlange, auch über ein Neuladen). Der Server prüft mit «vorher» auf Konflikte zwischen mehreren Scannern. Was nicht gespeichert wurde, steht in der roten Liste «Nicht gespeichert – nochmals scannen».
+2. **Scan** (seit 24.10.2026, Entscheid Jonas: «zuerst scannen, dann wählen, wo das Produkt hinkommt»): PG-ID oder Barcode scannen, das Stück erscheint gross und wartet; dann das Gebinde tippen (auch in der Kamera-Leiste). Ohne Tippen wird nichts gebucht. Ein neuer Scan ersetzt ein wartendes Stück (Hinweis «liegen gelassen»). Stück schon in einem anderen Gebinde: anderes Gebinde tippen = verschieben. Der Browser entscheidet beim Tippen sofort (✅ nur, wenn der Scan in der Warteschlange ist; ⚠️ schon zugeordnet / verschieben; ❌ rot mit tiefem Ton bei jeder Ablehnung), gespeichert wird im Hintergrund (Warteschlange, auch über ein Neuladen). Der Server prüft mit «vorher» auf Konflikte zwischen mehreren Scannern. Was nicht gespeichert wurde, steht in der roten Liste «Nicht gespeichert – nochmals scannen».
 3. **Abschluss**: Kontrolle, pro Abnehmer ein eigenes Sheet im Ordner «00_Claude-Eingang», Änderungsliste (Tab «Änderungen») fürs Return Tool, nicht gescannte Stücke als «Nicht gefunden – prüfen». Manuell eintragen und «erledigt» anhaken. Automatische Übertragung gesperrt, bis Jonas M. einverstanden ist und der Verkaufsablauf des Return Tools nachgebaut ist.
 4. **Verwerfen** (statt Abschluss, z.B. falsche Quelle): Status «Verworfen», Stücke und Lagerorte sind wieder frei. Ohne Scans jede Person, mit Scans nur Admins; nicht nach dem Abschluss.
 
@@ -69,3 +69,7 @@ Ziel: Nach dem Abschluss ein Knopf «Ins Return Tool übertragen» mit Vorschau.
 - Voraussetzung: Ok von Jonas M. für Schreibzugriff des Umpack Tools aufs Return Tool.
 - Die Datenbank hat dafür schon alles (Tab «Änderungen»: PG-ID, Aktion, Lagerort alt/neu, VP alt, Preis, Return-Tool-Tab, Erledigt). Neue Spalten (z.B. «Übertragen am», «Fehler») ergänzt «einrichten» ohne Umbau. Abgeschlossene Durchgänge von vorher lassen sich nachträglich übertragen.
 - Return Tool «Stationär»: Kopfzeile in Zeile 6 (☑, ID, …, Lagerort, Lief-Nr, → VERSCH.), Daten ab Zeile 7.
+
+## Tempo «Durchgang anlegen» (24.10.2026)
+
+`rtLesen_(e, art)`: «anlegen» (Quelle Return Tool) und «lagerorte» lesen die Quell-Tabs ganz, alle übrigen Tabs (Archive, Analyse, Scanner …) nur die Spalte «Lagerort» für die Belegt-Prüfung. «Gebinde ändern» liest überall nur «Lagerort». Liste von Hand und Abschluss lesen weiter alles (IDs über alle Tabs). Knöpfe «Speichern → Scan» und «Gebinde speichern» sind gesperrt, solange gespeichert wird.

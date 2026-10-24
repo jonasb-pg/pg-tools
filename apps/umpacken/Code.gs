@@ -27,7 +27,7 @@
  *  - Nicht gescannte Stücke kommen beim Abschluss als «Nicht gefunden – prüfen» in «Änderungen»; fremde Scans stehen im Log.
  */
 
-const VERSION = '2026-10-24.2';
+const VERSION = '2026-10-24.3';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -274,12 +274,32 @@ function start() {
  *  ohneId: Lagerort → Zeilen der Quell-Tabs mit Inhalt, aber ohne gültige ID (fallen nicht still heraus, das Setup zeigt sie),
  *  fehlend: Quell-Tabs, die fehlen oder nicht lesbar sind (Vertrag V4: Kopfzeile ohne ID, Bezeichnung oder Lagerort).
  */
-function rtLesen_(e) {
+function rtLesen_(e, art) {
+  /* art (24.10.2026, Jonas: «Durchgang anlegen speichert ultra langsam»): 'voll' (Vorgabe) = alle Tabs ganz (ids für Liste von Hand und Abschluss);
+     'quelle' = Quell-Tabs ganz, übrige Tabs nur die Spalte «Lagerort» (für belegte Orte); 'orte' = alle Tabs nur «Lagerort».
+     Die Archive sind die grössten Tabs: nur eine Spalte statt aller lesen spart den grössten Teil der Wartezeit. ids gibt es nur bei 'voll'. */
+  art = art || 'voll';
   const rt = SpreadsheetApp.openById(e['Return Tool ID'] || RT_ID), quell = {}, aus = { stuecke: [], orte: {}, ids: {}, ohneId: {}, fehlend: [] };
   String(e['Quell-Tabs'] || QUELL_TABS).split(',').map(function (t) { return t.trim(); }).filter(String).forEach(function (t) { quell[t] = false; });
+  const ortZaehlen = function (ort, tab) {
+    if (!ort) return;
+    const ok = ortKey_(ort), o = aus.orte[ok] = aus.orte[ok] || { ort: ort, anzahl: 0, tabs: {} };
+    o.anzahl++; o.tabs[tab] = (o.tabs[tab] || 0) + 1;
+  };
   rt.getSheets().forEach(function (sh) {
     const tab = sh.getName(), istQuelle = Object.prototype.hasOwnProperty.call(quell, tab), archiv = /^archiv/i.test(tab);
-    if (sh.getLastRow() < 2) { if (istQuelle) quell[tab] = true; return; }
+    const last = sh.getLastRow();
+    if (last < 2) { if (istQuelle) quell[tab] = true; return; }
+    const schlank = art === 'orte' || (art === 'quelle' && !istQuelle);
+    if (schlank) {
+      const breite = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(last, 15), breite).getValues();
+      let kk = -1, sp = -1;
+      for (let i = 0; i < kv.length; i++) { sp = kv[i].map(function (x) { return String(x).trim(); }).indexOf('Lagerort'); if (sp > -1) { kk = i; break; } }
+      if (kk < 0) return;
+      if (istQuelle) { const kp = kv[kk].map(function (x) { return String(x).trim(); }); if (kp.indexOf('ID') > -1 && kp.indexOf('Bezeichnung') > -1) quell[tab] = true; }
+      if (last > kk + 1) sh.getRange(kk + 2, sp + 1, last - kk - 1, 1).getValues().forEach(function (r) { ortZaehlen(String(r[0]).trim(), tab); });
+      return;
+    }
     const v = sh.getDataRange().getValues();
     let k = -1;
     for (let i = 0; i < Math.min(v.length, 15); i++) { if (v[i].map(function (x) { return String(x).trim(); }).indexOf('Lagerort') > -1) { k = i; break; } }
@@ -290,10 +310,7 @@ function rtLesen_(e) {
     for (let i = k + 1; i < v.length; i++) {
       const g = function (n) { return c(n) < 0 ? '' : v[i][c(n)]; };
       const ort = String(g('Lagerort')).trim(), id = String(g('ID') || '').trim(), name = String(g('Bezeichnung')).trim(), bc = String(g('Barcode')).replace(/^'/, '').trim();
-      if (ort) {
-        const ok = ortKey_(ort), o = aus.orte[ok] = aus.orte[ok] || { ort: ort, anzahl: 0, tabs: {} };
-        o.anzahl++; o.tabs[tab] = (o.tabs[tab] || 0) + 1;
-      }
+      ortZaehlen(ort, tab);
       if (!idGueltig_(id)) {
         if (quelle && (id || name || bc)) {
           const o = ort || '(ohne Lagerort)';
@@ -303,7 +320,7 @@ function rtLesen_(e) {
       }
       const vp = zahlOderNull_(g('VP'));
       const st = { id: id, barcode: bc, name: name, kat: String(g('Kategorie')).trim(), ovp: zahl_(g('OVP')), vp: vp, ort: ort, tab: tab, zeile: i + 1, archiv: archiv };
-      (aus.ids[pgNorm_(id)] = aus.ids[pgNorm_(id)] || []).push(st);
+      if (art === 'voll') (aus.ids[pgNorm_(id)] = aus.ids[pgNorm_(id)] || []).push(st);
       if (quelle) aus.stuecke.push(st);
     }
   });
@@ -373,7 +390,7 @@ function idsOffen_(ohne) {
  * fehlende Quell-Tabs. belegt = Schreibweisen der belegten Orte (der Browser vergleicht sie ohne Trennzeichen, wie ortKey_).
  */
 function lagerorte() {
-  const e = einst_(), rt = rtLesen_(e), je = {}, max = {};
+  const e = einst_(), rt = rtLesen_(e, 'quelle'), je = {}, max = {};
   const ort = function (o) { return je[o] = je[o] || { ort: o, anzahl: 0, ohneId: 0, tabs: {} }; };
   rt.stuecke.forEach(function (p) { const o = ort(p.ort || '(ohne Lagerort)'); o.anzahl++; o.tabs[p.tab] = true; });
   Object.keys(rt.ohneId).forEach(function (o) { ort(o).ohneId = rt.ohneId[o].length; });
@@ -489,7 +506,7 @@ function anlegen(s) {
   if (!name) throw new Error('Bitte dem Durchgang einen Namen geben.');
   const gebinde = gebindePruefen_(s.gebinde), e = einst_(), vorab = [];
   let rt;
-  try { rt = rtLesen_(e); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
+  try { rt = rtLesen_(e, s.quelle === 'manuell' ? 'voll' : 'quelle'); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
   let bestand;
   const orte = (s.lagerorte || []).map(String);
   if (s.quelle === 'manuell') {
@@ -553,7 +570,7 @@ function gebindeAendern(id, liste, stand) {
   if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   const neu = gebindePruefen_(liste);
   let rt;
-  try { rt = rtLesen_(einst_()); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
+  try { rt = rtLesen_(einst_(), 'orte'); } catch (err) { throw new Error('Das Return Tool ist nicht lesbar, belegte Lagerorte lassen sich nicht prüfen (' + (err && err.message) + ').'); }
   return gesperrt_(function () {
     /* Prüfung 24.10.2026: Status in der Sperre nochmals (Abschluss oder Verwerfen kann dazwischen gekommen sein) */
     const d2 = durchgang_(id);

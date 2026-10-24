@@ -52,6 +52,10 @@
   .gebinde-wahl { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-bottom:14px; }
   .gebinde-wahl button { text-align:left; border-radius:6px; padding:12px; text-transform:none; letter-spacing:0; line-height:1.3; }
   .gebinde-wahl button.an { background:var(--pink); border-width:4px; padding:10px; }
+  /* Scan zuerst, dann Ziel (Jonas 24.10.2026): wartet ein Stück, sind die Gebinde zum Tippen hervorgehoben */
+  .gebinde-wahl.bereit button { background:var(--pink-hell); border-width:4px; padding:10px; }
+  .meldung.warte { background:var(--weiss); border-width:4px; }
+  .hinweis-ablauf { font-weight:600; margin:0 0 8px; }
   .gebinde-wahl b { display:block; font-size:18px; } .gebinde-wahl small { display:block; color:var(--muted); font-weight:400; margin-top:4px; }
   #scan { height:64px; font-size:24px; font-family:var(--mono); }
   #rueck { min-height:60px; font-size:18px; }
@@ -78,8 +82,11 @@
   #kamera .zeile { display:flex; gap:8px; align-items:center; margin-top:8px; }
   #kamera .zeile b { flex:1; font-size:15px; line-height:1.25; }
   #kamera .zeile button { background:var(--weiss); }
+  #kamera .kam-ziele { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  #kamera .kam-ziele button { background:var(--weiss); text-transform:none; letter-spacing:0; padding:10px 12px; font-size:15px; }
+  #kamera .kam-ziele.bereit button { background:var(--pink); }
   #kamera .ok { color:#9ff0a8; } #kamera .warn { color:#ffe27a; } #kamera .stop { color:#ff9c9c; }
-  body.kam main { padding-bottom:calc(34vh + 90px); }
+  body.kam main { padding-bottom:calc(34vh + 150px); }
   .karte { overflow-x:auto; }
   @media (max-width: 800px) {
     .geb-zeile { grid-template-columns:1fr 1fr; } main { padding:12px; }
@@ -105,7 +112,7 @@
 <script>
 (function () {
   'use strict';
-  var V = { ansicht: 'start', start: null, D: null, setup: null, orte: null, aktiv: '', reiter: 'letzte', letzte: [], Q: [], qId: '', qLaeuft: false, haengt: null, rueck: null, offen: 0,
+  var V = { ansicht: 'start', start: null, D: null, setup: null, orte: null, aktiv: '', reiter: 'letzte', letzte: [], Q: [], qId: '', qLaeuft: false, haengt: null, rueck: null, offen: 0, wartet: null, anlegenLaeuft: false,
     qNr: 0, wTimer: null, waechter: 60000, ng: [], abfrageFehler: 0 };
   var NICHT_GEFUNDEN = 'Nicht gefunden – prüfen';
   function $(id) { return document.getElementById(id); }
@@ -262,17 +269,20 @@
     if (bel.length) { melde(belegtText(bel[0].lagerort) + '. Bitte einen freien Lagerort wählen.', true); zeichne(); return; }
     var n = 0; if (s.quelle === 'rt' && V.orte) V.orte.orte.forEach(function (o) { if (s.orte[o.ort]) n += o.anzahl; });
     var text = s.quelle === 'rt' ? orte.length + ' Lagerorte mit ' + n + ' Stücken (' + orte.join(', ') + ')' : 'die eingefügte Liste';
+    if (V.anlegenLaeuft) { melde('Der Durchgang wird schon angelegt. Bitte warten.'); return; }
     if (!confirm('Durchgang «' + s.name + '» anlegen?\n\nQuelle: ' + text + '\nGebinde: ' + s.gebinde.map(function (g) { return g.name + ' (' + g.art + (g.lagerort ? ', ' + g.lagerort : '') + ')'; }).join(', '))) return;
-    ruf('anlegen', [{ name: s.name, quelle: s.quelle, lagerorte: orte, liste: s.liste, gebinde: s.gebinde, kuerzel: K() }], function (d) { setzeD(d); V.setup = null; V.orte = null; V.ansicht = 'scan'; zeichne(); melde('Durchgang ' + d.id + ' angelegt: ' + d.bestand.length + ' Stücke.' + hinw(d), !!(d.hinweise && d.hinweise.length)); });
+    V.anlegenLaeuft = true; knopfSperren('anlegen', true); melde('Durchgang wird angelegt … das dauert einige Sekunden. Bitte nicht nochmals klicken.');
+    ruf('anlegen', [{ name: s.name, quelle: s.quelle, lagerorte: orte, liste: s.liste, gebinde: s.gebinde, kuerzel: K() }], function (d) { V.anlegenLaeuft = false; setzeD(d); V.setup = null; V.orte = null; V.ansicht = 'scan'; zeichne(); melde('Durchgang ' + d.id + ' angelegt: ' + d.bestand.length + ' Stücke.' + hinw(d), !!(d.hinweise && d.hinweise.length)); }, function (m) { V.anlegenLaeuft = false; knopfSperren('anlegen', false); melde(m, true); piep(false); });
   }
 
   /* ---------- 2 · Scan ---------- */
   /* Der Browser kennt Bestand und Zuordnung und entscheidet sofort. Gespeichert wird im Hintergrund (Warteschlange), der Server prüft noch einmal. */
   function setzeD(d) {
-    if (!V.D || V.D.id !== d.id) ngLaden(d.id);          // rote Liste «Nicht gespeichert» gehört zum Durchgang
+    if (!V.D || V.D.id !== d.id) { ngLaden(d.id); V.wartet = null; }          // rote Liste «Nicht gespeichert» gehört zum Durchgang
     V.D = d; V.idx = {}; V.bar = {}; V.geb = {};
     d.bestand.forEach(function (p) { V.idx[pgNorm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
     d.gebinde.forEach(function (g) { V.geb[g.id] = g; });
+    if (V.wartet && !V.idx[pgNorm(V.wartet.p.id)]) V.wartet = null;
     if (!V.geb[V.aktiv]) V.aktiv = lies('um-aktiv-' + d.id) || (d.gebinde[0] && d.gebinde[0].id) || '';
     if (!V.geb[V.aktiv]) V.aktiv = d.gebinde[0] ? d.gebinde[0].id : '';
     $('wo').textContent = d.id + ' · ' + d.name;
@@ -290,13 +300,14 @@
   }
   function scanSeite() {
     var d = V.D, z = d.zuordnung, zugeordnet = Object.keys(z).filter(function (k) { return V.idx[k]; }).length;
-    var wahl = d.gebinde.map(function (g) { var s = stand(g.id); return '<button class="' + (g.id === V.aktiv ? 'an' : '') + '" data-a="aktiv" data-v="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><span class="etikett ' + g.art + '">' + (g.art === 'Verkauf' ? 'Verkauf · ' + esc(g.abnehmer) : g.art === 'Lager' ? 'Lager' : 'Entsorgung') + '</span> ' + (g.lagerort ? '<span class="mono">' + esc(g.lagerort) + '</span>' : '') + '<small>' + s.n + ' Stück · ' + chf(s.t) + '</small></button>'; }).join('');
+    var wahl = d.gebinde.map(function (g) { var s = stand(g.id); return '<button data-a="ziel" data-v="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><span class="etikett ' + g.art + '">' + (g.art === 'Verkauf' ? 'Verkauf · ' + esc(g.abnehmer) : g.art === 'Lager' ? 'Lager' : 'Entsorgung') + '</span> ' + (g.lagerort ? '<span class="mono">' + esc(g.lagerort) + '</span>' : '') + '<small>' + s.n + ' Stück · ' + chf(s.t) + '</small></button>'; }).join('');
     return '<div class="schritte"><span>1 · Setup</span><span class="an">2 · Scan</span><span>3 · Abschluss</span></div>'
       + '<div id="ng-platz">' + ngHtml() + '</div>'
       + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Gebinde</h2><span class="still">' + zugeordnet + ' / ' + d.bestand.length + '</span></div>'
-      + '<div class="gebinde-wahl">' + wahl + '</div>'
+      + '<p class="hinweis-ablauf">1 · Stück scannen &nbsp; 2 · Gebinde tippen</p>'
       + '<div class="scan-reihe"><input type="text" id="scan" placeholder="PG-ID oder Barcode scannen" autocomplete="off" autocapitalize="characters" data-enter="scanne"><button class="pink" id="kamera-knopf" data-a="kamera">' + (KAM.an ? 'Kamera aus' : 'Kamera') + '</button></div>'
-      + '<div id="rueck">' + rueckHtml() + '</div></div>'
+      + '<div id="rueck">' + rueckHtml() + '</div>'
+      + '<div class="gebinde-wahl' + (V.wartet ? ' bereit' : '') + '">' + wahl + '</div></div>'
       + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt'], ['gebinde', 'Inhalt'], ['offen', 'Offen'], ['bearbeiten', 'Gebinde ändern']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
       + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Zum Abschluss</button><button data-a="verwerfen">Durchgang verwerfen</button></div></div>';
   }
@@ -355,8 +366,12 @@
     bearbLesen();
     if (V.Q.length) { melde('Zuerst fertig speichern, dann nochmals.', true); piep(false); return; }
     /* mit dem Gebinde-Stand, den dieses Gerät kennt: hat jemand anderes inzwischen geändert, lehnt der Server ab (Prüfung 24.10.2026) */
-    ruf('gebindeAendern', [V.D.id, V.bearb, V.D.gebindeStand || ''], function (d) { V.bearb = null; setzeD(d); ueberlagere(V.D.zuordnung); zeichne(); melde('Gebinde gespeichert.' + hinw(d), !!(d.hinweise && d.hinweise.length)); });
+    if (V.bearbLaeuft) return;
+    V.bearbLaeuft = true; knopfSperren('bearbSpeichern', true);
+    ruf('gebindeAendern', [V.D.id, V.bearb, V.D.gebindeStand || ''], function (d) { V.bearbLaeuft = false; V.bearb = null; setzeD(d); ueberlagere(V.D.zuordnung); zeichne(); melde('Gebinde gespeichert.' + hinw(d), !!(d.hinweise && d.hinweise.length)); },
+      function (m) { V.bearbLaeuft = false; knopfSperren('bearbSpeichern', false); melde(m, true); piep(false); });
   }
+  function knopfSperren(a, an) { Array.prototype.forEach.call(document.querySelectorAll('button[data-a="' + a + '"]'), function (b) { b.disabled = an; if (an) { b.setAttribute('data-text', b.textContent); b.textContent = 'Wird gespeichert …'; } else if (b.getAttribute('data-text')) b.textContent = b.getAttribute('data-text'); }); }
   function aktiv(id) { V.aktiv = id; KAM.sperreBis = 0; merke('um-aktiv-' + V.D.id, id); zeichne(); }     // Gebinde bewusst gewechselt: kurze Kamera-Sperre aufheben
   function reiter(r) { V.reiter = r; if (r !== 'bearbeiten') V.bearb = null; $('reiter-inhalt').innerHTML = reiterHtml(); Array.prototype.forEach.call(document.querySelectorAll('.reiter button'), function (b) { b.className = 'klein ' + (b.getAttribute('data-v') === r ? 'an' : ''); }); }
 
@@ -377,8 +392,7 @@
     V.scanErg = null;            // Ergebnis für die Kamera: { p, art: 'ok' | 'schon', bc } (Nach-Review 24.10.2026)
     if (!code) return;
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
-    var g = V.geb[V.aktiv];
-    if (!g) { ablehnen('Bitte zuerst ein Gebinde wählen.'); return; }
+    if (!d0()) return;
     var p = V.idx[pgNorm(code)], z = V.D.zuordnung, bc = '';
     if (!p && V.bar[bcKey(code)]) {
       var l = V.bar[bcKey(code)], frei = l.filter(function (x) { return !z[pgNorm(x.id)]; }), vp = {}, ort = {};
@@ -388,18 +402,43 @@
       if (Object.keys(ort).length > 1) { ablehnen('❌ ' + frei.length + ' freie Stücke mit diesem Barcode aus verschiedenen Lagerorten (' + Object.keys(ort).map(function (k) { return ort[k]; }).join(', ') + ')', ' PG-ID-Etikett scannen.'); return; }
       p = frei[0]; bc = code;
     }
-    if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Zur Seite legen.'); fremdMelden(code, g.id); return; }
-    var a = z[pgNorm(p.id)];
-    if (a && a.gebinde === g.id) { V.scanErg = { p: p, art: 'schon' }; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' ' + p.name }; $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return; }
-    if (a) {
-      V.rueck = { art: 'stop', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. NICHT verschoben. ',
-        knopf: '<div class="reihe" style="margin-top:8px"><button class="pink klein" data-a="verschieben" data-v="' + esc(p.id) + '">Nach ' + esc(g.name) + ' verschieben</button></div>' };
-      $('rueck').innerHTML = rueckHtml(); kamText(); piep(false); return;
+    if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Zur Seite legen.'); fremdMelden(code, ''); return; }
+    /* Scan zuerst, dann Ziel (Jonas 24.10.2026): das Stück wartet, bis ein Gebinde getippt wird. Ohne Tippen wird nichts gebucht. */
+    var a = z[pgNorm(p.id)], vorher = V.wartet;
+    V.scanErg = { p: p, art: 'warte', bc: !!bc };
+    if (vorher && pgNorm(vorher.p.id) === pgNorm(p.id)) { kamText(); return; }       // dasselbe Stück nochmals: wartet schon
+    V.wartet = { p: p, bc: bc };
+    var nicht = vorher ? ' Nicht zugeordnet und liegen gelassen: ' + vorher.p.id + ' (' + vorher.p.name + ').' : '';
+    V.rueck = a
+      ? { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. Anderes Gebinde tippen = verschieben.' + nicht }
+      : { art: 'warte', titel: '➜ ' + p.id + ' · ' + p.name, text: ' Aus ' + (p.ort || '–') + ' · ' + chf(p.vp) + '. Jetzt das Gebinde tippen.' + nicht };
+    piep(true); neuZeichnenScan(); zielHervor();
+  }
+  function d0() { return !!(V.D && V.D.gebinde && V.D.gebinde.length) || (ablehnen('Dieser Durchgang hat kein Gebinde.', ' Unten «Gebinde ändern».'), false); }
+  function zielHervor() {
+    var w = document.querySelector('.gebinde-wahl'); if (w) w.className = 'gebinde-wahl' + (V.wartet ? ' bereit' : '');
+    kamText();
+  }
+  /* Gebinde getippt: das wartende Stück dorthin (neu oder verschoben). */
+  function ziel(id) {
+    var g = V.geb[id]; if (!g) return;
+    KAM.sperreBis = 0;
+    var w = V.wartet;
+    if (!w) { ablehnen('Zuerst ein Stück scannen.', ' Dann das Gebinde tippen.'); return; }
+    var p = w.p, k = pgNorm(p.id), a = V.D.zuordnung[k], bc = w.bc;
+    if (a && bc) {
+      /* Barcode-Scan: das angezeigte Stück hat inzwischen jemand anderes gebucht → ein anderes freies Stück dieser EAN */
+      var frei = (V.bar[bcKey(bc)] || []).filter(function (x) { return !V.D.zuordnung[pgNorm(x.id)]; });
+      if (!frei.length) { V.wartet = null; zielHervor(); ablehnen('❌ Alle Stücke mit diesem Barcode sind schon zugeordnet', ' NICHT gebucht. PG-ID scannen.'); return; }
+      p = frei[0]; k = pgNorm(p.id); a = null;
     }
-    if (!setze(p, g.id, '', '', bc)) return;          // abgelehnt: setze meldet rot
+    if (a && a.gebinde === id) { V.wartet = null; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' Nichts geändert.' }; piep(false); neuZeichnenScan(); zielHervor(); return; }
+    if (a && bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals tippen.', null, true); return; }
+    if (!setze(p, id, '', a ? a.gebinde : '', a ? '' : bc)) return;          // abgelehnt: setze meldet rot
+    V.wartet = null;
     V.scanErg = { p: p, art: 'ok', bc: !!bc };
-    V.rueck = { art: 'ok', titel: '✅ ' + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + ' (aus ' + p.ort + ')' };
-    piep(true); neuZeichnenScan();
+    V.rueck = { art: 'ok', titel: '✅ ' + (a ? 'verschoben nach ' : '') + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + (a ? '' : ' (aus ' + p.ort + ')') };
+    piep(true); neuZeichnenScan(); zielHervor(); fokusScan();
   }
   /* Fremder Code (nicht in der Quelle): kommt über die Schlange ins Log des Servers (Prüfung 24.10.2026) */
   function fremdMelden(code, gid) {
@@ -670,7 +709,7 @@
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (st) {
       KAM.stream = st; KAM.an = true; KAM.sicht = {}; KAM.sperreBis = 0; KAM.eanZahl = {}; document.body.classList.add('kam');
       var k = $('kamera'); k.hidden = false;
-      k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Code in den Rahmen.</b><button class="klein" data-a="kamera">Kamera aus</button></div>';
+      k.innerHTML = '<video playsinline muted autoplay></video><div class="rahmen"></div><div class="zeile"><b id="kam-text">Stück in den Rahmen, dann Gebinde tippen.</b><button class="klein" data-a="kamera">Kamera aus</button></div><div class="kam-ziele" id="kam-ziele"></div>';
       var v = k.querySelector('video'); v.srcObject = st; var p = v.play(); if (p && p.catch) p.catch(function () {});
       if ($('kamera-knopf')) $('kamera-knopf').textContent = 'Kamera aus';
       kamText();
@@ -735,7 +774,7 @@
     var el = $('scan'); if (!el) return;
     el.value = code; scanne();
     var e = V.scanErg;
-    if (e && (e.art === 'ok' || e.art === 'schon')) {
+    if (e && (e.art === 'ok' || e.art === 'schon' || e.art === 'warte')) {
       /* Stück erkannt (gebucht oder schon in diesem Gebinde): es bleibt das Partner-Stück, sein zweiter Code bucht nicht.
          Eine EAN bucht erst nach 3 s Abwesenheit wieder (Nach-Review 24.10.2026: Erkennungslücke von 1 s buchte ein zweites Stück). */
       KAM.letzteP = { id: e.p.id, barcode: e.p.barcode };
@@ -757,9 +796,12 @@
   }
   function kamText() {
     var t = $('kam-text'); if (!t) return;
-    var g = V.geb && V.geb[V.aktiv], r = V.rueck;
-    t.className = r ? r.art : '';
-    t.textContent = (g ? 'In ' + g.name + ': ' : '') + (r && KAM.letzte ? r.titel : 'Code in den Rahmen.');
+    var r = V.rueck, w = V.wartet;
+    t.className = w ? 'warn' : r ? (r.art === 'warte' ? 'warn' : r.art) : '';
+    t.textContent = w ? '➜ ' + w.p.id + ' · ' + w.p.name + ': Gebinde tippen' : (r && KAM.letzte ? r.titel : 'Stück in den Rahmen, dann Gebinde tippen.');
+    /* Gebinde auch in der Kamera-Leiste: scannen und tippen, ohne zu scrollen (Jonas 24.10.2026) */
+    var zl = $('kam-ziele');
+    if (zl && V.D) { zl.className = 'kam-ziele' + (w ? ' bereit' : ''); zl.innerHTML = V.D.gebinde.map(function (g) { return '<button class="klein" data-a="ziel" data-v="' + esc(g.id) + '">' + esc(g.name) + '</button>'; }).join(''); }
   }
   function kameraAus() {
     KAM.an = false; clearTimeout(KAM.timer);
@@ -855,7 +897,7 @@
     else if (V.ansicht === 'abschluss') m.innerHTML = abschlussSeite();
   }
   var A = { zurStart: zurStart, oeffne: oeffne, neuerDurchgang: neuerDurchgang, gebDazu: gebDazu, gebWeg: gebWeg, vorschlag: vorschlag, alleOrte: alleOrte, keineOrte: keineOrte, anlegen: anlegen,
-    aktiv: aktiv, reiter: reiter, scanne: scanne, verschieben: verschieben, entfernen: entfernen, zumAbschluss: zumAbschluss, abschliessen: abschliessen, zurueckScan: zurueckScan, kopieren: kopieren,
+    aktiv: aktiv, ziel: ziel, reiter: reiter, scanne: scanne, verschieben: verschieben, entfernen: entfernen, zumAbschluss: zumAbschluss, abschliessen: abschliessen, zurueckScan: zurueckScan, kopieren: kopieren,
     bearbDazu: bearbDazu, bearbWeg: bearbWeg, bearbSpeichern: bearbSpeichern, kamera: kamera, qVerwerfen: qVerwerfen, verwerfen: verwerfen, ngWeg: ngWeg, ngAlle: ngAlle };
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-a]');

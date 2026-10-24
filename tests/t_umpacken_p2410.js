@@ -409,5 +409,30 @@ test('V6 Admins leer = nur das Konto, unter dem das Tool läuft; neues Sheet: Ad
   assert.strictEqual(tab(n.DB, 'Einstellungen').find(z => z[0] === 'Admins')[1], 'jonas@pg', 'neues Sheet: einrichtendes Konto eingetragen');
 });
 
+/* ---------- 24.10.2026 (Jonas: «Durchgang anlegen speichert ultra langsam»): Archive und andere Nicht-Quell-Tabs nur Spalte «Lagerort» ---------- */
+test('Schnell: anlegen und lagerorte lesen Nicht-Quell-Tabs nur über die Spalte Lagerort, gleiche Belegt-Prüfung', () => {
+  const n = lade(), { c, RT } = n, breit = [];
+  RT.getSheets().forEach(sh => { const g = sh.getDataRange; sh.getDataRange = () => { breit.push(sh.name); return g(); }; });
+  const o = c.lagerorte();
+  assert.ok(!breit.includes('Archiv Stationär'), 'lagerorte: Archiv nicht ganz gelesen: ' + breit.join(', '));
+  assert.ok(breit.includes('Stationär'), 'lagerorte: Quell-Tab ganz gelesen');
+  assert.ok(o.belegt.includes('KID-15') && o.naechste.KID === 'KID-16', 'Archiv-Lagerort zählt als belegt: ' + JSON.stringify(o.naechste));
+  breit.length = 0;
+  assert.throws(() => c.anlegen({ name: 'X', quelle: 'rt', lagerorte: ['KID-7'], gebinde: [lager('Neu', 'KID-15')], kuerzel: 'JB' }), /KID-15/, 'belegter Archiv-Ort abgelehnt');
+  const d = n.j(c.anlegen({ name: 'A', quelle: 'rt', lagerorte: ['KID-7'], gebinde: [lager('Neu', 'KID-20')], kuerzel: 'JB' }));
+  assert.ok(!breit.includes('Archiv Stationär'), 'anlegen: Archiv nicht ganz gelesen: ' + breit.join(', '));
+  assert.deepStrictEqual(d.bestand.map(p => p.id).sort(), ['PG-1', 'PG-2', 'PG-3', 'PG-4'], 'Bestand aus dem Quell-Tab vollständig');
+  breit.length = 0;
+  c.gebindeAendern(d.id, [lager('Neu', 'KID-20'), lager('Zwei', 'KID-21')], d.gebindeStand);
+  assert.strictEqual(breit.length, 0, 'gebindeAendern: kein Tab ganz gelesen: ' + breit.join(', '));
+  assert.throws(() => c.gebindeAendern(d.id, [lager('Neu', 'KID-20'), lager('Zwei', 'KID-21'), lager('Drei', 'KID 15')], c.laden(d.id).gebindeStand), /KID/, 'gebindeAendern: belegter Archiv-Ort abgelehnt');
+});
+test('Schnell: Liste von Hand liest weiter alles (IDs über alle Tabs)', () => {
+  const n = lade(), { c, RT } = n, breit = [];
+  RT.getSheets().forEach(sh => { const g = sh.getDataRange; sh.getDataRange = () => { breit.push(sh.name); return g(); }; });
+  try { c.anlegen({ name: 'M', quelle: 'manuell', liste: 'PG-1', gebinde: [lager('Neu', 'KID-20')], kuerzel: 'JB' }); } catch (e) { /* Ergebnis egal */ }
+  assert.ok(breit.includes('Archiv Stationär'), 'manuell: alle Tabs ganz');
+});
+
 console.log(fehler ? fehler + ' Fehler' : 't_umpacken_p2410 ok');
 process.exit(fehler ? 1 : 0);
