@@ -649,7 +649,7 @@
    
     'rt.s2': ['Rückzahlung gemacht', 'Refund made'], 'rt.s2.ok': ['CHF {0} zurückgezahlt am {1}', 'CHF {0} refunded on {1}'],
     'rt.s4': ['Was passiert mit dem Stück?', 'What happens to the item?'], 'rt.s4.ok': ['Entscheid: {0}', 'Decision: {0}'],
-    'rt.s3': ['Bei Ricardo storniert', 'Cancelled on Ricardo'], 'rt.s3.ok': ['Bei Ricardo storniert am {0}', 'Cancelled on Ricardo on {0}'],
+    'rt.s3': ['Bei Ricardo storniert', 'Cancelled on Ricardo'], 'rt.s3.link': ['Auf Ricardo stornieren', 'Cancel on Ricardo'], 'rt.s3.mail': ['Auf Ricardo die Stornierung anfragen. Der Schritt erledigt sich mit der Ricardo-Mail «Stornierungsanfrage eingereicht».', 'Request the cancellation on Ricardo. This step completes with the Ricardo mail «Stornierungsanfrage eingereicht».'], 'rt.s3.ok': ['Bei Ricardo storniert am {0}', 'Cancelled on Ricardo on {0}'],
     'rt.s3.frist': ['Provision zurückfordern bis {0} (noch {1} Tage)', 'Reclaim the commission by {0} ({1} days left)'], 'rt.s3.vorbei': ['Frist für die Provision war am {0}', 'The deadline for the commission was {0}'],
    
     'rt.f.eroeffnen': ['Retoure für {0} eröffnen (Grund: {1})? Der Verkauf zählt danach nicht mehr zum Umsatz.', 'Open a return for {0} (reason: {1})? The sale no longer counts towards revenue afterwards.'],
@@ -1370,7 +1370,8 @@
       var s = o.rueckzahlungAm ? ok(t('rt.s2.ok', esc(o.rueckzahlung), esc(o.rueckzahlungAm)))
         : '<div class="reihe" style="margin-bottom:8px">CHF <input type="text" id="rb-' + i + '" value="' + esc(o.betrag) + '" inputmode="decimal" style="width:110px;height:40px;font-size:15px"> <button class="haupt-knopf" onclick="retoureSchritt(' + i + ',\'rueckzahlung\')">' + t('rt.s2') + '</button></div>';
       if (o.ricardo) s += ok(t('rt.s3.ok', esc(o.ricardo)));
-      else s += '<div style="margin-bottom:8px"><button onclick="retoureSchritt(' + i + ',\'ricardo\')">' + t('rt.s3') + '</button><span class="klein">' + (o.ricardoTage == null ? '' : o.ricardoTage >= 0 ? t('rt.s3.frist', esc(o.ricardoFrist), o.ricardoTage) : t('rt.s3.vorbei', esc(o.ricardoFrist))) + '</span></div>';
+      /* 26.10.2026 (Jonas): auf Ricardo stornieren (Link), erledigt wird der Schritt durch die Ricardo-Mail «Stornierungsanfrage eingereicht» */
+      else s += '<div style="margin-bottom:8px">' + (o.stornoLink ? '<button' + akt('link', o.stornoLink) + '>' + t('rt.s3.link') + '</button>' : '') + '<span class="klein">' + t('rt.s3.mail') + '</span><span class="klein">' + (o.ricardoTage == null ? '' : o.ricardoTage >= 0 ? t('rt.s3.frist', esc(o.ricardoFrist), o.ricardoTage) : t('rt.s3.vorbei', esc(o.ricardoFrist))) + '</span></div>';
       if (o.entscheid) s += ok(t('rt.s4.ok', esc(t('f.e.' + o.entscheid))));
       else s += '<div><span class="klein" style="margin-bottom:4px">' + t('rt.s4') + '</span><div class="reihe">' + (RT.entscheide || []).map(function (e, j) { return '<button onclick="retoureEntscheid(' + i + ',' + j + ')">' + esc(t('f.e.' + e)) + '</button>'; }).join('') + '</div></div>';
       z += '<tr><td class="mono">' + esc(o.nr) + '<br>' + t('rt.seit', esc(o.eroeffnet)) + '</td>' +

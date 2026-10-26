@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-26.5';
+const VERSION = '2026-10-26.6';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2492,6 +2492,12 @@ function ricardoMail_(betreff, text) {
     return { art: 'Gebot', artikel: g(/ricardo\.ch\/de\/a\/(\d+)/), betrag: chf_(g(/aktuelle Verkaufspreis beträgt CHF\s*([\d'’.,]+-?)/)), anzahl: zi >= 0 ? Number(/(\d+)/.exec(zeilen[zi])[1]) : '',
       titel: titel };
   }
+  /* 26.10.2026 (Jonas): Stornierung über die Mail. «Stornierungsanfrage eingereicht - <Titel> - <Verkaufs-Nr>» = auf Ricardo storniert (Retoure: Schritt erledigt) */
+  if (/^Stornierungsanfrage eingereicht\b/i.test(betreff)) {
+    const gr = /Grund für die Stornierung\s*\n+\s*([^\n]+)/.exec(text);
+    return { art: 'Storno', artikel: g(/Artikel-Nr\.:\s*(\d+)/), verkauf: g(/Verkaufs-Nr\.:\s*(\d+)/) || ((/-\s*(\d{6,})\s*$/.exec(betreff) || [])[1] || ''),
+      referenz: g(/Referenz-Nr\.:\s*(\S+)/).replace(/^-$/, ''), grund: gr ? gr[1].trim() : '' };
+  }
   if (/hat angegeben, für folgenden Artikel bezahlt zu haben/.test(betreff)) {
     return { art: 'Bezahlt gemeldet', artikel: g(/Artikel-Nr\.:\s*(\d+)/), verkauf: g(/Verkaufs-Nr\.:\s*(\d+)/), kaeufer: (/^(\S+) hat angegeben/.exec(betreff) || [])[1] || '' };
   }
@@ -2548,13 +2554,15 @@ function mailsLesen_() {
   try {
     kopfPruefen_(sv, V_COLS); kopfPruefen_(sl, L_COLS); kopfPruefen_(si, I_COLS);
     let neuStand = stand, letzte = 0;
-    const k = karten_(sv, sl, si);
+    const k = karten_(sv, sl, si), stornos = [];
     g.mails.forEach(function (x) {
+      if (x.info.art === 'Storno') { stornos.push(x.info); return; }
       if (mailWirkung_(x.info, k, fragen)) verarbeitet++;
       if (x.datum.getTime() > neuStand) neuStand = x.datum.getTime();
       letzte = Math.max(letzte, x.datum.getTime());
     });
     k.schreiben();
+    stornos.forEach(function (i) { if (stornoAusMail_(i)) verarbeitet++; });
     /* 24.10.2026 (K7): erst nach dem Schreiben. Scheitert das Schreiben, zeigt die Mail-Kontrolle nicht fälschlich «Mails kommen an» */
     if (letzte) pr.setProperty(MAIL_LETZTE, String(Math.max(Number(pr.getProperty(MAIL_LETZTE)) || 0, letzte)));
     if (g.unecht) pr.setProperty(MAIL_UNECHT, String(Date.now()) + '|' + g.unecht);
@@ -3623,6 +3631,7 @@ function retouren() {
       eroeffnet: datum_(r['Eröffnet am']), grund: r['Grund'], notiz: r['Notiz'], iban: String(r['IBAN']),
       betrag: runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)).toFixed(2),
       rueckzahlung: r['Rückzahlung am'] ? Number(r['Rückzahlung CHF']).toFixed(2) : '', rueckzahlungAm: datum_(r['Rückzahlung am']),
+      stornoLink: r['Verkauf-Nr'] ? RICARDO_ORDER + 'cancelation/' + orderNr_(r['Verkauf-Nr']) + '/' : '',
       ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null,
       entscheid: String(r['Entscheid'] || '') };
   });
@@ -3724,9 +3733,26 @@ function rueckzahlungMail_(r) {
     Sind alle drei erledigt, ist die Retoure abgeschlossen. Entscheid Jonas 19.10.2026: gleiche Auswahl wie bei unverkauften Stücken. */
 /** bestaetigt: Review 24.10.2026, Rückzahlung über Preis + Porto (z.B. Rückporto) oder ohne bekannten Preis nur mit Bestätigung. */
 function retoureSchritt(rtNr, schritt, wert, bestaetigt) {
-  rtNr = String(rtNr).trim();
   const lock = sperre_(20000);
-  try {
+  try { retoureSchrittIntern_(rtNr, schritt, wert, bestaetigt); return retouren(); }
+  finally { lock.releaseLock(); }
+}
+/**
+ * 26.10.2026: Mail «Stornierungsanfrage eingereicht» erledigt bei einer offenen Retoure (gleiche Verkaufs-Nr) den Schritt «Bei Ricardo storniert».
+ * Läuft in der Sperre von mailsLesen_. Ohne offene Retoure: nur Log (unbezahlte Stornos laufen über «Täglich»). Gibt true zurück, wenn etwas geändert wurde.
+ */
+function stornoAusMail_(info) {
+  const vk = String(info.verkauf || '').trim();
+  if (!vk) return false;
+  const r = rZeilen_().filter(function (x) { return x['Status'] !== 'Abgeschlossen' && orderNr_(x['Verkauf-Nr']) === orderNr_(vk); })[0];
+  if (!r) { log_('Storno-Mail', String(info.referenz || ''), 'Stornierungsanfrage für Verkauf ' + vk + ' (' + (info.grund || 'ohne Grund') + '), keine offene Retoure.'); return false; }
+  if (r['Ricardo storniert am']) return false;
+  retoureSchrittIntern_(String(r['Retoure-Nr']), 'ricardo', '', true, info.datum instanceof Date ? info.datum : new Date());
+  return true;
+}
+function retoureSchrittIntern_(rtNr, schritt, wert, bestaetigt, am) {
+  rtNr = String(rtNr).trim();
+  {
     const ss = SpreadsheetApp.getActive(), rt = ss.getSheetByName(TAB_R), sl = ss.getSheetByName(TAB_L);
     const r = rZeilen_().filter(function (x) { return String(x['Retoure-Nr']) === rtNr; })[0];
     if (!r) throw new Error('Retoure ' + rtNr + ' nicht gefunden.');
@@ -3747,7 +3773,7 @@ function retoureSchritt(rtNr, schritt, wert, bestaetigt) {
       /* Prüfung 8: defekt zurück und wieder auf Ricardo nur mit Bestätigung */
       if (wert === 'Neu listen' && r['Grund'] === 'Defekt' && bestaetigt !== true) throw new Error('Bitte bestätigen: ' + rtNr + ' kam als «Defekt» zurück. Neu listen nur, wenn das Stück repariert und geprüft ist. «geprüft», Titel und Beschrieb werden geleert und müssen neu gemacht werden.');
       r[feld] = wert;
-    } else r[feld] = new Date();
+    } else r[feld] = am instanceof Date ? am : new Date();
     const fertig = r['Rückzahlung am'] && r['Ricardo storniert am'] && r['Entscheid'];
     if (fertig) { r['Status'] = 'Abgeschlossen'; r['Abgeschlossen am'] = new Date(); }
     rt.getRange(r._zeile, 1, 1, R_COLS.length).setValues([R_COLS.map(function (k) { return r[k]; })]);
@@ -3762,9 +3788,8 @@ function retoureSchritt(rtNr, schritt, wert, bestaetigt) {
         }
       }
     }
-    log_('Retoure ' + schritt, String(r['PG-ID']), rtNr + (wert ? ' ' + wert : ''));
-    return retouren();
-  } finally { lock.releaseLock(); }
+    log_('Retoure ' + schritt, String(r['PG-ID']), rtNr + (wert ? ' ' + wert : '') + (am ? ' (Ricardo-Mail)' : ''));
+  }
 }
 
 /**
