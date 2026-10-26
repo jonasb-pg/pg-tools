@@ -20,7 +20,7 @@ SCHICHT2 = {'art': 'schicht2', 'links': LINKS, 'verkaeufe': {'offen': OFFEN, 'zu
             'unverkauft': [{'id': 'PG-010', 'status': 'Unverkauft', 'name': 'Bügeleisen', 'ort': 'R1', 'link': 'https://www.ricardo.ch/de/a/neu-x-1300000010/', 'artikel': '1300000010', 'kopieren': 'https://www.ricardo.ch/de/list/?prefill=1300000010'}],
             'ohneMail': [{'id': 'PG-011', 'name': 'Schläger', 'link': 'https://www.ricardo.ch/de/a/neu-y-1300000011/', 'ende': '18.10.2026'}], 'regale': {}}
 SCHICHT3 = {'art': 'schicht3', 'links': LINKS, 'versand': [dict(OFFEN[0], status='Bereit zum Versand', sendung='99.60.123456.12345678')], 'warten': [dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000009'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000010'), dict(OFFEN[1], status='Wartet auf Zahlung', nr='50000011')], 'regale': {}}
-SCHICHT1 = {'art': 'schicht1', 'links': LINKS, 'bereit': [{'id': 'PG-010', 'status': 'Bereit', 'name': 'Bügeleisen', 'ort': 'R1', 'regal': 'Ricardo Offline', 'wieder': True}], 'analyse': 1, 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6, 'regale': {},
+SCHICHT1 = {'art': 'schicht1', 'links': LINKS, 'bereit': [{'id': 'PG-010', 'status': 'Bereit', 'name': 'Bügeleisen', 'ort': 'R1', 'regal': 'Ricardo Offline', 'wieder': True}, {'id': 'PG-020', 'status': 'In Arbeit', 'name': 'Wasserkocher', 'ort': 'R2', 'regal': 'Ricardo Offline', 'wieder': False}], 'analyse': 1, 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6, 'regale': {},
             'entscheide': ['Neu listen', 'Anderer Kanal', 'Entsorgung'], 'unverkauft': [{'id': 'PG-012', 'status': 'Unverkauft', 'name': 'Lampe', 'ort': 'R2', 'link': 'https://www.ricardo.ch/de/a/neu-x-1300000012/', 'artikel': '1300000012', 'kopieren': ''}],
             'ohneMail': [{'id': 'PG-011', 'name': 'Schläger', 'ort': 'R3', 'link': 'https://www.ricardo.ch/de/a/neu-y-1300000011/', 'ende': '18.10.2026'}]}
 R = {'id': 'PG-100', 'status': 'In Arbeit', 'ean': '076', 'bezeichnung': 'Toaster X', 'neupreis': 80, 'startpreis': '40.00', 'lagerort': 'H3', 'zustand': 'Gebraucht', 'maengel': '',
@@ -87,8 +87,13 @@ with sync_playwright() as p:
     s.click('#nav-f-schicht1'); s.wait_for_timeout(400)
     t = s.text_content('#f-schritte')
     zeilen = s.locator('#f-schritte .f-eintrag').all_inner_texts()
-    ok(len(zeilen) == 4 and 'Bügeleisen' in zeilen[0] and 'Toaster X' in zeilen[1] and 'Schläger' in t and 'Lampe' in t, 'Listing: eine Liste, angefangene zuoberst, Analyse ohne Doppel, abgelaufene und unverkaufte')
+    ok(len(zeilen) == 5 and 'Bügeleisen' in zeilen[0] and 'Wasserkocher' in zeilen[1] and 'Toaster X' in zeilen[2] and 'Schläger' in t and 'Lampe' in t, 'Listing: eine Liste, angefangene zuoberst, Analyse ohne Doppel, abgelaufene und unverkaufte')
     ok('angefangen' not in t.lower() and 'In Arbeit' not in t, 'Kein Sonderstatus «angefangen» / «In Arbeit»')
+    # 26.10.2026: angefangene Listings normal in der Liste, mit «Abbrechen» (keine Leichen)
+    ok(s.locator('#f-schritte .f-eintrag:has-text("Wasserkocher") button:text-is("Abbrechen")').count() == 1 and s.locator('#f-schritte .f-eintrag:has-text("Toaster X") button:text-is("Abbrechen")').count() == 0, 'Angefangenes Listing: Knopf «Abbrechen», andere nicht')
+    s.click('#f-schritte .f-eintrag:has-text("Wasserkocher") button:text-is("Abbrechen")'); s.wait_for_timeout(150)
+    s.click('#dialog-ja'); s.wait_for_timeout(300)
+    ok(['setzeStatus', ['PG-020', 'Abgebrochen']] in A(), 'Abbrechen setzt «Abgebrochen»')
     ok(s.locator('#f-schritte #such-karte').count() == 1 and s.evaluate("document.querySelector('#f-schritte > *').contains(document.getElementById('such-karte'))"), 'Suchfeld zuoberst, Liste darunter')
     ok('Anderes Stück' not in t and s.evaluate("document.activeElement.id") == 'q', 'Keine Überschrift «Anderes Stück», Fokus im Suchfeld')
     s.click('#f-schritte .f-eintrag:has-text("Toaster X") button'); s.wait_for_timeout(300)
@@ -112,7 +117,7 @@ with sync_playwright() as p:
     s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
     s.click('#f-schritte .f-eintrag:has-text("Toaster X") button'); s.wait_for_timeout(300)
     s.click('#f-leiste button:has-text("Zur Liste")'); s.wait_for_timeout(300)
-    ok(not [x for x in A() if x[0] in ('listingVerwerfen', 'setzeStatus')], 'Listing verlassen ohne «Gelistet»: bleibt offen, nichts verworfen (21.10.2026)')
+    ok(not [x for x in A() if x[0] == 'listingVerwerfen' or (x[0] == 'setzeStatus' and x[1] != ['PG-020', 'Abgebrochen'])], 'Listing verlassen ohne «Gelistet»: bleibt offen, nichts verworfen (21.10.2026)')
     # ---------- Packen ----------
     s.click('#nav-f-schicht2'); s.wait_for_timeout(300)
     t = s.text_content('#f-schritte')
