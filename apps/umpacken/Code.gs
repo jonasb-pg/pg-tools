@@ -27,7 +27,7 @@
  *  - Nicht gescannte Stücke kommen beim Abschluss als «Nicht gefunden – prüfen» in «Änderungen»; fremde Scans stehen im Log.
  */
 
-const VERSION = '2026-10-26.1';
+const VERSION = '2026-10-26.2';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -976,6 +976,74 @@ function erledigt(id, zeilen, wert) {
     if (fehlt.length) throw new Error('In den Änderungen von ' + id + ' nicht eindeutig gefunden: ' + kurz_(fehlt) + '. Nichts gesetzt, bitte neu laden.');
     setz_('Änderungen', aend);
     return aenderungenVon_(id);
+  });
+}
+
+/**
+ * 26.10.2026 (Jonas: «Das soll automatisch im Return Sheet passieren»): Übertrag eines abgeschlossenen Durchgangs ins Return Tool.
+ * Für jede offene Änderung «Lagerort ändern» und «Verkaufen»: Lagerort in der Zeile des Stücks auf «Lagerort neu» setzen (beim Verkauf der Lagerort
+ * des Abnehmer-Gebindes, z.B. BALU1). Danach im Return Tool «Lagerort(e) markieren» → «Lieferung erstellen»: so wird der Verkauf wie bisher gebucht.
+ * Jede Zeile wird geprüft: ID in der gemerkten Zeile (sonst eindeutig im Tab gesucht) und Lagerort noch «Lagerort alt» (steht schon der neue: nur abhaken).
+ * Abweichungen: nichts schreiben, als Fehler zurückgeben. Geschriebene Zeilen werden in «Änderungen» abgehakt («… (automatisch)»).
+ * «Nicht gefunden – prüfen» und «Entsorgen» werden nicht angefasst.
+ */
+function uebertragen(id) {
+  id = String(id || '').trim();
+  const d = durchgang_(id);
+  if (String(d['Status']) !== 'Abgeschlossen') throw new Error('Durchgang ' + id + ' ist nicht abgeschlossen (Status: ' + d['Status'] + ').');
+  const e = einst_(), rt = SpreadsheetApp.openById(e['Return Tool ID'] || RT_ID), tabs = {};
+  const tab = function (name) {
+    if (tabs[name] !== undefined) return tabs[name];
+    const sh = rt.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return (tabs[name] = null);
+    const breite = sh.getLastColumn(), kv = sh.getRange(1, 1, Math.min(sh.getLastRow(), 15), breite).getValues();
+    let hz = -1, cId = -1, cOrt = -1;
+    for (let i = 0; i < kv.length; i++) {
+      const k = kv[i].map(function (x) { return String(x).trim(); });
+      if (k.indexOf('Lagerort') > -1 && k.indexOf('ID') > -1) { hz = i + 1; cId = k.indexOf('ID') + 1; cOrt = k.indexOf('Lagerort') + 1; break; }
+    }
+    if (hz < 0) return (tabs[name] = null);
+    const n = sh.getLastRow() - hz, ids = n > 0 ? sh.getRange(hz + 1, cId, n, 1).getValues().map(function (r) { return norm_(r[0]); }) : [];
+    const orte = n > 0 ? sh.getRange(hz + 1, cOrt, n, 1).getValues().map(function (r) { return String(r[0]).trim(); }) : [];
+    return (tabs[name] = { sh: sh, hz: hz, cOrt: cOrt, ids: ids, orte: orte });
+  };
+  return gesperrt_(function () {
+    const offen = lies_('Änderungen').z.filter(function (r) {
+      return String(r['Durchgang']) === id && !String(r['Erledigt'] || '').trim() && (r['Aktion'] === 'Verkaufen' || r['Aktion'] === 'Lagerort ändern');
+    });
+    const aend = [], fehler = [], t = zeit_() + ' ' + (ich_() || einrichter_()) + ' (automatisch)';
+    let geschrieben = 0, schon = 0;
+    offen.forEach(function (r) {
+      const pg = String(r['PG-ID']), k = norm_(pg), ziel = ortName_(r['Lagerort neu']), x = tab(String(r['Return-Tool-Tab'] || '').trim());
+      if (!ziel) { fehler.push(pg + ': kein neuer Lagerort'); return; }
+      if (!x) { fehler.push(pg + ': Tab «' + r['Return-Tool-Tab'] + '» nicht lesbar'); return; }
+      let i = Number(r['Zeile']) - x.hz - 1;
+      if (!(i >= 0 && x.ids[i] === k)) {
+        const l = []; x.ids.forEach(function (v, j) { if (v === k) l.push(j); });
+        if (l.length !== 1) { fehler.push(pg + ': im Tab «' + r['Return-Tool-Tab'] + '» ' + (l.length ? l.length + '-mal' : 'nicht') + ' gefunden'); return; }
+        i = l[0];
+      }
+      const jetzt = x.orte[i];
+      if (ortKey_(jetzt) === ortKey_(ziel)) { schon++; aend.push({ _r: r._r, 'Erledigt': t }); return; }
+      if (ortKey_(jetzt) !== ortKey_(r['Lagerort alt'])) { fehler.push(pg + ': Lagerort ist «' + jetzt + '», erwartet «' + r['Lagerort alt'] + '»'); return; }
+      x.sh.getRange(x.hz + 1 + i, x.cOrt).setValue(ziel);
+      x.orte[i] = ziel; geschrieben++;
+      aend.push({ _r: r._r, 'Erledigt': t });
+    });
+    if (aend.length) setz_('Änderungen', aend);
+    log_('Übertrag Return Tool', id, geschrieben + ' Lagerorte geschrieben, ' + schon + ' schon richtig' + (fehler.length ? ', ' + fehler.length + ' nicht übertragen: ' + kurz_(fehler, 20) : ''));
+    return { geschrieben: geschrieben, schon: schon, fehler: fehler };
+  });
+}
+/** Im Editor ausführen: alle abgeschlossenen Durchgänge mit offenen Lagerort-/Verkauf-Änderungen übertragen. Ergebnis im Ausführungsprotokoll. */
+function uebertragenAlle() {
+  const offen = {};
+  lies_('Änderungen').z.forEach(function (r) { if (!String(r['Erledigt'] || '').trim() && (r['Aktion'] === 'Verkaufen' || r['Aktion'] === 'Lagerort ändern')) offen[String(r['Durchgang'])] = true; });
+  lies_('Durchgänge').z.forEach(function (d) {
+    const id = String(d['Durchgang']);
+    if (!offen[id] || String(d['Status']) !== 'Abgeschlossen') return;
+    const x = uebertragen(id);
+    console.log(id + ': ' + x.geschrieben + ' geschrieben, ' + x.schon + ' schon richtig, ' + x.fehler.length + ' Fehler' + (x.fehler.length ? ': ' + x.fehler.join(' | ') : ''));
   });
 }
 

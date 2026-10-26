@@ -445,5 +445,27 @@ test('Lagerort aus dem Namen', () => {
   assert.throws(() => c.anlegen({ name: 'C', quelle: 'rt', lagerorte: ['KID-12'], gebinde: [{ name: 'KID 15', art: 'Lager', lagerort: '', preisregel: 'VP' }], kuerzel: 'SI' }), /KID-15.*belegt|belegt.*KID-15/, 'belegter Ort aus dem Namen wird abgelehnt');
 });
 
+/* ---------- 26.10.2026 (Jonas): Übertrag eines abgeschlossenen Durchgangs ins Return Tool ---------- */
+test('Übertrag: Lagerort ändern und Verkaufen schreiben den Lagerort, Abweichungen bleiben stehen, «Nicht gefunden» unberührt', () => {
+  const n = lade(), { c, RT, DB } = n;
+  const verkauf = { name: 'Balu 1', art: 'Verkauf', abnehmer: 'Balu', lagerort: 'BALU1', preisregel: 'VP' };
+  const d = n.j(c.anlegen({ name: 'U', quelle: 'rt', lagerorte: ['KID-7'], gebinde: [lager('Neu', 'KID-20'), verkauf], kuerzel: 'JB' }));
+  assert.throws(() => c.uebertragen(d.id), /nicht abgeschlossen/);
+  c.zuordnen(d.id, [{ id: 'PG-1', gebinde: d.gebinde[0].id, vorher: '' }, { id: 'PG-2', gebinde: d.gebinde[0].id, vorher: '' }, { id: 'PG-3', gebinde: d.gebinde[1].id, vorher: '' }], 'JB');
+  c.abschliessen(d.id, 'JB', true);
+  const st = RT.getSheetByName('Stationär').v, ort = id => st.find(r => r[1] === id)[13];
+  st.find(r => r[1] === 'PG-2')[13] = 'HOM-1';                      // inzwischen von Hand verschoben: nicht überschreiben
+  const x = n.j(c.uebertragen(d.id));
+  assert.strictEqual(ort('PG-1'), 'KID-20'); assert.strictEqual(ort('PG-3'), 'BALU1');
+  assert.strictEqual(ort('PG-2'), 'HOM-1', 'Abweichung: nicht geschrieben'); assert.strictEqual(ort('PG-4'), 'KID-7', 'nicht gescannt: bleibt');
+  assert.ok(x.geschrieben === 2 && x.fehler.length === 1 && /PG-2: Lagerort ist «HOM-1», erwartet «KID-7»/.test(x.fehler[0]), JSON.stringify(x));
+  const ae = tab(DB, 'Änderungen'), k = ae[0], erl = id => ae.find(r => r[k.indexOf('PG-ID')] === id)[k.indexOf('Erledigt')];
+  assert.ok(/automatisch/.test(erl('PG-1')) && /automatisch/.test(erl('PG-3')) && !erl('PG-2') && !erl('PG-4'), 'nur übertragene Zeilen abgehakt');
+  const y = n.j(c.uebertragen(d.id));
+  assert.ok(y.geschrieben === 0 && y.schon === 0 && y.fehler.length === 1, 'zweiter Lauf: nichts doppelt');
+  st.find(r => r[1] === 'PG-2')[13] = 'KID-20';                     // steht schon richtig: nur abhaken
+  assert.ok(n.j(c.uebertragen(d.id)).schon === 1 && /automatisch/.test(erl('PG-2')), 'schon richtiger Lagerort: abgehakt, nicht geschrieben');
+});
+
 console.log(fehler ? fehler + ' Fehler' : 't_umpacken_p2410 ok');
 process.exit(fehler ? 1 : 0);
