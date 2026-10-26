@@ -31,6 +31,12 @@ kt = S.karten();
 S.c('mailWirkung_')(Object.assign({}, fr, { id: 'f1', datum: new Date(t0 + 180e3) }), kt, []); kt.schreiben();
 ok(S.G.d[1][1] === 181 && S.G.d[1][2] === 2 && S.pe('f1')['Art'] === 'Frage', 'Frage-Mail: Gebot nachgeführt, Anzahl bleibt, Frage im Posteingang');
 
+/* Frage ohne Gebots-Mail: «Aktuelles Gebot» kann der Startpreis sein → kein Eintrag. Gleiche Zeit: der höhere Betrag gilt */
+kt = S.karten();
+ok(S.c('mailWirkung_')(Object.assign({}, fr, { artikel: '2222222222', id: 'f2', datum: new Date() }), kt, []) === true && kt.gebot('2222222222', 50, '', new Date(), 'x') === false, 'Frage ohne Gebots-Mail: kein Gebot eingetragen');
+const tg = new Date(t0 + 240e3);
+kt.gebot('3333333333', 108.5, 27, tg, 'TV-Box'); kt.gebot('3333333333', 107.5, 27, tg, 'TV-Box'); kt.schreiben();
+ok(S.G.d.find(r => r[0] === '3333333333')[1] === 108.5 && !S.G.d.some(r => r[0] === '2222222222'), 'gleiche Zeit: höherer Betrag bleibt');
 /* Übersicht: Gebot beim gelisteten Stück, «Noch kein Gebot» beim anderen */
 S.neu();
 const u = S.c('uebersicht')(), a = u.liste.find(x => x.id === 'PG-100'), b = u.liste.find(x => x.id === 'PG-101');

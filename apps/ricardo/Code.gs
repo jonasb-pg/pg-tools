@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-26.1';
+const VERSION = '2026-10-26.2';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2659,9 +2659,13 @@ function karten_(sv, sl, si) {
       artikel = String(artikel || '').trim();
       if (!sg || !artikel || !(betrag > 0) || !(datum instanceof Date)) return false;
       let i = gIdx[artikel];
+      /* «Aktuelles Gebot» in einer Frage ohne Gebots-Mail kann der Startpreis sein (noch kein Gebot): nur bestehende Einträge nachführen */
+      if (i === undefined && (anzahl === '' || anzahl === undefined)) return false;
       if (i === undefined) { i = gRows.length; gRows.push([artikel, '', '', '', '']); gIdx[artikel] = i; }
       const r = gRows[i];
       if (r[3] instanceof Date && r[3].getTime() > datum.getTime()) return false;
+      /* gleiche Minute (Ricardo schickt mehrere Mails zur selben Zeit): der höhere Betrag gilt, ein Gebot sinkt nie */
+      if (r[3] instanceof Date && r[3].getTime() === datum.getTime() && Number(r[1]) > betrag) return false;
       r[1] = betrag; if (anzahl !== '' && anzahl !== undefined) r[2] = anzahl; r[3] = datum; if (titel) r[4] = String(titel).slice(0, 200);
       gGeaendert = true;
       return true;
