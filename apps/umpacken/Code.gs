@@ -32,7 +32,7 @@
  *  - Nicht gescannte Stücke kommen beim Abschluss als «Nicht gefunden – prüfen» in «Änderungen»; fremde Scans stehen im Log.
  */
 
-const VERSION = '2026-10-26.3';
+const VERSION = '2026-10-26.4';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool: lesen; schreiben nur der Übertrag (Spalte Lagerort)
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -780,7 +780,11 @@ function lieferung(id) {
       (archiv ? x.archiv : x.aktiv).push({ id: String(ids ? ids[i] : ''), anzahl: anz ? (anzOderNull_(anz[i]) || 1) : 1, lief: lief ? String(lief[i] || '') : '', status: stat ? String(stat[i] || '') : '', wert: wert ? zahl_(wert[i]) : 0, tab: sh.getName(), zeile: hz + 1 + i });
     });
   });
-  return { gebinde: Object.keys(ziele).map(function (k) {
+  return { gebinde: Object.keys(ziele).filter(function (k) {
+    /* Verkauf-Kanal ohne Stücke (z.B. leer gebliebene zweite Balu-Palette): nichts zu liefern, nicht anzeigen */
+    const g = ziele[k].g;
+    return ziele[k].archiv.length || ziele[k].aktiv.length || aend.some(function (r) { return String(r['Gebinde']) === String(g['Name']) && (r['Aktion'] === 'Verkaufen' || r['Aktion'] === TEILMENGE); });
+  }).map(function (k) {
     const x = ziele[k], g = x.g, erwartet = {}, unbekannt = {};
     let erwStueck = 0, erwTotal = 0, tmOffen = 0;
     aend.forEach(function (r) {
@@ -788,10 +792,10 @@ function lieferung(id) {
       if (r['Aktion'] === TEILMENGE && !String(r['Erledigt'] || '').trim()) tmOffen++;
       /* Durchgänge von vor 2026-10-26.3 haben keine «Anzahl»: dann gilt die Anzahl im Archiv (unbekannt = null) */
       const an = anzOderNull_(r['Anzahl']), n = an || anzOderNull_(r['Anzahl gesamt']), kk = norm_(r['PG-ID']);
-      if (!n) { unbekannt[kk] = true; erwartet[kk] = erwartet[kk] || 0; return; }
+      if (!n) { unbekannt[kk] = zahl_(r['Preis']); erwartet[kk] = erwartet[kk] || 0; return; }
       erwartet[kk] = (erwartet[kk] || 0) + n; erwStueck += n; erwTotal += n * zahl_(r['Preis']);
     });
-    Object.keys(unbekannt).forEach(function (kk) { const a = x.archiv.filter(function (r) { return norm_(r.id) === kk; }).reduce(function (s, r) { return s + r.anzahl; }, 0) || 1; erwartet[kk] = a; erwStueck += a; });
+    Object.keys(unbekannt).forEach(function (kk) { const a = x.archiv.filter(function (r) { return norm_(r.id) === kk; }).reduce(function (s, r) { return s + r.anzahl; }, 0) || 1; erwartet[kk] = a; erwStueck += a; erwTotal += a * unbekannt[kk]; });
     const proId = {}, doppelt = [];
     x.archiv.forEach(function (a) { const kk = norm_(a.id); if (proId[kk]) doppelt.push(a.id); proId[kk] = (proId[kk] || 0) + a.anzahl; });
     const fehlend = Object.keys(erwartet).filter(function (kk) { return !proId[kk] && !x.aktiv.some(function (a) { return norm_(a.id) === kk; }); });

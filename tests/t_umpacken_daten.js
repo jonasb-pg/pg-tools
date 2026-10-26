@@ -61,7 +61,7 @@ vm.createContext(c); vm.runInContext(fs.readFileSync(__dirname + '/../apps/umpac
 vm.runInContext('basisEinrichten_ = function () { return []; };', c);
 c.einrichten();
 const j = (x) => JSON.parse(JSON.stringify(x));
-assert.strictEqual(c.start().version, '2026-10-26.3');   // Prüfung 24.10.2026
+assert.strictEqual(c.start().version, '2026-10-26.4');   // Prüfung 24.10.2026
 
 /* S1 / M1: nächste Palette über alle Tabs (Scanner ohne ID, Analyse, Archiv), fehlende Quell-Tabs */
 let o = j(c.lagerorte());
