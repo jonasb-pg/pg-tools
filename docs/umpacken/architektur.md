@@ -1,29 +1,35 @@
 # Umpack Tool · Architektur
 
-Stand: Version `2026-10-24.2` (Code, nicht eingespielt; nach dem Einspielen sofort «einrichten» ausführen, ergänzt «Scan-ID» in «Zuordnung» und «Verworfen am/von» in «Durchgänge»; Umsetzung der Prüfung: [pruefung-2026-10-24.md](pruefung-2026-10-24.md)). Live: Version 2026-10-24.1 (Bereitstellung 5, 24.10.2026 09:41). Oberfläche schlank: keine Erklärtexte, kurze Meldungen (Wunsch Jonas). Link in TOOL LINKS. Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
+Stand: Version `2026-10-26.3` (Code, nicht eingespielt; nach dem Einspielen sofort «einrichten» ausführen: ergänzt «Anzahl» in «Bestand» und «Zuordnung», «Anzahl» und «Anzahl gesamt» in «Änderungen»). Live: Version 2026-10-26.1 (Bereitstellung 7); Code 2026-10-26.2 nur im Editor (Übertrag U-0003). Oberfläche schlank: keine Erklärtexte, kurze Meldungen (Wunsch Jonas). Link in TOOL LINKS. Code im Apps-Script-Projekt «Umpack Tool» (eigenständig, Konto jonas.b@pretty-good.ch, Projekt-ID 1VHq2IFZC4W6GRdvOPIYIKFHvrnL7CzlkPABe7_0xg4rOHGBt5hrcqisg). Datenbank: Sheet «(21/10/2026) UMPACK TOOL» (DB_ID im Code). Web-App: «Ausführen als Jonas», Zugriff «Jeder in Pretty Good»: Wer scannt, braucht keine eigenen Freigaben (Simon). Abnehmer-Listen sind für Pretty Good mit Link lesbar.
 
 ## Zweck
-Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst beim Abschluss nachgeführt.
+Paletten neu triagieren (Entscheid Jonas 21.10.2026): Stücke aus bestehenden Paletten herausnehmen und in neue Gebinde packen. Alle Entscheide im Tool, das Return Tool wird erst nach dem Abschluss nachgeführt (Übertrag).
+
+Begriffe (Jonas 26.10.2026): **Gebinde** = jede Palette, Kiste, Box. Ein Gebinde ist **Quelle** (von dort wird genommen, um zu triagieren) oder **Kanal** (dorthin wird triagiert, z.B. BALU1, KID-20).
 
 ## Ablauf eines Durchgangs
-1. **Setup**: Name, Quelle (Lagerorte aus dem Return Tool lesen oder Liste von Hand einfügen), Ziel-Gebinde.
+1. **Setup**: Name, Quelle (Lagerorte aus dem Return Tool lesen oder Liste von Hand einfügen), Kanal (Ziel-Gebinde). Der Bestand übernimmt die Anzahl (#) jeder Zeile.
    Gebinde-Arten: Verkauf an Abnehmer (Liste pro Abnehmer, gilt als verkauft), neue Palette im Lager (nur Lagerort neu), Entsorgung (Preis 0).
    Preisregel pro Gebinde: VP, % vom VP, 0 (gratis); pro Stück überschreibbar. Vorschlag für die nächste freie Palette pro Kürzel (z.B. KID-13).
 2. **Scan** (seit 24.10.2026, Entscheid Jonas: «zuerst scannen, dann wählen, wo das Produkt hinkommt»): PG-ID oder Barcode scannen, das Stück erscheint gross und wartet; dann das Gebinde tippen (auch in der Kamera-Leiste). Ohne Tippen wird nichts gebucht. Ein neuer Scan ersetzt ein wartendes Stück (Hinweis «liegen gelassen»). Stück schon in einem anderen Gebinde: anderes Gebinde tippen = verschieben. Der Browser entscheidet beim Tippen sofort (✅ nur, wenn der Scan in der Warteschlange ist; ⚠️ schon zugeordnet / verschieben; ❌ rot mit tiefem Ton bei jeder Ablehnung), gespeichert wird im Hintergrund (Warteschlange, auch über ein Neuladen). Der Server prüft mit «vorher» auf Konflikte zwischen mehreren Scannern. Was nicht gespeichert wurde, steht in der roten Liste «Nicht gespeichert – nochmals scannen».
-3. **Abschluss**: Kontrolle, pro Abnehmer ein eigenes Sheet im Ordner «00_Claude-Eingang», Änderungsliste (Tab «Änderungen») fürs Return Tool, nicht gescannte Stücke als «Nicht gefunden – prüfen». Manuell eintragen und «erledigt» anhaken. Automatische Übertragung gesperrt, bis Jonas M. einverstanden ist und der Verkaufsablauf des Return Tools nachgebaut ist.
-4. **Verwerfen** (statt Abschluss, z.B. falsche Quelle): Status «Verworfen», Stücke und Lagerorte sind wieder frei. Ohne Scans jede Person, mit Scans nur Admins; nicht nach dem Abschluss.
+   **Anzahl** (Jonas 26.10.2026): Hat die Zeile mehrere Stück, fragt das Tool nach dem Scan «wie viele packst du um?» (Zahlknöpfe bis 12, sonst Zahlfeld; am PC auch Zahl ins Scanfeld + Enter), erst dann Kanal tippen. Ein weiterer Scan zeigt, was schon umgepackt ist, und bietet nur noch den Rest an; alle umgepackt = rot. Stück einer Zeile dürfen auf mehrere Kanäle verteilt sein. Im Reiter «Inhalt» eine Zeile pro Kanal mit Anzahl (0 = entfernen) und Preis pro Stück.
+   **Quelle während des Scans**: «+ Gebinde» bei Quelle nimmt weitere Lagerorte dazu (geprüft: nicht schon Quelle, kein Kanal eines offenen Durchgangs, Stücke in keinem anderen offenen Durchgang, keine doppelten IDs); die anderen Handys laden über den Bestand-Stand neu. Ein Quell-Gebinde ohne Zuordnung lässt sich entfernen (Zeilen bleiben als «U-… (entfernt)»). **Fremder Scan**: das Tool sucht das Stück in den Quell-Tabs des Return Tools; steht es auf einer freien Palette, fragt es «als Quelle dazunehmen?» (Ja: Palette dazu, das Stück wartet auf den Kanal; Nein: zur Seite legen). **Kanal**: «+ Gebinde» öffnet «Kanal bearbeiten» mit einer neuen Zeile.
+3. **Abschluss**: Kontrolle (mit Liste der Teilmengen), pro Abnehmer ein eigenes Sheet im Ordner «00_Claude-Eingang» (Stück × Preis pro Stück), Änderungsliste (Tab «Änderungen», mit Anzahl und Anzahl gesamt), nicht gescannte Stücke als «Nicht gefunden – prüfen». Alle Stück einer Zeile im gleichen Kanal = normale Änderung. Nur ein Teil oder auf mehrere Kanäle verteilt = **«Teilmenge – aufteilen»** pro Kanal, der Rest als «Nicht gefunden – prüfen» mit Restmenge. Teilmengen belegen den Lagerort, bis sie abgehakt sind.
+4. **Übertrag** (Jonas 26.10.2026): Knopf «Ins Return Tool übertragen» mit Vorschau (Anzahl pro Ziel, Teilmengen, Abweichungen; die Vorschau schreibt nichts). Schreibt nur die Spalte «Lagerort» für «Lagerort ändern» und «Verkaufen», prüft ID in der Zeile (sonst eindeutig gesucht), alten Lagerort und Anzahl (#) seit dem Abschluss, hakt ab («… (automatisch)»), schreibt nie doppelt. Teilmengen lässt er aus (Variante A): Anleitung im Tool, im Return Tool von Hand aufteilen und abhaken. Verkauf danach im Return Tool: Lagerort markieren → «Lieferung erstellen», erst nach dem Übertrag und nur einmal.
+5. **Lieferung** (nur lesen): Pro Verkauf-Kanal liest das Tool, wo Zeilen mit dessen Lagerort stehen: noch nicht übertragen, noch nicht erstellt, unvollständig (teils im Archiv, teils noch aktiv: «nicht nochmals starten»), Abweichung (fehlt, fremd, Anzahl, doppelt) oder vollständig (Stück, Wert, Lief-Nr). Hintergrund: am 26.10.2026 löschte «Lieferung erstellen» bei BALU1 nur 55 von 86 Zeilen aus «Stationär».
+6. **Verwerfen** (statt Abschluss, z.B. falsche Quelle): Status «Verworfen», Stücke und Lagerorte sind wieder frei. Ohne Scans jede Person, mit Scans nur Admins; nicht nach dem Abschluss.
 
 ## Datenbank (eigenes Sheet)
-Durchgänge (Status Scan, Abgeschlossen, Verworfen; «Verworfen am/von») · Gebinde (gelöschte bleiben als «U-… (gelöscht)», Nummern nie wieder vergeben) · Bestand (Kopie der Quelle beim Setup; VP leer = im Return Tool leer oder unlesbar) · Zuordnung (Verlauf, letzte Zeile pro Stück gilt; «Scan-ID» = Kennung eines Barcode-Scans) · Änderungen · Log (auch «Fremder Scan») · Einstellungen.
+Durchgänge (Status Scan, Abgeschlossen, Verworfen; «Verworfen am/von») · Gebinde (gelöschte bleiben als «U-… (gelöscht)», Nummern nie wieder vergeben) · Bestand (Kopie der Quell-Gebinde mit Anzahl; VP leer = im Return Tool leer oder unlesbar; «U-… (entfernt)») · Zuordnung (Verlauf; Zeilen mit «Anzahl» setzen die Anzahl pro Stück und Gebinde, 0 = weg; Zeilen ohne «Anzahl» von vor 2026-10-26.3 gelten fürs ganze Stück; «Scan-ID» = Kennung des Vorgangs, eine Wiederholung bucht nichts doppelt) · Änderungen · Log (auch «Fremder Scan») · Einstellungen.
 
 ## Regeln
-- Das Return Tool wird nur gelesen (Setup). Kein Schreibzugriff im Code.
+- Das Return Tool wird gelesen. Geschrieben wird nur beim Übertrag, nur die Spalte «Lagerort» (Freigabe Jonas 26.10.2026).
 - Neue Lagerorte dürfen keine Quell-Lagerorte sein; zwei Gebinde nie mit gleichem Lagerort; doppelte IDs in der Quelle brechen das Setup ab.
 - Nicht gescannte Stücke bleiben, wo sie sind (keine Änderung im Return Tool); sie stehen als «Nicht gefunden – prüfen» in «Änderungen», sperren aber nichts.
 - Jeder schreibende Weg prüft den Status in der Sperre nochmals (Abschluss oder Verwerfen dazwischen: nichts wird mehr gebucht).
 - Admins (Wiederöffnen, Verwerfen mit Scans): Einstellung «Admins»; leer = nur das Konto, unter dem das Tool läuft (Jonas).
 
-Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche), tests/t_umpacken_daten.js und tests/t_umpacken_daten_ui.py (Datenintegrität), tests/t_umpacken_kamera.py (Kamera), Prüfung 24.10.2026: tests/t_umpacken_p2410.js (Server), tests/t_umpacken_p2410_ui.py (Oberfläche), tests/t_umpacken_p2410_kamera.py (Kamera-Sperren).
+Tests: tests/t_umpacken_anzahl.js und tests/t_umpacken_anzahl_ui.py (2026-10-26.3: Anzahl, Teilmengen, Quelle, fremder Scan, Übertrag, Lieferung), tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche), tests/t_umpacken_daten.js und tests/t_umpacken_daten_ui.py (Datenintegrität), tests/t_umpacken_kamera.py (Kamera), Prüfung 24.10.2026: tests/t_umpacken_p2410.js (Server), tests/t_umpacken_p2410_ui.py (Oberfläche), tests/t_umpacken_p2410_kamera.py (Kamera-Sperren).
 
 ## Datenintegrität (24.10.2026, nach Audit)
 | Punkt | Regel |
@@ -61,8 +67,8 @@ Tests: tests/t_umpacken.js (Server), tests/t_umpacken_ui.py (Oberfläche), tests
 - Im Return Tool stehen teils EANs als Lagerort (z.B. KID-4005176984105). Für «nächste Palette» zählen nur Nummern mit 1–4 Stellen; als belegt gelten sie trotzdem.
 - Tab «Tabellenblatt1» in der Datenbank ist leer und stört nicht.
 
-## Geplant: Übertragung ins Return Tool (Entscheid Jonas 22.10.2026)
-Ziel: Nach dem Abschluss ein Knopf «Ins Return Tool übertragen» mit Vorschau. Start mit Option B, später allenfalls C.
+## Übertragung ins Return Tool (Entscheid Jonas 22.10.2026, umgesetzt 26.10.2026 als Option B, siehe Ablauf Punkt 4)
+Ursprünglicher Plan, Option C (Verkauf selbst buchen) bleibt offen:
 - B: Lagerort (und Preis, wo er vom VP abweicht) pro Stück über die ID setzen. Verkauf der Abnehmer-Gebinde danach im Return Tool mit «Lieferung erstellen».
 - C: zusätzlich Verkauf wie «Lieferung erstellen» (Lief-Nr, Verschieben). Braucht den Code des Return Tools.
 - Sicherungen: Suche über ID (nie Zeile), vorher prüfen, ob «Lagerort alt» noch stimmt (sonst überspringen und melden), jede Änderung mit vorher/nachher ins Log, Zeilen in «Änderungen» bekommen «Erledigt», zweiter Klick schreibt nichts doppelt.

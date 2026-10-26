@@ -162,13 +162,13 @@ test('B15 einrichten ergänzt «Scan-ID», «Verworfen am/von» in bestehenden T
   const alt = { 'Zuordnung': [['Durchgang', 'PG-ID', 'Gebinde', 'Preis', 'Zeit', 'Kürzel'], ['U-0009', 'PG-1', 'U-0009-G1', '', 'x', 'JB']],
     'Durchgänge': [['Durchgang', 'Name', 'Status', 'Quelle', 'Quell-Lagerorte', 'Erstellt am', 'Erstellt von', 'Abgeschlossen am', 'Abgeschlossen von', 'Listen']] };
   const { c, DB } = lade({ db: alt });
-  assert.deepStrictEqual(tab(DB, 'Zuordnung')[0].slice(-1), ['Scan-ID']);
+  assert.deepStrictEqual(tab(DB, 'Zuordnung')[0].slice(-2), ['Scan-ID', 'Anzahl']);   // 2026-10-26.3: «Anzahl» dahinter
   assert.deepStrictEqual(tab(DB, 'Zuordnung')[1].slice(0, 2), ['U-0009', 'PG-1'], 'Daten bleiben');
   assert.deepStrictEqual(tab(DB, 'Durchgänge')[0].slice(-2), ['Verworfen am', 'Verworfen von']);
   /* Spalte fehlt (einrichten nicht gelaufen) */
   const { c: c2, DB: DB2, j } = lade();
   const d = j(c2.anlegen({ name: 'X', quelle: 'rt', lagerorte: ['KID-7'], gebinde: [lager('Neu', 'KID-20')] }));
-  tab(DB2, 'Zuordnung')[0].pop();
+  tab(DB2, 'Zuordnung')[0].pop(); tab(DB2, 'Zuordnung')[0].pop();      // «Anzahl» und «Scan-ID» weg
   assert.throws(() => c2.zuordnen(d.id, [{ id: 'PG-1', gebinde: d.gebinde[0].id, vorher: '' }], 'JB'), /Scan-ID» fehlt/);
 });
 

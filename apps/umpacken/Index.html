@@ -85,9 +85,21 @@
   #kamera .kam-ziele { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
   #kamera .kam-ziele button { background:var(--weiss); text-transform:none; letter-spacing:0; padding:10px 12px; font-size:15px; }
   #kamera .kam-ziele.bereit button { background:var(--pink); }
+  #kamera .kam-ziele.menge button { background:var(--gelb); font-size:18px; min-width:46px; }
   #kamera .ok { color:#9ff0a8; } #kamera .warn { color:#ffe27a; } #kamera .stop { color:#ff9c9c; }
   body.kam main { padding-bottom:calc(34vh + 150px); }
   .karte { overflow-x:auto; }
+  /* Anzahl (26.10.2026): Zahlknöpfe nach dem Scan eines Stücks mit mehreren Stück */
+  .mengen { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .mengen button { min-width:56px; font-size:20px; padding:12px 14px; background:var(--pink); }
+  .frage { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .quelle-zeile { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:0 0 10px; }
+  .quelle-zeile .etikett { background:var(--gelb); }
+  .bereich { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0 8px; }
+  .bereich h3 { margin:0; }
+  .lief { border:2px solid var(--ink); border-radius:4px; padding:10px 12px; margin:8px 0; }
+  .lief.vollstaendig { background:var(--gruen); } .lief.offen, .lief.leer { background:var(--gelb); } .lief.unvollstaendig, .lief.abweichung { background:var(--rot); }
+  .anleitung li { margin-bottom:6px; }
   @media (max-width: 800px) {
     .geb-zeile { grid-template-columns:1fr 1fr; } main { padding:12px; }
     header { padding:10px 12px; gap:8px; } header .rechts { margin-left:0; width:100%; } header h1 { font-size:17px; }
@@ -114,7 +126,7 @@
   'use strict';
   var V = { ansicht: 'start', start: null, D: null, setup: null, orte: null, aktiv: '', reiter: 'letzte', letzte: [], Q: [], qId: '', qLaeuft: false, haengt: null, rueck: null, offen: 0, wartet: null, anlegenLaeuft: false,
     qNr: 0, wTimer: null, waechter: 60000, ng: [], abfrageFehler: 0 };
-  var NICHT_GEFUNDEN = 'Nicht gefunden – prüfen';
+  var NICHT_GEFUNDEN = 'Nicht gefunden – prüfen', TEILMENGE = 'Teilmenge – aufteilen';
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function chf(n) { return 'CHF ' + (Math.round(Number(n || 0) * 100) / 100).toFixed(2); }
@@ -205,13 +217,13 @@
     }).join('');
     return '<div class="schritte"><span class="an">1 · Setup</span><span>2 · Scan</span><span>3 · Abschluss</span></div>'
       + '<div class="karte"><h2>Neuer Durchgang</h2><label for="s-name">Name</label><input type="text" id="s-name" value="' + esc(s.name) + '"></div>'
-      + '<div class="karte"><h3>Quelle</h3><div class="reihe">'
+      + '<div class="karte"><h3>Quelle</h3><p class="still">Gebinde, aus denen ihr nehmt, um zu triagieren. Weitere lassen sich während des Scans dazunehmen.</p><div class="reihe">'
       + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="rt"' + (s.quelle === 'rt' ? ' checked' : '') + '> Return Tool</label>'
       + '<label style="margin:0;display:flex;gap:6px;align-items:center"><input type="radio" name="quelle" value="manuell"' + (s.quelle === 'manuell' ? ' checked' : '') + '> Liste einfügen</label></div>'
       + (s.quelle === 'rt' ? ortListe : '<p class="still" style="margin-top:10px">Liste mit Kopfzeile einfügen. Pflicht: <b>ID</b>.</p><textarea id="s-liste" placeholder="ID&#9;Bezeichnung&#9;Barcode&#9;VP&#9;Lagerort">' + esc(s.liste) + '</textarea>')
       + '</div>'
-      + '<div class="karte"><h3>Gebinde</h3>'
-      + geb + '<div class="reihe" style="margin-top:12px"><button data-a="gebDazu">Gebinde hinzufügen</button></div></div>'
+      + '<div class="karte"><h3>Kanal</h3><p class="still">Gebinde, in die ihr triagiert (Verkauf an Abnehmer, neue Palette, Entsorgung).</p>'
+      + geb + '<div class="reihe" style="margin-top:12px"><button data-a="gebDazu">+ Gebinde</button></div></div>'
       + '<div class="karte"><div class="reihe"><button class="pink" data-a="anlegen">Speichern → Scan</button><button data-a="zurStart">Abbrechen</button></div></div>';
   }
   function ortHtml() {
@@ -279,22 +291,50 @@
     var n = 0; if (s.quelle === 'rt' && V.orte) V.orte.orte.forEach(function (o) { if (s.orte[o.ort]) n += o.anzahl; });
     var text = s.quelle === 'rt' ? orte.length + ' Lagerorte mit ' + n + ' Stücken (' + orte.join(', ') + ')' : 'die eingefügte Liste';
     if (V.anlegenLaeuft) { melde('Der Durchgang wird schon angelegt. Bitte warten.'); return; }
-    if (!confirm('Durchgang «' + s.name + '» anlegen?\n\nQuelle: ' + text + '\nGebinde: ' + s.gebinde.map(function (g) { return g.name + ' (' + g.art + (g.lagerort ? ', ' + g.lagerort : '') + ')'; }).join(', '))) return;
+    if (!confirm('Durchgang «' + s.name + '» anlegen?\n\nQuelle: ' + text + '\nKanal: ' + s.gebinde.map(function (g) { return g.name + ' (' + g.art + (g.lagerort ? ', ' + g.lagerort : '') + ')'; }).join(', '))) return;
     V.anlegenLaeuft = true; knopfSperren('anlegen', true); melde('Durchgang wird angelegt … das dauert einige Sekunden. Bitte nicht nochmals klicken.');
     ruf('anlegen', [{ name: s.name, quelle: s.quelle, lagerorte: orte, liste: s.liste, gebinde: s.gebinde, kuerzel: K() }], function (d) { V.anlegenLaeuft = false; setzeD(d); V.setup = null; V.orte = null; V.ansicht = 'scan'; zeichne(); melde('Durchgang ' + d.id + ' angelegt: ' + d.bestand.length + ' Stücke.' + hinw(d), !!(d.hinweise && d.hinweise.length)); }, function (m) { V.anlegenLaeuft = false; knopfSperren('anlegen', false); melde(m, true); piep(false); });
   }
 
   /* ---------- 2 · Scan ---------- */
-  /* Der Browser kennt Bestand und Zuordnung und entscheidet sofort. Gespeichert wird im Hintergrund (Warteschlange), der Server prüft noch einmal. */
+  /* Der Browser kennt Bestand und Zuordnung und entscheidet sofort. Gespeichert wird im Hintergrund (Warteschlange), der Server prüft noch einmal.
+     Anzahl (26.10.2026): Zuordnung pro Stück = Teile { Gebinde: { n, preis } }; ein Stück mit mehreren Stück kann auf mehrere Gebinde verteilt sein. */
   function setzeD(d) {
-    if (!V.D || V.D.id !== d.id) { ngLaden(d.id); V.wartet = null; }          // rote Liste «Nicht gespeichert» gehört zum Durchgang
+    if (!V.D || V.D.id !== d.id) { ngLaden(d.id); V.wartet = null; V.frage = null; V.qp = null; }          // rote Liste «Nicht gespeichert» gehört zum Durchgang
     V.D = d; V.idx = {}; V.bar = {}; V.geb = {};
-    d.bestand.forEach(function (p) { V.idx[pgNorm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
+    d.bestand.forEach(function (p) { p.anzahl = Number(p.anzahl) || 1; V.idx[pgNorm(p.id)] = p; var b = bcKey(p.barcode); if (b) (V.bar[b] = V.bar[b] || []).push(p); });
     d.gebinde.forEach(function (g) { V.geb[g.id] = g; });
+    Object.keys(d.zuordnung || {}).forEach(function (k) { zus(d.zuordnung, k); });
     if (V.wartet && !V.idx[pgNorm(V.wartet.p.id)]) V.wartet = null;
     if (!V.geb[V.aktiv]) V.aktiv = lies('um-aktiv-' + d.id) || (d.gebinde[0] && d.gebinde[0].id) || '';
     if (!V.geb[V.aktiv]) V.aktiv = d.gebinde[0] ? d.gebinde[0].id : '';
     $('wo').textContent = d.id + ' · ' + d.name;
+  }
+  function T(p) { return (p && Number(p.anzahl)) || 1; }
+  function teile(k) { var a = V.D.zuordnung[k]; return a && a.teile ? a.teile : {}; }
+  function summe(k) { var t = teile(k); return Object.keys(t).reduce(function (s, g) { return s + t[g].n; }, 0); }
+  function frei(p) { return T(p) - summe(pgNorm(p.id)); }
+  /* Ältere Antworten (ohne «teile») und Summen nachführen; ohne Teile fällt das Stück weg */
+  function zus(z, k) {
+    var a = z[k]; if (!a) return;
+    if (!a.teile) { a.teile = {}; if (a.gebinde) a.teile[a.gebinde] = { n: T(V.idx[k]), preis: a.preis }; }
+    var gs = Object.keys(a.teile);
+    if (!gs.length) { delete z[k]; return; }
+    a.n = gs.reduce(function (s, g) { return s + a.teile[g].n; }, 0); a.gebinde = gs[0]; a.preis = a.teile[gs[0]].preis;
+  }
+  /* Einen Vorgang auf einen Stand anwenden (gleiche Regeln wie der Server; für sofortige Anzeige und für die Schlange über dem Server-Stand) */
+  function anwenden(z, o) {
+    if (!o || o.unbekannt) return;
+    var k = pgNorm(o.id || o.wunsch); if (!k) return;
+    var a = z[k] || { teile: {} }, t = a.teile || (a.teile = {}), alt = t[o.gebinde];
+    if (o.art === 'dazu') t[o.gebinde] = { n: (alt ? alt.n : 0) + Number(o.menge || 1), preis: (o.preis === '' || o.preis == null) && alt ? alt.preis : (o.preis == null ? '' : o.preis) };
+    else if (o.art === 'setzen') { if (Number(o.anzahl) > 0) t[o.gebinde] = { n: Number(o.anzahl), preis: o.preis === undefined ? (alt ? alt.preis : '') : o.preis }; else delete t[o.gebinde]; }
+    else if (o.art === 'verschieben') {
+      var v = t[o.von], m = Number(o.menge || 1); if (!v) return;
+      if (v.n - m > 0) v.n -= m; else delete t[o.von];
+      t[o.gebinde] = { n: (alt ? alt.n : 0) + m, preis: alt ? alt.preis : '' };
+    } else { if (!o.gebinde) { delete z[k]; return; } a.teile = {}; a.teile[o.gebinde] = { n: T(V.idx[k]), preis: o.preis }; }
+    z[k] = a; zus(z, k);
   }
   function preis(g, p, eigen) {
     if (eigen !== '' && eigen !== undefined && eigen !== null) return Number(eigen);
@@ -304,45 +344,115 @@
   }
   function stand(gid) {
     var n = 0, t = 0, z = V.D.zuordnung;
-    Object.keys(z).forEach(function (k) { if (z[k].gebinde === gid && V.idx[k]) { n++; t += preis(V.geb[gid], V.idx[k], z[k].preis); } });
+    Object.keys(z).forEach(function (k) { var x = z[k].teile && z[k].teile[gid]; if (x && V.idx[k] && V.geb[gid]) { n += x.n; t += x.n * preis(V.geb[gid], V.idx[k], x.preis); } });
     return { n: n, t: t };
   }
+  function stueckTotal() { return V.D.bestand.reduce(function (s, p) { return s + T(p); }, 0); }
+  function stueckZu() { var z = V.D.zuordnung; return Object.keys(z).reduce(function (s, k) { return s + (V.idx[k] ? Math.min(z[k].n || 0, T(V.idx[k])) : 0); }, 0); }
+  function teilText(k) { var t = teile(k); return Object.keys(t).map(function (g) { return (V.geb[g] ? V.geb[g].name : g) + ': ' + t[g].n; }).join(', '); }
+  /* Quell-Gebinde (Lagerorte des Bestands) mit Anzahl Stücke und ob schon etwas daraus zugeordnet ist */
+  function quellOrte() {
+    var m = {}, l = [];
+    V.D.bestand.forEach(function (p) { var o = p.ort || '(ohne Lagerort)'; if (!m[o]) { m[o] = { ort: o, n: 0, zu: 0 }; l.push(m[o]); } m[o].n += T(p); m[o].zu += Math.min(summe(pgNorm(p.id)), T(p)); });
+    return l;
+  }
   function scanSeite() {
-    var d = V.D, z = d.zuordnung, zugeordnet = Object.keys(z).filter(function (k) { return V.idx[k]; }).length;
+    var d = V.D;
     var wahl = d.gebinde.map(function (g) { var s = stand(g.id); return '<button data-a="ziel" data-v="' + esc(g.id) + '"><b>' + esc(g.name) + '</b><span class="etikett ' + g.art + '">' + (g.art === 'Verkauf' ? 'Verkauf · ' + esc(g.abnehmer) : g.art === 'Lager' ? 'Lager' : 'Entsorgung') + '</span> ' + (g.lagerort ? '<span class="mono">' + esc(g.lagerort) + '</span>' : '') + '<small>' + s.n + ' Stück · ' + chf(s.t) + '</small></button>'; }).join('');
     return '<div class="schritte"><span>1 · Setup</span><span class="an">2 · Scan</span><span>3 · Abschluss</span></div>'
       + '<div id="ng-platz">' + ngHtml() + '</div>'
-      + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Gebinde</h2><span class="still">' + zugeordnet + ' / ' + d.bestand.length + '</span></div>'
-      + '<p class="hinweis-ablauf">1 · Stück scannen &nbsp; 2 · Gebinde tippen</p>'
+      + '<div class="karte"><div class="reihe" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Scan</h2><span class="still" id="zaehler">' + stueckZu() + ' / ' + stueckTotal() + ' Stück</span></div>'
+      + '<div id="quelle-platz">' + quelleHtml() + '</div>'
+      + '<p class="hinweis-ablauf">1 · Stück scannen &nbsp; 2 · bei mehreren Stück: Anzahl tippen &nbsp; 3 · Kanal tippen</p>'
       + '<div class="scan-reihe"><input type="text" id="scan" placeholder="PG-ID oder Barcode scannen" autocomplete="off" autocapitalize="characters" data-enter="scanne"><button class="pink" id="kamera-knopf" data-a="kamera">' + (KAM.an ? 'Kamera aus' : 'Kamera') + '</button></div>'
       + '<div id="rueck">' + rueckHtml() + '</div>'
-      + '<div class="gebinde-wahl' + (V.wartet ? ' bereit' : '') + '">' + wahl + '</div></div>'
-      + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt'], ['gebinde', 'Inhalt'], ['offen', 'Offen'], ['bearbeiten', 'Gebinde ändern']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
+      + '<div class="bereich"><h3>Kanal</h3><button class="klein" data-a="kanalPlus">+ Gebinde</button></div>'
+      + '<div class="gebinde-wahl' + (V.wartet && V.wartet.menge ? ' bereit' : '') + '">' + wahl + '</div></div>'
+      + '<div class="karte"><div class="reiter">' + [['letzte', 'Zuletzt'], ['gebinde', 'Inhalt'], ['offen', 'Offen'], ['bearbeiten', 'Kanal bearbeiten']].map(function (r) { return '<button class="klein ' + (V.reiter === r[0] ? 'an' : '') + '" data-a="reiter" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div><div id="reiter-inhalt">' + reiterHtml() + '</div></div>'
       + '<div class="karte"><div class="reihe"><button class="pink" data-a="zumAbschluss">Zum Abschluss</button><button data-a="verwerfen">Durchgang verwerfen</button></div></div>';
   }
+  /* Quelle (26.10.2026): Gebinde, aus denen genommen wird; «+ Gebinde» nimmt weitere Lagerorte aus dem Return Tool dazu */
+  function quelleHtml() {
+    var l = quellOrte();
+    var h = '<div class="bereich"><h3>Quelle</h3><button class="klein" data-a="quellePlus">' + (V.qp ? 'Schliessen' : '+ Gebinde') + '</button></div><div class="quelle-zeile">'
+      + l.map(function (o) { return '<span class="etikett">' + esc(o.ort) + ' · ' + o.zu + '/' + o.n + (!o.zu && l.length > 1 ? ' <button class="link" style="font-size:12px" data-a="quelleWeg" data-v="' + esc(o.ort) + '" title="Quell-Gebinde entfernen (nichts daraus zugeordnet)">✕</button>' : '') + '</span>'; }).join(' ') + '</div>';
+    if (!V.qp) return h;
+    var orte = V.orte, schon = {}; l.forEach(function (o) { schon[ortKey(o.ort)] = true; });
+    if (!orte) return h + '<p class="still">Lagerorte werden gelesen …</p>';
+    var f = norm(V.qp.filter);
+    var wahl = orte.orte.filter(function (o) { return !schon[ortKey(o.ort)] && (!f || norm(o.ort).indexOf(f) > -1); });
+    return h + '<div class="karte" style="background:var(--pink-hell)"><div class="reihe"><input type="text" id="qp-filter" placeholder="Filter, z.B. KID" value="' + esc(V.qp.filter) + '" style="max-width:240px"><span class="still">' + Object.keys(V.qp.orte).filter(function (k) { return V.qp.orte[k]; }).length + ' gewählt</span></div>'
+      + '<div class="orte" id="qp-orte">' + wahl.map(function (o) { var an = !!V.qp.orte[o.ort]; return '<label class="' + (an ? 'an' : '') + '"><input type="checkbox" data-qort="' + esc(o.ort) + '"' + (an ? ' checked' : '') + '><span><b>' + esc(o.ort) + '</b> <span class="still">' + o.anzahl + '</span>' + (o.ohneId ? ' <span class="warn-text">' + o.ohneId + ' ohne ID</span>' : '') + '</span></label>'; }).join('') + '</div>'
+      + '<div class="reihe" style="margin-top:10px"><button class="pink" data-a="quelleDazu">Als Quelle dazunehmen</button></div></div>';
+  }
+  function quellePlus() {
+    if (V.qp) { V.qp = null; $('quelle-platz').innerHTML = quelleHtml(); return; }
+    V.qp = { filter: '', orte: {} }; V.orte = null; $('quelle-platz').innerHTML = quelleHtml();
+    ruf('lagerorte', [], function (o) { V.orte = o; if (V.qp && $('quelle-platz')) $('quelle-platz').innerHTML = quelleHtml(); });
+  }
+  function quelleDazu() {
+    var orte = Object.keys(V.qp ? V.qp.orte : {}).filter(function (k) { return V.qp.orte[k]; });
+    if (!orte.length) { melde('Bitte mindestens einen Lagerort wählen.', true); return; }
+    quelleSenden(orte, '');
+  }
+  /* Quell-Gebinde dazunehmen; code = fremder Scan, der danach gleich als Stück wartet */
+  function quelleSenden(orte, code) {
+    if (V.quelleLaeuft) return;
+    if (!confirm(orte.join(', ') + ' als Quelle zu ' + V.D.id + ' dazunehmen? Die Stücke kommen in den Durchgang.')) return;
+    V.quelleLaeuft = true; knopfSperren('quelleDazu', true);
+    ruf('quelleErgaenzen', [V.D.id, orte, K()], function (d) {
+      V.quelleLaeuft = false; V.qp = null; V.frage = null; setzeD(d); ueberlagere(V.D.zuordnung); zeichne();
+      melde(orte.join(', ') + ' dazugenommen: ' + d.dazu + ' Stücke.' + hinw(d), !!(d.hinweise && d.hinweise.length));
+      if (code && $('scan')) { $('scan').value = code; scanne(); }
+    }, function (m) { V.quelleLaeuft = false; knopfSperren('quelleDazu', false); melde(m, true); piep(false); });
+  }
+  function quelleWeg(ort) {
+    if (!confirm('Quell-Gebinde ' + ort + ' aus dem Durchgang entfernen? Es ist noch nichts daraus zugeordnet.')) return;
+    ruf('quelleEntfernen', [V.D.id, ort, K()], function (d) { setzeD(d); ueberlagere(V.D.zuordnung); zeichne(); melde(ort + ' entfernt.'); }, function (m) { melde(m, true); piep(false); });
+  }
+  function kanalPlus() { reiter('bearbeiten'); bearbDazu(); var r = $('reiter-inhalt'); if (r && r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   function rueckHtml() {
     var r = V.rueck;
     if (!r) return '';
     return '<div class="meldung ' + r.art + '"><span class="gross">' + esc(r.titel) + '</span>' + esc(r.text || '') + (r.knopf || '') + '</div>';
   }
-  function zeile(p, mitAktion) {
-    var a = V.D.zuordnung[pgNorm(p.id)], g = a && V.geb[a.gebinde];
+  /* Zahlknöpfe für die Anzahl (bis 12), darüber ein Zahlfeld */
+  function mengeHtml(fr) {
+    if (fr <= 12) { var b = []; for (var i = 1; i <= fr; i++) b.push('<button data-a="menge" data-v="' + i + '">' + i + '</button>'); return '<div class="mengen">' + b.join('') + '</div>'; }
+    return '<div class="mengen"><input type="number" id="menge-feld" min="1" max="' + fr + '" style="width:120px;font-size:20px" data-enter="mengeOk"><button data-a="mengeOk">OK</button></div>';
+  }
+  /* Eine Zeile pro Stück und Gebinde (gid) oder eine Übersicht pro Stück (ohne gid) */
+  function zeile(p, mitAktion, gid) {
+    var k = pgNorm(p.id), t = gid ? teile(k)[gid] : null, g = gid ? V.geb[gid] : null, tot = T(p);
+    var ohneBc = bcKey(p.barcode) ? '' : ' <span class="warn-text">nur per PG-ID-Etikett</span>';
+    if (!g || !t) {
+      var su = summe(k);
+      return '<tr><td class="mono">' + esc(p.id) + '</td><td>' + esc(p.name) + ohneBc + '</td><td class="mono">' + esc(p.ort) + '</td><td>' + (su ? esc(teilText(k)) : '–') + '</td>'
+        + '<td class="zahl">' + (tot > 1 ? su + ' / ' + tot : (su ? '1' : '–')) + '</td><td class="zahl' + (p.vpFehlt ? ' gelb' : '') + '">' + chf(p.vp) + '</td>' + (mitAktion ? '<td></td>' : '') + '</tr>';
+    }
+    var v = Object.keys(teile(k)).length > 1 ? p.id + '|' + gid : p.id;          // ein Gebinde: nur die ID (wie bisher), sonst «ID|Gebinde»
     /* VP fehlt (leer, 0, unlesbar) und der Preis käme aus dem VP: gelb (Prüfung 24.10.2026) */
-    var gelb = p.vpFehlt && (!g || (g.art !== 'Entsorgung' && g.preisregel !== 'Null' && (a.preis === '' || a.preis === undefined)));
-    return '<tr><td class="mono">' + esc(p.id) + '</td><td>' + esc(p.name) + (bcKey(p.barcode) ? '' : ' <span class="warn-text">nur per PG-ID-Etikett</span>') + '</td><td class="mono">' + esc(p.ort) + '</td><td>' + (g ? esc(g.name) : '–') + '</td>'
-      + '<td class="zahl' + (gelb ? ' gelb' : '') + '"' + (gelb ? ' title="VP fehlt im Return Tool"' : '') + '>' + (g ? (mitAktion ? '<input type="number" min="0" step="0.05" value="' + preis(g, p, a.preis) + '" data-preis="' + esc(p.id) + '" style="width:100px;text-align:right"' + (g.art === 'Entsorgung' ? ' disabled' : '') + '>' : chf(preis(g, p, a.preis))) : chf(p.vp)) + '</td>'
-      + (mitAktion ? '<td>' + (g ? '<button class="klein" data-a="entfernen" data-v="' + esc(p.id) + '">Entfernen</button>' : '') + '</td>' : '') + '</tr>';
+    var gelb = p.vpFehlt && g.art !== 'Entsorgung' && g.preisregel !== 'Null' && (t.preis === '' || t.preis === undefined);
+    return '<tr><td class="mono">' + esc(p.id) + '</td><td>' + esc(p.name) + ohneBc + '</td><td class="mono">' + esc(p.ort) + '</td><td>' + esc(g.name) + '</td>'
+      + '<td class="zahl">' + (mitAktion && tot > 1 ? '<input type="number" min="0" max="' + tot + '" value="' + t.n + '" data-anz="' + esc(v) + '" style="width:70px;text-align:right"> / ' + tot : t.n + (tot > 1 ? ' / ' + tot : '')) + '</td>'
+      + '<td class="zahl' + (gelb ? ' gelb' : '') + '"' + (gelb ? ' title="VP fehlt im Return Tool"' : '') + '>' + (mitAktion ? '<input type="number" min="0" step="0.05" value="' + preis(g, p, t.preis) + '" data-preis="' + esc(v) + '" style="width:100px;text-align:right"' + (g.art === 'Entsorgung' ? ' disabled' : '') + '>' : chf(preis(g, p, t.preis))) + (tot > 1 || t.n > 1 ? '<div class="still" style="font-size:12px">pro Stück</div>' : '') + '</td>'
+      + (mitAktion ? '<td><button class="klein" data-a="entfernen" data-v="' + esc(v) + '">Entfernen</button></td>' : '') + '</tr>';
+  }
+  /* Alle Zeilen eines Stücks: pro Gebinde eine, sonst die Übersicht */
+  function zeilenStueck(p, mitAktion) {
+    var t = teile(pgNorm(p.id)), gs = Object.keys(t).filter(function (g) { return V.geb[g]; });
+    return gs.length ? gs.map(function (g) { return zeile(p, mitAktion, g); }).join('') : zeile(p, mitAktion);
   }
   function reiterHtml() {
-    var d = V.D, kopf = function (akt) { return '<table><thead><tr><th>ID</th><th>Bezeichnung</th><th>Lagerort alt</th><th>Gebinde</th><th class="zahl">Preis</th>' + (akt ? '<th></th>' : '') + '</tr></thead><tbody>'; };
-    if (V.reiter === 'letzte') return V.letzte.length ? kopf(true) + V.letzte.slice(0, 30).map(function (id) { return V.idx[id] ? zeile(V.idx[id], true) : ''; }).join('') + '</tbody></table>' : '<p class="still">Noch nichts.</p>';
+    var d = V.D, kopf = function (akt) { return '<table><thead><tr><th>ID</th><th>Bezeichnung</th><th>Lagerort alt</th><th>Gebinde</th><th class="zahl">Stück</th><th class="zahl">Preis</th>' + (akt ? '<th></th>' : '') + '</tr></thead><tbody>'; };
+    if (V.reiter === 'letzte') return V.letzte.length ? kopf(true) + V.letzte.slice(0, 30).map(function (id) { return V.idx[id] ? zeilenStueck(V.idx[id], true) : ''; }).join('') + '</tbody></table>' : '<p class="still">Noch nichts.</p>';
     if (V.reiter === 'gebinde') return d.gebinde.map(function (g) {
-      var l = d.bestand.filter(function (p) { var a = d.zuordnung[pgNorm(p.id)]; return a && a.gebinde === g.id; }), s = stand(g.id);
-      return '<h3 style="margin-top:14px">' + esc(g.name) + ' <span class="still" style="text-transform:none">· ' + s.n + ' Stück · ' + chf(s.t) + '</span></h3>' + (l.length ? kopf(true) + l.map(function (p) { return zeile(p, true); }).join('') + '</tbody></table>' : '<p class="still">Leer.</p>');
+      var l = d.bestand.filter(function (p) { return !!teile(pgNorm(p.id))[g.id]; }), s = stand(g.id);
+      return '<h3 style="margin-top:14px">' + esc(g.name) + ' <span class="still" style="text-transform:none">· ' + s.n + ' Stück · ' + chf(s.t) + '</span></h3>' + (l.length ? kopf(true) + l.map(function (p) { return zeile(p, true, g.id); }).join('') + '</tbody></table>' : '<p class="still">Leer.</p>');
     }).join('');
     if (V.reiter === 'offen') {
-      var o = d.bestand.filter(function (p) { return !d.zuordnung[pgNorm(p.id)]; }), ob = o.filter(function (p) { return !bcKey(p.barcode); }).length;
-      return '<p class="still">' + o.length + ' Stücke offen' + (ob ? ' · <span class="warn-text">' + ob + ' ohne Barcode: nur per PG-ID-Etikett</span>' : '') + '</p>' + (o.length ? kopf(false) + o.map(function (p) { return zeile(p, false); }).join('') + '</tbody></table>' : '');
+      var o = d.bestand.filter(function (p) { return frei(p) > 0; }), ob = o.filter(function (p) { return !bcKey(p.barcode); }).length, n = o.reduce(function (s, p) { return s + frei(p); }, 0);
+      return '<p class="still">' + n + ' Stück offen (' + o.length + ' Zeilen)' + (ob ? ' · <span class="warn-text">' + ob + ' ohne Barcode: nur per PG-ID-Etikett</span>' : '') + '</p>' + (o.length ? kopf(false) + o.map(function (p) { return zeile(p, false); }).join('') + '</tbody></table>' : '');
     }
     if (V.reiter === 'bearbeiten') return bearbeitenHtml();
     return '';
@@ -396,59 +506,86 @@
   }
   function fokusScan() { var s = $('scan'); if (s && V.ansicht === 'scan' && !KAM.an && !KAM.foto && !istHandy() && document.activeElement !== s) s.focus(); }
 
-  /* Ein Scan: PG-ID oder Barcode. Barcode: Der Browser zeigt das erste freie Stück an, der Server wählt beim Speichern selbst ein freies Stück dieser EAN
-     (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen. */
+  /* Ein Scan: PG-ID oder Barcode. Barcode: Der Browser zeigt das erste Stück mit freien Stück an, der Server wählt beim Speichern selbst ein Stück dieser EAN
+     (zwei Scanner können so nie dasselbe Stück buchen). Freie Stücke mit verschiedenem VP oder Lagerort alt: PG-ID verlangen.
+     Anzahl (Jonas 26.10.2026): Hat die Zeile mehrere Stück, fragt das Tool, wie viele umgepackt werden (Zahlknöpfe oder Zahl ins Scanfeld + Enter). */
   function scanne() {
     var el = $('scan'), code = norm(el.value); el.value = ''; if (!KAM.an && !KAM.foto) el.focus();
     V.scanErg = null;            // Ergebnis für die Kamera: { p, art: 'warte' (Scan) | 'ok' (getippt), bc } (24.10.2026)
     if (!code) return;
+    if (V.wartet && V.wartet.menge == null && /^\d{1,4}$/.test(code)) { menge(code); return; }      // Anzahl ins Scanfeld getippt
     if (!K()) { ablehnen('Bitte zuerst oben das Kürzel eintragen.'); $('kuerzel').focus(); return; }
     if (!d0()) return;
-    var p = V.idx[pgNorm(code)], z = V.D.zuordnung, bc = '';
+    var p = V.idx[pgNorm(code)], bc = '';
     if (!p && V.bar[bcKey(code)]) {
-      var l = V.bar[bcKey(code)], frei = l.filter(function (x) { return !z[pgNorm(x.id)]; }), vp = {}, ort = {};
-      if (!frei.length) { ablehnen('❌ Alle ' + l.length + ' Stücke mit diesem Barcode zugeordnet', ' PG-ID scannen.'); return; }
-      frei.forEach(function (x) { vp[Math.round(Number(x.vp || 0) * 100)] = true; ort[ortKey(x.ort)] = x.ort || '(leer)'; });
-      if (Object.keys(vp).length > 1) { ablehnen('❌ ' + frei.length + ' freie Stücke mit diesem Barcode, verschiedener VP', ' PG-ID-Etikett scannen.'); return; }
-      if (Object.keys(ort).length > 1) { ablehnen('❌ ' + frei.length + ' freie Stücke mit diesem Barcode aus verschiedenen Lagerorten (' + Object.keys(ort).map(function (k) { return ort[k]; }).join(', ') + ')', ' PG-ID-Etikett scannen.'); return; }
-      p = frei[0]; bc = code;
+      var l = V.bar[bcKey(code)], fr = l.filter(function (x) { return frei(x) > 0; }), vp = {}, ort = {};
+      if (!fr.length) { ablehnen('❌ Alle ' + l.length + ' Stücke mit diesem Barcode zugeordnet', ' PG-ID scannen.'); return; }
+      fr.forEach(function (x) { vp[Math.round(Number(x.vp || 0) * 100)] = true; ort[ortKey(x.ort)] = x.ort || '(leer)'; });
+      if (Object.keys(vp).length > 1) { ablehnen('❌ ' + fr.length + ' freie Stücke mit diesem Barcode, verschiedener VP', ' PG-ID-Etikett scannen.'); return; }
+      if (Object.keys(ort).length > 1) { ablehnen('❌ ' + fr.length + ' freie Stücke mit diesem Barcode aus verschiedenen Lagerorten (' + Object.keys(ort).map(function (k) { return ort[k]; }).join(', ') + ')', ' PG-ID-Etikett scannen.'); return; }
+      p = fr[0]; bc = code;
     }
-    if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Zur Seite legen.'); fremdMelden(code, ''); return; }
+    if (!p) { ablehnen('❌ ' + code + ' ist nicht in der Quelle', ' Suche im Return Tool …'); fremdMelden(code, ''); fremdSuchen(code); return; }
+    V.frage = null;
     /* Scan zuerst, dann Ziel (Jonas 24.10.2026): das Stück wartet, bis ein Gebinde getippt wird. Ohne Tippen wird nichts gebucht. */
-    var a = z[pgNorm(p.id)], vorher = V.wartet;
-    V.scanErg = { p: p, art: 'warte', bc: !!bc };
-    if (vorher && pgNorm(vorher.p.id) === pgNorm(p.id)) { kamText(); return; }       // dasselbe Stück nochmals: wartet schon
-    V.wartet = { p: p, bc: bc };
+    var k = pgNorm(p.id), tot = T(p), su = summe(k), vorher = V.wartet;
+    if (vorher && pgNorm(vorher.p.id) === k) { V.scanErg = { p: p, art: 'warte', bc: !!bc }; kamText(); return; }       // dasselbe Stück nochmals: wartet schon
     var nicht = vorher ? ' Nicht zugeordnet und liegen gelassen: ' + vorher.p.id + ' (' + vorher.p.name + ').' : '';
-    V.rueck = a
-      ? { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. Anderes Gebinde tippen = verschieben.' + nicht }
-      : { art: 'warte', titel: '➜ ' + p.id + ' · ' + p.name, text: ' Aus ' + (p.ort || '–') + ' · ' + chf(p.vp) + '. Jetzt das Gebinde tippen.' + nicht };
+    if (tot > 1 && su >= tot) { ablehnen('❌ Alle ' + tot + ' Stück von ' + p.id + ' schon umgepackt', ' (' + teilText(k) + '). Korrigieren unter «Inhalt».'); return; }
+    V.scanErg = { p: p, art: 'warte', bc: !!bc };
+    if (tot === 1) {
+      var a = V.D.zuordnung[k];
+      V.wartet = { p: p, bc: bc, menge: 1 };
+      V.rueck = a
+        ? { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. Anderes Gebinde tippen = verschieben.' + nicht }
+        : { art: 'warte', titel: '➜ ' + p.id + ' · ' + p.name, text: ' Aus ' + (p.ort || '–') + ' · ' + chf(p.vp) + '. Jetzt das Gebinde tippen.' + nicht };
+    } else {
+      V.wartet = { p: p, bc: bc, menge: null, frei: tot - su };
+      V.rueck = { art: 'warte', titel: '➜ ' + p.id + ' · ' + tot + ' Stück im Return Tool – wie viele packst du um?', text: ' ' + p.name + ' · aus ' + (p.ort || '–') + (su ? ' · schon umgepackt: ' + teilText(k) + ' · noch ' + (tot - su) + ' frei' : '') + '.' + nicht, knopf: mengeHtml(tot - su) };
+    }
     piep(true); neuZeichnenScan(); zielHervor();
+    if ($('menge-feld') && !istHandy()) $('menge-feld').focus();
   }
-  function d0() { return !!(V.D && V.D.gebinde && V.D.gebinde.length) || (ablehnen('Dieser Durchgang hat kein Gebinde.', ' Unten «Gebinde ändern».'), false); }
+  /* Anzahl gewählt: danach das Gebinde tippen */
+  function menge(v) {
+    var w = V.wartet, n = parseInt(v, 10);
+    if (!w) { ablehnen('Zuerst ein Stück scannen.'); return; }
+    if (!(n >= 1 && n <= (w.frei || 1))) { ablehnen('❌ Anzahl 1 bis ' + (w.frei || 1), ' Nochmals tippen.'); V.rueck.knopf = mengeHtml(w.frei || 1); $('rueck').innerHTML = rueckHtml(); return; }
+    w.menge = n;
+    V.rueck = { art: 'warte', titel: '➜ ' + n + ' × ' + w.p.id + ' · ' + w.p.name, text: ' Jetzt das Gebinde tippen.' };
+    piep(true); neuZeichnenScan(); zielHervor(); fokusScan();
+  }
+  function mengeOk() { var f = $('menge-feld'); if (f) menge(f.value); }
+  function d0() { return !!(V.D && V.D.gebinde && V.D.gebinde.length) || (ablehnen('Dieser Durchgang hat kein Gebinde.', ' Unten «Kanal bearbeiten».'), false); }
   function zielHervor() {
-    var w = document.querySelector('.gebinde-wahl'); if (w) w.className = 'gebinde-wahl' + (V.wartet ? ' bereit' : '');
+    var w = document.querySelector('.gebinde-wahl'); if (w) w.className = 'gebinde-wahl' + (V.wartet && V.wartet.menge ? ' bereit' : '');
     kamText();
   }
-  /* Gebinde getippt: das wartende Stück dorthin (neu oder verschoben). */
+  /* Gebinde getippt: das wartende Stück (mit Anzahl) dorthin, neu oder verschoben. */
   function ziel(id) {
     var g = V.geb[id]; if (!g) { ablehnen('Dieses Gebinde gibt es nicht mehr.', ' Bitte ein anderes tippen.'); zeichne(); return; }
     KAM.sperreBis = 0;
     var w = V.wartet;
     if (!w) { ablehnen('Zuerst ein Stück scannen.', ' Dann das Gebinde tippen.'); return; }
-    var p = w.p, k = pgNorm(p.id), a = V.D.zuordnung[k], bc = w.bc;
-    if (a && bc) {
-      /* Barcode-Scan: das angezeigte Stück hat inzwischen jemand anderes gebucht → ein anderes freies Stück dieser EAN */
-      var frei = (V.bar[bcKey(bc)] || []).filter(function (x) { return !V.D.zuordnung[pgNorm(x.id)]; });
-      if (!frei.length) { V.wartet = null; zielHervor(); ablehnen('❌ Alle Stücke mit diesem Barcode sind schon zugeordnet', ' NICHT gebucht. PG-ID scannen.'); return; }
-      p = frei[0]; k = pgNorm(p.id); a = null;
+    if (w.menge == null) { ablehnen('Zuerst die Anzahl tippen.', ' Wie viele Stück von ' + w.p.id + '?'); V.rueck.knopf = mengeHtml(w.frei || 1); $('rueck').innerHTML = rueckHtml(); return; }
+    var p = w.p, k = pgNorm(p.id), bc = w.bc, m = w.menge, op;
+    /* Barcode-Scan: hat inzwischen jemand anderes Stück davon gebucht → ein anderes Stück dieser EAN mit genug freien Stück */
+    if (bc && frei(p) < m) {
+      var andere = (V.bar[bcKey(bc)] || []).filter(function (x) { return frei(x) >= m; });
+      if (!andere.length) { V.wartet = null; zielHervor(); ablehnen('❌ Mit diesem Barcode ist nicht mehr genug frei', ' NICHT gebucht. PG-ID scannen.'); return; }
+      p = andere[0]; k = pgNorm(p.id);
     }
-    if (a && a.gebinde === id) { V.wartet = null; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' Nichts geändert.' }; piep(false); neuZeichnenScan(); zielHervor(); return; }
-    if (a && bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals tippen.', null, true); return; }
-    if (!setze(p, id, '', a ? a.gebinde : '', a ? '' : bc)) return;          // abgelehnt: setze meldet rot
+    var a = V.D.zuordnung[k];
+    if (T(p) === 1 && a) {
+      if (a.gebinde === id) { V.wartet = null; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' Nichts geändert.' }; piep(false); neuZeichnenScan(); zielHervor(); return; }
+      if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals tippen.', null, true); return; }
+      op = { art: 'verschieben', id: p.id, von: a.gebinde, gebinde: id, menge: 1, vorher: a.teile[a.gebinde].n };
+    } else if (frei(p) < m) { ablehnen('❌ Von ' + p.id + ' sind nur noch ' + frei(p) + ' Stück frei', ' NICHT gebucht.'); V.wartet = null; zielHervor(); return; }
+    else op = bc ? { art: 'dazu', code: bc, wunsch: p.id, gebinde: id, menge: m, preis: '' } : { art: 'dazu', id: p.id, gebinde: id, menge: m, preis: '' };
+    if (!schicke(op, p)) return;          // abgelehnt: schicke meldet rot
     V.wartet = null;
     V.scanErg = { p: p, art: 'ok', bc: !!bc };
-    V.rueck = { art: 'ok', titel: '✅ ' + (a ? 'verschoben nach ' : '') + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + (a ? '' : ' (aus ' + p.ort + ')') };
+    V.rueck = { art: 'ok', titel: '✅ ' + (op.art === 'verschieben' ? 'verschoben nach ' : (m > 1 ? m + ' Stück → ' : '')) + g.name + (g.lagerort ? ' · ' + g.lagerort : ''), text: ' ' + p.id + ' · ' + p.name + ' · ' + chf(preis(g, p, '')) + (m > 1 ? ' pro Stück' : '') + (op.art === 'verschieben' ? '' : ' (aus ' + p.ort + ')') + (T(p) > 1 ? ' · ' + summe(k) + ' von ' + T(p) + ' umgepackt' : '') };
     piep(true); neuZeichnenScan(); zielHervor(); fokusScan();
   }
   /* Fremder Code (nicht in der Quelle): kommt über die Schlange ins Log des Servers (Prüfung 24.10.2026) */
@@ -456,21 +593,54 @@
     if (!V.D || V.haengt || (V.qId && V.qId !== V.D.id && V.Q.length)) return;
     V.qId = V.D.id; V.Q.push({ unbekannt: String(code).slice(0, 40), bei: gid || '' }); sichereQ(); senden();
   }
+  /* Fremder Scan (Jonas 26.10.2026): wo steht das Stück im Return Tool? Steht es auf einer freien Palette, fragen, ob sie als Quelle dazukommt. */
+  function fremdSuchen(code) {
+    if (!V.D) return;
+    var nr = V.fNr = (V.fNr || 0) + 1, id = V.D.id;
+    google.script.run.withSuccessHandler(function (r) {
+      if (nr !== V.fNr || !V.D || V.D.id !== id || V.ansicht !== 'scan') return;
+      var t = (r && r.treffer) || [], f = t.filter(function (x) { return x.frei; });
+      if (!t.length) { V.frage = null; V.rueck = { art: 'stop', titel: '❌ ' + code + ' nicht in der Quelle', text: ' Auch nicht in den Quell-Tabs des Return Tools (verkauft, im Archiv oder nicht erfasst). Zur Seite legen.' }; }
+      else if (!f.length) { V.frage = null; V.rueck = { art: 'stop', titel: '❌ ' + code + ' nicht in der Quelle', text: ' Steht im Return Tool auf ' + t.map(function (x) { return x.ort + ' (' + x.grund + ')'; }).join(', ') + '. Zur Seite legen.' }; }
+      else {
+        V.frage = { code: code, orte: f.map(function (x) { return x.ort; }) };
+        V.rueck = { art: 'warn', titel: '❓ ' + code + ' steht im Return Tool auf ' + f.map(function (x) { return x.ort; }).join(', '), text: ' ' + f[0].name + ' (' + f[0].id + '). Als Quelle dazunehmen?',
+          knopf: '<div class="frage">' + f.map(function (x) { return '<button class="pink" data-a="fremdJa" data-v="' + esc(x.ort + '|' + code) + '">Ja, ' + esc(x.ort) + ' (' + x.anzahl + ' Stücke) als Quelle</button>'; }).join('') + '<button data-a="fremdNein">Nein, zur Seite legen</button></div>' };
+      }
+      if ($('rueck')) $('rueck').innerHTML = rueckHtml();
+      kamText(); piep(!!f.length);
+    }).withFailureHandler(function () { /* Suche ist nur eine Hilfe: ohne Antwort bleibt «zur Seite legen» */ }).api('fremdSuchen', [id, code]);
+  }
+  function fremdJa(v) { var i = String(v).lastIndexOf('|'); quelleSenden([String(v).slice(0, i)], String(v).slice(i + 1)); }
+  function fremdNein() { V.frage = null; V.rueck = { art: 'stop', titel: 'Zur Seite legen', text: '' }; if ($('rueck')) $('rueck').innerHTML = rueckHtml(); kamText(); }
   /* Barcode-Scan dieses Stücks wartet noch auf den Server (der Server kann ein anderes Stück derselben EAN wählen): Folgeaktionen erst nach der Antwort */
   function bcOffen(k) { return V.Q.some(function (o) { return o.code && pgNorm(o.wunsch) === k; }); }
+  /* «id|Gebinde» (eine Zeile pro Gebinde) oder nur id (Stück mit einem Gebinde) */
+  function teilVon(v) { var s = String(v || ''), i = s.indexOf('|'), k = pgNorm(i > -1 ? s.slice(0, i) : s), t = teile(k), g = i > -1 ? s.slice(i + 1) : Object.keys(t)[0]; return { k: k, p: V.idx[k], g: g, t: t[g] }; }
   function verschieben(id) {
-    var k = pgNorm(id), p = V.idx[k], g = V.geb[V.aktiv], a = V.D.zuordnung[k];
-    if (!p || !g) return;
-    if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
-    if (!setze(p, g.id, '', a ? a.gebinde : '')) return;
-    V.rueck = { art: 'ok', titel: '✅ verschoben nach ' + g.name, text: ' ' + p.id + ' · ' + p.name }; piep(true); neuZeichnenScan();
+    var x = teilVon(id), g = V.geb[V.aktiv];
+    if (!x.p || !g || !x.t || x.g === g.id) return;
+    if (bcOffen(x.k)) { ablehnen('❌ ' + x.p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
+    if (!schicke({ art: 'verschieben', id: x.p.id, von: x.g, gebinde: g.id, menge: x.t.n, vorher: x.t.n }, x.p)) return;
+    V.rueck = { art: 'ok', titel: '✅ verschoben nach ' + g.name, text: ' ' + x.p.id + ' · ' + x.p.name }; piep(true); neuZeichnenScan();
   }
-  function entfernen(id) {
-    var k = pgNorm(id), p = V.idx[k], a = V.D.zuordnung[k];
-    if (!p || !a) return;
-    if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT entfernt', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
-    if (!setze(p, '', '', a.gebinde)) return;
-    V.rueck = { art: 'warn', titel: p.id + ' aus dem Gebinde entfernt', text: ' Es bleibt, wo es war (' + p.ort + ').' }; neuZeichnenScan();
+  function entfernen(v) {
+    var x = teilVon(v);
+    if (!x.p || !x.t) return;
+    if (bcOffen(x.k)) { ablehnen('❌ ' + x.p.id + ' NICHT entfernt', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); return; }
+    if (!schicke({ art: 'setzen', id: x.p.id, gebinde: x.g, anzahl: 0, vorher: x.t.n }, x.p)) return;
+    V.rueck = { art: 'warn', titel: x.p.id + ' aus ' + (V.geb[x.g] || {}).name + ' entfernt', text: ' Es bleibt, wo es war (' + x.p.ort + ').' }; neuZeichnenScan();
+  }
+  /* Anzahl in einem Gebinde korrigieren (Reiter «Inhalt»); 0 = entfernen */
+  function anzSetzen(v, wert) {
+    var x = teilVon(v);
+    if (!x.p || !x.t) return;
+    var n = parseInt(String(wert).trim(), 10), tot = T(x.p), su = summe(x.k);
+    if (!(n >= 0) || su - x.t.n + n > tot) { ablehnen('❌ Anzahl NICHT gespeichert: ' + x.p.id, ' 0 bis ' + (tot - su + x.t.n) + ' (im Return Tool ' + tot + ' Stück).', null, true); neuZeichnenScan(true); return; }
+    if (n === x.t.n) return;
+    if (bcOffen(x.k)) { ablehnen('❌ Anzahl NICHT gespeichert: ' + x.p.id, ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); neuZeichnenScan(true); return; }
+    if (!schicke({ art: 'setzen', id: x.p.id, gebinde: x.g, anzahl: n, vorher: x.t.n }, x.p)) { neuZeichnenScan(true); return; }
+    melde(x.p.id + ': ' + n + ' Stück in ' + (V.geb[x.g] || {}).name); neuZeichnenScan();
   }
   /* Preis plausibel (gleich wie der Server): ab 0, unter CHF 100 000, keine 8–14 Ziffern (= Barcode ins Preisfeld gescannt) */
   function preisFehler(roh, n) {
@@ -480,34 +650,33 @@
     if (n >= 100000) return 'Preis zu hoch (ab CHF 100 000).';
     return '';
   }
-  function preisSetzen(id, wert) {
-    var k = pgNorm(id), p = V.idx[k], a = V.D.zuordnung[k];
-    if (!p || !a) return;
+  function preisSetzen(v, wert) {
+    var x = teilVon(v);
+    if (!x.p || !x.t) return;
     var roh = String(wert == null ? '' : wert).trim(), n = roh === '' ? '' : Math.round(parseFloat(roh.replace(',', '.')) * 100) / 100, f = preisFehler(roh, n);
-    if (f) { ablehnen('❌ Preis NICHT gespeichert: ' + p.id, ' ' + f, null, true); neuZeichnenScan(true); return; }
-    if (bcOffen(k)) { ablehnen('❌ Preis NICHT gespeichert: ' + p.id, ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); neuZeichnenScan(true); return; }
-    if (!setze(p, a.gebinde, n, a.gebinde)) { neuZeichnenScan(true); return; }
-    melde(p.id + ': ' + chf(preis(V.geb[a.gebinde], p, n))); neuZeichnenScan();
+    if (f) { ablehnen('❌ Preis NICHT gespeichert: ' + x.p.id, ' ' + f, null, true); neuZeichnenScan(true); return; }
+    if (bcOffen(x.k)) { ablehnen('❌ Preis NICHT gespeichert: ' + x.p.id, ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals.', null, true); neuZeichnenScan(true); return; }
+    if (!schicke({ art: 'setzen', id: x.p.id, gebinde: x.g, anzahl: x.t.n, vorher: x.t.n, preis: n }, x.p)) { neuZeichnenScan(true); return; }
+    melde(x.p.id + ': ' + chf(preis(V.geb[x.g], x.p, n)) + (x.t.n > 1 ? ' pro Stück' : '')); neuZeichnenScan();
   }
-  /* Sofort im Browser, dann in die Warteschlange. vorher = was der Browser gesehen hat (der Server erkennt so, wenn jemand anderes schneller war).
-     Gibt zurück, ob der Scan in der Schlange ist (Prüfung 24.10.2026: sonst rot «NICHT gespeichert», nie ✅). */
-  function setze(p, gebinde, preisWert, vorher, code) {
+  /* Sofort im Browser, dann in die Warteschlange. Jeder Vorgang hat eine Kennung (sid): kommt die Antwort nicht an und der Browser schickt ihn
+     nochmals, bucht der Server nichts doppelt. Gibt zurück, ob der Vorgang in der Schlange ist (sonst rot «NICHT gespeichert», nie ✅). */
+  function schicke(op, p) {
     var k = pgNorm(p.id);
     if (V.haengt || (V.qId && V.qId !== V.D.id && V.Q.length)) {
       var grund = V.haengt ? 'Durchgang nicht mehr im Scan' : 'andere Scans warten noch (oben)';
       ablehnen('❌ NICHT gespeichert: ' + p.id, ' ' + grund + '. Stück zur Seite legen, zuerst oben klären.', { id: p.id, grund: grund }, true);
       return false;
     }
-    if (gebinde) V.D.zuordnung[k] = { gebinde: gebinde, preis: preisWert }; else delete V.D.zuordnung[k];
+    op.sid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    anwenden(V.D.zuordnung, op);
     V.letzte = [k].concat(V.letzte.filter(function (x) { return x !== k; })).slice(0, 50);
-    V.qId = V.D.id;
-    /* sid: Kennung dieses einen Scans. Kommt die Antwort nicht an und der Browser schickt ihn nochmals, bucht der Server kein zweites Stück (Spalte «Scan-ID»). */
-    V.Q.push(code ? { code: code, wunsch: p.id, gebinde: gebinde, preis: preisWert, vorher: '', sid: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) } : { id: p.id, gebinde: gebinde, preis: preisWert, vorher: vorher });
+    V.qId = V.D.id; V.Q.push(op);
     sichereQ(); senden();
     return true;
   }
   /* Was noch in der Schlange wartet, über den Stand vom Server legen (Barcode-Scans mit dem angezeigten Stück; fremde Codes zählen nicht) */
-  function ueberlagere(zu) { V.Q.forEach(function (o) { var k = pgNorm(o.id || o.wunsch); if (!k) return; if (o.gebinde) zu[k] = { gebinde: o.gebinde, preis: o.preis }; else delete zu[k]; }); }
+  function ueberlagere(zu) { Object.keys(zu).forEach(function (k) { zus(zu, k); }); V.Q.forEach(function (o) { anwenden(zu, o); }); }
   function sichereQ() { if (V.qId) { if (V.Q.length) merke('um-q-' + V.qId, JSON.stringify(V.Q)); else weg('um-q-' + V.qId); } $('lade').hidden = (!V.Q.length || !!V.haengt) && V.offen <= 0; banner(); }
   function weg(k) { try { localStorage.removeItem(k); } catch (e) { /* ohne Speicher */ } }
   /* Ungespeicherte Scans (auch von früher, aus dem Speicher des Browsers): oben rot, bis gespeichert oder bewusst verworfen */
@@ -593,7 +762,7 @@
       teil.forEach(function (o) { var k = pgNorm(o.id || o.wunsch); if (k && !bad[k]) ngWeg(k); });
       (r.ergebnis || []).forEach(function (x) { ngWeg(x.id); });
       if (echt.length) { V.rueck = { art: 'stop', titel: 'Nicht gespeichert: ' + echt.map(function (c) { return c.id + ' (' + c.grund + ')'; }).join(', '), text: ' Steht oben in der roten Liste.' }; piep(false); }
-      if (r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) gebindeNeu();
+      if ((r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) || (r.bestandStand && V.D.bestandStand && r.bestandStand !== V.D.bestandStand)) gebindeNeu();
       else if (V.ansicht === 'scan') neuZeichnenScan();
       if (V.Q.length) senden();
     }).withFailureHandler(function (e) {
@@ -613,7 +782,7 @@
     ruf('laden', [id], function (d) {
       if (!V.D || V.D.id !== d.id) return;
       setzeD(d); ueberlagere(V.D.zuordnung);
-      melde('Die Gebinde wurden geändert und neu geladen.');
+      melde('Quelle oder Kanal wurden geändert und neu geladen.');
       if (V.ansicht === 'scan') zeichne();
     });
   }
@@ -630,8 +799,8 @@
       V.abfrageFehler = 0;
       if (!V.D || V.D.id !== id || V.Q.length || V.qLaeuft || V.ansicht !== 'scan') return;
       if (r.status !== 'Scan') { statusGeaendert(r.status); return; }
-      V.D.zuordnung = r.zuordnung;
-      if (r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) { gebindeNeu(); return; }
+      V.D.zuordnung = r.zuordnung; ueberlagere(V.D.zuordnung);
+      if ((r.gebindeStand && V.D.gebindeStand && r.gebindeStand !== V.D.gebindeStand) || (r.bestandStand && V.D.bestandStand && r.bestandStand !== V.D.bestandStand)) { gebindeNeu(); return; }
       var ae = document.activeElement;
       if (!ae || ae.id === 'scan' || !/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) neuZeichnenScan(true);
     }).withFailureHandler(function (e) {
@@ -642,11 +811,10 @@
   setInterval(abfrage, 20000);
   function neuZeichnenScan(still) {
     if (V.ansicht !== 'scan') return;
-    var fokus = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-preis');
-    var d = V.D;
+    var ae = document.activeElement, fokus = ae && ae.getAttribute && (ae.getAttribute('data-preis') || ae.getAttribute('data-anz'));
     Array.prototype.forEach.call(document.querySelectorAll('.gebinde-wahl button'), function (b) { var s = stand(b.getAttribute('data-v')); b.querySelector('small').textContent = s.n + ' Stück · ' + chf(s.t); });
-    var z = Object.keys(d.zuordnung).filter(function (k) { return V.idx[k]; }).length;
-    var info = document.querySelector('.karte .reihe .still'); if (info) info.textContent = z + ' / ' + d.bestand.length;
+    var info = $('zaehler'); if (info) info.textContent = stueckZu() + ' / ' + stueckTotal() + ' Stück';
+    if ($('quelle-platz') && !(ae && ae.id === 'qp-filter')) $('quelle-platz').innerHTML = quelleHtml();
     if (!still) $('rueck').innerHTML = rueckHtml();
     kamText();
     if (V.reiter !== 'bearbeiten' && !fokus) $('reiter-inhalt').innerHTML = reiterHtml();
@@ -658,7 +826,7 @@
   function verwerfen() {
     var d = V.D; if (!d) return;
     if (V.Q.length && !V.haengt) { melde('Es wird noch gespeichert. Bitte einen Moment warten.', true); piep(false); return; }
-    var n = Object.keys(d.zuordnung).filter(function (k) { return V.idx[k]; }).length;
+    var n = stueckZu();
     if (!confirm('Durchgang ' + d.id + ' «' + d.name + '» verwerfen?\n\n' + (n ? n + ' gescannte Stücke werden NICHT übernommen (nur Admins). ' : 'Es ist noch nichts gescannt. ') + 'Stücke und Lagerorte sind danach wieder frei. Das lässt sich nicht rückgängig machen.')) return;
     ruf('verwerfen', [d.id, K()], function () {
       if (KAM.an) kameraAus();
@@ -809,11 +977,16 @@
     var r = V.rueck, w = V.wartet;
     /* Ablehnung (rot) geht vor dem wartenden Stück: sonst sieht man in der Kamera-Leiste nur den tiefen Ton */
     var rot = r && r.art === 'stop';
+    var fragt = w && w.menge == null;
     t.className = rot ? 'stop' : w ? 'warn' : r ? (r.art === 'warte' ? 'warn' : r.art) : '';
-    t.textContent = rot ? r.titel + (w ? ' · wartet noch: ' + w.p.id : '') : w ? '➜ ' + w.p.id + ' · ' + w.p.name + ': Gebinde tippen' : (r && KAM.letzte ? r.titel : 'Stück in den Rahmen, dann Gebinde tippen.');
-    /* Gebinde auch in der Kamera-Leiste: scannen und tippen, ohne zu scrollen (Jonas 24.10.2026) */
+    t.textContent = rot ? r.titel + (w ? ' · wartet noch: ' + w.p.id : '') : fragt ? '➜ ' + w.p.id + ' · ' + T(w.p) + ' Stück: wie viele? (noch ' + w.frei + ' frei)' : w ? '➜ ' + (w.menge > 1 ? w.menge + ' × ' : '') + w.p.id + ' · ' + w.p.name + ': Gebinde tippen' : (r && KAM.letzte ? r.titel : 'Stück in den Rahmen, dann Gebinde tippen.');
+    /* Gebinde auch in der Kamera-Leiste: scannen und tippen, ohne zu scrollen (Jonas 24.10.2026). Bei mehreren Stück zuerst die Anzahl (26.10.2026). */
     var zl = $('kam-ziele');
-    if (zl && V.D) { zl.className = 'kam-ziele' + (w ? ' bereit' : ''); zl.innerHTML = V.D.gebinde.map(function (g) { return '<button class="klein" data-a="ziel" data-v="' + esc(g.id) + '">' + esc(g.name) + '</button>'; }).join(''); }
+    if (zl && V.D) {
+      if (fragt) { var b = []; for (var i = 1; i <= Math.min(w.frei, 12); i++) b.push('<button class="klein" data-a="menge" data-v="' + i + '">' + i + '</button>'); zl.className = 'kam-ziele menge'; zl.innerHTML = b.join('') + (w.frei > 12 ? '<span>mehr: Zahl oben eintippen</span>' : ''); }
+      else if (V.frage && !w) { zl.className = 'kam-ziele bereit'; zl.innerHTML = V.frage.orte.map(function (o) { return '<button class="klein" data-a="fremdJa" data-v="' + esc(o + '|' + V.frage.code) + '">' + esc(o) + ' als Quelle</button>'; }).join('') + '<button class="klein" data-a="fremdNein">Nein</button>'; }
+      else { zl.className = 'kam-ziele' + (w ? ' bereit' : ''); zl.innerHTML = V.D.gebinde.map(function (g) { return '<button class="klein" data-a="ziel" data-v="' + esc(g.id) + '">' + esc(g.name) + '</button>'; }).join(''); }
+    }
   }
   function kameraAus() {
     KAM.an = false; clearTimeout(KAM.timer);
@@ -845,38 +1018,107 @@
   }
 
   /* ---------- 3 · Abschluss ---------- */
+  /* Teilmengen vor dem Abschluss: nur ein Teil umgepackt oder auf mehrere Gebinde verteilt */
+  function teilmengen() {
+    return V.D.bestand.filter(function (p) { var k = pgNorm(p.id), su = summe(k), gs = Object.keys(teile(k)); return su && (gs.length > 1 || su < T(p)); });
+  }
   function abschlussSeite() {
-    var d = V.D, fertig = d.status === 'Abgeschlossen', verworfen = d.status === 'Verworfen', z = d.zuordnung, tot = 0;
-    var offen = d.bestand.filter(function (p) { return !z[pgNorm(p.id)]; }).length;
-    var zeilen = d.gebinde.map(function (g) { var s = stand(g.id); tot += s.t; return '<tr><td><b>' + esc(g.name) + '</b></td><td><span class="etikett ' + g.art + '">' + esc(g.art === 'Verkauf' ? 'Verkauf · ' + g.abnehmer : g.art === 'Lager' ? 'Neue Palette' : 'Entsorgung') + '</span></td><td class="mono">' + esc(g.lagerort || '–') + '</td><td class="zahl">' + s.n + '</td><td class="zahl">' + chf(s.t) + '</td></tr>'; }).join('');
+    var d = V.D, fertig = d.status === 'Abgeschlossen', verworfen = d.status === 'Verworfen', z = d.zuordnung;
+    var offenStueck = d.bestand.reduce(function (s, p) { return s + Math.max(0, frei(p)); }, 0);
+    var zeilen = d.gebinde.map(function (g) { var s = stand(g.id); return '<tr><td><b>' + esc(g.name) + '</b></td><td><span class="etikett ' + g.art + '">' + esc(g.art === 'Verkauf' ? 'Verkauf · ' + g.abnehmer : g.art === 'Lager' ? 'Neue Palette' : 'Entsorgung') + '</span></td><td class="mono">' + esc(g.lagerort || '–') + '</td><td class="zahl">' + s.n + '</td><td class="zahl">' + chf(s.t) + '</td></tr>'; }).join('');
     var h = '<div class="schritte"><span>1 · Setup</span><span>2 · Scan</span><span class="an">3 · Abschluss</span></div>'
-      + '<div class="karte"><h2>' + (fertig ? 'Abgeschlossen' : verworfen ? 'Verworfen' : 'Kontrolle') + '</h2><table><thead><tr><th>Gebinde</th><th>Art</th><th>Lagerort neu</th><th class="zahl">Stück</th><th class="zahl">Total</th></tr></thead><tbody>' + zeilen + '</tbody></table>';
+      + '<div class="karte"><h2>' + (fertig ? 'Abgeschlossen' : verworfen ? 'Verworfen' : 'Kontrolle') + '</h2><table><thead><tr><th>Kanal</th><th>Art</th><th>Lagerort neu</th><th class="zahl">Stück</th><th class="zahl">Total</th></tr></thead><tbody>' + zeilen + '</tbody></table>';
     if (verworfen) return h + '<p style="margin-top:10px">Dieser Durchgang ist verworfen: nichts wird übernommen, Stücke und Lagerorte sind wieder frei.</p></div>';
-    h += '<p style="margin-top:10px">' + (offen ? '<b>' + offen + ' nicht gescannt</b> · bleiben am alten Ort und kommen als «' + NICHT_GEFUNDEN + '» in die Liste' : 'Alles zugeordnet') + '</p>';
-    if (!fertig) return h + '<div class="reihe"><button class="pink" data-a="abschliessen"' + (Object.keys(z).length ? '' : ' disabled') + '>Abschliessen</button><button data-a="zurueckScan">Zurück zum Scan</button><button data-a="verwerfen">Durchgang verwerfen</button></div>'
-      + '</div>';
+    if (!fertig) {
+      var tm = teilmengen();
+      h += '<p style="margin-top:10px">' + (offenStueck ? '<b>' + offenStueck + ' Stück nicht umgepackt</b> · bleiben am alten Ort und kommen als «' + NICHT_GEFUNDEN + '» in die Liste' : 'Alles zugeordnet') + '</p>'
+        + (tm.length ? '<div class="meldung warn"><b style="font-size:18px">' + (tm.length === 1 ? '1 Teilmenge' : tm.length + ' Teilmengen') + '</b><br>Nur ein Teil umgepackt oder auf mehrere Kanäle verteilt. Nach dem Abschluss im Return Tool von Hand aufteilen (Anleitung kommt dann); der Übertrag lässt sie aus.<ul>'
+          + tm.map(function (p) { var k = pgNorm(p.id); return '<li><b>' + esc(p.id) + '</b> ' + esc(p.name) + ': ' + esc(teilText(k)) + ' von ' + T(p) + (frei(p) > 0 ? ', ' + frei(p) + ' bleiben auf ' + esc(p.ort) : '') + '</li>'; }).join('') + '</ul></div>' : '');
+      return h + '<div class="reihe"><button class="pink" data-a="abschliessen"' + (Object.keys(z).length ? '' : ' disabled') + '>Abschliessen</button><button data-a="zurueckScan">Zurück zum Scan</button><button data-a="verwerfen">Durchgang verwerfen</button></div></div>';
+    }
     var listen = d.listen ? d.listen.split('\n').map(function (l) { var i = l.indexOf(': '); return '<li>' + esc(l.slice(0, i)) + ': <a href="' + esc(l.slice(i + 2)) + '">Liste öffnen</a></li>'; }).join('') : '';
     var a = d.aenderungen, erl = a.filter(function (x) { return x.erledigt; }).length, abw = a.filter(function (x) { return /^ABWEICHUNG/.test(x.pruefung || ''); }).length;
-    var akt = { 'Verkaufen': 'Lagerort auf das Gebinde setzen, dann im Return Tool «Lieferung erstellen» (setzt verkauft)', 'Lagerort ändern': 'Lagerort ändern', 'Entsorgen': 'Entsorgen' };
-    akt[NICHT_GEFUNDEN] = 'Beim Umpacken nicht gefunden: am alten Lagerort suchen, sonst im Return Tool klären. Keine Änderung nötig.';
-    h += (listen ? '<h3 style="margin-top:14px">Listen</h3><ul>' + listen + '</ul>' : '') + '</div>'
+    var offenUe = a.filter(function (x) { return !x.erledigt && (x.aktion === 'Verkaufen' || x.aktion === 'Lagerort ändern'); }).length;
+    var tmOffen = a.filter(function (x) { return !x.erledigt && x.aktion === TEILMENGE; });
+    var akt = { 'Verkaufen': 'Lagerort des Abnehmers setzen (Übertrag), dann im Return Tool «Lieferung erstellen» (setzt verkauft)', 'Lagerort ändern': 'Lagerort ändern (Übertrag)', 'Entsorgen': 'Entsorgen' };
+    akt[NICHT_GEFUNDEN] = 'Nicht umgepackt: am alten Lagerort suchen, sonst im Return Tool klären. Keine Änderung nötig.';
+    akt[TEILMENGE] = 'Nur ein Teil der Anzahl: im Return Tool von Hand aufteilen (Anleitung oben), dann abhaken.';
+    h += '<p style="margin-top:10px">' + (offenStueck ? '<b>' + offenStueck + ' Stück nicht umgepackt</b> · bleiben am alten Ort («' + NICHT_GEFUNDEN + '»)' : 'Alles zugeordnet') + '</p>'
+      + (listen ? '<h3 style="margin-top:14px">Listen</h3><ul>' + listen + '</ul>' : '') + '</div>'
+      + lieferungHtml()
       + '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Return Tool</h2><span class="still">' + erl + ' von ' + a.length + ' erledigt</span></div>'
-      + '<div class="reihe" style="margin:12px 0"><button data-a="kopieren">Liste kopieren</button><span class="still">Im Return Tool eintragen, dann abhaken. Verkauf: Lagerort setzen → «Lieferung erstellen».</span></div>'
+      + '<div class="reihe" style="margin:12px 0">' + (offenUe ? '<button class="pink" data-a="uebertragen">Ins Return Tool übertragen (' + offenUe + ')</button>' : '') + '<button data-a="kopieren">Liste kopieren</button>'
+      + '<span class="still">' + (offenUe ? 'Der Übertrag setzt die Lagerorte im Return Tool und hakt ab. ' : '') + 'Verkauf danach im Return Tool: Lagerort markieren → «Lieferung erstellen», erst wenn der Übertrag fertig ist, und nur einmal.</span></div>'
+      + (tmOffen.length ? anleitungHtml(tmOffen) : '')
       + (abw ? '<div class="meldung stop" style="margin-bottom:10px"><span class="gross">' + abw + ' Abweichungen zum Return Tool</span> Vor dem Eintragen prüfen (gelb). Suchen über die ID, die Zeile ist nur ein Hinweis.</div>' : '')
-      + '<table><thead><tr><th><input type="checkbox" data-a="alleErledigt"></th><th>ID</th><th>Bezeichnung</th><th>Aktion</th><th>Tab · Zeile (Hinweis)</th><th>Lagerort alt → neu</th><th class="zahl">VP alt</th><th class="zahl">Preis</th><th>Prüfung</th></tr></thead><tbody>'
+      + '<table><thead><tr><th><input type="checkbox" data-a="alleErledigt"></th><th>ID</th><th>Bezeichnung</th><th>Aktion</th><th class="zahl">Stück</th><th>Tab · Zeile (Hinweis)</th><th>Lagerort alt → neu</th><th class="zahl">VP alt</th><th class="zahl">Preis</th><th>Prüfung</th></tr></thead><tbody>'
       + a.map(function (x) {
-        var ng = x.aktion === NICHT_GEFUNDEN;
-        return '<tr' + (x.erledigt ? ' style="opacity:.5"' : '') + '><td><input type="checkbox" data-erl="' + x.r + '"' + (x.erledigt ? ' checked' : '') + '></td><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td title="' + esc(akt[x.aktion] || '') + '">' + (ng ? '<b>' + esc(x.aktion) + '</b>' : esc(x.aktion)) + (x.abnehmer ? ' · ' + esc(x.abnehmer) : '') + '</td><td>' + esc(x.tab) + ' · ' + esc(x.zeile) + '</td>'
+        var ng = x.aktion === NICHT_GEFUNDEN, tmz = x.aktion === TEILMENGE;
+        return '<tr' + (x.erledigt ? ' style="opacity:.5"' : '') + '><td><input type="checkbox" data-erl="' + x.r + '"' + (x.erledigt ? ' checked' : '') + '></td><td class="mono">' + esc(x.id) + '</td><td>' + esc(x.name) + '</td><td title="' + esc(akt[x.aktion] || '') + '">' + (ng || tmz ? '<b>' + esc(x.aktion) + '</b>' : esc(x.aktion)) + (x.abnehmer ? ' · ' + esc(x.abnehmer) : '') + '</td>'
+          + '<td class="zahl">' + (x.gesamt > 1 ? x.anzahl + ' / ' + x.gesamt : x.anzahl) + '</td><td>' + esc(x.tab) + ' · ' + esc(x.zeile) + '</td>'
           + '<td class="mono">' + esc(x.alt) + (ng ? '' : ' → <b>' + esc(x.neu || (x.aktion === 'Entsorgen' ? 'Entsorgen' : '')) + '</b>') + '</td><td class="zahl' + (!(x.vp > 0) ? ' gelb' : '') + '">' + chf(x.vp) + '</td>'
-          + (ng ? '<td class="zahl">–</td>' : '<td class="zahl"' + (Math.abs(x.preis - x.vp) > 0.004 ? ' style="background:var(--gelb)"' : '') + '>' + chf(x.preis) + '</td>')
+          + (ng ? '<td class="zahl">–</td>' : '<td class="zahl"' + (Math.abs(x.preis - x.vp) > 0.004 ? ' style="background:var(--gelb)"' : '') + '>' + chf(x.preis) + (x.anzahl > 1 ? '<div class="still" style="font-size:12px">pro Stück</div>' : '') + '</td>')
           + '<td' + (/^ABWEICHUNG/.test(x.pruefung || '') ? ' class="abw" style="background:var(--gelb)"' : '') + '>' + esc(x.pruefung || '') + '</td></tr>';
       }).join('')
       + '</tbody></table></div>';
+    if (!V.lief || V.lief.id !== d.id) lieferungLaden();
     return h;
   }
+  /* Anleitung für Teilmengen (Variante A, Jonas 26.10.2026): Zeile im Return Tool von Hand aufteilen */
+  function anleitungHtml(l) {
+    var pro = {}, ord = [];
+    l.forEach(function (x) { var k = pgNorm(x.id); if (!pro[k]) { pro[k] = { x: x, teile: [] }; ord.push(k); } pro[k].teile.push(x); });
+    return '<div class="meldung warn anleitung"><b style="font-size:18px">' + (ord.length === 1 ? '1 Teilmenge' : ord.length + ' Teilmengen') + ' von Hand aufteilen</b><br>Der Übertrag lässt sie aus. Im Return Tool pro Stück:<ol>'
+      + ord.map(function (k) {
+        var e = pro[k], x = e.x, su = e.teile.reduce(function (s, t) { return s + t.anzahl; }, 0), rest = Math.max(0, x.gesamt - su);
+        var teil = e.teile.map(function (t) { return t.anzahl + ' Stück → ' + (t.neu || 'Entsorgen') + (t.gebinde ? ' (' + t.gebinde + ')' : ''); });
+        return '<li><b>' + esc(x.id) + '</b> ' + esc(x.name) + ' · ' + esc(x.tab) + ', Zeile ' + esc(x.zeile) + ' (Hinweis), Anzahl ' + x.gesamt + ' auf ' + esc(x.alt) + ':<br>'
+          + (rest ? 'Anzahl der Zeile auf ' + rest + ' setzen (bleibt auf ' + esc(x.alt) + '), dazu ' : 'Zeile aufteilen in ') + 'je eine Zeile mit denselben Angaben für ' + esc(teil.join(', ')) + '. Wert = Anzahl × VP. Danach unten abhaken.</li>';
+      }).join('') + '</ol></div>';
+  }
+  /* Lieferung im Return Tool (Jonas 26.10.2026): nur lesen, pro Verkauf-Kanal vollständig, offen, unvollständig oder Abweichung */
+  function lieferungLaden() {
+    var id = V.D.id; V.lief = { id: id, laedt: true };
+    google.script.run.withSuccessHandler(function (r) { if (!V.lief || V.lief.id !== id) return; V.lief = { id: id, r: r }; if (V.ansicht === 'abschluss' && V.D && V.D.id === id) zeichne(); })
+      .withFailureHandler(function (e) { if (!V.lief || V.lief.id !== id) return; V.lief = { id: id, fehler: String((e && e.message) || e).replace(/^Error:\s*/, '') }; if (V.ansicht === 'abschluss') zeichne(); }).api('lieferung', [id]);
+  }
+  function lieferungHtml() {
+    var l = V.lief;
+    if (!l || l.id !== V.D.id) return '';
+    var kopf = '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Lieferung</h2><button class="klein" data-a="lieferungPruefen">Neu prüfen</button></div>';
+    if (l.laedt) return kopf + '<p class="still" style="margin-top:10px">Prüfe die Lieferung im Return Tool …</p></div>';
+    if (l.fehler) return kopf + '<div class="meldung stop">Prüfen ging nicht: ' + esc(l.fehler) + '</div></div>';
+    var g = (l.r && l.r.gebinde) || [];
+    if (!g.length) return '';
+    return kopf + g.map(function (x) {
+      var titel = { vollstaendig: '✅ vollständig', offen: '⏳ noch nicht erstellt', leer: '⏳ noch nicht übertragen', unvollstaendig: '❌ unvollständig', abweichung: '❌ Abweichung' }[x.status] || x.status;
+      return '<div class="lief ' + esc(x.status) + '"><b>' + esc(x.name) + ' · ' + esc(x.lagerort) + ' · ' + esc(titel) + '</b><br>' + esc(x.text)
+        + '<br><span class="still">Erwartet ' + x.erwartetStueck + ' Stück · ' + chf(x.erwartetTotal) + (x.stueck ? ' · im Archiv ' + x.stueck + ' Stück · Wert ' + chf(x.wert) : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
+  function lieferungPruefen() { V.lief = null; zeichne(); }
+  /* Übertrag ins Return Tool mit Vorschau (Jonas 26.10.2026) */
+  function uebertragen() {
+    var d = V.D;
+    if (V.ueLaeuft) return;
+    V.ueLaeuft = true; knopfSperren('uebertragen', true);
+    var frei = function () { V.ueLaeuft = false; knopfSperren('uebertragen', false); };
+    ruf('uebertragenVorschau', [d.id], function (v) {
+      var ziele = Object.keys(v.proZiel || {}).map(function (z) { return z + ': ' + v.proZiel[z]; }).join(', ');
+      var text = 'Ins Return Tool übertragen?\n\nLagerorte setzen: ' + v.geschrieben + (ziele ? ' (' + ziele + ')' : '') + (v.schon ? '\nSchon richtig (nur abhaken): ' + v.schon : '')
+        + (v.teilmengen.length ? '\nTeilmengen, von Hand aufteilen: ' + v.teilmengen.length : '') + (v.nichtGefunden ? '\nBleiben, wo sie sind (nicht umgepackt): ' + v.nichtGefunden : '')
+        + (v.fehler.length ? '\n\nNICHT übertragen (' + v.fehler.length + '):\n' + v.fehler.slice(0, 8).join('\n') + (v.fehler.length > 8 ? '\n…' : '') : '');
+      if (!v.geschrieben && !v.schon) { frei(); melde('Nichts zu übertragen.' + (v.fehler.length ? ' ' + v.fehler.length + ' Abweichungen: ' + v.fehler.slice(0, 3).join(' | ') : ''), !!v.fehler.length); return; }
+      if (!confirm(text)) { frei(); return; }
+      ruf('uebertragen', [d.id], function (r) {
+        melde(r.geschrieben + ' Lagerorte ins Return Tool geschrieben' + (r.schon ? ', ' + r.schon + ' schon richtig' : '') + (r.fehler.length ? ', ' + r.fehler.length + ' nicht übertragen (siehe Liste)' : '') + '. Jetzt im Return Tool: Lagerort markieren → «Lieferung erstellen» (nur einmal).', !!r.fehler.length);
+        ruf('laden', [d.id], function (x) { frei(); setzeD(x); V.lief = null; zeichne(); }, function (m) { frei(); melde(m, true); });
+      }, function (m) { frei(); melde(m, true); piep(false); });
+    }, function (m) { frei(); melde(m, true); piep(false); });
+  }
   function abschliessen() {
-    var d = V.D, offen = d.bestand.filter(function (p) { return !d.zuordnung[pgNorm(p.id)]; }).length;
-    if (!confirm('Durchgang ' + d.id + ' abschliessen?' + (offen ? '\n\n' + offen + ' Stücke sind in keinem Gebinde: Sie bleiben, wo sie sind, und kommen als «' + NICHT_GEFUNDEN + '» in die Liste.' : '') + '\n\nDanach lässt sich nichts mehr scannen.')) return;
+    var d = V.D, offen = d.bestand.reduce(function (s, p) { return s + Math.max(0, frei(p)); }, 0), tm = teilmengen().length;
+    if (!confirm('Durchgang ' + d.id + ' abschliessen?' + (offen ? '\n\n' + offen + ' Stück sind in keinem Gebinde: Sie bleiben, wo sie sind, und kommen als «' + NICHT_GEFUNDEN + '» in die Liste.' : '') + (tm ? '\n\n' + tm + ' Teilmengen: im Return Tool von Hand aufteilen.' : '') + '\n\nDanach lässt sich nichts mehr scannen.')) return;
     abschliessenSenden(false);
   }
   /* Kamen eben noch Zuordnungen anderer, fragt der Server zuerst nach (warnung) */
@@ -884,12 +1126,12 @@
     var d = V.D;
     ruf('abschliessen', [d.id, K(), bestaetigt], function (x) {
       if (x && x.warnung) { if (confirm(x.warnung + '\n\nTrotzdem abschliessen?')) abschliessenSenden(true); return; }
-      setzeD(x); zeichne(); melde('Abgeschlossen.' + hinw(x), !!(x.hinweise && x.hinweise.length));
+      setzeD(x); V.lief = null; zeichne(); melde('Abgeschlossen.' + hinw(x), !!(x.hinweise && x.hinweise.length));
     });
   }
   function zurueckScan() { V.ansicht = 'scan'; zeichne(); }
   function kopieren() {
-    var a = V.D.aenderungen, t = ['ID\tBezeichnung\tAktion\tAbnehmer\tTab\tZeile (Hinweis)\tLagerort alt\tLagerort neu\tVP alt\tPreis\tPrüfung'].concat(a.map(function (x) { return [x.id, x.name, x.aktion, x.abnehmer, x.tab, x.zeile, x.alt, x.neu, x.vp.toFixed(2), x.aktion === NICHT_GEFUNDEN ? '' : x.preis.toFixed(2), x.pruefung || ''].join('\t'); })).join('\n');
+    var a = V.D.aenderungen, t = ['ID\tBezeichnung\tAktion\tAbnehmer\tStück\tAnzahl gesamt\tTab\tZeile (Hinweis)\tLagerort alt\tLagerort neu\tVP alt\tPreis pro Stück\tPrüfung'].concat(a.map(function (x) { return [x.id, x.name, x.aktion, x.abnehmer, x.anzahl, x.gesamt, x.tab, x.zeile, x.alt, x.neu, x.vp.toFixed(2), x.aktion === NICHT_GEFUNDEN ? '' : x.preis.toFixed(2), x.pruefung || ''].join('\t'); })).join('\n');
     var ok = function () { melde(a.length + ' Zeilen kopiert.'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { melde('Kopieren ging nicht.', true); }); else melde('Kopieren ging nicht.', true);
   }
@@ -910,7 +1152,9 @@
   }
   var A = { zurStart: zurStart, oeffne: oeffne, neuerDurchgang: neuerDurchgang, gebDazu: gebDazu, gebWeg: gebWeg, vorschlag: vorschlag, alleOrte: alleOrte, keineOrte: keineOrte, anlegen: anlegen,
     aktiv: aktiv, ziel: ziel, reiter: reiter, scanne: scanne, verschieben: verschieben, entfernen: entfernen, zumAbschluss: zumAbschluss, abschliessen: abschliessen, zurueckScan: zurueckScan, kopieren: kopieren,
-    bearbDazu: bearbDazu, bearbWeg: bearbWeg, bearbSpeichern: bearbSpeichern, kamera: kamera, qVerwerfen: qVerwerfen, verwerfen: verwerfen, ngWeg: ngWeg, ngAlle: ngAlle };
+    bearbDazu: bearbDazu, bearbWeg: bearbWeg, bearbSpeichern: bearbSpeichern, kamera: kamera, qVerwerfen: qVerwerfen, verwerfen: verwerfen, ngWeg: ngWeg, ngAlle: ngAlle,
+    menge: menge, mengeOk: mengeOk, quellePlus: quellePlus, quelleDazu: quelleDazu, quelleWeg: quelleWeg, kanalPlus: kanalPlus, fremdJa: fremdJa, fremdNein: fremdNein,
+    uebertragen: uebertragen, lieferungPruefen: lieferungPruefen };
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-a]');
     if (b && A[b.getAttribute('data-a')] && b.tagName !== 'INPUT') {
@@ -927,9 +1171,14 @@
     if (t.getAttribute('data-g') && t.tagName === 'SELECT') { if (V.ansicht === 'setup') { setupLesen(); zeichne(); } else { bearbLesen(); $('reiter-inhalt').innerHTML = reiterHtml(); } return; }
     if (t.getAttribute('data-erl')) { erledigt([Number(t.getAttribute('data-erl'))], t.checked); return; }
     if (t.getAttribute('data-a') === 'alleErledigt') { erledigt(V.D.aenderungen.map(function (x) { return x.r; }), t.checked); return; }
+    if (t.getAttribute('data-qort') !== null) { V.qp.orte[t.getAttribute('data-qort')] = t.checked; t.parentNode.className = t.checked ? 'an' : ''; return; }
+    if (t.getAttribute('data-anz')) { anzSetzen(t.getAttribute('data-anz'), t.value); fokusScan(); return; }
     if (t.getAttribute('data-preis')) { preisSetzen(t.getAttribute('data-preis'), t.value); fokusScan(); }
   });
-  document.addEventListener('input', function (ev) { if (ev.target.id === 's-filter') { V.setup.filter = ev.target.value; $('s-orte').innerHTML = ortHtml(); } });
+  document.addEventListener('input', function (ev) {
+    if (ev.target.id === 's-filter') { V.setup.filter = ev.target.value; $('s-orte').innerHTML = ortHtml(); }
+    if (ev.target.id === 'qp-filter' && V.qp) { V.qp.filter = ev.target.value; var f = ev.target, pos = f.selectionStart; $('quelle-platz').innerHTML = quelleHtml(); var n = $('qp-filter'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { /* ohne */ } } }
+  });
   /* Hand-Scanner (Prüfung 24.10.2026): tippt sehr schnell (unter 50 ms pro Zeichen) und schliesst mit Enter. Landet das in der Scan-Ansicht ausserhalb
      des Scanfelds (Kürzel, Preisfeld, Knopf, nirgends), geht der Code ans Scanfeld und das andere Feld behält seinen alten Wert. */
   var TS = { buf: '', t: 0, el: null, alt: null };
@@ -953,7 +1202,7 @@
     if (ev.key !== 'Enter') return;
     var a = ev.target.getAttribute('data-enter');
     if (a) { ev.preventDefault(); A[a](); return; }
-    if (ev.target.getAttribute('data-preis')) { ev.preventDefault(); ev.target.blur(); }
+    if (ev.target.getAttribute('data-preis') || ev.target.getAttribute('data-anz')) { ev.preventDefault(); ev.target.blur(); }
   });
   $('kuerzel').value = lies('um-kuerzel') || '';
   $('kuerzel').addEventListener('input', function () { merke('um-kuerzel', K()); });

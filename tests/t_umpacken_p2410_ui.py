@@ -35,7 +35,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
     if(MODUS.indexOf('fehler:')===0&&args[1].length){fail&&fail({message:MODUS.slice(7)});return;}
     var konf=[],erg=[];
     args[1].forEach(function(o){ if(o.unbekannt)return; var id=o.id; if(!id&&o.code){id=UMMAP[o.wunsch]||o.wunsch;erg.push({code:o.code,wunsch:o.wunsch,id:id,gebinde:o.gebinde});}
-      if(KONF[id]){konf.push({id:id,grund:KONF[id]});return;} if(o.gebinde)ZU[id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[id];});
+      if(KONF[id]){konf.push({id:id,grund:KONF[id]});return;} if((o.art==='setzen'&&!Number(o.anzahl))||(!o.art&&!o.gebinde))delete ZU[id];else ZU[id]={gebinde:o.gebinde,preis:o.preis===undefined?(ZU[id]||{}).preis:o.preis};});
     r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf,ergebnis:erg,gebindeStand:GSTAND};}
   ok&&ok(r);};
   if(name==='zuordnen'&&(MODUS==='verzoegert'||MODUS==='haengen')&&args[1].length){WARTET.push(antw);return;}
@@ -64,7 +64,7 @@ def tippe(s, gid='U-0001-G1', warte=80):
     s.click('.gebinde-wahl button[data-a=ziel][data-v="%s"]' % gid); s.wait_for_timeout(warte)
 def buche(s, code, gid='U-0001-G1', warte=80):
     scan(s, code, 30); tippe(s, gid, warte)
-OPS = "CALLS.filter(function(c){return c[0]==='zuordnen'&&c[1][1].length}).map(function(c){return c[1][1].map(function(o){return o.unbekannt?('?'+o.unbekannt):(o.id||('bc:'+o.code+'>'+o.wunsch))+(o.gebinde===''?'-weg':'')+(o.preis!==undefined&&o.preis!==''?'@'+o.preis:'')})})"
+OPS = "CALLS.filter(function(c){return c[0]==='zuordnen'&&c[1][1].length}).map(function(c){return c[1][1].map(function(o){return o.unbekannt?('?'+o.unbekannt):(o.id||('bc:'+o.code+'>'+o.wunsch))+((o.gebinde===''||(o.art==='setzen'&&!Number(o.anzahl)))?'-weg':'')+(o.preis!==undefined&&o.preis!==''?'@'+o.preis:'')})})"
 ops = lambda s: s.evaluate(OPS)
 flach = lambda s: [o for x in ops(s) for o in x]
 rot = lambda s: s.locator('#rueck .meldung.stop').count() == 1
@@ -198,7 +198,7 @@ with sync_playwright() as p:
     s.click('button[data-a=zumAbschluss]'); s.wait_for_timeout(150)
     s.click('button[data-a=abschliessen]'); s.wait_for_timeout(200)
     zeilen = s.locator('main table').nth(1).locator('tbody tr')
-    ok(zeilen.nth(1).locator('td.gelb').count() == 1 and zeilen.nth(2).locator('td').nth(7).text_content() == '–' and 'Nicht gefunden – prüfen' in zeilen.nth(2).text_content(), 'B13/B16 Abschluss: VP 0 gelb, «Nicht gefunden – prüfen» ohne Preis')
+    ok(zeilen.nth(1).locator('td.gelb').count() == 1 and zeilen.nth(2).locator('td').nth(8).text_content() == '–' and 'Nicht gefunden – prüfen' in zeilen.nth(2).text_content(), 'B13/B16 Abschluss: VP 0 gelb, «Nicht gefunden – prüfen» ohne Preis')
     # Befund 20: Erledigt mit PG-ID
     s.click('input[data-erl="3"]'); s.wait_for_timeout(120)
     e = s.evaluate("CALLS.filter(function(c){return c[0]==='erledigt'})[0][1]")

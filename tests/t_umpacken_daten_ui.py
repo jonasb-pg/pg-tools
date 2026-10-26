@@ -24,7 +24,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
   if(name==='laden'||name==='anlegen'){r=JSON.parse(JSON.stringify(D));r.zuordnung=JSON.parse(JSON.stringify(ZU));}
   if(name==='zuordnen'){ if(window.ZU_ZU&&args[1].length){fail&&fail(new Error('Der Durchgang ist nicht im Scan (Status: Abgeschlossen).'));return;}
     var konf=[],erg=[];args[1].forEach(function(o){var id=o.id||o.wunsch; if(window.GLEICH){konf.push({id:id,grund:'schon in Balu 1 (JB)',gleich:true});return;}
-      if(o.gebinde)ZU[id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[id]; if(o.code)erg.push({code:o.code,wunsch:o.wunsch,id:id,gebinde:o.gebinde});});
+      if((o.art==='setzen'&&!Number(o.anzahl))||(!o.art&&!o.gebinde))delete ZU[id];else ZU[id]={gebinde:o.gebinde,preis:o.preis===undefined?(ZU[id]||{}).preis:o.preis}; if(o.code)erg.push({code:o.code,wunsch:o.wunsch,id:id,gebinde:o.gebinde});});
     r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:konf,ergebnis:erg};}
   if(name==='abschliessen'){ if(!args[2])r={warnung:'In den letzten 2 Minuten haben andere noch zugeordnet: SM (3). Sind alle fertig und ist alles gespeichert?'};
     else{r=JSON.parse(JSON.stringify(D));r.status='Abgeschlossen';r.zuordnung=ZU;r.listen='Balu: https://docs.google.com/x';r.aenderungen=AEND;r.hinweise=['1 Abweichungen zum Return Tool: vor dem Eintragen prüfen (Spalte «Prüfung»).'];}}

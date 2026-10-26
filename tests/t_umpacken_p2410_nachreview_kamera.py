@@ -24,7 +24,7 @@ window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:functi
  return function(name,args){CALLS.push([name,JSON.parse(JSON.stringify(args))]);setTimeout(function(){var r;
   if(name==='start')r={version:'t',durchgaenge:[{id:'U-0001',name:'Kids',status:'Scan',quelle:'Return Tool',lagerorte:'KID-7',erstellt:'24.10.2026'}]};
   if(name==='laden'){r=JSON.parse(JSON.stringify(D));r.zuordnung=JSON.parse(JSON.stringify(ZU));}
-  if(name==='zuordnen'){args[1].forEach(function(o){if(o.unbekannt)return;var id=o.id||o.wunsch;if(o.gebinde)ZU[id]={gebinde:o.gebinde,preis:o.preis};else delete ZU[id];});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:[],ergebnis:[],gebindeStand:'a'};}
+  if(name==='zuordnen'){args[1].forEach(function(o){if(o.unbekannt)return;var id=o.id||o.wunsch;if((o.art==='setzen'&&!Number(o.anzahl))||(!o.art&&!o.gebinde))delete ZU[id];else ZU[id]={gebinde:o.gebinde,preis:o.preis===undefined?(ZU[id]||{}).preis:o.preis};});r={zuordnung:JSON.parse(JSON.stringify(ZU)),konflikte:[],ergebnis:[],gebindeStand:'a'};}
   ok&&ok(r);},5)}}})})()}};</script>""" % json.dumps(D)
 html = html0.replace('<head>', '<head>' + stub, 1)
 fehler = 0
