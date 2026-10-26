@@ -240,7 +240,7 @@ with sync_playwright() as p:
     b, s, err = seite(p, oeffnen=False)
     s.click('button[data-a=neuerDurchgang]'); s.wait_for_timeout(150)
     s.click('.orte label input'); s.wait_for_timeout(30)
-    s.locator('.geb-zeile').first.locator('[data-g=name]').fill('Neu')
+    s.locator('.geb-zeile').first.locator('[data-g=name]').fill('Neu'); s.locator('.geb-zeile').first.locator('[data-g=lagerort]').fill('NEU-1')
     s.click('button[data-a=anlegen]'); s.wait_for_timeout(80)
     kn = s.locator('button[data-a=anlegen]')
     ok(kn.is_disabled() and 'Wird gespeichert' in kn.text_content(), 'Anlegen: Knopf gesperrt «Wird gespeichert …», solange der Server arbeitet')

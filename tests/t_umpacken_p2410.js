@@ -434,5 +434,16 @@ test('Schnell: Liste von Hand liest weiter alles (IDs über alle Tabs)', () => {
   assert.ok(breit.includes('Archiv Stationär'), 'manuell: alle Tabs ganz');
 });
 
+/* ---------- 26.10.2026 (Simon: «neuer Lagerort fehlt» bei Gebinde «KIDS 20»): Name als Lagerort, wenn er selbst einer ist ---------- */
+test('Lagerort aus dem Namen', () => {
+  const n = lade(), { c } = n;
+  assert.strictEqual(c.ortAusName_('KIDS 20'), 'KIDS-20'); assert.strictEqual(c.ortAusName_('kid-15'), 'KID-15'); assert.strictEqual(c.ortAusName_('BALU2'), 'BALU-2');
+  assert.strictEqual(c.ortAusName_('Balu Palette 1'), ''); assert.strictEqual(c.ortAusName_('Kids neu'), '');
+  const d = n.j(c.anlegen({ name: 'A', quelle: 'rt', lagerorte: ['KID-7'], gebinde: [{ name: 'KIDS 20', art: 'Lager', lagerort: '', preisregel: 'VP' }], kuerzel: 'SI' }));
+  assert.strictEqual(d.gebinde[0].lagerort, 'KIDS-20', 'Lagerort aus dem Namen übernommen');
+  assert.throws(() => c.anlegen({ name: 'B', quelle: 'rt', lagerorte: ['KID-12'], gebinde: [{ name: 'Neue Palette', art: 'Lager', lagerort: '', preisregel: 'VP' }], kuerzel: 'SI' }), /Feld «Neuer Lagerort» fehlt/);
+  assert.throws(() => c.anlegen({ name: 'C', quelle: 'rt', lagerorte: ['KID-12'], gebinde: [{ name: 'KID 15', art: 'Lager', lagerort: '', preisregel: 'VP' }], kuerzel: 'SI' }), /KID-15.*belegt|belegt.*KID-15/, 'belegter Ort aus dem Namen wird abgelehnt');
+});
+
 console.log(fehler ? fehler + ' Fehler' : 't_umpacken_p2410 ok');
 process.exit(fehler ? 1 : 0);

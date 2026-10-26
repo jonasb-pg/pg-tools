@@ -262,8 +262,17 @@
   function vorschlag(v) { setupLesen(); var t = v.split('|'); V.setup.gebinde[Number(t[0])].lagerort = t[1]; zeichne(); }
   function alleOrte() { setupLesen(); var f = norm(V.setup.filter); V.orte.orte.forEach(function (o) { if (!f || norm(o.ort).indexOf(f) > -1) V.setup.orte[o.ort] = true; }); $('s-orte').innerHTML = ortHtml(); ortZahl(); }
   function keineOrte() { V.setup.orte = {}; $('s-orte').innerHTML = ortHtml(); ortZahl(); }
+  /* Name ist selbst ein Lagerort («KIDS 20») und das Feld «Neuer Lagerort» leer: übernehmen (gleich wie der Server, 26.10.2026) */
+  function ortAusName(n) { var m = /^([A-Za-z]{2,8})[\s\-_.]*(\d{1,4})$/.exec(String(n || '').trim()); return m ? m[1].toUpperCase() + '-' + m[2] : ''; }
+  function orteErgaenzen(liste) {
+    var fehlt = '';
+    liste.forEach(function (g) { if (g.art !== 'Entsorgung' && !norm(g.lagerort)) { g.lagerort = ortAusName(g.name); if (!g.lagerort && !fehlt) fehlt = g.name || '(ohne Name)'; } });
+    return fehlt;
+  }
   function anlegen() {
     setupLesen();
+    var fehlt = orteErgaenzen(V.setup.gebinde);
+    if (fehlt) { zeichne(); melde('Gebinde «' + fehlt + '»: Im Feld «Neuer Lagerort» fehlt der Lagerort (z.B. KID-20).', true); piep(false); return; }
     var s = V.setup, orte = Object.keys(s.orte).filter(function (k) { return s.orte[k]; });
     var bel = s.gebinde.filter(function (g) { return g.art !== 'Entsorgung' && belegtText(g.lagerort); });
     if (bel.length) { melde(belegtText(bel[0].lagerort) + '. Bitte einen freien Lagerort wählen.', true); zeichne(); return; }
@@ -364,6 +373,8 @@
   function bearbWeg(i) { bearbLesen(); V.bearb.splice(Number(i), 1); $('reiter-inhalt').innerHTML = reiterHtml(); }
   function bearbSpeichern() {
     bearbLesen();
+    var fehlt = orteErgaenzen(V.bearb);
+    if (fehlt) { $('reiter-inhalt').innerHTML = reiterHtml(); melde('Gebinde «' + fehlt + '»: Im Feld «Neuer Lagerort» fehlt der Lagerort (z.B. KID-20).', true); piep(false); return; }
     if (V.Q.length) { melde('Zuerst fertig speichern, dann nochmals.', true); piep(false); return; }
     /* mit dem Gebinde-Stand, den dieses Gerät kennt: hat jemand anderes inzwischen geändert, lehnt der Server ab (Prüfung 24.10.2026) */
     if (V.bearbLaeuft) return;

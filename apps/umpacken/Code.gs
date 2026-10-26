@@ -27,7 +27,7 @@
  *  - Nicht gescannte Stücke kommen beim Abschluss als «Nicht gefunden – prüfen» in «Änderungen»; fremde Scans stehen im Log.
  */
 
-const VERSION = '2026-10-24.3';
+const VERSION = '2026-10-26.1';
 const TZ = 'Europe/Zurich';
 const RT_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';          // Return Tool, nur lesen
 const DB_ID = '1VexhXpyWyGTVaKiH7BPLPNQyENKYA-flgeRs-FPN-IA';         // Datenbank «(21/10/2026) UMPACK TOOL» (eigenständiges Skript, nicht im Sheet)
@@ -220,6 +220,8 @@ function idGueltig_(s) { return /^[A-Z]{2,4}-\d+$/.test(pgNorm_(s)); }
 /** Lagerort zum Vergleichen: gross, ohne Leerzeichen und Trennzeichen (KID-15 = KID15 = KID 15 = KID–15 = KID_15). Nie so speichern. */
 function ortKey_(s) { return String(s == null ? '' : s).toUpperCase().replace(/[\s\-–—_.\/]+/g, ''); }
 /** Lagerort zum Speichern und Anzeigen: gross, ohne Leerzeichen. */
+/** Name, der selbst ein Lagerort ist («KIDS 20», «kid-15», «BALU2») → «KIDS-20»; sonst ''. */
+function ortAusName_(n) { const m = /^([A-Za-z]{2,8})[\s\-_.]*(\d{1,4})$/.exec(String(n || '').trim()); return m ? m[1].toUpperCase() + '-' + m[2] : ''; }
 function ortName_(s) { return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ''); }
 /** Ähnliche Schreibweise, nur für Hinweise (nie zusammenlegen): KIDS-8 ~ KID-8, KID-08 ~ KID-8. */
 function ortAehnlich_(s) { const k = ortKey_(s), m = /^([A-Z]+?)S?0*(\d+)$/.exec(k); return m ? m[1] + '-' + m[2] : k; }
@@ -478,13 +480,15 @@ function gebindePruefen_(liste) {
   if (!Array.isArray(liste) || !liste.length) throw new Error('Bitte mindestens ein Gebinde anlegen.');
   const namen = {}, orte = {};
   return liste.map(function (g, i) {
-    const name = String(g.name || '').trim(), art = String(g.art || ''), ort = ortName_(g.lagerort), regel = String(g.preisregel || 'VP');
+    const name = String(g.name || '').trim(), art = String(g.art || ''), regel = String(g.preisregel || 'VP');
+    /* 26.10.2026 (Simon: «neuer Lagerort fehlt» bei «KIDS 20»): Lagerort leer und der Name ist ein Lagerort → Name als Lagerort */
+    const ort = ortName_(g.lagerort) || (art !== 'Entsorgung' ? ortAusName_(name) : '');
     if (!name) throw new Error('Gebinde ' + (i + 1) + ': Name fehlt.');
     if (namen[name.toLowerCase()]) throw new Error('Den Gebinde-Namen «' + name + '» gibt es doppelt.');
     namen[name.toLowerCase()] = true;
     if (ARTEN.indexOf(art) < 0) throw new Error('Gebinde «' + name + '»: Art fehlt.');
     if (art === 'Verkauf' && !String(g.abnehmer || '').trim()) throw new Error('Gebinde «' + name + '»: Abnehmer fehlt.');
-    if (art !== 'Entsorgung' && !ort) throw new Error('Gebinde «' + name + '»: neuer Lagerort fehlt.');
+    if (art !== 'Entsorgung' && !ort) throw new Error('Gebinde «' + name + '»: Im Feld «Neuer Lagerort» fehlt der Lagerort (z.B. KID-20). Der Name allein reicht nur, wenn er selbst ein Lagerort ist.');
     if (art !== 'Entsorgung' && orte[ortKey_(ort)]) throw new Error('Den Lagerort «' + ort + '» haben zwei Gebinde.');
     if (art !== 'Entsorgung') orte[ortKey_(ort)] = true;
     if (REGELN.indexOf(regel) < 0) throw new Error('Gebinde «' + name + '»: Preisregel fehlt.');
