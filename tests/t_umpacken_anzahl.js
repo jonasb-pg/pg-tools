@@ -175,11 +175,20 @@ test('Barcode mit Anzahl: wählt ein Stück mit genug freien Stück', () => {
 
 test('Alte Seiten (ohne art) und alte Zeilen (ohne Anzahl): ganzes Stück', () => {
   const n = neu();
-  let r = n.zu([{ id: 'PG-1', gebinde: n.G1, vorher: '' }]);
-  assert.ok(r.zuordnung['PG-1'].n === 3 && r.zuordnung['PG-1'].teile[n.G1].n === 3, 'altes Verschieben bucht alle 3');
-  assert.deepStrictEqual(spalteW(n.DB, 'Zuordnung', 'PG-1', 'Anzahl'), [''], 'Zeile ohne Anzahl');
+  let r = n.zu([{ id: 'PG-2', gebinde: n.G1, vorher: '' }]);
+  assert.ok(r.zuordnung['PG-2'].n === 1, 'alte Seite, Stück mit Anzahl 1: wie bisher');
+  assert.deepStrictEqual(spalteW(n.DB, 'Zuordnung', 'PG-2', 'Anzahl'), [''], 'Zeile ohne Anzahl');
+  r = n.zu([{ id: 'PG-2', gebinde: '', vorher: n.G1 }]);
+  assert.ok(!r.zuordnung['PG-2'], 'alte Seite entfernt');
+  /* Review 26.10.2026: alte Seite darf bei mehreren Stück nichts buchen (Anzahl muss gewählt werden) */
+  r = n.zu([{ id: 'PG-1', gebinde: n.G1, vorher: '' }]);
+  assert.ok(!r.zuordnung['PG-1'] && /3 Stück: Seite neu laden und Anzahl wählen/.test(r.konflikte[0].grund), JSON.stringify(r.konflikte));
+  n.zu([{ art: 'dazu', id: 'PG-1', gebinde: n.G1, menge: 1, sid: 'w1' }]);
+  r = n.zu([{ id: 'PG-1', gebinde: n.G2, vorher: n.G1 }]);
+  assert.ok(r.zuordnung['PG-1'].teile[n.G1].n === 1 && !r.zuordnung['PG-1'].teile[n.G2], 'altes Verschieben einer Teilmenge abgelehnt');
   r = n.zu([{ id: 'PG-1', gebinde: '', vorher: n.G1 }]);
-  assert.ok(!r.zuordnung['PG-1']);
+  assert.ok(r.zuordnung['PG-1'] && r.konflikte.length === 1, 'altes Entfernen einer Teilmenge abgelehnt');
+  n.zu([{ art: 'setzen', id: 'PG-1', gebinde: n.G1, anzahl: 0, vorher: 1, sid: 'w2' }]);
   n.zu([{ art: 'dazu', id: 'PG-3', gebinde: n.G1, menge: 1, sid: 'x' }, { art: 'dazu', id: 'PG-3', gebinde: n.G2, menge: 1, sid: 'y' }]);
   r = n.zu([{ id: 'PG-3', gebinde: n.G1, vorher: n.G1 }]);
   assert.ok(/auf mehrere Gebinde verteilt/.test(r.konflikte[0].grund), 'alter Vorgang auf verteiltes Stück abgelehnt');
@@ -278,6 +287,39 @@ test('Lieferung prüfen: leer, offen, unvollständig, vollständig, Abweichung',
   l = L(); assert.ok(l.status === 'vollstaendig' && l.stueck === 2 && l.liefNr.join() === 'STA-1' && l.wert === 15, JSON.stringify(l));
   ar[ar.length - 1][5] = 3;                                                 // Anzahl im Archiv falsch (wie heute beim Kalaha)
   l = L(); assert.ok(l.status === 'abweichung' && /Anzahl: PG-4 \(3 statt 1\)/.test(l.text), JSON.stringify(l));
+});
+
+test('Review: Übertrag schreibt nicht auf einen fremd belegten Ziel-Lagerort und nicht bei doppelter ID; hakt sofort ab', () => {
+  const n = neu(), { c, RT } = n;
+  n.zu([{ art: 'dazu', id: 'PG-2', gebinde: n.G1, menge: 1, sid: '1' }, { art: 'dazu', id: 'PG-4', gebinde: n.G2, menge: 1, sid: '2' }]);
+  c.abschliessen(n.d.id, 'BB', true);
+  const st = RT.getSheetByName('Stationär').v, ort = id => st.find(r => r[1] === id)[13];
+  st[st.length - 1][13] = 'KID-20';                                         // fremde Ware inzwischen auf KID-20
+  const x = n.j(c.uebertragen(n.d.id));
+  assert.ok(ort('PG-2') === 'BALU1' && ort('PG-4') === 'KID-12' && x.fehler.length === 1 && /Lagerort KID-20 im Return Tool schon belegt \(Stationär PG-8\)/.test(x.fehler[0]), JSON.stringify(x));
+});
+test('Review: Verkauf-Kanal eines abgeschlossenen Durchgangs nie wieder Quelle; «(ohne Lagerort)» klar abgelehnt', () => {
+  const n = neu(), { c, j } = n;
+  n.zu([{ art: 'dazu', id: 'PG-2', gebinde: n.G1, menge: 1, sid: '1' }]);
+  c.abschliessen(n.d.id, 'BB', true); c.uebertragen(n.d.id);
+  const d2 = j(c.anlegen({ name: 'Z', quelle: 'rt', lagerorte: ['KID-13'], gebinde: [lager('X', 'KID-31')] }));
+  assert.throws(() => c.quelleErgaenzen(d2.id, ['BALU1']), /Verkauf-Kanal von U-0001/);
+  assert.throws(() => c.quelleErgaenzen(d2.id, ['(ohne Lagerort)']), /ohne Lagerort/);
+});
+test('Review: Lieferung bei alten Änderungen ohne «Anzahl» nimmt die Anzahl aus dem Archiv; offene Teilmengen gemeldet', () => {
+  const n = neu(), { c, RT, DB, j } = n;
+  n.zu([{ art: 'dazu', id: 'PG-2', gebinde: n.G1, menge: 1, sid: '1' }, { art: 'dazu', id: 'PG-1', gebinde: n.G1, menge: 1, sid: '2' }]);
+  c.abschliessen(n.d.id, 'BB', true); c.uebertragen(n.d.id);
+  let l = j(c.lieferung(n.d.id)).gebinde[0];
+  assert.ok(l.teilmengenOffen === 1 && /1 Teilmenge\(n\) für diesen Kanal noch nicht aufgeteilt/.test(l.text), JSON.stringify(l));
+  const ae = tab(DB, 'Änderungen'), k = ae[0];
+  ae.slice(1).forEach(r => { r[k.indexOf('Anzahl')] = ''; r[k.indexOf('Anzahl gesamt')] = ''; r[k.indexOf('Erledigt')] = 'x'; });      // wie vor 2026-10-26.3
+  const st = RT.getSheetByName('Stationär').v, ar = RT.getSheetByName('Archiv Stationär').v, r2 = st.find(x => x[1] === 'PG-2');
+  const zeile = r2.slice(0, 14); zeile[5] = 2; ar.push(zeile.concat(['VERKAUFT', '26.10.2026', 'STA-9'])); st.splice(st.indexOf(r2), 1);
+  const r1 = st.find(x => x[1] === 'PG-1'); r1[13] = 'BALU1'; ar.push(r1.slice(0, 14).concat(['VERKAUFT', '26.10.2026', 'STA-9'])); st.splice(st.indexOf(r1), 1);
+  c.vergiss_();
+  l = j(c.lieferung(n.d.id)).gebinde[0];
+  assert.ok(l.status === 'vollstaendig', JSON.stringify(l));
 });
 
 console.log(fehler ? fehler + ' Fehler' : 't_umpacken_anzahl ok');

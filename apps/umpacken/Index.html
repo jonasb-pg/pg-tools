@@ -535,7 +535,7 @@
     V.scanErg = { p: p, art: 'warte', bc: !!bc };
     if (tot === 1) {
       var a = V.D.zuordnung[k];
-      V.wartet = { p: p, bc: bc, menge: 1 };
+      V.wartet = { p: p, bc: bc, menge: 1, vorG: a ? a.gebinde : '' };
       V.rueck = a
         ? { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + (V.geb[a.gebinde] || {}).name, text: ' ' + p.name + '. Anderes Gebinde tippen = verschieben.' + nicht }
         : { art: 'warte', titel: '➜ ' + p.id + ' · ' + p.name, text: ' Aus ' + (p.ort || '–') + ' · ' + chf(p.vp) + '. Jetzt das Gebinde tippen.' + nicht };
@@ -576,6 +576,12 @@
       p = andere[0]; k = pgNorm(p.id);
     }
     var a = V.D.zuordnung[k];
+    /* Inzwischen von jemand anderem gebucht oder verschoben (Abfrage alle 20 s): nicht still verschieben, zuerst neu warnen (Review 26.10.2026) */
+    if (T(p) === 1 && !bc && (a ? a.gebinde : '') !== (w.vorG || '')) {
+      w.vorG = a ? a.gebinde : '';
+      V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + (a ? ' ist inzwischen in ' + (V.geb[a.gebinde] || {}).name + (a.kuerzel ? ' (' + a.kuerzel + ')' : '') : ' wurde inzwischen entfernt'), text: ' Nochmals tippen = ' + (a ? 'verschieben.' : 'zuordnen.') };
+      piep(false); neuZeichnenScan(); zielHervor(); return;
+    }
     if (T(p) === 1 && a) {
       if (a.gebinde === id) { V.wartet = null; V.rueck = { art: 'warn', titel: '⚠️ ' + p.id + ' ist schon in ' + g.name, text: ' Nichts geändert.' }; piep(false); neuZeichnenScan(); zielHervor(); return; }
       if (bcOffen(k)) { ablehnen('❌ ' + p.id + ' NICHT verschoben', ' Der Barcode-Scan wird noch gespeichert. Gleich nochmals tippen.', null, true); return; }
@@ -1049,7 +1055,7 @@
       + '<div class="karte"><div class="reihe" style="justify-content:space-between"><h2 style="margin:0">Return Tool</h2><span class="still">' + erl + ' von ' + a.length + ' erledigt</span></div>'
       + '<div class="reihe" style="margin:12px 0">' + (offenUe ? '<button class="pink" data-a="uebertragen">Ins Return Tool übertragen (' + offenUe + ')</button>' : '') + '<button data-a="kopieren">Liste kopieren</button>'
       + '<span class="still">' + (offenUe ? 'Der Übertrag setzt die Lagerorte im Return Tool und hakt ab. ' : '') + 'Verkauf danach im Return Tool: Lagerort markieren → «Lieferung erstellen», erst wenn der Übertrag fertig ist, und nur einmal.</span></div>'
-      + (tmOffen.length ? anleitungHtml(tmOffen) : '')
+      + (tmOffen.length ? anleitungHtml(tmOffen, a) : '')
       + (abw ? '<div class="meldung stop" style="margin-bottom:10px"><span class="gross">' + abw + ' Abweichungen zum Return Tool</span> Vor dem Eintragen prüfen (gelb). Suchen über die ID, die Zeile ist nur ein Hinweis.</div>' : '')
       + '<table><thead><tr><th><input type="checkbox" data-a="alleErledigt"></th><th>ID</th><th>Bezeichnung</th><th>Aktion</th><th class="zahl">Stück</th><th>Tab · Zeile (Hinweis)</th><th>Lagerort alt → neu</th><th class="zahl">VP alt</th><th class="zahl">Preis</th><th>Prüfung</th></tr></thead><tbody>'
       + a.map(function (x) {
@@ -1065,15 +1071,18 @@
     return h;
   }
   /* Anleitung für Teilmengen (Variante A, Jonas 26.10.2026): Zeile im Return Tool von Hand aufteilen */
-  function anleitungHtml(l) {
+  function anleitungHtml(l, alle) {
     var pro = {}, ord = [];
-    l.forEach(function (x) { var k = pgNorm(x.id); if (!pro[k]) { pro[k] = { x: x, teile: [] }; ord.push(k); } pro[k].teile.push(x); });
+    l.forEach(function (x) { var k = pgNorm(x.id); if (!pro[k]) { pro[k] = { x: x, teile: [], alle: [] }; ord.push(k); } pro[k].teile.push(x); });
+    /* Rest aus allen Teilmengen dieses Stücks (auch schon abgehakten), sonst stimmt die Anzahl nach dem ersten Haken nicht mehr (Review 26.10.2026) */
+    (alle || l).forEach(function (x) { var k = pgNorm(x.id); if (pro[k] && x.aktion === TEILMENGE) pro[k].alle.push(x); });
     return '<div class="meldung warn anleitung"><b style="font-size:18px">' + (ord.length === 1 ? '1 Teilmenge' : ord.length + ' Teilmengen') + ' von Hand aufteilen</b><br>Der Übertrag lässt sie aus. Im Return Tool pro Stück:<ol>'
       + ord.map(function (k) {
-        var e = pro[k], x = e.x, su = e.teile.reduce(function (s, t) { return s + t.anzahl; }, 0), rest = Math.max(0, x.gesamt - su);
+        var e = pro[k], x = e.x, su = (e.alle.length ? e.alle : e.teile).reduce(function (s, t) { return s + t.anzahl; }, 0), rest = Math.max(0, x.gesamt - su), schonErl = e.alle.length > e.teile.length;
         var teil = e.teile.map(function (t) { return t.anzahl + ' Stück → ' + (t.neu || 'Entsorgen') + (t.gebinde ? ' (' + t.gebinde + ')' : ''); });
         return '<li><b>' + esc(x.id) + '</b> ' + esc(x.name) + ' · ' + esc(x.tab) + ', Zeile ' + esc(x.zeile) + ' (Hinweis), Anzahl ' + x.gesamt + ' auf ' + esc(x.alt) + ':<br>'
-          + (rest ? 'Anzahl der Zeile auf ' + rest + ' setzen (bleibt auf ' + esc(x.alt) + '), dazu ' : 'Zeile aufteilen in ') + 'je eine Zeile mit denselben Angaben für ' + esc(teil.join(', ')) + '. Wert = Anzahl × VP. Danach unten abhaken.</li>';
+          + (schonErl ? 'Ein Teil ist schon abgehakt. Noch offen: je eine Zeile mit denselben Angaben für ' + esc(teil.join(', ')) + '; die Originalzeile behält am Ende ' + rest + ' Stück auf ' + esc(x.alt) + '.'
+            : (rest ? 'Anzahl der Zeile auf ' + rest + ' setzen (bleibt auf ' + esc(x.alt) + '), dazu ' : 'Zeile aufteilen in ') + 'je eine Zeile mit denselben Angaben für ' + esc(teil.join(', ')) + '.') + ' Wert = Anzahl × VP. Danach unten abhaken.</li>';
       }).join('') + '</ol></div>';
   }
   /* Lieferung im Return Tool (Jonas 26.10.2026): nur lesen, pro Verkauf-Kanal vollständig, offen, unvollständig oder Abweichung */
@@ -1105,13 +1114,15 @@
     var frei = function () { V.ueLaeuft = false; knopfSperren('uebertragen', false); };
     ruf('uebertragenVorschau', [d.id], function (v) {
       var ziele = Object.keys(v.proZiel || {}).map(function (z) { return z + ': ' + v.proZiel[z]; }).join(', ');
+      var tmVk = d.aenderungen.filter(function (x) { return !x.erledigt && x.aktion === TEILMENGE && x.abnehmer; }).length;
+      var warnTm = tmVk ? '\n\nACHTUNG: ' + tmVk + ' Teilmengen für einen Verkauf sind noch nicht aufgeteilt. Zuerst im Return Tool aufteilen, erst dann «Lieferung erstellen».' : '';
       var text = 'Ins Return Tool übertragen?\n\nLagerorte setzen: ' + v.geschrieben + (ziele ? ' (' + ziele + ')' : '') + (v.schon ? '\nSchon richtig (nur abhaken): ' + v.schon : '')
         + (v.teilmengen.length ? '\nTeilmengen, von Hand aufteilen: ' + v.teilmengen.length : '') + (v.nichtGefunden ? '\nBleiben, wo sie sind (nicht umgepackt): ' + v.nichtGefunden : '')
-        + (v.fehler.length ? '\n\nNICHT übertragen (' + v.fehler.length + '):\n' + v.fehler.slice(0, 8).join('\n') + (v.fehler.length > 8 ? '\n…' : '') : '');
+        + (v.fehler.length ? '\n\nNICHT übertragen (' + v.fehler.length + '):\n' + v.fehler.slice(0, 8).join('\n') + (v.fehler.length > 8 ? '\n…' : '') : '') + warnTm;
       if (!v.geschrieben && !v.schon) { frei(); melde('Nichts zu übertragen.' + (v.fehler.length ? ' ' + v.fehler.length + ' Abweichungen: ' + v.fehler.slice(0, 3).join(' | ') : ''), !!v.fehler.length); return; }
       if (!confirm(text)) { frei(); return; }
       ruf('uebertragen', [d.id], function (r) {
-        melde(r.geschrieben + ' Lagerorte ins Return Tool geschrieben' + (r.schon ? ', ' + r.schon + ' schon richtig' : '') + (r.fehler.length ? ', ' + r.fehler.length + ' nicht übertragen (siehe Liste)' : '') + '. Jetzt im Return Tool: Lagerort markieren → «Lieferung erstellen» (nur einmal).', !!r.fehler.length);
+        melde(r.geschrieben + ' Lagerorte ins Return Tool geschrieben' + (r.schon ? ', ' + r.schon + ' schon richtig' : '') + (r.fehler.length ? ', ' + r.fehler.length + ' nicht übertragen (siehe Liste)' : '') + (tmVk ? '. Zuerst die Teilmengen im Return Tool aufteilen, dann' : '. Jetzt im Return Tool:') + ' Lagerort markieren → «Lieferung erstellen» (nur einmal).', !!r.fehler.length || !!tmVk);
         ruf('laden', [d.id], function (x) { frei(); setzeD(x); V.lief = null; zeichne(); }, function (m) { frei(); melde(m, true); });
       }, function (m) { frei(); melde(m, true); piep(false); });
     }, function (m) { frei(); melde(m, true); piep(false); });

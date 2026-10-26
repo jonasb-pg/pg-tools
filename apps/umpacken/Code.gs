@@ -650,8 +650,8 @@ function gebindeAendern(id, liste, stand) {
  * anderen offenen Durchgang, doppelte IDs. Zeilen ohne gültige ID: Hinweis.
  */
 function quelleErgaenzen(id, orte, kuerzel) {
-  orte = (orte || []).map(function (o) { return String(o || '').trim(); }).filter(String);
-  if (!orte.length) throw new Error('Bitte mindestens einen Lagerort wählen.');
+  orte = (orte || []).map(function (o) { return String(o || '').trim(); }).filter(function (o) { return o && o !== '(ohne Lagerort)'; });
+  if (!orte.length) throw new Error('Bitte mindestens einen Lagerort wählen (Stücke ohne Lagerort lassen sich nicht nachträglich dazunehmen).');
   const d = durchgang_(id);
   if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
   let rt;
@@ -671,6 +671,12 @@ function quelleErgaenzen(id, orte, kuerzel) {
     offeneGebinde_().forEach(function (g) {
       const k = ortKey_(g['Lagerort neu']);
       if (k && wahl[k]) throw new Error('«' + wahl[k] + '» ist ' + (String(g['Durchgang']) === id ? 'ein Kanal dieses Durchgangs' : 'ein Kanal im offenen Durchgang ' + g['Durchgang']) + ' (Gebinde «' + g['Name'] + '»).');
+    });
+    /* Verkauf-Kanal eines abgeschlossenen Durchgangs (z.B. BALU1 vor «Lieferung erstellen»): verkauft, nie wieder Quelle (Review 26.10.2026) */
+    const zu = {}; lies_('Durchgänge').z.forEach(function (x) { if (String(x['Status']) === 'Abgeschlossen') zu[String(x['Durchgang'])] = true; });
+    lies_('Gebinde').z.forEach(function (g) {
+      const k = ortKey_(g['Lagerort neu']);
+      if (k && wahl[k] && zu[String(g['Durchgang'])] && String(g['Art']) === 'Verkauf') throw new Error('«' + wahl[k] + '» ist der Verkauf-Kanal von ' + g['Durchgang'] + ' (' + g['Abnehmer'] + '): verkauft, nicht als Quelle.');
     });
     const neu = rt.stuecke.filter(function (p) { return wahl[ortKey_(p.ort)]; });
     Object.keys(wahl).forEach(function (k) {
@@ -698,9 +704,10 @@ function quelleEntfernen(id, ort, kuerzel) {
   return gesperrt_(function () {
     const d = durchgang_(id);
     if (String(d['Status']) !== 'Scan') throw new Error('Der Durchgang ist nicht im Scan (Status: ' + d['Status'] + ').');
+    if (String(ort) === '(ohne Lagerort)') ort = '';
     const k = ortKey_(ort), alle = lies_('Bestand').z.filter(function (p) { return String(p['Durchgang']) === id; });
     const weg = alle.filter(function (p) { return ortKey_(p['Lagerort alt']) === k; });
-    if (!weg.length) throw new Error('«' + ort + '» ist keine Quelle dieses Durchgangs.');
+    if (!weg.length) throw new Error('«' + (ort || '(ohne Lagerort)') + '» ist keine Quelle dieses Durchgangs.');
     if (weg.length === alle.length) throw new Error('Das ist die letzte Quelle. Falscher Durchgang: «Durchgang verwerfen».');
     const z = zuordnungVon_(id), belegt = weg.filter(function (p) { return z[norm_(p['PG-ID'])]; });
     if (belegt.length) throw new Error('Aus «' + ort + '» sind schon ' + belegt.length + ' Stücke zugeordnet (' + kurz_(belegt.map(function (p) { return p['PG-ID']; }), 5) + '). Zuerst dort entfernen.');
@@ -774,13 +781,17 @@ function lieferung(id) {
     });
   });
   return { gebinde: Object.keys(ziele).map(function (k) {
-    const x = ziele[k], g = x.g, erwartet = {};
-    let erwStueck = 0, erwTotal = 0;
+    const x = ziele[k], g = x.g, erwartet = {}, unbekannt = {};
+    let erwStueck = 0, erwTotal = 0, tmOffen = 0;
     aend.forEach(function (r) {
       if (String(r['Gebinde']) !== String(g['Name']) || (r['Aktion'] !== 'Verkaufen' && r['Aktion'] !== TEILMENGE)) return;
-      const n = anzOderNull_(r['Anzahl']) || 1, kk = norm_(r['PG-ID']);
+      if (r['Aktion'] === TEILMENGE && !String(r['Erledigt'] || '').trim()) tmOffen++;
+      /* Durchgänge von vor 2026-10-26.3 haben keine «Anzahl»: dann gilt die Anzahl im Archiv (unbekannt = null) */
+      const an = anzOderNull_(r['Anzahl']), n = an || anzOderNull_(r['Anzahl gesamt']), kk = norm_(r['PG-ID']);
+      if (!n) { unbekannt[kk] = true; erwartet[kk] = erwartet[kk] || 0; return; }
       erwartet[kk] = (erwartet[kk] || 0) + n; erwStueck += n; erwTotal += n * zahl_(r['Preis']);
     });
+    Object.keys(unbekannt).forEach(function (kk) { const a = x.archiv.filter(function (r) { return norm_(r.id) === kk; }).reduce(function (s, r) { return s + r.anzahl; }, 0) || 1; erwartet[kk] = a; erwStueck += a; });
     const proId = {}, doppelt = [];
     x.archiv.forEach(function (a) { const kk = norm_(a.id); if (proId[kk]) doppelt.push(a.id); proId[kk] = (proId[kk] || 0) + a.anzahl; });
     const fehlend = Object.keys(erwartet).filter(function (kk) { return !proId[kk] && !x.aktiv.some(function (a) { return norm_(a.id) === kk; }); });
@@ -796,7 +807,8 @@ function lieferung(id) {
       status = 'abweichung';
       text = 'Abweichung: ' + [fehlend.length ? 'fehlt im Archiv: ' + kurz_(fehlend, 10) : '', fremd.length ? 'nicht aus diesem Durchgang: ' + kurz_(fremd, 10) : '', anzFalsch.length ? 'Anzahl: ' + kurz_(anzFalsch, 10) : '', doppelt.length ? 'doppelt im Archiv: ' + kurz_(doppelt, 10) : '', 'Stück ' + stueck + ' statt ' + erwStueck].filter(String).join('; ') + '.';
     } else { status = 'vollstaendig'; text = 'Vollständig: ' + stueck + ' Stück im Archiv' + (liefNr.length ? ' (' + liefNr.join(', ') + ')' : '') + '.'; }
-    return { name: String(g['Name']), abnehmer: String(g['Abnehmer']), lagerort: String(g['Lagerort neu']), status: status, text: text, stueck: stueck, wert: wert,
+    if (tmOffen && status !== 'vollstaendig') text += ' Achtung: ' + tmOffen + ' Teilmenge(n) für diesen Kanal noch nicht aufgeteilt; zuerst im Return Tool aufteilen, dann liefern.';
+    return { name: String(g['Name']), abnehmer: String(g['Abnehmer']), lagerort: String(g['Lagerort neu']), status: status, text: text, stueck: stueck, wert: wert, teilmengenOffen: tmOffen,
       erwartetStueck: erwStueck, erwartetTotal: rappen_(erwTotal), liefNr: liefNr, aktiv: x.aktiv.map(function (r) { return r.id; }) };
   }) };
 }
@@ -999,8 +1011,10 @@ function zuordnen(id, ops, kuerzel) {
       const k = norm_(o.id), jetzt = z[k] ? z[k].gebinde : '';
       if (!bestand[k]) { konflikte.push({ id: o.id, grund: 'nicht in der Quelle' }); fremd.push(String(o.id).slice(0, 40)); return; }
       if (o.gebinde && !gebinde[o.gebinde]) { konflikte.push({ id: o.id, grund: 'Gebinde gibt es nicht (mehr)' }); return; }
-      /* Ein alter Vorgang fürs ganze Stück passt nicht zu einem Stück, das schon auf mehrere Gebinde verteilt ist */
+      /* Ein alter Vorgang fürs ganze Stück (Seite von vor 2026-10-26.3) darf bei mehreren Stück nichts buchen: die Anzahl muss gewählt werden (Review 26.10.2026).
+         Erlaubt bleibt nur das Entfernen eines Stücks, das ganz in einem Gebinde liegt. */
       if (z[k] && Object.keys(z[k].teile).length > 1) { konflikte.push({ id: o.id, grund: 'auf mehrere Gebinde verteilt, Seite neu laden' }); return; }
+      if (anzBestand_(bestand[k]) > 1 && (o.gebinde || (z[k] && z[k].n < anzBestand_(bestand[k])))) { konflikte.push({ id: o.id, grund: anzBestand_(bestand[k]) + ' Stück: Seite neu laden und Anzahl wählen' }); return; }
       if (o.vorher === '' && jetzt) {
         konflikte.push({ id: o.id, grund: 'schon in ' + gName(jetzt) + (z[k].kuerzel ? ' (' + z[k].kuerzel + ')' : ''), gebinde: jetzt, gleich: jetzt === o.gebinde && z[k].kuerzel === ku });
         return;
@@ -1325,14 +1339,37 @@ function uebertragen(id, trocken) {
     const anz = n > 0 && cAnz > 0 ? sh.getRange(hz + 1, cAnz, n, 1).getValues().map(function (r) { return anzOderNull_(r[0]) || 1; }) : null;
     return (tabs[name] = { sh: sh, hz: hz, cOrt: cOrt, ids: ids, orte: orte, anz: anz });
   };
+  /* Review 26.10.2026: Ziel-Lagerort darf im Return Tool nur Zeilen dieses Durchgangs haben (sonst Mischung mit fremder Ware). Liest ID und Lagerort aller Tabs. */
+  const fremdAmZiel = function (ziele, eigene) {
+    const aus = {};
+    rt.getSheets().forEach(function (sh) {
+      const last = sh.getLastRow(); if (last < 2) return;
+      const kv = sh.getRange(1, 1, Math.min(last, 15), sh.getLastColumn()).getValues();
+      let hz = -1, cI = -1, cO = -1;
+      for (let i = 0; i < kv.length; i++) { const k = kv[i].map(function (x) { return String(x).trim(); }); if (k.indexOf('Lagerort') > -1) { hz = i + 1; cI = k.indexOf('ID'); cO = k.indexOf('Lagerort'); break; } }
+      if (hz < 0 || last <= hz) return;
+      const orte = sh.getRange(hz + 1, cO + 1, last - hz, 1).getValues(), ids = cI > -1 ? sh.getRange(hz + 1, cI + 1, last - hz, 1).getValues() : null;
+      orte.forEach(function (o, i) { const z = ortKey_(o[0]); if (ziele[z] && !(ids && eigene[norm_(ids[i][0])])) (aus[z] = aus[z] || []).push(sh.getName() + ' ' + (ids ? String(ids[i][0] || '(ohne ID)') : 'Zeile ' + (hz + 1 + i))); });
+    });
+    return aus;
+  };
   const lauf = function () {
     const alle = lies_('Änderungen').z.filter(function (r) { return String(r['Durchgang']) === id && !String(r['Erledigt'] || '').trim(); });
     const offen = alle.filter(function (r) { return r['Aktion'] === 'Verkaufen' || r['Aktion'] === 'Lagerort ändern'; });
     const aend = [], fehler = [], proZiel = {}, t = zeit_() + ' ' + (ich_() || einrichter_()) + ' (automatisch)';
     let geschrieben = 0, schon = 0;
+    const ziele = {}, eigene = {};
+    lies_('Änderungen').z.forEach(function (r) { if (String(r['Durchgang']) === id) eigene[norm_(r['PG-ID'])] = true; });
+    offen.forEach(function (r) { const z = ortKey_(r['Lagerort neu']); if (z) ziele[z] = true; });
+    const fremd = Object.keys(ziele).length ? fremdAmZiel(ziele, eigene) : {};
     offen.forEach(function (r) {
       const pg = String(r['PG-ID']), k = norm_(pg), ziel = ortName_(r['Lagerort neu']), x = tab(String(r['Return-Tool-Tab'] || '').trim());
       if (!ziel) { fehler.push(pg + ': kein neuer Lagerort'); return; }
+      const fz = fremd[ortKey_(ziel)];
+      if (fz) { fehler.push(pg + ': Lagerort ' + ziel + ' im Return Tool schon belegt (' + kurz_(fz, 3) + ')'); return; }
+      /* Abweichungen vom Abschluss, die der Übertrag nicht selbst lösen kann (doppelte ID, Stück in einem anderen offenen Durchgang) */
+      const pru = String(r['Prüfung'] || '');
+      if (/× im Return Tool|auch in U-/.test(pru)) { fehler.push(pg + ': beim Abschluss ' + pru.replace(/^ABWEICHUNG:\s*/, '')); return; }
       if (!x) { fehler.push(pg + ': Tab «' + r['Return-Tool-Tab'] + '» nicht lesbar'); return; }
       let i = Number(r['Zeile']) - x.hz - 1;
       if (!(i >= 0 && x.ids[i] === k)) {
@@ -1345,7 +1382,8 @@ function uebertragen(id, trocken) {
       if (ortKey_(jetzt) !== ortKey_(r['Lagerort alt'])) { fehler.push(pg + ': Lagerort ist «' + jetzt + '», erwartet «' + r['Lagerort alt'] + '»'); return; }
       /* Anzahl seit dem Abschluss geändert: sonst würde eine andere Stückzahl umgebucht als gescannt (26.10.2026) */
       if (soll && x.anz && x.anz[i] !== soll) { fehler.push(pg + ': Anzahl im Return Tool ist ' + x.anz[i] + ', beim Abschluss ' + soll); return; }
-      if (!trocken) { x.sh.getRange(x.hz + 1 + i, x.cOrt).setValue(ziel); x.orte[i] = ziel; aend.push({ _r: r._r, 'Erledigt': t }); }
+      /* Sofort abhaken (Review 26.10.2026): bricht der Lauf ab, ist jede geschriebene Zeile schon erledigt */
+      if (!trocken) { x.sh.getRange(x.hz + 1 + i, x.cOrt).setValue(ziel); x.orte[i] = ziel; setz_('Änderungen', [{ _r: r._r, 'Erledigt': t }]); }
       geschrieben++; proZiel[ziel] = (proZiel[ziel] || 0) + 1;
     });
     if (!trocken && aend.length) setz_('Änderungen', aend);

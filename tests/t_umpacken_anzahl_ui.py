@@ -104,6 +104,14 @@ with sync_playwright() as p:
     scan(s, 'PG-2')
     ok(s.locator('#rueck .mengen').count() == 0 and 'Jetzt das Gebinde tippen' in s.text_content('#rueck'), 'Anzahl 1: keine Frage')
     tippe(s); ok(s.evaluate(OPS)[-1]['menge'] == 1, 'Anzahl 1 gebucht')
+    # Review: Stück mit Anzahl 1 inzwischen von jemand anderem gebucht: neu warnen statt still verschieben
+    scan(s, 'PG-2')                                                           # liegt in Balu 1 (G1)
+    s.evaluate("ZU['PG-2']={teile:{'U-0001-G2':{n:1,preis:''}},n:1,gebinde:'U-0001-G2'}; UM.D.zuordnung['PG-2']={teile:{'U-0001-G2':{n:1,preis:'',kuerzel:'XY'}},n:1,gebinde:'U-0001-G2',kuerzel:'XY'}")
+    n0 = len(s.evaluate(OPS)); tippe(s, 'U-0001-G1')
+    ok('inzwischen in Kids 20 (XY)' in s.text_content('#rueck') and len(s.evaluate(OPS)) == n0, 'inzwischen von jemand anderem verschoben: Warnung, nichts gesendet')
+    tippe(s, 'U-0001-G1', 120)
+    o = s.evaluate(OPS)[-1]
+    ok(o['art'] == 'verschieben' and o['von'] == 'U-0001-G2' and o['gebinde'] == 'U-0001-G1', 'nochmals tippen: bewusst verschieben')
     # Fremder Scan: Rückfrage, dann als Quelle dazunehmen und das Stück wartet
     s.evaluate("FREMD['666']={treffer:[{ort:'KID-13',tab:'Stationär',id:'PG-6',name:'Fremd',anzahl:4,frei:true,grund:''}]}")
     scan(s, '666', 120)
