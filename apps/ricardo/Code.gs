@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-26.2';
+const VERSION = '2026-10-26.3';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -1607,7 +1607,8 @@ function uebersicht() {
     const vals = werte_(TAB_L, L_COLS.length);
     vals.forEach(function (row) {
       const rec = {}; L_COLS.forEach(function (k, i) { rec[k] = row[i]; });
-      if (!rec['PG-ID'] || ['In Arbeit', 'Bereit', 'Gelistet'].indexOf(rec['Status']) === -1) return;
+      /* 26.10.2026 (Jonas): «Laufende Angebote» = nur was auf Ricardo läuft. Angefangene (In Arbeit, Bereit) stehen unter «Listing» (Bereit zum Listen) */
+      if (!rec['PG-ID'] || rec['Status'] !== 'Gelistet') return;
       const g = rec['Gelistet am'];
       const tage = g instanceof Date ? Math.floor((jetzt - g.getTime()) / 86400000) : 0;
       out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],

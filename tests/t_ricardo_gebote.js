@@ -43,6 +43,8 @@ const u = S.c('uebersicht')(), a = u.liste.find(x => x.id === 'PG-100'), b = u.l
 ok(a.gebot && a.gebot.chf === 181 && a.gebot.anzahl === 2 && a.gebot.stand, 'Übersicht: aktuelles Gebot ' + JSON.stringify(a.gebot));
 ok(b.gebot && b.gebot.keins === true, 'Übersicht: «Noch kein Gebot»');
 
+S.listing(Object.assign({ 'PG-ID': 'PG-102', 'Status': 'Bereit' }, KOMPLETT)); S.listing(Object.assign({ 'PG-ID': 'PG-103', 'Status': 'In Arbeit' }, KOMPLETT)); S.neu();
+ok(S.c('uebersicht')().liste.every(x => x.status === 'Gelistet'), '«Laufende Angebote» nur mit Status «Gelistet» (Jonas 26.10.2026)');
 /* Ohne Tab-Zugriff: Verkäufe laufen weiter */
 S = sandbox();
 S.ctx.SpreadsheetApp.getActive = (orig => () => Object.assign(orig(), { insertSheet: () => { throw new Error('keine Rechte'); } }))(S.ctx.SpreadsheetApp.getActive);
