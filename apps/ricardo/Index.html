@@ -697,6 +697,7 @@
     'u.hinweis': ['Ein Angebot gilt als abgelaufen, wenn seine Laufzeit vorbei ist (eingetragen beim Listen, sonst {0} Tage). Auf «Unverkauft» geht es mit der Ricardo-Mail «nicht verkauft» oder von Hand. Letzter Verkaufsbericht: {1}.', 'A listing counts as expired when its duration is over (entered when listing, otherwise {0} days). It goes to «Unsold» with the Ricardo mail «not sold» or by hand. Last sales report: {1}.'],
     'u.unzug': ['Achtung: {0} Verkäufe sind keinem Listing zugeordnet ({1}). Gehört einer davon zu diesem Stück, nicht «Unverkauft» setzen.', 'Caution: {0} sales are not assigned to a listing ({1}). If one of them belongs to this item, do not set «Unsold».'],
     'u.keiner': ['noch keiner', 'none yet'], 'u.leer': ['Keine laufenden Angebote.', 'No running listings.'], 'u.bearbeiten': ['Bearbeiten', 'Edit'], 'u.unverkauft': ['Unverkauft', 'Unsold'],
+    'u.gebot': ['Gebot CHF {0}', 'Bid CHF {0}'], 'u.gebotzahl': [' · {0} Gebote', ' · {0} bids'], 'u.gebot1': [' · 1 Gebot', ' · 1 bid'], 'u.gebotstand': ['Stand {0}', 'as of {0}'], 'u.keingebot': ['Noch kein Gebot', 'No bid yet'],
     'u.abgelaufen': ['Abgelaufen', 'Expired'], 'u.seit': ['seit {0}', 'since {0}'], 'u.angebot': ['Angebot', 'Listing'],
     'u.laeuft': ['Achtung: Laut Laufzeit läuft das Angebot noch. Zuerst auf Ricardo beenden.', 'Note: according to its duration the listing is still running. End it on Ricardo first.'],
     'u.frage': ['{0} als unverkauft markieren? Das Stück neu triagieren (Caritas, Heilsarmee oder Lagerverkauf) und im Return Tool den neuen Kanal eintragen.', 'Mark {0} as unsold? Re-triage the item (Caritas, Heilsarmee or warehouse sale) and enter the new channel in the Return Tool.']
@@ -1560,8 +1561,11 @@
       if (x.status === 'In Arbeit' || x.status === 'Bereit') a = '<button' + akt('weiter', x.id) + '>' + t('u.bearbeiten') + '</button>';
       if (x.status === 'Gelistet') a = '<button class="' + (x.abgelaufen ? 'haupt-knopf' : '') + '"' + akt('unverkauft', x.id, x.abgelaufen ? '1' : '0') + '>' + t('u.unverkauft') + '</button>';
       var m = x.abgelaufen ? '<span class="etikett hell">' + t('u.abgelaufen') + '</span>' : '<span class="etikett">' + esc(st(x.status)) + '</span>';
+      /* 26.10.2026: aktuelles Gebot aus den Ricardo-Mails (oder «Noch kein Gebot») */
+      var gb = x.gebot ? (x.gebot.keins ? '<span class="klein still">' + t('u.keingebot') + '</span>'
+        : '<span class="klein"><strong>' + t('u.gebot', Number(x.gebot.chf).toFixed(2)) + '</strong>' + (x.gebot.anzahl === 1 ? t('u.gebot1') : x.gebot.anzahl ? t('u.gebotzahl', esc(x.gebot.anzahl)) : '') + (x.gebot.stand ? '<br>' + t('u.gebotstand', esc(x.gebot.stand)) : '') + '</span>') : '';
       z += '<tr><td class="mono">' + esc(x.id) + (x.buendel ? '<br>+ ' + esc(x.buendel) : '') + '</td><td>' + esc(x.name) + (istRicardo(x.link) ? '<span class="klein"><a href="' + esc(x.link) + '" rel="noopener">' + t('u.angebot') + '</a></span>' : '') + '</td>' +
-        '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span></td><td>' + esc(x.ort) + (x.regal ? '<span class="klein">' + esc(x.regal) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
+        '<td>' + m + '<span class="klein">' + t('u.seit', esc(x.seit)) + '</span>' + gb + '</td><td>' + esc(x.ort) + (x.regal ? '<span class="klein">' + esc(x.regal) + '</span>' : '') + '</td><td>' + a + '</td></tr>';
     });
     $('u-liste').innerHTML = tab(['th.id', 'th.produkt', 'th.status', 'th.ort', ''], z);
   }

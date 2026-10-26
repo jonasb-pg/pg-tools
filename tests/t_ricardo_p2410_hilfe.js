@@ -23,9 +23,11 @@ function blatt(name, rows) {
         if (sh.kaputt) throw new Error('Sheet kaputt');
         if (sh.maxRows && r + v.length - 1 > sh.maxRows) throw new Error('Zeilen reichen nicht (Vertrag V2)');
         v.forEach((z, i) => { while (d.length < r + i) d.push([]); z.forEach((x, j) => { d[r - 1 + i][c - 1 + j] = x; }); });
+        return sh.getRange(r, c, nr, nc);
       },
       setNumberFormat() { return this; }, setFontWeight() { return this; }, setBackground() { return this; }
-    })
+    }),
+    setFrozenRows() { return sh; }
   };
   return sh;
 }
@@ -71,7 +73,8 @@ function sandbox(opt) {
   S.aktiv = 'test@pretty-good.ch'; S.besitzer = 'test@pretty-good.ch';
   const ctx = {
     console, Date, Math, JSON, Object, String, Number, Array, RegExp, Error, isNaN, parseFloat, Buffer, Promise,
-    SpreadsheetApp: { getActive: () => ({ getSheetByName: n => ({ Listings: S.L, Einstellungen: S.E, Versand: S.V, Log: S.LOG, 'Verkäufe': S.VK, Posteingang: S.PE, Retouren: S.RE })[n] || null }),
+    SpreadsheetApp: { getActive: () => ({ getSheetByName: n => ({ Listings: S.L, Einstellungen: S.E, Versand: S.V, Log: S.LOG, 'Verkäufe': S.VK, Posteingang: S.PE, Retouren: S.RE, Gebote: S.G })[n] || null,
+        insertSheet: n => { if (n !== 'Gebote') throw new Error('insertSheet ' + n); S.G = blatt(n, []); return S.G; } }),
       openById: id => {
         if (id === 'RT') S.oeffnen++;
         if (id === 'AT') S.atOeffnen = (S.atOeffnen || 0) + 1;

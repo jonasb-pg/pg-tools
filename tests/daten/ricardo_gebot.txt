@@ -1,0 +1,41 @@
+*********************************************************************
+ricardo.ch
+https://www.ricardo.ch/?utm_source=275_de&utm_medium=email&utm_campaign=rtm_core&utm_content=header_logo
+*********************************************************************
+
+Jonas,
+der aktuelle Verkaufspreis beträgt CHF 31.-
+
+.....................................................................
+
+<var>deliveryLocal = functions.i18n("shippingCostsLabel")</var>
+<var>expiryDateLocal = functions.i18n("expirationDateLabel")</var>
+Philips Toaster
+https://www.ricardo.ch/de/a/1111111111?utm_source=275_de&utm_medium=email&utm_campaign=rtm_core&utm_content=body_title
+
+2 Gebote
+
+Sofort kaufen
+
+undefined: 22. Oktober 2026, 12:39
+
+Angebot anschauen
+https://www.ricardo.ch/de/a/1111111111?utm_campaign=rtm_core&utm_content=body_cta&utm_medium=email&utm_source=275_de
+
+.....................................................................
+
+Dein Ricardo-Team
+
+*********************************************************************
+Ricardo AG
+Theilerstrasse 1a | CH-6300 Zug
+
+AGB & Reglemente
+https://help.ricardo.ch/hc/de/articles/115002934305-AGB-und-Reglemente
+
+Möchten Sie diese E-Mail in Zukunft nicht mehr erhalten?
+Zur Abmeldung >
+https://www.ricardo.ch/de/profile/notification-settings?utm_campaign=rtm_core&utm_content=footer_unsb&utm_medium=email&utm_source=275_de
+
+Copyright © 2026 by Ricardo | Alle Rechte vorbehalten
+*********************************************************************

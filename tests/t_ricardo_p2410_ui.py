@@ -24,7 +24,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': True, 'zustaende': ['Neu und or
          'lade': R, 'starteListing': R, 'buendelHinzu': dict(R, status='In Arbeit', buendelIds=['PG-400']), 'entscheidUnverkauft': SCHICHT1, 'aehnlicheStuecke': {'kandidaten': []},
          'suche': {'treffer': [{'id': 'PG-100', 'name': 'Toaster', 'tab': 'Online', 'ort': 'TEC-1', 'erfasst': '', 'vp': 30, 'status': 'Unverkauft', 'entscheid': '', 'entscheidOffen': True, 'teilVon': '', 'quelle': 'rt', 'warnung': ''},
                                {'id': 'PG-401', 'name': 'Mixer', 'tab': 'Analyse', 'ort': '', 'erfasst': '', 'vp': 40, 'status': '', 'teilVon': '', 'quelle': 'analyse', 'mm': True, 'mmStatus': 'Geholt', 'warnung': ''}], 'andere': [], 'archiv': [], 'eigene': [], 'anzahl': 2},
-         'uebersicht': {'letzterImport': '', 'aktiv': 1, 'schwelle': 90, 'laufzeit': 6, 'unzugeordnet': [], 'liste': [{'id': "PG-9');alert(3);('", 'status': 'Gelistet', 'name': 'Kabel', 'ort': '', 'link': 'javascript:alert(4)', 'buendel': '', 'regal': '', 'seit': '', 'laufzeit': 6, 'abgelaufen': True}]},
+         'uebersicht': {'letzterImport': '', 'aktiv': 1, 'schwelle': 90, 'laufzeit': 6, 'unzugeordnet': [], 'liste': [{'id': "PG-9');alert(3);('", 'status': 'Gelistet', 'name': 'Kabel', 'ort': '', 'link': 'javascript:alert(4)', 'buendel': '', 'regal': '', 'seit': '', 'laufzeit': 6, 'abgelaufen': True, 'gebot': {'chf': 31, 'anzahl': '2<b>x</b>', 'stand': '26.10. 10:17'}}, {'id': 'PG-8', 'status': 'Gelistet', 'name': 'Toaster', 'ort': '', 'link': 'https://www.ricardo.ch/de/a/t-1111111111/', 'buendel': '', 'regal': '', 'seit': '', 'laufzeit': 6, 'abgelaufen': False, 'gebot': {'keins': True}}]},
          'adminSuche': {'listings': [{'zeile': 2, 'id': 'PG-100', 'name': 'Toaster', 'status': 'Gelistet', 'am': '', 'buendel': '', 'loeschbar': False}, {'zeile': 3, 'id': 'PG-101', 'name': 'Kabel', 'status': 'Bereit', 'am': '', 'buendel': '', 'loeschbar': True}],
                         'verkaeufe': [dict(OFFEN[0], nr='9004', zeile=2, status='Bezahlt und versendet', bezahlt='20.10.2026', storno=False, zuordnen=False), dict(OFFEN[0], nr='9012', pgId='', zeile=3, storno=True, zuordnen=True)]},
          'adminVerkaufZuordnen': True, 'adminBetrieb': {'ki': True, 'mail': {'aktiv': True, 'letzte': '', 'warnung': False, 'unecht': 0}, 'url': '#', 'ausloeser': True, 'vorrat': False, 'jetzt': None},
@@ -61,6 +61,8 @@ with sync_playwright() as p:
     ok(rufe('aufgabeErledigt')[-1] == ["m1');alert(1);('"], '13: Knopf liefert die ID über data-*, unverändert')
     s.evaluate("zeige('ueber')"); s.wait_for_timeout(300)
     ok('javascript:' not in s.inner_html('#u-liste') and "alert(3)" not in ''.join(seg.split('>')[0] for seg in s.inner_html('#u-liste').split('onclick=')[1:]), '13: Übersicht ohne javascript:-Link und ohne Text im onclick')
+    ok('Gebot CHF 31.00' in s.text_content('#u-liste') and '2<b>x</b> Gebote' in s.text_content('#u-liste') and '<b>x' not in s.inner_html('#u-liste') and 'Stand 26.10. 10:17' in s.text_content('#u-liste'), '26.10.: aktuelles Gebot in der Übersicht (escaped)')
+    ok('Noch kein Gebot' in s.text_content('#u-liste'), '26.10.: «Noch kein Gebot»')
     s.evaluate("H.setzeStatus = function () { return { ok: D.uebersicht }; }; 0")
     s.click('#u-liste button'); s.wait_for_timeout(100); s.click('#dialog-ja'); s.wait_for_timeout(150)
     ok(rufe('setzeStatus')[-1][0] == "PG-9');alert(3);('", '13: «Unverkauft» bekommt die Nummer über data-*')

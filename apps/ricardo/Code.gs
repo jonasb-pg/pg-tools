@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-24.5';
+const VERSION = '2026-10-26.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -189,6 +189,7 @@ function einrichten() {
   kopf_(rt, R_COLS, 0, ALT_R);
   textSpalten_(rt, R_COLS, ['Verkauf-Nr', 'PG-ID', 'Käufer', 'IBAN', 'PLZ']);
 
+  gebotTab_(ss);
   let pe = ss.getSheetByName(TAB_I);
   if (!pe) pe = ss.insertSheet(TAB_I);
   kopf_(pe, I_COLS, 0, []);
@@ -362,11 +363,39 @@ const DOKU = [
 ];
 
 /** Tabs des Ricardo Tools für die gemeinsame Übersicht (Basis.gs). Reihenfolge innerhalb der Art = Reihenfolge im Sheet. */
+/* 26.10.2026 (Jonas: «die Mails mit den Geboten herauslesen und im Tool anzeigen, wie hoch das aktuelle Gebot ist»):
+   Stand pro Ricardo-Artikel aus den Mails «du hast ein (erstes) Gebot erhalten» und «Aktuelles Gebot» in Fragen. Eigener Tab, damit «Listings» gleich bleibt. */
+const TAB_G = 'Gebote', G_COLS = ['Artikel-Nr', 'Aktuelles Gebot CHF', 'Gebote', 'Stand', 'Titel'];
+function gebotTab_(ss) {
+  let sh = ss.getSheetByName(TAB_G);
+  if (!sh) {
+    sh = ss.insertSheet(TAB_G);
+    sh.getRange(1, 1, 1, G_COLS.length).setValues([G_COLS]).setFontWeight('bold').setBackground('#efefef');
+    sh.getRange(2, 1, Math.max(1, sh.getMaxRows() - 1), 1).setNumberFormat('@');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+/** Artikel-Nr → { chf, anzahl, stand } (für die Übersicht). */
+function gebote_() {
+  const aus = {};
+  let sh = null;
+  try { sh = SpreadsheetApp.getActive().getSheetByName(TAB_G); } catch (e) { sh = null; }
+  if (!sh || sh.getLastRow() < 2) return aus;
+  sh.getRange(2, 1, sh.getLastRow() - 1, G_COLS.length).getValues().forEach(function (r) {
+    const a = String(r[0]).trim(); if (!a) return;
+    aus[a] = { chf: Number(r[1]) || 0, anzahl: r[2] === '' ? '' : Number(r[2]) || 0, stand: r[3] instanceof Date ? r[3] : null };
+  });
+  return aus;
+}
+/** Betrag wie in den Gebots-Mails: «31.-», «101.50», «1'250.-». */
+function chf_(s) { return geld_(String(s || '').trim().replace(/\.?-$/, '')); }
 const RICARDO_KATALOG = [
   { tab: 'Listings', art: 'arbeit', inhalt: 'Ein Stück oder Bündel pro Zeile: Text, Preis, Status, Link.' },
   { tab: 'Verkäufe', art: 'arbeit', inhalt: 'Ein Verkauf pro Zeile aus Mails und Verkaufsbericht: Käufer, Adresse, Zahlung, Versand.' },
   { tab: 'Posteingang', art: 'arbeit', inhalt: 'Fragen, Nachrichten und Preisvorschläge aus den Ricardo-Mails («Zu erledigen»).' },
   { tab: 'Retouren', art: 'arbeit', inhalt: 'Ein Garantiefall pro Zeile mit Grund und Rückzahlung.' },
+  { tab: 'Gebote', art: 'arbeit', inhalt: 'Aktuelles Gebot pro Ricardo-Artikel aus den Ricardo-Mails (wird überschrieben, nichts von Hand eintragen).' },
   { tab: 'Feedback', art: 'protokoll', wer: 'Tool (bis 24.10.2026)', inhalt: 'Alt: Rückmeldungen bis 24.10.2026, wird nicht mehr beschrieben. Neue Feedbacks stehen im Sheet «FEEDBACK TOOLS» (Ordner OPS TOOLS), Spalte «Tool». Kann gelöscht werden.' },
   { tab: 'Wochenübersicht', art: 'arbeit', inhalt: 'Umsatz pro Kalenderwoche. Wird bei jeder Änderung neu berechnet, nichts von Hand eintragen.' },
   { tab: 'Log', art: 'protokoll', inhalt: 'Jede Aktion mit Zeit und Person. Erste Anlaufstelle bei Unklarheiten.' },
@@ -1563,10 +1592,17 @@ function setzeStatus(id, neu, bestaetigt) {
    Wer ein anderes Stück anschaut oder den Browser schliesst, verliert nichts. Weg geht es nur mit «Gelistet» oder mit «Abbrechen» von Hand.
    Offene Listings stehen in der Schicht unter «Bereit zum Listen». */
 
+/** Gebot zum aktuellen Ricardo-Link: { chf, anzahl, stand } oder { keins: true }. Ältere Mails als «Gelistet am» zählen nicht. */
+function gebotFuer_(gb, link, gelistet) {
+  const a = artikelAusLink_(link), x = a ? gb[a] : null;
+  if (!a) return null;
+  if (!x || !x.chf || (gelistet instanceof Date && x.stand && x.stand.getTime() < gelistet.getTime() - 86400000)) return { keins: true };
+  return { chf: x.chf, anzahl: x.anzahl, stand: x.stand ? Utilities.formatDate(x.stand, TZ, 'dd.MM. HH:mm') : '' };
+}
 function uebersicht() {
   const out = [];
   const laufzeit = Number(cfg_('Laufzeit Tage')) || 6;
-  const jetzt = new Date().getTime();
+  const jetzt = new Date().getTime(), gb = gebote_();
   {
     const vals = werte_(TAB_L, L_COLS.length);
     vals.forEach(function (row) {
@@ -1577,6 +1613,7 @@ function uebersicht() {
       out.push({ id: String(rec['PG-ID']), status: rec['Status'], name: rec['Bezeichnung'], ort: rec['Lagerort'],
         zustand: rec['Zustand'], link: rec['Ricardo-Link'], buendel: String(rec['Bündel-IDs'] || ''), regal: regal_(rec['Status']), quelle: String(rec['Quelle Tab'] || ''),
         seit: datum_(rec['Gelistet am'] || rec['Angelegt am']),
+        gebot: rec['Status'] === 'Gelistet' ? gebotFuer_(gb, rec['Ricardo-Link'], rec['Gelistet am']) : null,
         laufzeit: laufzeitVon_(rec['Laufzeit Tage'], laufzeit), abgelaufen: rec['Status'] === 'Gelistet' && tage > laufzeitVon_(rec['Laufzeit Tage'], laufzeit) });
     });
   }
@@ -2446,13 +2483,21 @@ function ricardoMail_(betreff, text) {
       titel: titelVor('Artikel-Nr.:'), menge: p ? Number(p[1]) : 1, preis: p ? runde_(Number(p[1]) * geld_(p[2])) : (p1 ? geld_(p1[1]) : 0),
       lieferart: vs ? vs[1].trim() : '', versand: vs ? geld_(vs[2]) : 0, total: geld_(g(/Total:\s*([\d'’.,]+)/)), kaeufer: g(/Verkauft an:\s*(\S+)/) || m[1] };
   }
+  if (/du hast ein (?:erstes )?Gebot erhalten/i.test(betreff)) {
+    /* Zwei Formen: «2 Gebote» auf eigener Zeile (Titel, Link, Anzahl) und «1 Gebote(e) CHF 30.-» (Titel direkt darüber) */
+    const zeilen = text.split('\n'), zi = zeilen.findIndex(function (z) { return /^\s*\d+\s+Gebot/.test(z); });
+    let titel = '';
+    for (let i = zi - 1; i >= 0 && zi > 0; i--) { const z = zeilen[i].trim(); if (!z || /^https?:/.test(z)) continue; if (/^[.*]{5,}$/.test(z) || /<var>/.test(z)) break; titel = z; break; }
+    return { art: 'Gebot', artikel: g(/ricardo\.ch\/de\/a\/(\d+)/), betrag: chf_(g(/aktuelle Verkaufspreis beträgt CHF\s*([\d'’.,]+-?)/)), anzahl: zi >= 0 ? Number(/(\d+)/.exec(zeilen[zi])[1]) : '',
+      titel: titel };
+  }
   if (/hat angegeben, für folgenden Artikel bezahlt zu haben/.test(betreff)) {
     return { art: 'Bezahlt gemeldet', artikel: g(/Artikel-Nr\.:\s*(\d+)/), verkauf: g(/Verkaufs-Nr\.:\s*(\d+)/), kaeufer: (/^(\S+) hat angegeben/.exec(betreff) || [])[1] || '' };
   }
   if (/^Beantworte die Frage zu deinem Angebot/.test(betreff)) {
     const f = /\n(\S+) fragt:\s*\n([\s\S]*?)\n\s*BEANTWORTE DIESE FRAGE/.exec(text), artikel = g(/Artikelnummer:\s*(\d+)/);
     return { art: 'Frage', artikel: artikel, titel: betreff.replace(/^Beantworte die Frage zu deinem Angebot:\s*/, ''), von: f ? f[1] : '', text: f ? f[2].trim() : '',
-      link: artikel ? RICARDO_A + artikel : '' };
+      link: artikel ? RICARDO_A + artikel : '', gebot: chf_(g(/Aktuelles Gebot:\s*CHF\s*([\d'’.,]+-?)/)) };
   }
   if ((m = /^Neue Nachricht zu: (.+) - (\d+)\s*$/.exec(betreff))) {
     const l = /(https:\/\/www\.ricardo\.ch\/de\/my-ricardo\/messages\/\S*?)(?:&utm_|\s|$)/.exec(text);
@@ -2521,6 +2566,23 @@ function mailsLesen_() {
   if (verarbeitet) log_('Ricardo-Mails', '', verarbeitet + ' verarbeitet');
   return { neu: verarbeitet };
 }
+/** Einmalig im Editor (26.10.2026): Gebote der letzten 10 Tage nachholen. Wirkt nur auf den Tab «Gebote», nicht auf Verkäufe oder Posteingang. */
+function geboteNachholen() {
+  nurEditor_();
+  const g = mailsHolen_(Date.now() - 10 * 86400000), lock = sperre_(20000);
+  let n = 0;
+  try {
+    const ss = SpreadsheetApp.getActive(), k = karten_(ss.getSheetByName(TAB_S), ss.getSheetByName(TAB_L), ss.getSheetByName(TAB_I));
+    g.mails.forEach(function (x) {
+      const i = x.info;
+      if (i.art === 'Gebot' && k.gebot(i.artikel, i.betrag, i.anzahl, i.datum, i.titel)) n++;
+      if (i.art === 'Frage' && i.gebot > 0 && k.gebot(i.artikel, i.gebot, '', i.datum, i.titel)) n++;
+    });
+    k.schreiben();
+  } finally { lock.releaseLock(); }
+  log_('Gebote nachgeholt', '', n + ' Mails übernommen' + (g.voll ? ' (mehr als ' + (MAIL_SEITE * MAIL_SEITEN) + ' Verläufe, ältere fehlen)' : ''));
+  return n + ' Gebots-Mails übernommen';
+}
 /** Gmail lesen (ohne Sperre): { mails: [{ info, datum }], unecht, unbekannt: [{ id, betreff }], voll }. */
 function mailsHolen_(ab) {
   const q = 'from:' + (cfg_('Mail-Absender') || 'care@pretty-good.ch') + ' after:' + Math.floor(ab / 1000);
@@ -2574,6 +2636,13 @@ function karten_(sv, sl, si) {
   const vRows = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues() : [];
   const lRows = sl.getLastRow() > 1 ? sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues() : [];
   const iRows = si.getLastRow() > 1 ? si.getRange(2, 1, si.getLastRow() - 1, I_COLS.length).getValues() : [];
+  /* Gebote sind nur Anzeige: Fehler dort dürfen Verkäufe und Posteingang nie aufhalten */
+  let sg = null, gRows = [];
+  const gIdx = {};
+  try { sg = gebotTab_(SpreadsheetApp.getActive()); gRows = sg.getLastRow() > 1 ? sg.getRange(2, 1, sg.getLastRow() - 1, G_COLS.length).getValues() : []; }
+  catch (e) { sg = null; gRows = []; log_('Gebote', '', 'Tab «Gebote» nicht lesbar: ' + String(e && e.message || e).slice(0, 150)); }
+  let gGeaendert = false;
+  gRows.forEach(function (r, i) { const a = String(r[0]).trim(); if (a) gIdx[a] = i; });
   const vNr = {}, iId = {}, geaendert = { v: {}, l: {}, i: {} }, neuV = [], neuI = [], karte = listingKarte_(lRows), vMap = verkaufSchluessel_(vRows);
   vRows.forEach(function (r, i) { vNr[String(r[0]).trim()] = i; });
   iRows.forEach(function (r, i) { iId[String(r[0]).trim()] = i; });
@@ -2585,7 +2654,23 @@ function karten_(sv, sl, si) {
       return z && z.sicher ? z.i : null;
     },
     zuordnung: function (referenz, artikel) { return verkaufZuordnen_(karte, lRows, referenz, artikel); },
+    /** Gebot aus einer Mail: nur wenn neuer als der gespeicherte Stand. «CHF 0.-» bei mehreren Geboten (kommt in Ricardo-Mails vor) zählt nicht. */
+    gebot: function (artikel, betrag, anzahl, datum, titel) {
+      artikel = String(artikel || '').trim();
+      if (!sg || !artikel || !(betrag > 0) || !(datum instanceof Date)) return false;
+      let i = gIdx[artikel];
+      if (i === undefined) { i = gRows.length; gRows.push([artikel, '', '', '', '']); gIdx[artikel] = i; }
+      const r = gRows[i];
+      if (r[3] instanceof Date && r[3].getTime() > datum.getTime()) return false;
+      r[1] = betrag; if (anzahl !== '' && anzahl !== undefined) r[2] = anzahl; r[3] = datum; if (titel) r[4] = String(titel).slice(0, 200);
+      gGeaendert = true;
+      return true;
+    },
     schreiben: function () {
+      if (sg && gGeaendert && gRows.length) {
+        try { sg.getRange(2, 1, gRows.length, 1).setNumberFormat('@'); sg.getRange(2, 1, gRows.length, G_COLS.length).setValues(gRows); }
+        catch (e) { log_('Gebote', '', 'Gebote nicht gespeichert: ' + String(e && e.message || e).slice(0, 150)); }
+      }
       zurueckschreiben_(sv, vRows, Object.keys(geaendert.v), V_COLS.length);
       zurueckschreiben_(sl, lRows, Object.keys(geaendert.l), L_COLS.length, gleichListing_(sl, lRows));
       zurueckschreiben_(si, iRows, Object.keys(geaendert.i), I_COLS.length);
@@ -2744,6 +2829,8 @@ function mailWirkung_(info, k, fragen) {
     });
     return ja;
   }
+  if (info.art === 'Gebot') return k.gebot(info.artikel, info.betrag, info.anzahl, info.datum, info.titel);
+  if (info.art === 'Frage' && info.gebot > 0) k.gebot(info.artikel, info.gebot, '', info.datum, info.titel);
   if (info.art === 'Nicht verkauft') {
     const li = k.listing('', info.artikel);
     if (li === null || k.lRows[li][lc('Status')] !== 'Gelistet') return false;
