@@ -62,7 +62,7 @@
  * - Der Status steht in der Zeile über der Kopfzeile (ohne freie Zeile: als Hinweis unten rechts).
  */
 
-const VERSION = '2026-10-24.5';
+const VERSION = '2026-10-26.1';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -97,9 +97,15 @@ const SPALTEN = [
   ['GESUCHT', /^gesucht\b/i, true, 'Gesucht'], ['INFOS', /^mehr\s*infos/i, true, 'Mehr Infos'], ['LIMIT', /^limit/i, false, 'Limit CHF'],
   ['PROFIL', /^suchprofil/i, true, 'Suchprofil'], ['PASST', /^passt\b/i, true, 'Passt'], ['AE1', /^(ä|ae)hnlich\s*1\b/i, true, 'Ähnlich 1'],
   ['AE2', /^(ä|ae)hnlich\s*2\b/i, true, 'Ähnlich 2'], ['AE3', /^(ä|ae)hnlich\s*3\b/i, true, 'Ähnlich 3'], ['GEHOLT', /^geholt\b/i, true, 'Geholt'],
-  ['AUS', /^aus\s*analyse/i, false, 'Aus Analyse']];
+  ['AUS', /^aus\s*analyse/i, false, 'Aus Analyse'],
+  /* 26.10.2026 (Jonas): Spalten «Flexibilität» und «Fälligkeit» im Tab «Matchmaker». Fälligkeit vorbei (heute später): Auftrag nach «Erledigt», Grund «Abgelaufen» */
+  ['FLEX', /^flexibilit/i, false, 'Flexibilität'], ['FAELLIG', /^f(ä|ae)lligkeit/i, false, 'Fälligkeit']];
 /** «Aus Analyse» ist neu (24.10.2026, Vertrag V5): hilfsTabs_ ergänzt sie in bestehenden Tabs als letzte Spalte. Gelesen wird über den Kopf. */
 const KOPF_ERLEDIGT = ['Geholt am', 'Gesucht', 'Mehr Infos', 'Limit CHF', 'Suchprofil', 'Gefunden', 'Zurück in die Liste', 'Aus Analyse'];
+/* 26.10.2026: «Erledigt» vereint geholte und abgelaufene Aufträge (Jonas). Zusatzspalten, die hilfsTabs_ rechts anfügt. «Aus Analyse» bleibt nur bei geholten
+   Aufträgen gefüllt (das Analyse Tool liest sie als «Geholt», Vertrag V5); bei abgelaufenen steht der Vermerk in «Aus Analyse (abgelaufen)». */
+const ERLEDIGT_ZUSATZ = ['Aus Analyse', 'Grund', 'Flexibilität', 'Fälligkeit', 'Aus Analyse (abgelaufen)'];
+const GRUND_GEHOLT = 'Geholt', GRUND_ABGELAUFEN = 'Abgelaufen';
 const KOPF_URTEILE = ['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am', 'Produkt-Schlüssel'];
 
 // ---------- Menü ----------
@@ -174,21 +180,50 @@ function sperre_() {
 }
 
 /** Läuft in der Sperre: alle Zeilen mit «Geholt» = TRUE nach «Erledigt», von unten nach oben gelöscht. Gibt die Anzahl zurück. */
-function geholtAlle_(sh) {
+function geholtAlle_(sh) { return nachErledigt_(sh, GRUND_GEHOLT); }
+
+/** Tag (yyyy-MM-dd) aus der Zelle «Fälligkeit» (Datum oder Text dd.MM.yyyy / yyyy-MM-dd), sonst ''. */
+function faellig_(v) {
+  if (v === '' || v == null) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+  return tag_(v, TZ) || '';
+}
+
+/**
+ * 26.10.2026 (Jonas): bei jedem Lauf (heute, gestern, ganzer Bestand) Aufträge mit «Fälligkeit» vor heute nach «Erledigt», Grund «Abgelaufen».
+ * Läuft in der Sperre. Gibt { n, unklar } zurück (unklar = Zellen, die kein Datum sind: bleiben stehen).
+ */
+function abgelaufenAlle_(sh) { return nachErledigt_(sh, GRUND_ABGELAUFEN); }
+
+/** Verschiebt Zeilen nach «Erledigt»: grund «Geholt» = Haken gesetzt, «Abgelaufen» = Fälligkeit vor heute. Geholt: Anzahl; Abgelaufen: { n, unklar }. */
+function nachErledigt_(sh, grund) {
+  const abgelaufen = grund === GRUND_ABGELAUFEN, heute = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   const hz = kopfZeile_(sh);
   if (!hz) throw new Error('Im Tab «' + TAB + '» fehlt die Kopfzeile.');
   const sp = spalten_(sh, hz);
+  const nichts = abgelaufen ? { n: 0, unklar: 0 } : 0;
+  if (abgelaufen && !sp.FAELLIG) return nichts;
   const last = sh.getLastRow();
-  if (last <= hz) return 0;
+  if (last <= hz) return nichts;
   const w = sh.getRange(hz + 1, 1, last - hz, Math.max(sh.getLastColumn(), sp.max)).getValues();
   const ss = sh.getParent();
   hilfsTabs_(ss);
   const ziel = ss.getSheetByName(TAB_ERLEDIGT), ke = spaltenErledigt_(ziel);
   const neu = [], weg = [];
+  let unklar = 0;
   w.forEach(function (row, i) {
-    if (row[sp.GEHOLT - 1] !== true) return;
     const z = hz + 1 + i;
-    if (!String(row[sp.GESUCHT - 1]).trim()) { sh.getRange(z, sp.GEHOLT).setValue(false); return; }
+    if (abgelaufen) {
+      if (!String(row[sp.GESUCHT - 1]).trim() || row[sp.GEHOLT - 1] === true) return;      // angehakt: geht als «Geholt» (Haken)
+      const f = row[sp.FAELLIG - 1];
+      if (f === '' || f == null) return;
+      const t = faellig_(f);
+      if (!t) { unklar++; return; }
+      if (!(heute > t)) return;
+    } else {
+      if (row[sp.GEHOLT - 1] !== true) return;
+      if (!String(row[sp.GESUCHT - 1]).trim()) { sh.getRange(z, sp.GEHOLT).setValue(false); return; }
+    }
     const gefunden = [sp.PASST, sp.AE1, sp.AE2, sp.AE3].map(function (c) { return row[c - 1]; })
       .filter(function (x) { return String(x).trim(); }).join('\n\n');
     const e = [];
@@ -200,7 +235,12 @@ function geholtAlle_(sh) {
     e[ke['Suchprofil'] - 1] = row[sp.PROFIL - 1];
     e[ke['Gefunden'] - 1] = gefunden;
     e[ke['Zurück in die Liste'] - 1] = false;
-    if (ke['Aus Analyse']) e[ke['Aus Analyse'] - 1] = sp.AUS ? row[sp.AUS - 1] : '';
+    const ausW = sp.AUS ? row[sp.AUS - 1] : '';
+    if (abgelaufen) { if (ke['Aus Analyse (abgelaufen)']) e[ke['Aus Analyse (abgelaufen)'] - 1] = ausW; }
+    else if (ke['Aus Analyse']) e[ke['Aus Analyse'] - 1] = ausW;
+    if (ke['Grund']) e[ke['Grund'] - 1] = grund;
+    if (ke['Flexibilität']) e[ke['Flexibilität'] - 1] = sp.FLEX ? row[sp.FLEX - 1] : '';
+    if (ke['Fälligkeit']) e[ke['Fälligkeit'] - 1] = sp.FAELLIG ? row[sp.FAELLIG - 1] : '';
     neu.push(e);
     weg.push(z);
   });
@@ -210,9 +250,10 @@ function geholtAlle_(sh) {
     ziel.getRange(z, 1, neu.length, ke.breite).setValues(neu).setVerticalAlignment('top').setWrap(true);
     ziel.getRange(z, ke['Geholt am'], neu.length, 1).setNumberFormat('dd.MM.yyyy');
     ziel.getRange(z, ke['Zurück in die Liste'], neu.length, 1).insertCheckboxes();
+    if (ke['Fälligkeit']) ziel.getRange(z, ke['Fälligkeit'], neu.length, 1).setNumberFormat('dd.MM.yyyy');
   }
   for (let i = weg.length - 1; i >= 0; i--) sh.deleteRow(weg[i]);
-  return weg.length;
+  return abgelaufen ? { n: weg.length, unklar: unklar } : weg.length;
 }
 
 function aufraeumen_(sh, sp, z1, z2, s1, s2) {
@@ -264,7 +305,9 @@ function zurueckAlle_(sh, mm) {
     else sh.getRange(i + 2, ke['Zurück in die Liste']).setValue(false);       // leere Zeile: nur den Haken zurücksetzen
   });
   if (!zur.length) return 0;
-  const ausWert = function (row) { return ke['Aus Analyse'] ? row[ke['Aus Analyse'] - 1] : ''; };
+  /* abgelaufene Aufträge: Vermerk aus «Aus Analyse (abgelaufen)», Fälligkeit leer (sonst gleich wieder abgelaufen) */
+  const istAbg = function (row) { return ke['Grund'] && String(row[ke['Grund'] - 1]).trim() === GRUND_ABGELAUFEN; };
+  const ausWert = function (row) { return istAbg(row) ? (ke['Aus Analyse (abgelaufen)'] ? row[ke['Aus Analyse (abgelaufen)'] - 1] : '') : (ke['Aus Analyse'] ? row[ke['Aus Analyse'] - 1] : ''); };
   let aus = sp.AUS;
   if (!aus && zur.some(function (i) { return String(ausWert(w[i]) || '').trim(); })) aus = spalteAnlegen_(mm, hz, 'Aus Analyse');
   const z0 = Math.max(mm.getLastRow(), hz) + 1;
@@ -276,10 +319,13 @@ function zurueckAlle_(sh, mm) {
     if (sp.LIMIT) mm.getRange(z, sp.LIMIT).setValue(row[ke['Limit CHF'] - 1]);
     mm.getRange(z, sp.PROFIL).setValue(row[ke['Suchprofil'] - 1]);
     if (aus && String(ausWert(row) || '').trim()) mm.getRange(z, aus).setValue(ausWert(row));
+    if (sp.FLEX && ke['Flexibilität']) mm.getRange(z, sp.FLEX).setValue(row[ke['Flexibilität'] - 1]);
+    if (sp.FAELLIG && ke['Fälligkeit'] && !istAbg(row)) mm.getRange(z, sp.FAELLIG).setValue(row[ke['Fälligkeit'] - 1]);
     mm.getRange(z, 1, 1, Math.max(sp.max, aus || 0)).setVerticalAlignment('top').setWrap(true);
     mm.getRange(z, sp.GEHOLT).insertCheckboxes();
   });
   for (let k = zur.length - 1; k >= 0; k--) sh.deleteRow(zur[k] + 2);
+  if (zur.some(function (i) { return istAbg(w[i]); })) mm.getParent().toast('Abgelaufene Aufträge sind zurück. Bitte «Fälligkeit» neu setzen, sonst bleibt sie leer.', 'Matchmaker', 10);
   return zur.length;
 }
 
@@ -336,6 +382,14 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
     const d = modus === 'heute' ? new Date() : vortag_();
     tag = Utilities.formatDate(d, TZ, 'yyyy-MM-dd');
     bereich = (modus === 'heute' ? 'Heute erfasst' : 'Gestern erfasst') + ' (' + Utilities.formatDate(d, TZ, 'dd.MM.yyyy') + ')';
+  }
+
+  // 0. Abgelaufene Aufträge (Fälligkeit vor heute) nach «Erledigt» (Jonas 26.10.2026). Danach Kopf und Spalten neu (Zeilen sind weg).
+  let abg = { n: 0, unklar: 0 };
+  if (sp.FAELLIG) {
+    const l0 = sperre_();
+    if (l0) { try { abg = abgelaufenAlle_(sh); } finally { try { SpreadsheetApp.flush(); } catch (e) {} l0.releaseLock(); } }
+    hz = kopfZeile_(sh); sp = spalten_(sh, hz);
   }
 
   // 1. Suchaufträge und Suchprofile
@@ -416,6 +470,8 @@ function sucheAusfuehren_(ss, sh, hz, sp, modus, key) {
     ' (nur Stücke dieses Tages; ältere Stücke und neue Suchaufträge gegen den ganzen Bestand: «Ganzer Bestand»)';
   text += ' · ' + mitTreffer + ' von ' + auftraege.length + ' Suchaufträgen mit Treffer.';
   if (neuGeprueft) text += ' ' + neuGeprueft + ' Paare neu von Claude geprüft.';
+  if (abg.n) text += ' ' + abg.n + ' Suchaufträge abgelaufen (Fälligkeit vorbei), nach «Erledigt» verschoben.';
+  if (abg.unklar) text += ' ' + abg.unklar + ' Zellen in «Fälligkeit» sind kein Datum (TT.MM.JJJJ): diese Aufträge bleiben stehen.';
   if (weg.analyse) text += ' ' + weg.analyse + ' Stück mit Ergebnis im ANALYSE TOOL (Matchmaker, Ricardo, nicht reusable) weggelassen.';
   if (weg.ricardo) text += ' ' + weg.ricardo + ' Stück im Ricardo Tool (gelistet, verkauft oder entsorgt) weggelassen.';
   if (weg.umpack) text += ' ' + weg.umpack + ' Stück im Umpack Tool verkauft oder entsorgt (im Return Tool noch nicht eingetragen) weggelassen.';
@@ -489,9 +545,9 @@ function spalten_(sh, hz) {
 function spaltenErledigt_(sh) {
   const k = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(function (x) { return String(x).trim(); });
   const ke = { breite: 0 }, fehlt = [];
-  KOPF_ERLEDIGT.forEach(function (n) {
+  KOPF_ERLEDIGT.concat(ERLEDIGT_ZUSATZ).forEach(function (n) {
     const i = k.indexOf(n);
-    if (i < 0) { if (n !== 'Aus Analyse') fehlt.push('«' + n + '»'); return; }
+    if (i < 0) { if (ERLEDIGT_ZUSATZ.indexOf(n) < 0) fehlt.push('«' + n + '»'); return; }
     ke[n] = i + 1;
     ke.breite = Math.max(ke.breite, i + 1);
   });
@@ -548,21 +604,25 @@ function hilfsTabs_(ss) {
   let er = ss.getSheetByName(TAB_ERLEDIGT);
   if (!er) {
     er = ss.insertSheet(TAB_ERLEDIGT, ss.getNumSheets());
-    kopfFormat(er.getRange(1, 1, 1, KOPF_ERLEDIGT.length).setValues([KOPF_ERLEDIGT]));
+    const kopfNeu = KOPF_ERLEDIGT.concat(ERLEDIGT_ZUSATZ.filter(function (n) { return KOPF_ERLEDIGT.indexOf(n) < 0; }));
+    kopfFormat(er.getRange(1, 1, 1, kopfNeu.length).setValues([kopfNeu]));
     er.setFrozenRows(1);
     [90, 230, 230, 80, 270, 320, 120, 320].forEach(function (w, i) { er.setColumnWidth(i + 1, w); });
   } else {
     /* 24.10.2026: bestehende Tabs um «Aus Analyse» ergänzen (wie Spalte G in «Urteile»). Leerer Kopf: ganzen Kopf schreiben. */
     const k = er.getRange(1, 1, 1, Math.max(er.getLastColumn(), 1)).getValues()[0].map(function (x) { return String(x).trim(); });
-    if (!k.some(String)) kopfFormat(er.getRange(1, 1, 1, KOPF_ERLEDIGT.length).setValues([KOPF_ERLEDIGT]));
-    else if (k.indexOf('Aus Analyse') < 0) {
+    if (!k.some(String)) { const kopfNeu = KOPF_ERLEDIGT.concat(ERLEDIGT_ZUSATZ.filter(function (n) { return KOPF_ERLEDIGT.indexOf(n) < 0; })); kopfFormat(er.getRange(1, 1, 1, kopfNeu.length).setValues([kopfNeu])); }
+    else ERLEDIGT_ZUSATZ.forEach(function (name) {
+      if (k.indexOf(name) >= 0) return;
       let c = k.length;
       while (c > 0 && !k[c - 1]) c--;
       c = Math.max(c + 1, KOPF_ERLEDIGT.length);
       if (er.getMaxColumns() < c) er.insertColumnsAfter(er.getMaxColumns(), c - er.getMaxColumns());
-      kopfFormat(er.getRange(1, c).setValue('Aus Analyse'));
-      er.setColumnWidth(c, 320);
-    }
+      kopfFormat(er.getRange(1, c).setValue(name));
+      er.setColumnWidth(c, /Aus Analyse/.test(name) ? 320 : 110);
+      while (k.length < c) k.push('');
+      k[c - 1] = name;
+    });
   }
   if (!ss.getSheetByName(TAB_URTEILE)) {
     const sh = ss.insertSheet(TAB_URTEILE, ss.getNumSheets());

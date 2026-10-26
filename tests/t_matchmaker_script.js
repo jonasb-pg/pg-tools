@@ -84,7 +84,7 @@ vm.runInContext(QUELLE, c);
 const mm = MM.getSheetByName('Matchmaker'), U = MM.getSheetByName('Urteile');
 const zelle = (r, col) => String(mm.v[r - 1][col - 1] || '');
 const status = () => String(mm.v[1][0]);
-assert.ok(/const VERSION = '2026-10-24\.5'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
+assert.ok(/const VERSION = '2026-10-26\.1'/.test(fs.readFileSync(__dirname + '/../apps/matchmaker/Code.gs', 'utf8')));
 
 /* Lauf 1: ganzer Bestand */
 paareGeprueft = 0;
