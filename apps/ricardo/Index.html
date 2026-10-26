@@ -1329,7 +1329,6 @@
   function erledigt(id) { ruf('aufgabeErledigt', [id], nachAufgaben); }
   function erinnert(nr) { ruf('erinnerungErledigt', [nr], nachAufgaben); }
   Object.assign(AKTIONEN, { link: function (a) { oeffneLink(a); }, kopierOeffne: function (a, b) { kopiereUndOeffne(a, b); }, erledigt: function (a) { erledigt(a); }, erinnert: function (a) { erinnert(a); },
-    listingWeg: function (a) { frage(t('s4.abbr.frage', a), function () { ruf('setzeStatus', [a, 'Abgebrochen'], function () { melde(t('g.l.abbrechen') + ' ' + a); ladeAblauf(); ladeAnalyse(); }); }); },
     weiter: function (a) { weiter(a); }, unverkauft: function (a, b) { unverkauft(a, b === '1'); }, fall: function (a) { fallStarten(a); },
     sendung: function (a, b) { if (a) kopiereText(a); oeffneLink(b); } });
 
@@ -1604,7 +1603,7 @@
     'g.doppelt': ['Zweiter Verkauf auf ein schon verkauftes Stück. Prüfen und einen der Verkäufe stornieren (Ricardo und Admin-Teil):', 'Second sale of an item that was already sold. Check and cancel one of the sales (Ricardo and Admin):'],
     /* Listing */
     'g.l.neu': ['aus Analyse', 'from analysis'], 'g.l.mm': ['aus Matchmaker', 'from Matchmaker'], 'such.immm': ['im Matchmaker', 'in Matchmaker'],
-    'mm.frage': ['{0} lag im Matchmaker (Suchauftrag: {1}). Dort nicht verkauft und jetzt auf Ricardo?', '{0} was in Matchmaker (request: {1}). Not sold there and now on Ricardo?'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.abbrechen': ['Abbrechen', 'Discard'], 'g.l.wieder': ['neu listen', 'relist'],
+    'mm.frage': ['{0} lag im Matchmaker (Suchauftrag: {1}). Dort nicht verkauft und jetzt auf Ricardo?', '{0} was in Matchmaker (request: {1}). Not sold there and now on Ricardo?'], 'g.l.angefangen': ['angefangen', 'started'], 'g.l.wieder': ['neu listen', 'relist'],
     'g.l.abgelaufen': ['abgelaufen', 'expired'], 'g.l.unverkauft': ['nicht verkauft', 'not sold'],
     'g.l.anderes': ['Anderes Stück', 'Other item'], 'g.l.anderes.text': ['Stück nicht in der Liste? Mit PG-ID, EAN oder Name suchen.', 'Item not in the list? Search by PG-ID, EAN or name.'],
     'g.l.pruefen': ['Prüfen', 'Check'], 'g.l.holen': ['Stück holen: {0}', 'Take the item: {0}'],
@@ -1819,10 +1818,9 @@
     /* Entscheid Jonas 19.10.2026: angefangene und bereite Stücke einfach in derselben Liste, zuoberst, ohne Sonderstatus (sonst bleiben Leichen liegen) */
     /* Seit 19.10 (zweite Runde): angefangene Listings gibt es nicht mehr, nur Stücke mit Entscheid «Neu listen» */
     /* 26.10.2026 (Jonas: «angefangene Listings finde ich doof … es generiert Leichen»): angefangene Stücke («In Arbeit», «Bereit») stehen hier
-       ganz normal in der Liste (ohne Etikett), zuoberst, mit Knopf «Abbrechen». So bleibt keins unsichtbar liegen. */
+       ganz normal in der Liste (ohne Etikett), zuoberst. Kein Abbrechen-Knopf in der Liste (Jonas 26.10.2026, 11:57); abbrechen geht im Listing selbst. So bleibt keins unsichtbar liegen. */
     F.bereit.forEach(function (x) {
       neu(x.id, x.name, esc(x.id) + (x.ort ? ' · ' + esc(x.ort) : ''), x.wieder ? t('g.l.wieder') : '', function () { weiter(x.id); });   // kein Sonderstatus (Entscheid 19.10.)
-      if (!x.wieder) l[l.length - 1].weg = x.id;
     });
     (ANA || []).forEach(function (a) {
       if (schon[a.id]) return;
@@ -1996,7 +1994,7 @@
     h = vorher + '<div class="karte"><div class="kopf"><h2>' + t('f.' + FA) + '</h2><span class="still">' + t('g.offen', l.length) + '</span></div>'
       + (l.length ? l.map(function (f) {
         return '<div class="f-zeile f-eintrag">' + (f.bild ? '<img class="vbild" src="' + esc(f.bild) + '" alt="">' : '') + '<div class="f-text"><strong>' + esc(f.titel) + '</strong><span class="still">' + (f.info || '') + '</span>'
-          + (f.tag ? ' <span class="etikett ' + (f.tagKlasse || '') + '">' + esc(f.tag) + '</span>' : '') + '</div><div class="knoepfe">' + (f.weg ? '<button' + akt('listingWeg', f.weg) + '>' + t('g.l.abbrechen') + '</button>' : '') + '<button class="haupt-knopf"' + akt('fall', f.key) + '>' + t('g.start') + ' →</button></div></div>';
+          + (f.tag ? ' <span class="etikett ' + (f.tagKlasse || '') + '">' + esc(f.tag) + '</span>' : '') + '</div><div class="knoepfe"><button class="haupt-knopf"' + akt('fall', f.key) + '>' + t('g.start') + ' →</button></div></div>';
       }).join('') : '<p class="still">' + t('g.leer') + '</p>') + '</div>' + (nachher ? nachher() : '');
     $('f-schritte').innerHTML = h;
     einbauen();
