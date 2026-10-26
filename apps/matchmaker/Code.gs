@@ -62,7 +62,7 @@
  * - Der Status steht in der Zeile über der Kopfzeile (ohne freie Zeile: als Hinweis unten rechts).
  */
 
-const VERSION = '2026-10-26.1';
+const VERSION = '2026-10-26.2';
 
 // ---------- Einstellungen ----------
 const RETURN_TOOL_ID = '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E';
@@ -103,8 +103,9 @@ const SPALTEN = [
 /** «Aus Analyse» ist neu (24.10.2026, Vertrag V5): hilfsTabs_ ergänzt sie in bestehenden Tabs als letzte Spalte. Gelesen wird über den Kopf. */
 const KOPF_ERLEDIGT = ['Geholt am', 'Gesucht', 'Mehr Infos', 'Limit CHF', 'Suchprofil', 'Gefunden', 'Zurück in die Liste', 'Aus Analyse'];
 /* 26.10.2026: «Erledigt» vereint geholte und abgelaufene Aufträge (Jonas). Zusatzspalten, die hilfsTabs_ rechts anfügt. «Aus Analyse» bleibt nur bei geholten
-   Aufträgen gefüllt (das Analyse Tool liest sie als «Geholt», Vertrag V5); bei abgelaufenen steht der Vermerk in «Aus Analyse (abgelaufen)». */
-const ERLEDIGT_ZUSATZ = ['Aus Analyse', 'Grund', 'Flexibilität', 'Fälligkeit', 'Aus Analyse (abgelaufen)'];
+   Aufträgen gefüllt (das Analyse Tool liest sie als «Geholt», Vertrag V5); bei abgelaufenen steht der Vermerk in «Aus Analyse (abgelaufen)».
+   Flexibilität und Fälligkeit werden nicht mitgenommen: beim Zurückholen neu eintragen. */
+const ERLEDIGT_ZUSATZ = ['Aus Analyse', 'Grund', 'Aus Analyse (abgelaufen)'];   // 26.10.2026 12:23 (Jonas): Flexibilität und Fälligkeit nicht mitnehmen
 const GRUND_GEHOLT = 'Geholt', GRUND_ABGELAUFEN = 'Abgelaufen';
 const KOPF_URTEILE = ['Kennung', 'Gesucht', 'Produkt', 'Urteil (passt / ähnlich / nein)', 'Hinweis', 'Geprüft am', 'Produkt-Schlüssel'];
 
@@ -239,8 +240,6 @@ function nachErledigt_(sh, grund) {
     if (abgelaufen) { if (ke['Aus Analyse (abgelaufen)']) e[ke['Aus Analyse (abgelaufen)'] - 1] = ausW; }
     else if (ke['Aus Analyse']) e[ke['Aus Analyse'] - 1] = ausW;
     if (ke['Grund']) e[ke['Grund'] - 1] = grund;
-    if (ke['Flexibilität']) e[ke['Flexibilität'] - 1] = sp.FLEX ? row[sp.FLEX - 1] : '';
-    if (ke['Fälligkeit']) e[ke['Fälligkeit'] - 1] = sp.FAELLIG ? row[sp.FAELLIG - 1] : '';
     neu.push(e);
     weg.push(z);
   });
@@ -250,7 +249,6 @@ function nachErledigt_(sh, grund) {
     ziel.getRange(z, 1, neu.length, ke.breite).setValues(neu).setVerticalAlignment('top').setWrap(true);
     ziel.getRange(z, ke['Geholt am'], neu.length, 1).setNumberFormat('dd.MM.yyyy');
     ziel.getRange(z, ke['Zurück in die Liste'], neu.length, 1).insertCheckboxes();
-    if (ke['Fälligkeit']) ziel.getRange(z, ke['Fälligkeit'], neu.length, 1).setNumberFormat('dd.MM.yyyy');
   }
   for (let i = weg.length - 1; i >= 0; i--) sh.deleteRow(weg[i]);
   return abgelaufen ? { n: weg.length, unklar: unklar } : weg.length;
@@ -319,13 +317,11 @@ function zurueckAlle_(sh, mm) {
     if (sp.LIMIT) mm.getRange(z, sp.LIMIT).setValue(row[ke['Limit CHF'] - 1]);
     mm.getRange(z, sp.PROFIL).setValue(row[ke['Suchprofil'] - 1]);
     if (aus && String(ausWert(row) || '').trim()) mm.getRange(z, aus).setValue(ausWert(row));
-    if (sp.FLEX && ke['Flexibilität']) mm.getRange(z, sp.FLEX).setValue(row[ke['Flexibilität'] - 1]);
-    if (sp.FAELLIG && ke['Fälligkeit'] && !istAbg(row)) mm.getRange(z, sp.FAELLIG).setValue(row[ke['Fälligkeit'] - 1]);
     mm.getRange(z, 1, 1, Math.max(sp.max, aus || 0)).setVerticalAlignment('top').setWrap(true);
     mm.getRange(z, sp.GEHOLT).insertCheckboxes();
   });
   for (let k = zur.length - 1; k >= 0; k--) sh.deleteRow(zur[k] + 2);
-  if (zur.some(function (i) { return istAbg(w[i]); })) mm.getParent().toast('Abgelaufene Aufträge sind zurück. Bitte «Fälligkeit» neu setzen, sonst bleibt sie leer.', 'Matchmaker', 10);
+  if (sp.FAELLIG || sp.FLEX) mm.getParent().toast('Zurück in der Liste. «Flexibilität» und «Fälligkeit» bitte neu eintragen.', 'Matchmaker', 10);
   return zur.length;
 }
 

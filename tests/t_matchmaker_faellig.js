@@ -14,7 +14,7 @@ let env = umgebung({ mm: liste(), rt: rt([z('PG-1', '24.10.2026', 'Philips Toast
 env.c.sucheHeute();
 assert.deepStrictEqual(offen(env), ['Velo', 'Lampe', 'Kocher'], 'abgelaufen (23.10., 01.10.) weg, heute fällig / leer / kein Datum bleiben: ' + offen(env));
 const t = erl(env, 'Toaster'), ti = erl(env, 'Tisch');
-assert.ok(t && t[ek(env, 'Grund')] === 'Abgelaufen' && t[ek(env, 'Flexibilität')] === 'hoch' && t[ek(env, 'Fälligkeit')] === '23.10.2026', 'Toaster in «Erledigt», Grund, Flexibilität, Fälligkeit');
+assert.ok(t && t[ek(env, 'Grund')] === 'Abgelaufen' && ek(env, 'Flexibilität') < 0 && ek(env, 'Fälligkeit') < 0, 'Toaster in «Erledigt» mit Grund; keine Spalten Flexibilität/Fälligkeit (Jonas 12:23)');
 assert.ok(ti[ek(env, 'Aus Analyse')] === '' && /PG-5/.test(ti[ek(env, 'Aus Analyse (abgelaufen)')]), 'abgelaufen: Vermerk nicht in «Aus Analyse» (sonst gilt das Stück als geholt), sondern in «Aus Analyse (abgelaufen)»');
 assert.ok(/2 Suchaufträge abgelaufen/.test(env.status()) && /1 Zellen in «Fälligkeit» sind kein Datum/.test(env.status()), env.status());
 env.v1();
@@ -31,7 +31,7 @@ const mm = env.mm(), vr = mm.v.findIndex(r => r[0] === 'Velo') + 1;
 mm.v[vr - 1][10] = true;
 env.c.onEdit(env.ev(mm, vr, 11));
 const v = erl(env, 'Velo');
-assert.ok(v && v[ek(env, 'Grund')] === 'Geholt' && v[ek(env, 'Fälligkeit')] === '24.10.2026', 'Velo geholt: Grund «Geholt», Fälligkeit mitgenommen');
+assert.ok(v && v[ek(env, 'Grund')] === 'Geholt', 'Velo geholt: Grund «Geholt»');
 
 /* Ohne Spalte «Fälligkeit»: nichts verschoben */
 env = umgebung({ mm: { 'Matchmaker': [['Matchmaker'], [''], K2.filter(k => k !== 'Fälligkeit'), ['Toaster', '', '', 50, P('Toaster'), '', '', '', '', false, '']] } });
