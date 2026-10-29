@@ -28,6 +28,7 @@ with sync_playwright() as p:
     pg.click('.karte .leiste button[data-a=zurueck], button[data-a=zurueck]'); pg.wait_for_timeout(100); print('nach zurueck sp?', pg.evaluate('!!AN.gate && !AN.gate.sp && AN.gate.min')); pg.click('button[data-a=repSpaeter]'); pg.wait_for_timeout(200); pg.click('button[data-a=spNimm][data-v="0"]'); pg.click('button[data-a=repPause]'); pg.wait_for_timeout(200)
     pg.screenshot(path='rep3.png', full_page=True)
     print('pause', json.dumps(pg.evaluate('PAUSE'))[:400])
+    assert pg.evaluate("PAUSE.stand.ohne===false"), 'Review 29.10.2026 (2): «ohne» geht mit dem Stand der Reparatur-Pause mit'
     pg.click('#rep-liste button[data-a=repWeiter]'); pg.wait_for_timeout(200)
     pg.screenshot(path='rep4.png', full_page=True)
     pg.fill('#rep-text','Akku ersetzt'); pg.click('button[data-a=repFertig]'); pg.wait_for_timeout(100)

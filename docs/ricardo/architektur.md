@@ -70,5 +70,5 @@ Tests: `tests/t_ricardo_integritaet.js` (Server), `tests/t_ricardo_integritaet_u
 
 ## Sendungsnummer von Hand (29.10.2026)
 
-`sendungSetzen(nr, sendung, ueberschreiben)` schreibt die Spalte «Sendungsnummer» im Tab «Verkäufe» (8–40 Zeichen, Ziffern, Buchstaben, Punkt, Strich). Eine andere vorhandene Nummer wird nur nach Rückfrage (`[sn]`) ersetzt; Log «Sendungsnummer von Hand». Oberfläche: Feld im Packen-Schritt «Etikette» (`sendungFeld`), beim Versenden steht die Nummer wie bisher zum Kopieren bereit.
+`sendungSetzen(nr, sendung, ueberschreiben)` schreibt die Spalte «Sendungsnummer» im Tab «Verkäufe» (8–40 Zeichen, Ziffern, Buchstaben, Punkt, Strich). Eine andere vorhandene Nummer wird nur nach Rückfrage (`[sn]`) ersetzt; Log «Sendungsnummer von Hand». Die Zelle wird als Text geschrieben (`setNumberFormat('@')`), damit reine Ziffernfolgen genau bleiben. Oberfläche: Feld im Packen-Schritt «Etikette» (`sendungFeld`), auch ohne eingelesene Adresse; Text «Sendungsnummer eingetragen», wenn sie nicht aus dem Tool kommt. Beim Versenden steht die Nummer wie bisher zum Kopieren bereit.
 

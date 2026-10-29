@@ -2994,7 +2994,7 @@ function urteil_(d, u, e) {
   const maengel = ja && !versiegelt ? String(d.maengel || '').trim() : '';
   /* Entscheid Jonas 29.10.2026 (Feedback SW 21.10.): Der Befund ist bis zum Abschluss frei bearbeitbar. Hat die Person ihn im Entscheid überschrieben
      (befundText), gilt ihr Text; das Protokoll der Schritte bleibt davon unberührt. */
-  const befundEigen = ja ? String(d.befundText || '').trim().slice(0, 4000) : '';
+  const befundEigen = ja && !versiegelt ? String(d.befundText || '').trim().slice(0, 4000) : '';      // versiegelt: der Befund ist fix (die Oberfläche sperrt das Bearbeiten)
   const befund = befundEigen || (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
     kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel, doch: dochGeprueft }).filter(String).forEach(function (y) { verkauf.push(y); });
@@ -3139,7 +3139,9 @@ function abschliessen(d) {
   const auftrag = mm ? mm.gesucht + (mm.mehr ? ' (' + mm.mehr + ')' : '') : '', heute = Utilities.formatDate(new Date(), TZ, 'dd.MM.yyyy');
   const vermerk = mm ? pg + ' · ' + p['Bezeichnung'] + ' · ' + heute + (mmV && mmV['Foto-Ordner'] ? ' · Fotos: ' + mmV['Foto-Ordner'] : '') : '';
   /* Für den Wiedereinstieg: der Stand der Analyse und der Auftrag. Nur bei Matchmaker. */
-  const stand = mm ? JSON.stringify({ s: d.stand.s, i: d.stand.i, start: d.stand.start, aktiv: d.stand.aktiv, rm: d.stand.rm || {}, mm: mm, lauf: lauf }) : '';
+  /* Review 29.10.2026: «ohne» (kurzer Ablauf ohne Recherche) muss mit, sonst holt der Wiedereinstieg den vollen Überblick. */
+  const stand = mm ? JSON.stringify({ s: d.stand.s, i: d.stand.i, start: d.stand.start, aktiv: d.stand.aktiv, rm: d.stand.rm || {}, mm: mm, lauf: lauf, ohne: d.stand.ohne === true || d.ohne === true }) : '';
+  const preisAus = function () { const pr = ric ? ric['Startpreis CHF'] : (mmV ? mmV['Preis CHF'] : (x.reusable ? p['VP CHF'] : '')); return pr === '' || pr == null ? '' : Number(pr) || ''; };
   if (stand.length > 45000) throw new Error('Der Stand der Analyse ist zu gross zum Speichern.');
   if (nachMm) {
     let alt = null;
@@ -3158,7 +3160,7 @@ function abschliessen(d) {
       if (ric) schreib_('Ricardo', [Object.assign(ric, { 'Analyse-Nr': r['Analyse-Nr'], 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offline' })]);
       mmStatus_(pg, 'Nicht geklappt');                                // der alte Matchmaker-Eintrag gilt nicht mehr
       if (mmV) schreib_('Matchmaker', [Object.assign(mmV, { 'Analyse-Nr': r['Analyse-Nr'], 'Suchauftrag': txt_(auftrag), 'Kürzel': kuerzel, 'Analysiert am': zeit_(), 'Status': 'Offen' })]);
-      return { nr: String(r['Analyse-Nr']), pgid: String(r['PG-ID']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: r['Dauer Min'], budget: u.produkt.budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
+      return { nr: String(r['Analyse-Nr']), pgid: String(r['PG-ID']), reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, preis: preisAus(), dauerMin: r['Dauer Min'], budget: u.produkt.budget, zahlen: zahlen_(lies_('Produkte').z), mm: mm };
     }, ['Analysen', 'Produkte']);
     if (aus.schon) return aus;
     if (alt) mmVermerk_(e, alt, pg + ' · nicht geklappt · ' + heute, pg, true);
@@ -3214,8 +3216,7 @@ function abschliessen(d) {
     if (Object.keys(rs).length) setz_('Produkte', REP_SPALTE, rs);                   // kam das Stück aus dem Regal «Reparatur», ist sein Stand erledigt
     try { PropertiesService.getScriptProperties().deleteProperty(REP_STAND + pg); } catch (err) { /* alter Stand, harmlos */ }
     /* Feedback SW 29.10.2026: Der Preis gehört auf die letzte Seite (Zettel fürs Produkt): Startpreis Ricardo, Preis Matchmaker, sonst der VP. */
-    const preis = ric ? ric['Startpreis CHF'] : (mmV ? mmV['Preis CHF'] : (x.reusable ? p['VP CHF'] : ''));
-    return { nr: nr, pgid: pg, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, preis: preis === '' || preis == null ? '' : Number(preis) || '',
+    return { nr: nr, pgid: pg, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, preis: preisAus(),
       dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm, nachgeholt: !!frueher };
   }, ['Produkte', 'Analysen', 'Testmittel']);
   takt_('gespeichert');

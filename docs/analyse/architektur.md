@@ -119,4 +119,5 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 | Uhr | `visibilitychange`: verdeckt → `AN.seit = null`, `AN.autoPause = true`; sichtbar → weiter, ausser von Hand pausiert |
 | Preis am Schluss | `abschliessen` gibt `preis` zurück (Startpreis Ricardo, Preis Matchmaker, sonst VP); der Browser zeigt ihn sofort aus den eigenen Daten |
 | Übernahme abgelehnt | `uebernehmen`: Meldung mit allen Tabs, in denen die ID steht, Log «Übernahme abgelehnt» |
+| Wiedereinstieg | `ohne` steht im Matchmaker-Stand (`abschliessen`) und im Reparatur-Stand (`repPause`); `matchmakerZurueck`/`reparaturWeiter` holen damit den kurzen Ablauf. `preisAus()` liefert den Preis auch nach dem Wiedereinstieg; bei `schon` behält der Browser den gezeigten Preis |
 

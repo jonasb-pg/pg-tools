@@ -2190,7 +2190,7 @@ function sendungSetzen(nr, sendung, ueberschreiben) {
     if (!zeile) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
     const c = V_COLS.indexOf('Sendungsnummer') + 1, alt = String(sv.getRange(zeile, c).getValue() || '').trim();
     if (alt && alt !== sendung && ueberschreiben !== true) throw new Error('Bitte bestätigen: Für ' + nr + ' ist schon die Sendung ' + alt + ' eingetragen. Ersetzen? [sn]');
-    sv.getRange(zeile, c).setValue(sendung);
+    sv.getRange(zeile, c).setNumberFormat('@').setValue(sendung);                 // als Text: 18 Ziffern ohne Punkte blieben sonst nicht genau (Review 29.10.2026)
     log_('Sendungsnummer von Hand', nr, sendung + (alt && alt !== sendung ? ' (vorher ' + alt + ')' : ''));
   } finally { lock.releaseLock(); }
   return { nr: nr, sendung: sendung };

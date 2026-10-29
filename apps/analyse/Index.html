@@ -188,6 +188,7 @@
   #foto-gross[hidden] { display:none; }
   .gross-inhalt { max-width:min(96vw, 1200px); max-height:96vh; display:flex; flex-direction:column; gap:10px; align-items:center; }
   .gross-inhalt img { max-width:100%; max-height:84vh; object-fit:contain; background:#fff; border-radius:4px; }
+  .gross-leer { color:#fff; padding:40px 20px; text-align:center; }
   .ric-bild button { position:absolute; top:2px; right:2px; height:22px; width:22px; padding:0; border-radius:50%; font-size:12px; line-height:1; }
   .ric-leer { width:64px; height:64px; border:2px dashed var(--muted); border-radius:4px; }
   .ric-check { display:flex; gap:8px; align-items:center; font-size:14px; }
@@ -576,6 +577,7 @@
     're.ohne': ['Ohne Recherche prüfen', 'Check without research'], 're.ohne.hilfe': ['Ohne Recherche: kurzer Ablauf (Produkt, Vollständigkeit, Funktion, Zustand, Entscheid), ohne Produktwissen vom Tool. Für Produkte, bei denen eine Recherche nichts bringt.', 'Without research: short flow (product, completeness, function, condition, decision) with no product knowledge from the tool. For products where research adds nothing.'],
     're.ohne.link': ['Ohne Recherche weiter (kurzer Ablauf)', 'Continue without research (short flow)'], 're.ohne.aktiv': ['Kurzer Ablauf ohne Recherche.', 'Short flow without research.'],
     're.laeuft': ['Die Recherche läuft, das dauert etwa eine Minute.', 'Research is running, this takes about a minute.'],
+    're.ohneLaeuft': ['Der kurze Ablauf wird vorbereitet.', 'Preparing the short procedure.'],
     'id.frage': ['Ist es genau dieses Produkt?', 'Is it exactly this product?'], 'id.marke': ['Marke', 'Brand'], 'id.modell': ['Modell', 'Model'], 'id.nr': ['Herstellernr.', 'Manufacturer no.'],
     'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'],
     'id.neuovp': ['Ja, neu und unbenutzt (Verpackung offen)', 'Yes, new and unused (box opened)'],
@@ -589,7 +591,7 @@
     'en.befund.auto': ['Vom Tool: {0}', 'From the tool: {0}'], 'en.befund.ok': ['Übernehmen', 'Apply'],
     'en.befund.ric': ['Befund geändert: Den Ricardo-Text bei Bedarf mit «Neu schreiben» anpassen.', 'Finding changed: update the Ricardo text with «Rewrite» if needed.'],
     'ri.empfohlen': ['Vorschlag', 'Suggested'], 'mm.empfehlung': ['Empfehlung: Regal Matchmaker', 'Recommended: shelf “Matchmaker”'], 'mm.anders': ['Oder anders entscheiden:', 'Or decide differently:'],
-    'fo.titel': ['Fotos', 'Photos'], 'fo.gross': ['In voller Grösse öffnen', 'Open full size'], 'fo.drive': ['Datei in Drive', 'File in Drive'], 'fo.zu': ['Schliessen', 'Close'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
+    'fo.titel': ['Fotos', 'Photos'], 'fo.gross': ['In voller Grösse öffnen', 'Open full size'], 'fo.drive': ['Datei in Drive', 'File in Drive'], 'fo.zu': ['Schliessen', 'Close'], 'fo.keinBild': ['Das Bild lässt sich hier nicht anzeigen. Öffne die Datei in Drive.', 'The image cannot be shown here. Open the file in Drive.'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
     'fs.galerie': ['Aus Galerie', 'From gallery'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
     'id.welches': ['Welches Modell ist es?', 'Which model is it?'], 'id.platz': ['Modell, wie es auf dem Gerät steht', 'Model as written on the device'], 'id.neu': ['Neu recherchieren', 'Research again'], 'id.doch': ['Doch richtig', 'It is correct after all'],
     'id.rueckruf': ['Rückruf', 'Recall'], 'id.rfrage': ['Betrifft der Rückruf dieses Gerät?', 'Does the recall affect this device?'], 'id.rnein': ['Nein, nicht betroffen', 'No, not affected'], 'id.rja': ['Ja, betroffen', 'Yes, affected'],
@@ -1373,16 +1375,16 @@
   function etikett(text, farbe) { return '<span class="etikett ' + farbe + '">' + tx(text) + '</span>'; }
 
   function ohneRecherche() {
-    return '<div class="karte">' + fragt('re.keine') + (LAUF.sucht ? box(t('re.laeuft'), 'warn') : (LAUF.suchFehler ? box(LAUF.suchFehler, 'stop') : ''))
+    return '<div class="karte">' + fragt('re.keine') + (LAUF.sucht ? box(t(LAUF.ohneLaeuft ? 're.ohneLaeuft' : 're.laeuft'), 'warn') : (LAUF.suchFehler ? box(LAUF.suchFehler, 'stop') : ''))
       + '<div class="knoepfe">' + taste('recherche', 're.jetzt', 'pink', LAUF.sucht ? ' disabled' : '') + taste('ohneStart', 're.ohne', '', LAUF.sucht ? ' disabled' : '') + '</div>'
       + '<p class="still">' + tx('re.ohne.hilfe') + '</p>' + leiste() + '</div>';
   }
   /* Entscheid Jonas 29.10.2026 (Feedback SW 28.10.): Ohne Recherche weiter: kurzer Ablauf (Identität, Vollständigkeit, Funktion, Zustand, Entscheid). */
   function ohneStart() {
     var id = AN.d.produkt.id, meins = function () { return AN && AN.d.produkt.id === id; };
-    if (!ruf('starteAnalyse', [id, true], function (d) { if (meins()) uebernimm(d); },
-      function (m) { if (meins()) { LAUF.sucht = false; LAUF.suchFehler = m; zeichneSchritt(); } })) return;
-    LAUF.sucht = true; LAUF.suchFehler = ''; zeichneSchritt();
+    if (!ruf('starteAnalyse', [id, true], function (d) { if (meins()) { LAUF.ohneLaeuft = false; uebernimm(d); } },
+      function (m) { if (meins()) { LAUF.sucht = false; LAUF.ohneLaeuft = false; LAUF.suchFehler = m; zeichneSchritt(); } })) return;
+    LAUF.sucht = true; LAUF.ohneLaeuft = true; LAUF.suchFehler = ''; zeichneSchritt();
   }
   var SEITE = {
     ident: function () {
@@ -1753,7 +1755,7 @@
     var g = AN.gate, v = g.sp, p = AN.d.produkt;
     if (!v.was) { $('sp-was').focus(); return; }
     sichern();
-    var stand = { s: AN.s, i: AN.i, aktiv: AN.aktiv, start: AN.start, rm: AN.rm, lauf: AN.lauf, gate: { von: g.von, was: g.was, min: g.min, teil: Number(v.preis) || g.teil || 0 } };
+    var stand = { s: AN.s, i: AN.i, aktiv: AN.aktiv, start: AN.start, rm: AN.rm, lauf: AN.lauf, ohne: !!AN.d.ohne, gate: { von: g.von, was: g.was, min: g.min, teil: Number(v.preis) || g.teil || 0 } };
     ruf('reparaturPause', [{ id: p.id, kuerzel: K, was: v.was, teil: v.teil ? { teil: v.teil, nummer: v.nummer, shop: v.shop, preis: v.preis, link: v.link } : null, stand: stand }], function (r) {
       if (!AN || AN.d.produkt.id !== p.id) return;
       FERTIG = { titel: p.bezeichnung, r: { pause: true, id: p.id, teil: !!v.teil } }; RIC = null;
@@ -1857,6 +1859,9 @@
     var el = $('foto-gross'), gross = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w1600';
     el.innerHTML = '<div class="gross-inhalt"><img src="' + esc(gross) + '" alt=""><div class="knoepfe"><a class="knopf" href="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view" target="_blank" rel="noopener noreferrer">' + tx('fo.drive') + '</a><button class="knopf pink" data-a="fotoGrossZu">' + tx('fo.zu') + '</button></div></div>';
     el.hidden = false;
+    /* Review 29.10.2026: Wer den Foto-Ordner nicht sehen darf, bekommt von Drive kein Bild. Dann wenigstens die kleine Vorschau aus dem Tool (Data-URL). */
+    var x = RIC && RIC.st ? RIC.st.liste.filter(function (y) { return y.id === id; })[0] : null, img = el.querySelector('img');
+    if (img) img.addEventListener('error', function () { if (x && x.bild && img.src !== x.bild) img.src = x.bild; else img.replaceWith(Object.assign(document.createElement('p'), { className: 'gross-leer', textContent: t('fo.keinBild') })); });
   }
   function fotoGrossZu() { $('foto-gross').hidden = true; $('foto-gross').innerHTML = ''; }
   function fotoSlots() {
@@ -2084,7 +2089,7 @@
     ausPausiert(AN.lauf);
     var reg = d.kanal === 'matchmaker' && r.reusable ? 'Matchmaker' : (d.kanal === 'ricardo' && r.reusable ? 'Ricardo Offline' : (r.reusable ? 'Analysiert' : ''));
     /* Feedback SW 29.10.2026: Preis sofort auf der letzten Seite (Startpreis Ricardo, Preis Matchmaker, sonst VP); der Server bestätigt ihn beim Speichern. */
-    var preis = !r.reusable ? '' : ((d.kanal === 'ricardo' || d.kanal === 'matchmaker') && zahlVon(d.ricardo && d.ricardo.preis) > 0 ? zahlVon(d.ricardo.preis) : zahlVon(p.vp));
+    var preis = !r.reusable ? '' : ((d.kanal === 'ricardo' || d.kanal === 'matchmaker') && zahlVon(d.ricardo && d.ricardo.preis) > 0 ? zahlVon(d.ricardo.preis) : (d.kanal === 'ricardo' ? ricVorschlag().preis : zahlVon(p.vp)));
     fertigZeigen(p, { reusable: r.reusable, grade: r.grade, regal: reg, befund: r.befund, verkaufsinfo: r.verkaufsinfo, preis: preis, dauerMin: Math.round((Number(d.aktivSek) || 0) / 6) / 10,
       budget: p.budget, nr: '', speichert: true });
     spWeiter();
@@ -2130,7 +2135,7 @@
       if (r && r.offen) { spFehler(x, t('sp.offen')); return; }
       spWeg(x);                                                                 // gespeichert (r.schon: war schon gespeichert, nichts doppelt)
       if (r && r.zahlen) zahlen(r.zahlen);
-      if (FERTIG && FERTIG.r && FERTIG.r.id === x.id && FERTIG.r.speichert) { r.id = x.id; FERTIG.r = r; zeichneFertig(); }
+      if (FERTIG && FERTIG.r && FERTIG.r.id === x.id && FERTIG.r.speichert) { r.id = x.id; if (r.preis === undefined) r.preis = FERTIG.r.preis; FERTIG.r = r; zeichneFertig(); }   // «schon gespeichert» bringt keinen Preis: den gezeigten behalten
       spWeiter();
     }, function (m, e) {
       SP_LAEUFT = false;

@@ -97,6 +97,30 @@ function umgebung() {
     bezug: { ablauf: u8.ablauf, sicher: [], liefer: [], fn: u8.funktion.liste.map(x => x.n), reset: [] } });
   assert.strictEqual(r8.preis, 48, 'A2: Startpreis Ricardo im Abschluss');
   assert.ok(!LOG.some(l => /Überblick geändert/.test(l)), 'E5: Abschluss mit ohne = true nimmt denselben kurzen Ablauf');
+  /* Review 29.10.2026 (7): versiegelt → eigener Befundtext zählt nicht */
+  const xv = c.urteil_(j(Object.assign({}, d, { versiegelt: true, befundText: 'Alter Handtext' })), u, e);
+  assert.ok(!/Alter Handtext/.test(xv.befund), 'Review 7: bei versiegelt gilt der feste Befund, nicht der Handtext');
+}
+
+/* ---- Review 29.10.2026 (1, 4): Matchmaker mit «ohne Recherche»: das Flag bleibt im Stand, der Wiedereinstieg holt den kurzen Ablauf, der Abschluss danach bringt den Preis ---- */
+{
+  const { c, DB } = umgebung();
+  DB.Produkte.push({ 'PG-ID': 'PG-9', 'Bezeichnung': 'Pfanne', 'Analyse-Status': 'Offen', 'Recherche-Schlüssel': 'K9', 'Herkunft': 'Retoure', 'VP CHF': 25, 'Neupreis CHF': 50 });
+  DB.Stufen.push({ 'Herkunft': 'Retoure', 'VP ab CHF': 0, 'Stufe': 'Key Functions', 'Minuten': 10, 'Websuchen': 3, 'KI-Modell': '', 'Recherche-Umfang': 'Voll', 'Prüfumfang': 'Kern' });
+  c.mmPruefen_ = () => ({ gesucht: 'Pfanne', schluessel: 'k9', mehr: '' }); c.mmVermerk_ = () => {}; c.mmStatus_ = () => {};
+  const e = c.einst_(), u = c.ueberblick_(c.produkt_('PG-9'), e, true);
+  const bezug = { ablauf: u.ablauf, sicher: [], liefer: [], fn: u.funktion.liste.map(x => x.n), reset: [] };
+  const s = { fn: ['ok'], grade: 'A' };
+  const r = c.abschliessen({ id: 'PG-9', kuerzel: 'AB', start: 1, aktivSek: 60, ohne: true, fn: ['ok'], grade: 'A', kanal: 'matchmaker', mm: { gesucht: 'Pfanne', schluessel: 'k9' },
+    stand: { s: s, i: 4, start: 1, aktiv: 60000, rm: {}, ohne: true }, lauf: 'L-9', v: '2026-10-29.1', bezug: bezug });
+  assert.strictEqual(r.regal, 'Matchmaker');
+  const st = JSON.parse(DB.Analysen[0]['Stand']);
+  assert.strictEqual(st.ohne, true, 'Review 1: «ohne» steht im gespeicherten Stand');
+  const z = c.matchmakerZurueck('PG-9');
+  assert.ok(z.d.ohne === true && z.d.ablauf.join() === 'ident,voll,funktion,zustand,entscheid', 'Review 1: Wiedereinstieg holt den kurzen Ablauf');
+  c.mmPruefen_ = () => null;
+  const r2 = c.abschliessen({ id: 'PG-9', kuerzel: 'AB', start: 1, aktivSek: 90, ohne: true, nachMm: true, fn: ['ok'], grade: 'A', kanal: 'regal', lauf: 'L-9b', v: '2026-10-29.1', bezug: bezug });
+  assert.ok(r2.regal === 'Analysiert' && r2.preis === 25, 'Review 4: Abschluss nach dem Wiedereinstieg bringt den Preis (VP)');
 }
 
 /* ---- A4: Übernahme abgelehnt: Meldung nennt die Tabs, Log-Zeile ---- */

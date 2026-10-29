@@ -1638,7 +1638,7 @@
     'g.p.gepackt': ['Gepackt', 'Packed'], 'g.p.post.fehlt': ['Post-Zugang fehlt: Etiketten gehen erst, wenn der Admin ihn einträgt.', 'Swiss Post access missing: labels work once the admin enters it.'],
     'g.p.bezahlt': ['bezahlt', 'paid'], 'g.p.adresse': ['Adresse fehlt', 'Address missing'],
     'g.p.sendung': ['Sendungsnummer von Hand (Etikette nicht aus dem Tool)', 'Tracking number by hand (label not from the tool)'], 'g.p.sendung.neu': ['Andere Sendungsnummer eintragen', 'Enter a different tracking number'],
-    'g.p.sendung.k': ['Speichern', 'Save'], 'g.p.sendung.ok': ['Sendungsnummer {0} gespeichert. Sie steht beim Versenden zum Kopieren bereit.', 'Tracking number {0} saved. It is ready to copy when shipping.'],
+    'g.p.sendung.k': ['Speichern', 'Save'], 'g.p.sendung.da': ['Sendungsnummer {0} eingetragen', 'Tracking number {0} entered'], 'g.p.sendung.ok': ['Sendungsnummer {0} gespeichert. Sie steht beim Versenden zum Kopieren bereit.', 'Tracking number {0} saved. It is ready to copy when shipping.'],
     /* Versenden */
     'g.v.wagen': ['Postwagen', 'Postal cart'], 'g.v.wagen.p': ['Paket {0} aus «{1}» in den Postwagen.', 'Parcel {0} from «{1}» into the postal cart.'],
     'g.v.bestaetigen': ['Versand bestätigen', 'Confirm shipping'], 'g.v.bestaetigen.r': ['Beim Verkauf «Versand bestätigen» klicken und die Sendungsnummer {0} einfügen. Damit ist der Verkauf abgeschlossen.', 'Click «Versand bestätigen» on the sale and paste tracking number {0}. That closes the sale.'],
@@ -1891,7 +1891,8 @@
     return [
       { titel: t('g.p.holen'), html: (o.bild ? '<img class="f-bild" src="' + esc(o.bild) + '" alt="">' : '') + tun('physisch', t('g.p.holen.p', '<strong>' + esc(o.lagerort || '') + '</strong>') + rtOrtHtml(o), ''),
         aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
-      { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? '' : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t('g.p.etikette.da', esc(o.sendung)) + '</span>' : ''),
+      /* Review 29.10.2026: Sendungsnummer von Hand auch ohne Adresse (Etikette aus dem Ricardo-Mail); Text neutral, wenn sie nicht aus dem Tool kommt. */
+      { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? sendungFeld(o) : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t(ETIKETTEN[o.nr] ? 'g.p.etikette.da' : 'g.p.sendung.da', esc(o.sendung)) + '</span>' : ''),
           (F.postBereit ? etikettKnoepfe(o) : '') + sendungFeld(o))),
         aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
       { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
