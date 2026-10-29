@@ -107,3 +107,16 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 | Dienst | Kennzeichnung | Wozu |
 |---|---|---|
 | Google Sheets API v4 | `Sheets` | mehrere Tabs in einem Aufruf lesen (apiWerte_, vorladen_). Fehlt der Dienst, liest das Tool wie bisher über SpreadsheetApp. Eingeschaltet am 17.10.2026. |
+
+## Feedback-Runde 29.10.2026
+
+| Thema | Umsetzung |
+|---|---|
+| Ablauf ohne Recherche | `starteAnalyse(id, true)` → `ueberblick_(p, e, true)`: Ablauf `ident, voll, funktion, zustand, entscheid`, Ersatzfunktion «Alle Teile sind unbeschädigt und benutzbar», Lieferumfang als Freitext. Das Flag `ohne` reist mit (`daten()`, `preisSetzen`, `pruefen`, `abschliessen`, `ricardoText`, gespeicherter Stand) und bestimmt den Überblick auf dem Server. Cache-Schlüssel mit `:ohne` |
+| Befund frei bearbeitbar | `d.befundText` (Entscheid, Textfeld `#befund-text`) ersetzt in `urteil_` den Befund (`befund`), nicht das Protokoll. «Text vom Tool wiederherstellen» löscht ihn |
+| Abgelesenes Modell | `rechercheJetzt(id, modell)`: kein Icecat, `params_` nennt Listing und EAN nur als Hinweis, `modellAbgelesen_` setzt das Modell in die Antwort |
+| Fotos | Pflicht nur Hauptbild (`fotoFehlt_`), Empfehlungen `fotoEmpfohlen_`; Grossansicht `#foto-gross` (Overlay auf Body-Ebene) |
+| Uhr | `visibilitychange`: verdeckt → `AN.seit = null`, `AN.autoPause = true`; sichtbar → weiter, ausser von Hand pausiert |
+| Preis am Schluss | `abschliessen` gibt `preis` zurück (Startpreis Ricardo, Preis Matchmaker, sonst VP); der Browser zeigt ihn sofort aus den eigenen Daten |
+| Übernahme abgelehnt | `uebernehmen`: Meldung mit allen Tabs, in denen die ID steht, Log «Übernahme abgelehnt» |
+

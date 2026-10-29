@@ -67,3 +67,8 @@ Einzelheiten, Tests und offene Punkte: `pruefung-2026-10-24.md`.
 Nach-Review 24.10.2026: `pruefung-2026-10-24.md`, Abschnitt «Nach-Review»; Tests `tests/t_ricardo_p2410_nachreview.js`, `tests/t_ricardo_p2410_nachreview_ui.py`.
 
 Tests: `tests/t_ricardo_integritaet.js` (Server), `tests/t_ricardo_integritaet_ui.py` (Oberfläche), `tests/t_ricardo_integritaet_daten.py` (Suche gegen eine Momentaufnahme des echten Return Tools; ohne Datei übersprungen). Prüfung 24.10.2026: `tests/t_ricardo_p2410_status.js`, `_verkauf.js`, `_quellen.js`, `_en.js` (Server, gemeinsame Umgebung `_hilfe.js`), `tests/t_ricardo_p2410_ui.py` (Oberfläche, Zebra Browser Print gestubbt).
+
+## Sendungsnummer von Hand (29.10.2026)
+
+`sendungSetzen(nr, sendung, ueberschreiben)` schreibt die Spalte «Sendungsnummer» im Tab «Verkäufe» (8–40 Zeichen, Ziffern, Buchstaben, Punkt, Strich). Eine andere vorhandene Nummer wird nur nach Rückfrage (`[sn]`) ersetzt; Log «Sendungsnummer von Hand». Oberfläche: Feld im Packen-Schritt «Etikette» (`sendungFeld`), beim Versenden steht die Nummer wie bisher zum Kopieren bereit.
+

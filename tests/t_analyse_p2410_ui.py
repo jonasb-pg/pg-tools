@@ -81,7 +81,7 @@ with sync_playwright() as p:
     pg.evaluate("window.ABS=function(d){return {konflikt:{id:d.id,kuerzel:'AB',zeit:'24.10.2026 09:12',nr:'A-000001'}};}; 1")
     pg.evaluate("abschluss()"); pg.wait_for_timeout(400)
     d = letzter(pg, 'abschliessen')[0]
-    assert d['lauf'] == lauf and d['v'] == '2026-10-24.2' and d['bezug']['fn'] == ['Heizen', 'Timer', 'Display'] and d['ueb'] == 'u1', 'H2/M1: Lauf-ID, Version, Namen mitgeschickt'
+    assert d['lauf'] == lauf and d['v'] == '2026-10-29.1' and d['bezug']['fn'] == ['Heizen', 'Timer', 'Display'] and d['ueb'] == 'u1', 'H2/M1: Lauf-ID, Version, Namen mitgeschickt'
     pz = pg.evaluate("pausierte()")
     assert len(pz) == 1 and pz[0]['d']['produkt']['id'] == 'PG-1' and 'AB' in pz[0]['fehler'] and pz[0]['lauf'] == lauf, 'H3: Analyse unter «Pausiert» mit Kürzel'
     assert pg.evaluate("JSON.parse(localStorage.getItem('at-speichern')).length") == 0

@@ -20,7 +20,7 @@
  * Prüfung 24.10.2026 (Version .2): Lauf-ID gegen doppelte Abschlüsse, Namen statt Positionen beim Abschluss (bezugPruefen_), Kanal-Tabs nach Kopfzeile erkannt (Vertrag V4).
  */
 
-const VERSION = '2026-10-24.2';
+const VERSION = '2026-10-29.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -1371,7 +1371,15 @@ function uebernehmen(pid, bestaetigt) {
   let t = rtFinde_(ss, '^\\s*[Pp][Gg][-\\s\']?0*' + n.slice(3) + '\\s*$', 'ID', rtSuchTabs_(ss, e)).filter(function (z) { return z.idN === n; });
   if (!t.some(function (z) { return kanal.indexOf(z.tab) > -1; })) t = t.concat(rtLesen_(ss, kanal).zeilen.filter(function (z) { return z.idN === n; }));
   const z = t.filter(function (x) { return kanal.indexOf(x.tab) > -1; })[0];
-  if (!z) throw new Error(n + (t.length ? ' steht nur im Archiv des Return Tools (' + t[0].tab + ') und lässt sich nicht analysieren.' : ' steht nicht im Return Tool.'));
+  if (!z) {
+    /* Feedback DS 27.10.2026: Die Meldung sagt jetzt, in welchen Tabs das Stück steht, und das Log hält den Fall fest (zum Nachsehen, warum es nicht ging). */
+    const tabs = t.map(function (x) { return x.tab; }).filter(function (x, i, a) { return a.indexOf(x) === i; });
+    const nurArchiv = tabs.length && tabs.every(rtArchiv_);
+    const text = n + (!tabs.length ? ' steht nicht im Return Tool.' : nurArchiv ? ' steht nur im Archiv des Return Tools (' + tabs.join(', ') + ') und lässt sich nicht analysieren. Steht es wieder im Lager, muss es zuerst im Return Tool in einen aktiven Tab.'
+      : ' steht im Return Tool im Tab «' + tabs.join('», «') + '», der nicht als Kanal-Tab gilt. Kanal-Tabs: ' + kanal.join(', ') + '.');
+    log_('Übernahme abgelehnt', n, tabs.length ? 'Tabs: ' + tabs.join(', ') : 'nicht gefunden');
+    throw new Error(text);
+  }
   const alle = lies_('Produkte').z, p = alle.filter(function (r) { return pgNorm_(r['PG-ID']) === n; })[0];
   if (p && p['Analyse-Status'] === 'Erledigt' && !retoure) {
     if (bestaetigt) throw new Error(n + ' ist schon analysiert (Erledigt). Ist es eine Retoure, «Neu analysieren» wählen.');
@@ -1794,10 +1802,20 @@ function kontext_() {
     vorhanden: tm.filter(function (r) { return String(r['Vorhanden']) === 'Ja'; }).map(function (r) { return String(r['Testmittel']); }) };
 }
 /** Die Anfrage an Claude für ein Produkt (p = Zeile aus «Produkte»). Gleich für Vorab-Recherche und Sofort-Recherche. modell = das Modell, das jemand am Gerät abgelesen hat. */
+/** Das abgelesene Modell gilt. Steht es schon im Modell der Antwort, bleibt die Antwort; sonst ersetzt es sie (die Antwort steht dann in Klammern). */
+function modellAbgelesen_(modell, antwort) {
+  const a = String(antwort || '').trim(), n = function (s) { return norm_(s).replace(/ /g, ''); };
+  if (!a) return modell;
+  if (n(a).indexOf(n(modell)) > -1 || n(modell).indexOf(n(a)) > -1) return a.length >= modell.length ? a : modell;
+  return modell + ' (' + a + ')';
+}
 function params_(p, ice, e, kontext, modell) {
-  const z = ['Produkt: ' + p['Bezeichnung']], ean = ean_(p['Barcode']), st = stufe_(kontext.zb, p['Herkunft'], p['VP CHF']), budget = st.minuten;
-  if (modell) z.push('Modell, am Gerät abgelesen: ' + modell + '. Es ist verbindlich. Angaben, die nicht zu diesem Modell passen, gelten nicht.');
-  if (ean) z.push('EAN: ' + ean);
+  const z = [], ean = ean_(p['Barcode']), st = stufe_(kontext.zb, p['Herkunft'], p['VP CHF']), budget = st.minuten;
+  if (modell) {
+    z.push('Modell, am Gerät abgelesen: ' + modell + '. Es ist verbindlich: Recherchiere genau dieses Modell und trage es als "modell" ein. Angaben, die nicht zu diesem Modell passen, gelten nicht.');
+    z.push('Händler-Listing (kann eine andere Variante desselben Produkts sein, nur als Hinweis): ' + p['Bezeichnung']);
+  } else z.push('Produkt: ' + p['Bezeichnung']);
+  if (ean) z.push((modell ? 'EAN des Händler-Listings: ' : 'EAN: ') + ean);
   if (p['Link']) z.push('Link beim Händler: ' + p['Link']);
   if (p['Neupreis CHF']) z.push('Neupreis: CHF ' + p['Neupreis CHF']);
   if (budget) z.push('Zeitbudget für die Analyse: ' + budget + ' Minuten');
@@ -2306,12 +2324,15 @@ function rechercheJetzt(id, modell) {
   let d = null, ice = { daten: {}, log: [] };
   if (modell || !recherchiert_()[k]) {
     try {
-      ice = icecat_([k], e);
+      /* Feedback SW 22.10.2026 (PG-17278): Mit einem abgelesenen Modell gehören die Icecat-Daten der EAN (Händler-Listing) nicht in die Anfrage, sonst
+         setzt sich das Listing-Modell wieder durch. Das abgelesene Modell steht danach verbindlich in «Marke und Modell». */
+      ice = modell ? { daten: {}, log: [] } : icecat_([k], e);
       const anfrage = params_(p, ice.daten[k], e, kontext_(), modell);
       anfrage.tools[0].max_uses = Math.min(anfrage.tools[0].max_uses, 5);          // direkt und ohne Warteschlange: kürzer suchen, damit die Antwort in einer Minute da ist
       const roh = json_(text_(claude_(anfrage, 'Sofort-Recherche', k, p['Bezeichnung'])));
       d = rechercheNorm_(roh);                                                    // H5: falsches Format nie schreiben, die alte Recherche bleibt
       if (!d) throw new Error(roh ? 'Antwort im falschen Format' : 'Antwort nicht lesbar');
+      if (modell) d.modell = modellAbgelesen_(modell, d.modell);
     } catch (err) {
       log_('Recherche-Fehler', id, err.message);
       if (/Claude-Schlüssel fehlt/.test(err.message)) throw err;
@@ -2363,18 +2384,21 @@ function funktionsAuswahl_(fn, umfang, e) {
   return { kern: kern, weitere: weitere, ungeprueft: ungeprueft, ungeprueftKurz: ungeprueftKurz };
 }
 
-function ueberblick_(p, e) {
+function ueberblick_(p, e, ohne) {
   const k = String(p['Recherche-Schlüssel']), sg = scoreGrenzen_(), gruen = sg[0], gelb = sg[1];
   const hilf = {}, nach = {}, vorhanden = {}, st = stufe_(lies_('Stufen').z, p['Herkunft'], p['VP CHF']);
   let infos = [];
-  rechercheVon_(k).z.forEach(function (r) {
+  /* Entscheid Jonas 29.10.2026 (Feedback SW 28.10.): «Ohne Recherche» = kurzer Ablauf ohne Produktwissen: Identität, Vollständigkeit (Freitext),
+     Funktion (alle Teile unbeschädigt und benutzbar), Zustand, Entscheid. Keine Recherche-Zeilen, kein Handbuch, keine Sicherheitspunkte aus der Recherche. */
+  ohne = ohne === true;
+  (ohne ? [] : rechercheVon_(k).z).forEach(function (r) {
     const feld = String(r['Feld']);
     if (INFO_FELDER.indexOf(feld) < 0) { hilf[feld] = String(r['Inhalt']); return; }
     const score = typeof r['Score'] === 'number' ? r['Score'] : null;
     infos.push(nach[feld] = { feld: feld, inhalt: String(r['Inhalt']), quelle: String(r['Quelle (Link)'] || ''), quellentyp: String(r['Quellentyp']), modelltreffer: String(r['Modelltreffer']),
       score: score, stufe: score === null ? '' : (score >= gruen ? 'Gruen' : (score >= gelb ? 'Gelb' : 'Rot')) });
   });
-  const da = hilf['Funktionen'] !== undefined;                       // eine Recherche in der heutigen Fassung (recherchiert_)
+  const da = ohne || hilf['Funktionen'] !== undefined;               // eine Recherche in der heutigen Fassung (recherchiert_), oder bewusst ohne
   if (!da) { infos = []; Object.keys(nach).forEach(function (f) { delete nach[f]; }); Object.keys(hilf).forEach(function (f) { delete hilf[f]; }); }
   infos.sort(function (a, b) { return INFO_FELDER.indexOf(a.feld) - INFO_FELDER.indexOf(b.feld); });
   lies_('Testmittel').z.forEach(function (r) { vorhanden[norm_(r['Testmittel'])] = String(r['Vorhanden'] || ''); });
@@ -2410,15 +2434,16 @@ function ueberblick_(p, e) {
   }
 
   /* Handbuch: nur bei Geräten mit Strom. Fehlt es (kein PDF gefunden, oder die Suche lief noch nicht), kommt nach «Produkt» der Schritt «Handbuch»: von ManualsLib holen und hochladen. */
-  let hb = da ? handbuchFuer_(e, mm[0], mm[1]) : null;
-  if (da && strom.length && !hb && (mm[0] || '').trim()) hb = { status: 'Hochladen nötig', datei: '', pdf: '', herkunft: '', manualslib: manualslibSuche_({ marke: mm[0].trim(), modell: (mm[1] || '').trim(), nummer: (mm[2] || '').trim() }), themen: {} };
+  let hb = da && !ohne ? handbuchFuer_(e, mm[0], mm[1]) : null;
+  if (da && !ohne && strom.length && !hb && (mm[0] || '').trim()) hb = { status: 'Hochladen nötig', datei: '', pdf: '', herkunft: '', manualslib: manualslibSuche_({ marke: mm[0].trim(), modell: (mm[1] || '').trim(), nummer: (mm[2] || '').trim() }), themen: {} };
   /* Sicherheit für genau dieses Produkt, nach den allgemeinen Punkten: aus dem gelesenen Handbuch (mit Seite), sonst aus der Recherche. Höchstens vier. */
   const sicherAllgemein = sicher.length, ausHb = hbBereit_(hb) ? zeilen(hb.themen['Sichtprüfung']).filter(function (x) { return !/^nicht im handbuch/i.test(x.replace(/^-\s*/, '')); }) : [];
   sicher = sicher.concat((ausHb.length ? ausHb : zeilen(hilf['Sichtprüfung'])).map(function (x) {
     return x.replace(/^[-•]\s*/, '').replace(/\s*\(S\. (\d+): «[^»]*»\)/g, ' (Handbuch S. $1)').trim(); })
     .filter(function (x) { return x && sicher.indexOf(x) < 0; }).slice(0, 4));
   const ablauf = [];
-  if (da) {
+  if (ohne) ablauf.push('ident', 'voll', 'funktion', 'zustand', 'entscheid');
+  else if (da) {
     ablauf.push('ident');
     if (strom.length && hb && /^(Hochladen nötig|falsches Modell|Fehler)$/.test(hb.status)) ablauf.push('handbuch');
     if (hat('Körpernah')) ablauf.push('hygiene');
@@ -2432,7 +2457,7 @@ function ueberblick_(p, e) {
   const liefer = nach['Lieferumfang'], rueckruf = nach['Rückruf'], handbuch = (hb && hb.datei && /^(gelesen|nur Bild)$/.test(hb.status) ? hb.datei : '') || text('Handbuch');
   const u = {
     produkt: { id: String(p['PG-ID']), bezeichnung: String(p['Bezeichnung']), link: String(p['Link'] || ''), anzahl: Number(p['Anzahl']) || 1, vp: p['VP CHF'], ovp: p['Neupreis CHF'], stufe: st.name, budget: st.minuten, umfang: st.umfang },
-    recherche: da,
+    recherche: da, ohne: ohne,
     strom: strom,
     ablauf: ablauf,
     infos: infos,
@@ -2527,7 +2552,8 @@ function scoreGrenzen_() {
   try { c.put('score:' + (c.get('ueb-gen') || '0'), JSON.stringify(g), 600); } catch (err) { /* ohne Zwischenspeicher */ }
   return g;
 }
-function starteAnalyse(id) { return ueberblickSpeicher_(produkt_(id), einst_()); }
+/** ohne = true: Ablauf ohne Recherche (Entscheid Jonas 29.10.2026), für Produkte, bei denen Produktwissen nichts bringt (z.B. ein Kochtopf). */
+function starteAnalyse(id, ohne) { return ueberblickSpeicher_(produkt_(id), einst_(), ohne === true); }
 /** Weg A: Überblicke für die nächsten Stücke einer Liste vorab (höchstens 5), damit «Starten» sofort da ist. Fehler einzelner Stücke zählen nicht. */
 function vorab(ids) {
   const e = einst_(), aus = {};
@@ -2546,7 +2572,7 @@ function uiTempo(liste, kuerzel) {
  * Feedback SW 22.10.2026: Der Neupreis (OVP) ist Pflicht, der VP ist ohne Eingabe 50% vom OVP.
  */
 function vpAusOvp_(o) { return Math.round((Number(o) || 0) * 0.5); }
-function preisSetzen(id, vp, ovp) {
+function preisSetzen(id, vp, ovp, ohne) {
   let v = zahl_(vp);
   const o = zahl_(ovp), alt = zahl_(produkt_(id)['Neupreis CHF']), ovpDa = o > 0 ? o : (alt > 0 ? alt : 0);
   if (!(ovpDa > 0)) throw new Error('Bitte den Neupreis (OVP) eingeben.');
@@ -2557,7 +2583,7 @@ function preisSetzen(id, vp, ovp) {
     if (o > 0 && !(zahl_(p['Neupreis CHF']) > 0)) { const q = {}; q[p._r] = o; setz_('Produkte', 'Neupreis CHF', q); }
   });
   log_('Preis nachgetragen', String(id), 'VP ' + v + (o > 0 ? ', OVP ' + o : ''));
-  return starteAnalyse(id);
+  return starteAnalyse(id, ohne === true);                                   // der kurze Ablauf (ohne Recherche) bleibt erhalten
 }
 
 /**
@@ -2573,11 +2599,12 @@ function uebSchluessel_(p, gen) {
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
   return 'ueb:' + VERSION + ':' + LANG + ':' + gen + ':' + String(p['PG-ID']) + ':' + h.toString(36);
 }
-function ueberblickSpeicher_(p, e) {
+function ueberblickSpeicher_(p, e, ohne) {
   let c = null, k = '', u = null;
-  try { c = CacheService.getScriptCache(); k = uebSchluessel_(p, c.get('ueb-gen') || '0'); const alt = c.get(k); if (alt) u = JSON.parse(alt); } catch (err) { c = null; }
+  ohne = ohne === true;
+  try { c = CacheService.getScriptCache(); k = uebSchluessel_(p, c.get('ueb-gen') || '0') + (ohne ? ':ohne' : ''); const alt = c.get(k); if (alt) u = JSON.parse(alt); } catch (err) { c = null; }
   if (!u) {
-    u = ueberblick_(p, e);
+    u = ueberblick_(p, e, ohne);
     if (c && u.recherche) try { const s = JSON.stringify(u); if (s.length < 95000) c.put(k, s, UEB_TTL); } catch (err) { /* zu gross: ohne Zwischenspeicher */ }
   }
   if (u.ricardo) u.ricardo.fotoUrl = fotoUrl_(p, e);                     // nie aus dem Zwischenspeicher: der Abgleich (Testbereitstellung) kennt nur die /dev-Adresse
@@ -2821,7 +2848,7 @@ function matchmakerZurueck(id) {
   let st = null;
   try { st = JSON.parse(String(r['Stand'] || '') || 'null'); } catch (e) { /* ohne Stand geht es nicht weiter */ }
   if (!st || !st.s) throw new Error('Der gespeicherte Stand der Analyse fehlt.');
-  return { d: ueberblick_(p, einst_()), stand: st };
+  return { d: ueberblick_(p, einst_(), st.ohne === true), stand: st };
 }
 
 /* ------------------------------------------------------------------ */
@@ -2887,7 +2914,7 @@ function reparaturWeiter(id) {
   const p = produkt_(id);
   if (p['Analyse-Status'] !== 'Reparatur') throw new Error('Produkt ' + id + ' wartet nicht auf eine Reparatur.');
   const m = repStand_(p);
-  return { d: ueberblick_(p, einst_()), stand: m && m.stand ? m.stand : null };
+  return { d: ueberblick_(p, einst_(), !!(m && m.stand && m.stand.ohne === true)), stand: m && m.stand ? m.stand : null };
 }
 
 /** Was eine Reparatur kostet (Arbeit zum Stundenansatz plus Ersatzteil) und ob sie sich lohnt: höchstens so viel Prozent vom Verkaufspreis wie in den Einstellungen. Ohne Verkaufspreis oder Grenze gibt es kein Nein. */
@@ -2965,7 +2992,10 @@ function urteil_(d, u, e) {
   const firmware = ja && !versiegelt && u.firmware ? String(d.firmwareVersion || '').trim() : '', garantie = e['Garantie Tage'] || '';
   /* Mängel und Hinweise der Person (Schritt «Zustand») stehen zuerst, dann, was das Tool weiss. */
   const maengel = ja && !versiegelt ? String(d.maengel || '').trim() : '';
-  const befund = (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
+  /* Entscheid Jonas 29.10.2026 (Feedback SW 21.10.): Der Befund ist bis zum Abschluss frei bearbeitbar. Hat die Person ihn im Entscheid überschrieben
+     (befundText), gilt ihr Text; das Protokoll der Schritte bleibt davon unberührt. */
+  const befundEigen = ja ? String(d.befundText || '').trim().slice(0, 4000) : '';
+  const befund = befundEigen || (maengel ? [satz(maengel)] : []).concat(auto).join(' '), verkauf = [];
   if (ja) {
     kaeuferSaetze_({ versiegelt: versiegelt, grade: grade, fehlt: fehlt, rep: rep, nichtGeprueftKurz: nichtGeprueftKurz }, u, { fn: fn, maengel: maengel, doch: dochGeprueft }).filter(String).forEach(function (y) { verkauf.push(y); });
     if (garantie) verkauf.push(satz(garantie + ' Tage Garantie'));
@@ -3035,7 +3065,7 @@ function kaeuferSaetze_(x, u, d) {
 /** Schritte «Zustand» und «Entscheid»: was schon im Befund steht, und das Urteil, bevor abgeschlossen wird. Schreibt nichts. */
 function pruefen(d) {
   d = d || {};
-  const e = einst_(), u0 = ueberblickSpeicher_(produkt_(d.id), e), bz = bezugPruefen_(d, u0);
+  const e = einst_(), u0 = ueberblickSpeicher_(produkt_(d.id), e, d.ohne === true), bz = bezugPruefen_(d, u0);
   /* M1 (24.10.2026): nach den Namen, die die Person sieht. Verbindlich prüft erst abschliessen. */
   return pruefenAus_(bz.d ? urteil_(bz.d, u0, e) : urteil_(d, uAusBezug_(u0, d.bezug), e));
 }
@@ -3092,7 +3122,7 @@ function abschliessen(d) {
     const r0 = lies_('Analysen').z.filter(function (y) { return idKey_(y['PG-ID']) === idKey_(pg); }).pop();
     if (r0 && String(r0['Lauf-ID'] || '') === lauf) return ergebnisAus_(r0);
   }
-  const u = ueberblickSpeicher_(p, e), bz = bezugPruefen_(d, u);
+  const u = ueberblickSpeicher_(p, e, d.ohne === true), bz = bezugPruefen_(d, u);
   if (bz.neu) { log_('Überblick geändert', pg, 'Schritte neu bestätigen: ' + bz.neu.join(', ')); return { ueberblickNeu: true, d: u, neu: bz.neu }; }
   d = bz.d;
   const x = urteil_(d, u, e);
@@ -3183,7 +3213,10 @@ function abschliessen(d) {
     setz_('Produkte', 'Analyse-Status', st);
     if (Object.keys(rs).length) setz_('Produkte', REP_SPALTE, rs);                   // kam das Stück aus dem Regal «Reparatur», ist sein Stand erledigt
     try { PropertiesService.getScriptProperties().deleteProperty(REP_STAND + pg); } catch (err) { /* alter Stand, harmlos */ }
-    return { nr: nr, pgid: pg, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm, nachgeholt: !!frueher };
+    /* Feedback SW 29.10.2026: Der Preis gehört auf die letzte Seite (Zettel fürs Produkt): Startpreis Ricardo, Preis Matchmaker, sonst der VP. */
+    const preis = ric ? ric['Startpreis CHF'] : (mmV ? mmV['Preis CHF'] : (x.reusable ? p['VP CHF'] : ''));
+    return { nr: nr, pgid: pg, reusable: x.reusable, grade: x.grade, regal: regal, befund: x.befund, verkaufsinfo: x.verkaufsinfo, preis: preis === '' || preis == null ? '' : Number(preis) || '',
+      dauerMin: min, budget: budget, zahlen: zahlen_(alle), mm: mm, nachgeholt: !!frueher };
   }, ['Produkte', 'Analysen', 'Testmittel']);
   takt_('gespeichert');
   if (fertig.konflikt) return fertig;
@@ -3384,10 +3417,18 @@ function fotoOhne(id, art, wert) {
   });
   return fotoStand(pg);
 }
-/** Welche Pflichtfotos fehlen: Hauptbild, mindestens zwei weitere, Typenschild (ausser es gibt keins), Mangel (wenn Mängel notiert sind und sichtbar). */
+/**
+ * Welche Pflichtfotos fehlen. Entscheid Jonas 29.10.2026 (Feedback DS 26.10.): Pflicht ist nur das Hauptbild. Weitere Fotos, Typenschild und
+ * Mangelfoto bleiben Empfehlung (die Oberfläche zeigt sie an), sperren den Abschluss aber nicht mehr.
+ */
 function fotoFehlt_(st, maengel) {
   const f = [];
   if (st.zahl.hauptbild < 1) f.push('Hauptbild');
+  return f;
+}
+/** Empfohlene Fotos, die noch fehlen (nur Hinweis): zwei weitere, Typenschild, Mangel. */
+function fotoEmpfohlen_(st, maengel) {
+  const f = [];
   if (st.zahl.weitere < 2) f.push('zwei weitere Fotos');
   if (st.zahl.typenschild < 1 && !st.ohneTypenschild) f.push('Typenschild');
   if (maengel && st.zahl.mangel < 1 && !st.ohneMangel) f.push('Mangel');
@@ -3396,7 +3437,7 @@ function fotoFehlt_(st, maengel) {
 /** Titel und Artikelbeschrieb: Die KI schreibt Titel, Einleitung und Stichpunkte aus der Recherche; Zustand, Neupreis, Versand und Garantie setzt das Tool selbst darunter. */
 function ricardoText(d) {
   d = d || {};
-  const e = einst_(), p = produkt_(d.id), u0 = ueberblickSpeicher_(p, e), bz = bezugPruefen_(d, u0);
+  const e = einst_(), p = produkt_(d.id), u0 = ueberblickSpeicher_(p, e, d.ohne === true), bz = bezugPruefen_(d, u0);
   /* M1 (24.10.2026): Der Text folgt dem, was die Person geprüft hat. Passt der Überblick nicht (mehr), zählen die Namen aus dem Browser; der Abschluss lässt die Schritte dann neu bestätigen. */
   let u = u0;
   if (bz.d) d = bz.d; else u = uAusBezug_(u0, d.bezug);

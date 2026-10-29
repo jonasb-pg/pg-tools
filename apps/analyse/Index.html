@@ -184,6 +184,10 @@
   .ric-bilder { display:flex; flex-wrap:wrap; gap:4px; min-height:64px; }
   .ric-bild { position:relative; width:64px; height:64px; border:2px solid var(--ink); border-radius:4px; overflow:hidden; background:var(--grau); }
   .ric-bild img { width:100%; height:100%; object-fit:cover; display:block; }
+  #foto-gross { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex; align-items:center; justify-content:center; padding:16px; }
+  #foto-gross[hidden] { display:none; }
+  .gross-inhalt { max-width:min(96vw, 1200px); max-height:96vh; display:flex; flex-direction:column; gap:10px; align-items:center; }
+  .gross-inhalt img { max-width:100%; max-height:84vh; object-fit:contain; background:#fff; border-radius:4px; }
   .ric-bild button { position:absolute; top:2px; right:2px; height:22px; width:22px; padding:0; border-radius:50%; font-size:12px; line-height:1; }
   .ric-leer { width:64px; height:64px; border:2px dashed var(--muted); border-radius:4px; }
   .ric-check { display:flex; gap:8px; align-items:center; font-size:14px; }
@@ -498,7 +502,7 @@
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
   /* Version der Oberfläche. Geht beim Abschluss mit (N6, 24.10.2026). Ein gespeicherter Lauf aus einer anderen Version wird NICHT mehr verworfen:
      Der Server vergleicht beim Abschluss die Namen der Schritte (d.bezug) und lässt geänderte Schritte neu bestätigen. */
-  var VERSION = '2026-10-24.2';
+  var VERSION = '2026-10-29.1';
   var TAB_ID = Math.random().toString(36).slice(2, 10);   // M5: dieses Browser-Tab (zweites Tab erkennen, Speicher zusammenführen)
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
@@ -569,19 +573,23 @@
     'zurueck': ['Zurück', 'Back'], 'infos': ['Infos zum Produkt', 'Product info'], 'kopie.produkt': ['Produkt kopieren', 'Copy product'], 'raus': ['Aus anderem Grund nicht reusable', 'Not reusable for another reason'],
     'raus.frage': ['Warum ist das Produkt nicht reusable?', 'Why is the product not reusable?'], 'raus.platz': ['z.B. riecht stark nach Rauch', 'e.g. smells strongly of smoke'], 'raus.knopf': ['Nicht reusable', 'Not reusable'],
     're.keine': ['Für dieses Produkt gibt es noch keine Recherche.', 'There is no research for this product yet.'], 're.jetzt': ['Jetzt recherchieren', 'Research now'],
+    're.ohne': ['Ohne Recherche prüfen', 'Check without research'], 're.ohne.hilfe': ['Ohne Recherche: kurzer Ablauf (Produkt, Vollständigkeit, Funktion, Zustand, Entscheid), ohne Produktwissen vom Tool. Für Produkte, bei denen eine Recherche nichts bringt.', 'Without research: short flow (product, completeness, function, condition, decision) with no product knowledge from the tool. For products where research adds nothing.'],
+    're.ohne.link': ['Ohne Recherche weiter (kurzer Ablauf)', 'Continue without research (short flow)'], 're.ohne.aktiv': ['Kurzer Ablauf ohne Recherche.', 'Short flow without research.'],
     're.laeuft': ['Die Recherche läuft, das dauert etwa eine Minute.', 'Research is running, this takes about a minute.'],
     'id.frage': ['Ist es genau dieses Produkt?', 'Is it exactly this product?'], 'id.marke': ['Marke', 'Brand'], 'id.modell': ['Modell', 'Model'], 'id.nr': ['Herstellernr.', 'Manufacturer no.'],
     'id.ja': ['Ja, stimmt', 'Yes, correct'], 'id.versiegelt': ['Ja, originalversiegelt', 'Yes, factory sealed'],
     'id.neuovp': ['Ja, neu und unbenutzt (Verpackung offen)', 'Yes, new and unused (box opened)'],
     'id.neuovp.hilfe': ['Neu und unbenutzt, auch wenn die Verpackung geöffnet ist: Hygiene und Zurücksetzen entfallen, Grade A ist vorgewählt.', 'New and unused, even if the box is opened: hygiene and reset are skipped, grade A is preselected.'],
-    'id.vp': ['Verkaufspreis (VP) CHF, leer = 50% vom OVP', 'Sales price (VP) CHF, empty = 50% of RRP'], 'id.ovp': ['Neupreis (OVP) CHF', 'New price (RRP) CHF'],
+    'id.vp': ['Verkaufspreis (VP) CHF, Vorschlag 50% vom OVP, anpassbar', 'Sales price (VP) CHF, suggested 50% of RRP, editable'], 'id.ovp': ['Neupreis (OVP) CHF', 'New price (RRP) CHF'],
     'id.preisfehlt': ['Für dieses Stück fehlt der Preis. Bitte hier eintragen.', 'The price is missing for this item. Please enter it here.'],
     'id.vpfehlt': ['Bitte zuerst den Neupreis (OVP) eintragen.', 'Please enter the new price (RRP) first.'],
     'en.bearbeiten': ['Befund bearbeiten', 'Edit finding'], 'en.befund.eigen': ['Deine Angaben (Mängel, Hinweise)', 'Your notes (defects, remarks)'],
+    'en.befund.frei': ['Befund, so wie er ins Protokoll kommt (frei bearbeitbar)', 'Finding as it goes into the record (freely editable)'], 'en.befund.eigenTag': ['von Hand angepasst', 'edited by hand'],
+    'en.befund.tool': ['Text vom Tool wiederherstellen', 'Restore the tool text'], 'abbrechen': ['Abbrechen', 'Cancel'],
     'en.befund.auto': ['Vom Tool: {0}', 'From the tool: {0}'], 'en.befund.ok': ['Übernehmen', 'Apply'],
     'en.befund.ric': ['Befund geändert: Den Ricardo-Text bei Bedarf mit «Neu schreiben» anpassen.', 'Finding changed: update the Ricardo text with «Rewrite» if needed.'],
     'ri.empfohlen': ['Vorschlag', 'Suggested'], 'mm.empfehlung': ['Empfehlung: Regal Matchmaker', 'Recommended: shelf “Matchmaker”'], 'mm.anders': ['Oder anders entscheiden:', 'Or decide differently:'],
-    'fo.titel': ['Fotos', 'Photos'], 'fo.gross': ['In voller Grösse öffnen', 'Open full size'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
+    'fo.titel': ['Fotos', 'Photos'], 'fo.gross': ['In voller Grösse öffnen', 'Open full size'], 'fo.drive': ['Datei in Drive', 'File in Drive'], 'fo.zu': ['Schliessen', 'Close'], 'fo.text': ['Fotos kannst du schon jetzt machen oder hochladen. Sie stehen später im Ricardo-Teil bereit.', 'You can take or upload photos now. They will be ready in the Ricardo part later.'],
     'fs.galerie': ['Aus Galerie', 'From gallery'], 'id.nein': ['Nein, anderes Modell', 'No, different model'],
     'id.welches': ['Welches Modell ist es?', 'Which model is it?'], 'id.platz': ['Modell, wie es auf dem Gerät steht', 'Model as written on the device'], 'id.neu': ['Neu recherchieren', 'Research again'], 'id.doch': ['Doch richtig', 'It is correct after all'],
     'id.rueckruf': ['Rückruf', 'Recall'], 'id.rfrage': ['Betrifft der Rückruf dieses Gerät?', 'Does the recall affect this device?'], 'id.rnein': ['Nein, nicht betroffen', 'No, not affected'], 'id.rja': ['Ja, betroffen', 'Yes, affected'],
@@ -650,7 +658,7 @@
     'mv.zustand': ['Zustand', 'Condition'], 'mv.vonVp': ['VP aus dem Return Tool', 'selling price from the Return Tool'], 'mv.fPreis': ['Preis', 'price'],
     'mv.zettel': ['Zum Schluss: Zettel mit {0} aufs Produkt, ins Regal «Matchmaker».', 'Finally: note with {0} on the product, shelf “Matchmaker”.'], 'ri.fehlt': ['Es fehlt noch: {0}', 'Still missing: {0}'],
     'ri.fVersand': ['Versandklasse', 'shipping class'], 'ri.fTitel': ['Titel', 'title'], 'ri.fBeschrieb': ['Artikelbeschrieb', 'description'], 'ri.fPreis': ['Startpreis', 'starting price'],
-    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['{0} wird hochgeladen … Du kannst weiter fotografieren.', '{0} uploading … You can keep taking photos.'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
+    'fs.titel': ['Fotos für Ricardo', 'Photos for Ricardo'], 'fs.empf': ['empfohlen', 'recommended'], 'fs.foto': ['Foto', 'Photo'], 'fs.laedt': ['{0} wird hochgeladen … Du kannst weiter fotografieren.', '{0} uploading … You can keep taking photos.'], 'fs.keinbild': ['Dieses Bild lässt sich nicht lesen. Bitte als JPG aufnehmen.', 'This image cannot be read. Please take it as JPG.'], 'fs.da': ['{0} da', '{0} done'], 'fs.fehlt': ['fehlt', 'missing'],
     'fs.haupt': ['Ganzes Produkt von vorne', 'Whole product from the front'], 'fs.weitere': ['Hinten, Seite, Zubehör', 'Back, side, accessories'], 'fs.typ': ['Typenschild gut lesbar', 'Type plate readable'], 'fs.mangel': ['Jeden sichtbaren Mangel einzeln', 'Each visible defect'],
     'fs.weg': ['Foto löschen', 'Delete photo'], 'fs.hinweis': ['Die Fotos erscheinen sofort am Analyseplatz.', 'The photos appear at the analysis desk right away.'], 'fertig.weg': ['Produkt entsorgen.', 'Dispose of the product.'],
     'sp.laeuft': ['Speichert im Hintergrund: {0}', 'Saving in the background: {0}'], 'sp.speichert': ['Wird gespeichert …', 'Saving …'],
@@ -675,7 +683,7 @@
     'adm.uebernehmen': ['Übernehmen', 'Take over'], 'adm.tabs': ['Gelesene Kanal-Tabs: {0}', 'Channel tabs read: {0}'],
     'fs.nochmal': ['{0} Foto(s) nicht hochgeladen. Nochmals versuchen oder neu aufnehmen.', '{0} photo(s) not uploaded. Try again or take them again.'], 'fs.nochmalKnopf': ['Nochmals hochladen', 'Upload again'],
     'fs.wiederholt': ['Hochladen hat nicht geklappt, neuer Versuch …', 'Upload failed, trying again …'],
-    'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
+    'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.preis': ['Preis {0}', 'Price {0}'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
     'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
     'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pausieren', 'Pause'], 'weiter': ['Weiter', 'Resume'],
     'liste.titel': ['Warteschlange', 'Queue'], 'liste.zahlen': ['{0} offen · {1} mit Recherche · {2} in Recherche · {3} mit Fehler', '{0} open · {1} researched · {2} in research · {3} with error'],
@@ -984,7 +992,7 @@
   function leer(d) {
     return { versiegelt: false, neuOvp: false, rueckrufFrei: false, unbenutzt: false, sicher: false, sicherNein: false, sicherWahl: {}, fehlt: {}, fehltText: '', sperreFrei: false, fn: {},
       mittelFehlt: [], mittelDa: [],              // nichts wird als fehlend angenommen: Unbekanntes fragt der Schritt «Funktion»
-      reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '' };
+      reset: 0, fw: '', maengel: '', grade: '', rep: [], ko: null, ab: null, kanal: '', ricTitel: '', ricBeschrieb: '', ricVersand: '', ricPreis: '', befundText: '' };
   }
   /* H2/H3 (24.10.2026): Jede Analyse hat eine Lauf-ID. Der Server erkennt daran einen wiederholten Abschluss (nichts doppelt) und unterscheidet ihn von einer zweiten Analyse desselben Stücks (Konflikt). */
   function neuLauf() { return (K || 'X') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
@@ -1137,7 +1145,7 @@
   }
   function pause() {
     sichern();
-    AN.seit = AN.seit ? null : Date.now();
+    AN.seit = AN.seit ? null : Date.now(); AN.autoPause = false;                  // von Hand: gilt, bis die Person wieder drückt
     sichern(); uhr();
   }
 
@@ -1366,7 +1374,15 @@
 
   function ohneRecherche() {
     return '<div class="karte">' + fragt('re.keine') + (LAUF.sucht ? box(t('re.laeuft'), 'warn') : (LAUF.suchFehler ? box(LAUF.suchFehler, 'stop') : ''))
-      + '<div class="knoepfe">' + taste('recherche', 're.jetzt', 'pink', LAUF.sucht ? ' disabled' : '') + '</div>' + leiste() + '</div>';
+      + '<div class="knoepfe">' + taste('recherche', 're.jetzt', 'pink', LAUF.sucht ? ' disabled' : '') + taste('ohneStart', 're.ohne', '', LAUF.sucht ? ' disabled' : '') + '</div>'
+      + '<p class="still">' + tx('re.ohne.hilfe') + '</p>' + leiste() + '</div>';
+  }
+  /* Entscheid Jonas 29.10.2026 (Feedback SW 28.10.): Ohne Recherche weiter: kurzer Ablauf (Identität, Vollständigkeit, Funktion, Zustand, Entscheid). */
+  function ohneStart() {
+    var id = AN.d.produkt.id, meins = function () { return AN && AN.d.produkt.id === id; };
+    if (!ruf('starteAnalyse', [id, true], function (d) { if (meins()) uebernimm(d); },
+      function (m) { if (meins()) { LAUF.sucht = false; LAUF.suchFehler = m; zeichneSchritt(); } })) return;
+    LAUF.sucht = true; LAUF.suchFehler = ''; zeichneSchritt();
   }
   var SEITE = {
     ident: function () {
@@ -1382,9 +1398,9 @@
       else {
         if (preisFehlt()) h += '<div class="meldung warn">' + tx('id.preisfehlt') + '</div>'
           + (zahlVon(d.produkt.ovp) > 0 ? '' : '<label for="id-ovp">' + tx('id.ovp') + '</label><input type="number" id="id-ovp" min="1" step="any" inputmode="decimal" style="max-width:200px">')
-          + '<label for="id-vp">' + tx('id.vp') + '</label><input type="number" id="id-vp" min="1" step="any" inputmode="decimal" style="max-width:200px">';
+          + '<label for="id-vp">' + tx('id.vp') + '</label><input type="number" id="id-vp" min="1" step="any" inputmode="decimal" style="max-width:200px" value="' + (zahlVon(d.produkt.ovp) > 0 ? Math.round(zahlVon(d.produkt.ovp) * 0.5) : '') + '" data-ovp-input="id-ovp">';
         h += '<div class="knoepfe">' + taste('identJa', 'id.ja', 'pink') + taste('neuOvp', 'id.neuovp') + taste('versiegelt', 'id.versiegelt') + taste('modellFrage', 'id.nein') + '</div>'
-          + '<p class="still">' + tx('id.neuovp.hilfe') + '</p>';
+          + '<p class="still">' + tx('id.neuovp.hilfe') + (d.ohne ? ' ' + tx('re.ohne.aktiv') : ' <a href="#" class="link" data-a="ohneStart">' + tx('re.ohne.link') + '</a>') + '</p>';
       }
       return karte('ident', h);
     },
@@ -1488,18 +1504,24 @@
       return '<div class="karte">' + h + leiste(true) + '</div>';
     }
   };
-  /* Feedback DS 19.10.2026: Befund im Entscheid bearbeiten. Bearbeitet werden die eigenen Angaben (Mängel, Hinweise); was das Tool weiss, steht darunter. */
+  /* Entscheid Jonas 29.10.2026 (Feedback SW 21.10.): Der ganze Befund ist bis zum Abschluss frei bearbeitbar. Der eigene Text ersetzt den Text des Tools (Server: befundText). */
   function befundTeil(r) {
-    var bearbeitbar = r.reusable && !r.versiegelt;
-    if (!LAUF.befundAuf || !bearbeitbar) return (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + '</h3>' + esc(r.befund)
+    var bearbeitbar = r.reusable && !AN.s.versiegelt, eigen = !!(AN.s.befundText || '').trim();
+    if (!LAUF.befundAuf || !bearbeitbar) return (r.befund ? '<div class="meldung"><h3>' + tx('en.befund') + (eigen ? ' <span class="etikett">' + tx('en.befund.eigenTag') + '</span>' : '') + '</h3>' + esc(r.befund)
       + (bearbeitbar ? ' <button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button>' : '') + '</div>'
       : (bearbeitbar ? '<p><button class="link" data-a="befundAuf">' + tx('en.bearbeiten') + '</button></p>' : ''))
       + (LAUF.befundGeaendert && verkauf() ? '<p class="still">' + tx('en.befund.ric') + '</p>' : '');
-    return '<div class="meldung"><h3>' + tx('en.befund') + '</h3><label for="maengel-en">' + tx('en.befund.eigen') + '</label><textarea id="maengel-en" data-e="maengel">' + esc(AN.s.maengel) + '</textarea>'
-      + (r.befundAuto ? '<p class="still">' + tx('en.befund.auto', r.befundAuto) + '</p>' : '') + dochWahl(r) + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + '</div></div>';
+    return '<div class="meldung"><h3>' + tx('en.befund') + '</h3><label for="befund-text">' + tx('en.befund.frei') + '</label><textarea id="befund-text" rows="5">' + esc(AN.s.befundText || r.befund || '') + '</textarea>'
+      + dochWahl(r) + '<div class="knoepfe">' + taste('befundOk', 'en.befund.ok', 'pink') + (eigen ? taste('befundTool', 'en.befund.tool') : '') + taste('befundZu', 'abbrechen') + '</div></div>';
   }
-  function befundAuf() { LAUF.befundAuf = true; zeichneSchritt(); if ($('maengel-en')) $('maengel-en').focus(); }
-  function befundOk() { LAUF.befundAuf = false; LAUF.befundGeaendert = true; stand(); }
+  function befundAuf() { LAUF.befundAuf = true; zeichneSchritt(); if ($('befund-text')) $('befund-text').focus(); }
+  function befundOk() {
+    var v = $('befund-text') ? $('befund-text').value.trim() : '', r = LAUF.urteil;
+    AN.s.befundText = r && v === String(r.befund || '').trim() && !(AN.s.befundText || '').trim() ? '' : v;   // unverändert = kein eigener Text
+    LAUF.befundAuf = false; LAUF.befundGeaendert = true; sichern(); stand();
+  }
+  function befundTool() { AN.s.befundText = ''; LAUF.befundAuf = false; LAUF.befundGeaendert = true; sichern(); stand(); }
+  function befundZu() { LAUF.befundAuf = false; zeichneSchritt(); }
   /* ---------- Matchmaker ---------- */
   /* Läuft einmal pro Analyse im Hintergrund, nach der bestätigten Identität (oder beim Entscheid, falls noch nicht). aus = Aufträge, die beim Wiedereinstieg nicht mehr zählen. */
   function mmStart() {
@@ -1622,7 +1644,7 @@
     if (!preisFehlt()) { danach(); return; }
     var vp = $('id-vp') ? zahlVon($('id-vp').value) : 0, ovp = $('id-ovp') ? zahlVon($('id-ovp').value) : 0, id = AN.d.produkt.id;
     if (!(ovp > 0) && !(zahlVon(AN.d.produkt.ovp) > 0)) { melde(t('id.vpfehlt'), true); if ($('id-ovp')) $('id-ovp').focus(); return; }
-    ruf('preisSetzen', [id, vp, ovp || ''], function (d) { if (!AN || AN.d.produkt.id !== id) return; AN.d = d; sichern(); danach(); });
+    ruf('preisSetzen', [id, vp, ovp || '', !!AN.d.ohne], function (d) { if (!AN || AN.d.produkt.id !== id) return; AN.d = d; sichern(); danach(); });
   }
   function identJa() { mitPreis(function () { AN.s.neuOvp = false; weiter(); }); }
   function neuOvp() { mitPreis(function () { var s = AN.s; s.neuOvp = true; s.unbenutzt = true; if (!s.grade) s.grade = 'A'; weiter(); }); }
@@ -1802,10 +1824,8 @@
     var s = AN.s, f = [], st = RIC && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = !!s.maengel.trim();
     if (!st) f.push(t('ri.haupt'));
     else {
+      /* Entscheid Jonas 29.10.2026: Pflicht ist nur das Hauptbild. Weitere, Typenschild und Mangelfoto sind Empfehlung (Etikett «empfohlen»). */
       if (st.zahl.hauptbild < 1) f.push(t('ri.haupt'));
-      if (st.zahl.weitere < 2) f.push(t('ri.weitere'));
-      if (st.zahl.typenschild < 1 && !st.ohneTypenschild) f.push(t('ri.typ'));
-      if (mangel && st.zahl.mangel < 1 && !st.ohneMangel) f.push(t('ri.mangel'));
     }
     if (!s.ricTitel.trim() || s.ricTitel.trim().length > 60) f.push(t('ri.fTitel'));
     if (!s.ricBeschrieb.trim()) f.push(t('ri.fBeschrieb'));
@@ -1832,12 +1852,19 @@
   }
   /* Vorschau vom Server (sieht jede Person mit Zugang zum Tool). Nur wenn Drive noch keine hat: direkt aus Drive, das klappt nur mit Zugriff auf den Ordner. */
   function fotoSrc(x) { return x.bild || ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(x.id) + '&sz=w160'); }
+  /* Entscheid Jonas 29.10.2026 (Feedback SW 21.10.): Grossansicht im Tool. Das Bild kommt in voller Breite aus Drive, darunter der Link zur Datei. */
+  function fotoGross(id) {
+    var el = $('foto-gross'), gross = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w1600';
+    el.innerHTML = '<div class="gross-inhalt"><img src="' + esc(gross) + '" alt=""><div class="knoepfe"><a class="knopf" href="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view" target="_blank" rel="noopener noreferrer">' + tx('fo.drive') + '</a><button class="knopf pink" data-a="fotoGrossZu">' + tx('fo.zu') + '</button></div></div>';
+    el.hidden = false;
+  }
+  function fotoGrossZu() { $('foto-gross').hidden = true; $('foto-gross').innerHTML = ''; }
   function fotoSlots() {
     var st = RIC && AN && RIC.id === AN.d.produkt.id ? RIC.st : null, mangel = AN && !!AN.s.maengel.trim();
     var art = function (a, titel, soll, extra) {
       var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length;
-      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><a href="https://drive.google.com/file/d/' + encodeURIComponent(x.id) + '/view" target="_blank" rel="noopener noreferrer" title="' + tx('fo.gross') + '"><img src="' + esc(fotoSrc(x)) + '" alt="' + esc(x.name) + '"></a><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
-        + '</div><strong>' + tx(titel) + '</strong>' + (extra || '') + (soll === null ? '' : '<span class="etikett ' + (n >= soll ? 'gruen' : '') + '" style="align-self:flex-start">' + (n >= soll ? tx('fs.da', n) : tx('fs.fehlt')) + '</span>') + '</div>';
+      return '<div class="ric-slot"><div class="ric-bilder">' + (n ? bilder.map(function (x) { return '<span class="ric-bild"><a href="#" data-a="fotoGross" data-v="' + esc(x.id) + '" title="' + tx('fo.gross') + '"><img src="' + esc(fotoSrc(x)) + '" alt="' + esc(x.name) + '"></a><button data-a="fotoWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') : '<span class="ric-leer"></span>')
+        + '</div><strong>' + tx(titel) + '</strong>' + (extra || '') + (soll === null ? '' : '<span class="etikett ' + (n >= soll ? 'gruen' : '') + '" style="align-self:flex-start">' + (n >= soll ? tx('fs.da', n) : tx(a === 'hauptbild' ? 'fs.fehlt' : 'fs.empf')) + '</span>') + '</div>';
     };
     var cb = function (a, an, text) { return '<label class="ric-check"><input type="checkbox" data-a="fotoOhne" data-v="' + a + '"' + (an ? ' checked' : '') + '>' + tx(text) + '</label>'; };
     return art('hauptbild', 'ri.haupt', 1) + art('weitere', 'ri.weitere', 2)
@@ -1924,7 +1951,7 @@
     var zeile = function (a, titel, hilfe, soll, extra) {
       var bilder = st ? st.liste.filter(function (x) { return x.art === a; }) : [], n = bilder.length, offen = soll !== null && n < soll;
       return '<div class="fs-zeile' + (offen ? ' offen' : '') + '"><div class="fs-titel"><div><strong>' + tx(titel) + '</strong><span class="still">' + tx(hilfe) + '</span></div>'
-        + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx('fs.fehlt') : tx('fs.da', n)) + '</span>') + '</div>'
+        + (soll === null ? '' : '<span class="etikett ' + (offen ? '' : 'gruen') + '">' + (offen ? tx(a === 'hauptbild' ? 'fs.fehlt' : 'fs.empf') : tx('fs.da', n)) + '</span>') + '</div>'
         + (n ? '<div class="ric-bilder">' + bilder.map(function (x) { return '<span class="ric-bild"><img src="' + esc(fotoSrc(x)) + '" alt=""><button data-a="fsWeg" data-v="' + esc(x.id) + '" aria-label="' + tx('fs.weg') + '">×</button></span>'; }).join('') + '</div>' : '')
         + (extra || '') + (FS.laedt[a] ? '<p class="hb-warte"><span class="dreh"></span>' + tx('fs.laedt', FS.laedt[a]) + '</p>' : '') + ('<div class="knoepfe"><button class="knopf' + (offen ? ' pink' : '') + '" data-a="fsFoto" data-v="' + a + '">' + tx('fs.foto') + ' · ' + tx(titel) + '</button><button class="knopf" data-a="fsGalerie" data-v="' + a + '">' + tx('fs.galerie') + '</button></div>') + '</div>';
     };
@@ -2004,8 +2031,9 @@
       sicherNok: Object.keys(s.sicherWahl).map(function (n) { return d.sicher[n]; }), fehlt: Object.keys(s.fehlt).map(function (n) { return d.liefer.teile[n]; }).concat(s.fehltText.trim() ? [s.fehltText.trim()] : []),
       sperreFrei: s.sperreFrei, fn: d.funktion.liste.map(function (x, i) { return s.fn[i] || ''; }), doch: Object.keys(s.doch || {}), mittelFehlt: s.mittelFehlt, mittelDa: s.mittelDa || [], reset: s.reset, firmwareVersion: s.fw, fwAbbruch: !!s.fwAbbruch, maengel: s.maengel, grade: s.grade,
       rep: s.rep, ko: s.ko, rueckmeldung: AN.rm, kanal: s.kanal, ricardo: { titel: s.ricTitel, beschrieb: s.ricBeschrieb, versand: s.ricVersand, preis: s.ricPreis },
+      befundText: s.befundText || '', ohne: !!d.ohne,
       mm: s.kanal === 'matchmaker' && AN.mm && AN.mm.passt ? AN.mm.passt[0] : null, nachMm: !!AN.nachMm,
-      stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm } : null,
+      stand: s.kanal === 'matchmaker' ? { s: s, i: AN.i, start: AN.start, aktiv: Math.round(aktivMs()), rm: AN.rm, ohne: !!d.ohne } : null,
       /* 24.10.2026: Lauf-ID (H2/H3), Version der Oberfläche (N6), Kennung und Namen des Überblicks, auf den sich die Antworten beziehen (M1) */
       lauf: AN.lauf || '', v: VERSION, ueb: d.kennung || '', bezug: bezugVon(d) };
   }
@@ -2055,7 +2083,9 @@
     spMerken();
     ausPausiert(AN.lauf);
     var reg = d.kanal === 'matchmaker' && r.reusable ? 'Matchmaker' : (d.kanal === 'ricardo' && r.reusable ? 'Ricardo Offline' : (r.reusable ? 'Analysiert' : ''));
-    fertigZeigen(p, { reusable: r.reusable, grade: r.grade, regal: reg, befund: r.befund, verkaufsinfo: r.verkaufsinfo, dauerMin: Math.round((Number(d.aktivSek) || 0) / 6) / 10,
+    /* Feedback SW 29.10.2026: Preis sofort auf der letzten Seite (Startpreis Ricardo, Preis Matchmaker, sonst VP); der Server bestätigt ihn beim Speichern. */
+    var preis = !r.reusable ? '' : ((d.kanal === 'ricardo' || d.kanal === 'matchmaker') && zahlVon(d.ricardo && d.ricardo.preis) > 0 ? zahlVon(d.ricardo.preis) : zahlVon(p.vp));
+    fertigZeigen(p, { reusable: r.reusable, grade: r.grade, regal: reg, befund: r.befund, verkaufsinfo: r.verkaufsinfo, preis: preis, dauerMin: Math.round((Number(d.aktivSek) || 0) / 6) / 10,
       budget: p.budget, nr: '', speichert: true });
     spWeiter();
   }
@@ -2159,6 +2189,7 @@
     if (r && r.pause) { $('fertig').innerHTML = '<div class="karte"><div class="urteil ja">' + tx('fertig.reparatur', r.id) + '</div><h2>' + tx('fertig.pausiert', FERTIG.titel) + '</h2>' + (r.teil ? '<p class="still">' + tx('fertig.bestellt') + '</p>' : '') + '</div>'; return; }
     $('fertig').innerHTML = !r ? '' : '<div class="karte"><div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + (r.regal === 'Matchmaker' ? tx('fertig.mm', r.id || '') : r.regal === 'Ricardo Offline' ? tx('fertig.ricardo', r.id || '') : tx(r.regal === 'Analysiert' ? 'fertig.analysiert' : (r.reusable ? 'fertig.regal' : 'fertig.weg'))) + '</div><h2>' + tx('fertig.titel', FERTIG.titel) + '</h2>'
       + '<p class="still">' + (r.speichert ? esc(t('sp.speichert')) : esc(r.pgid || '')) + ' · ' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.grade ? ' · ' + tx('zu.grade') + ' ' + esc(r.grade) : '') + ' · ' + tx('fertig.dauer', r.dauerMin, r.budget || '–') + '</p>'
+      + (r.preis ? '<div class="urteil ja" style="margin-top:8px">' + tx('fertig.preis', chf(r.preis)) + '</div>' : '')
       + (r.befund ? zeileF('fertig.befund', 'f-befund', r.befund) : '') + (r.verkaufsinfo ? zeileF('fertig.verkauf', 'f-verkauf', r.verkaufsinfo) : '') + '</div>';
   }
   function kopiere(id, k, el) { kopiereText($(id).textContent, el); }
@@ -2442,7 +2473,7 @@
   var A = { zeige: zeige, sprache: sprache, sessionStart: sessionStart, sessionEnde: sessionEnde, pause: pause, parken: function () { parken(false); }, weiterPausiert: weiterPausiert, suchen: suchen, starten: starten, ohneZeigen: ohneZeigen, ohneKat: ohneKat, ohneAnlegen: ohneAnlegen, ohneTrotzdem: ohneTrotzdem, uebernehmen: function (id) { uebernehmen(id, false); }, uebernehmenTrotzdem: uebernehmenTrotzdem,
     nochmal: nochmal, retoure: retoure, admUebernehmen: admUebernehmen, fsNochmal: fsNochmal,
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
-    versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
+    versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, befundTool: befundTool, befundZu: befundZu, ohneStart: ohneStart, fotoGross: fotoGross, fotoGrossZu: fotoGrossZu, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
     kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz };
 
@@ -2502,6 +2533,12 @@
     });
     setInterval(uhr, 1000);
     window.addEventListener('pagehide', sichern);                              // beim Neuladen oder Schliessen: die Zeit bis jetzt zählt noch
+    /* Entscheid Jonas 29.10.2026 (Feedback DS 19.10.): Die Uhr zählt nur, wenn dieses Tab sichtbar ist. Verdeckt = automatisch angehalten, sichtbar = weiter (nur, wenn die Person nicht selbst pausiert hat). */
+    document.addEventListener('visibilitychange', function () {
+      if (!AN) return;
+      if (document.visibilityState === 'hidden') { if (AN.seit) { sichern(); AN.seit = null; AN.autoPause = true; sichern(); uhr(); } }
+      else if (AN.autoPause) { AN.autoPause = false; if (!AN.seit) { AN.seit = Date.now(); sichern(); uhr(); } }
+    });
     /* Foto-Seite fürs Handy: Die Adresse aus dem QR-Code trägt ?foto=PG-ID. Dann gibt es weder Kürzel noch Analyse. */
     try { google.script.url.getLocation(function (loc) { var f = loc && loc.parameter && loc.parameter.foto; if (f) fotoModus(String(f)); }); } catch (e) { /* ausserhalb von Apps Script */ }
     /* Startdaten des letzten Besuchs sofort anzeigen (gleiche Version), dann frisch vom Server */
@@ -2526,5 +2563,6 @@
     ruf('startDaten', [], function (s) { start(s, true); vorladen(); });
   })();
 </script>
+  <div id="foto-gross" hidden></div>
 </body>
 </html>

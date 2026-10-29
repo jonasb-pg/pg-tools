@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-26.6';
+const VERSION = '2026-10-29.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2173,6 +2173,28 @@ function vZeile_(v) {
 }
 
 /** aktion: 'gepackt', 'bezahlt' (Zahlung von Hand), 'versendet' (Versenden) oder 'ricardoBezahlt' (Zahlung auf Ricardo gemeldet). */
+/**
+ * Feedback Jonas 29.10.2026: Sendungsnummer von Hand beim Packen eintragen (Etikette nicht aus dem Tool, z.B. pick@home oder Etikette aus dem Ricardo-Mail).
+ * Sie erscheint dann beim Versenden zum Kopieren. Eine vorhandene Nummer wird nur mit ueberschreiben = true ersetzt.
+ */
+function sendungSetzen(nr, sendung, ueberschreiben) {
+  nr = String(nr || '').trim(); sendung = String(sendung || '').replace(/\s+/g, '').slice(0, 40);
+  if (!nr) throw new Error('Verkauf fehlt.');
+  if (!/^[0-9A-Za-z.\-]{8,40}$/.test(sendung)) throw new Error('Das sieht nicht nach einer Sendungsnummer aus (8 bis 40 Zeichen, Ziffern und Buchstaben).');
+  const lock = sperre_(20000);
+  try {
+    const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+    const nrn = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues() : [];
+    let zeile = 0;
+    for (let i = 0; i < nrn.length; i++) if (String(nrn[i][0]).trim() === nr) { zeile = i + 2; break; }
+    if (!zeile) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    const c = V_COLS.indexOf('Sendungsnummer') + 1, alt = String(sv.getRange(zeile, c).getValue() || '').trim();
+    if (alt && alt !== sendung && ueberschreiben !== true) throw new Error('Bitte bestätigen: Für ' + nr + ' ist schon die Sendung ' + alt + ' eingetragen. Ersetzen? [sn]');
+    sv.getRange(zeile, c).setValue(sendung);
+    log_('Sendungsnummer von Hand', nr, sendung + (alt && alt !== sendung ? ' (vorher ' + alt + ')' : ''));
+  } finally { lock.releaseLock(); }
+  return { nr: nr, sendung: sendung };
+}
 function setzeVerkauf(nr, aktion) {
   nr = String(nr).trim();
   const lock = sperre_(20000);
@@ -3060,7 +3082,7 @@ function api(lang, name, args) {
     erstelleText: erstelleText, buendelHinzu: buendelHinzu, buendelLeeren: buendelLeeren, freiesListing: freiesListing, aehnlicheStuecke: aehnlicheStuecke,
     markiereGelistet: markiereGelistet, setzeStatus: setzeStatus,
     uebersicht: uebersicht, importVerkaeufe: importVerkaeufe, verkaeufe: verkaeufe,
-    setzeVerkauf: setzeVerkauf, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
+    setzeVerkauf: setzeVerkauf, sendungSetzen: sendungSetzen, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,

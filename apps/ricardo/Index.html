@@ -86,6 +86,8 @@
   td .klein { display:block; }
   .vbild { float:left; width:56px; height:56px; object-fit:cover; border:2px solid var(--ink); border-radius:4px; margin:0 10px 4px 0; background:#fff; }
   .mono { font:400 14px/1.4 var(--mono); color:var(--muted); }
+  .sendung-hand { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .sendung-hand input { max-width:260px; }
   .zeile-neu td { background:var(--pink-hell); }
   .betrag { white-space:nowrap; font-size:18px; }
   .aufgabe { border:2px solid var(--ink); border-radius:4px; padding:12px 14px; margin:10px 0; background:var(--weiss); }
@@ -1635,6 +1637,8 @@
     'g.p.packen': ['Packen', 'Pack'], 'g.p.packen.p': ['Mit Matchmaker-Karte und Care-Flyer packen. Paket ins Regal «{0}».', 'Pack with matchmaker card and care flyer. Parcel onto the shelf «{0}».'],
     'g.p.gepackt': ['Gepackt', 'Packed'], 'g.p.post.fehlt': ['Post-Zugang fehlt: Etiketten gehen erst, wenn der Admin ihn einträgt.', 'Swiss Post access missing: labels work once the admin enters it.'],
     'g.p.bezahlt': ['bezahlt', 'paid'], 'g.p.adresse': ['Adresse fehlt', 'Address missing'],
+    'g.p.sendung': ['Sendungsnummer von Hand (Etikette nicht aus dem Tool)', 'Tracking number by hand (label not from the tool)'], 'g.p.sendung.neu': ['Andere Sendungsnummer eintragen', 'Enter a different tracking number'],
+    'g.p.sendung.k': ['Speichern', 'Save'], 'g.p.sendung.ok': ['Sendungsnummer {0} gespeichert. Sie steht beim Versenden zum Kopieren bereit.', 'Tracking number {0} saved. It is ready to copy when shipping.'],
     /* Versenden */
     'g.v.wagen': ['Postwagen', 'Postal cart'], 'g.v.wagen.p': ['Paket {0} aus «{1}» in den Postwagen.', 'Parcel {0} from «{1}» into the postal cart.'],
     'g.v.bestaetigen': ['Versand bestätigen', 'Confirm shipping'], 'g.v.bestaetigen.r': ['Beim Verkauf «Versand bestätigen» klicken und die Sendungsnummer {0} einfügen. Damit ist der Verkauf abgeschlossen.', 'Click «Versand bestätigen» on the sale and paste tracking number {0}. That closes the sale.'],
@@ -1888,7 +1892,7 @@
       { titel: t('g.p.holen'), html: (o.bild ? '<img class="f-bild" src="' + esc(o.bild) + '" alt="">' : '') + tun('physisch', t('g.p.holen.p', '<strong>' + esc(o.lagerort || '') + '</strong>') + rtOrtHtml(o), ''),
         aktion: [t('g.weiter'), function () { geheSchritt(1); }] },
       { titel: t('g.p.etikette'), html: adresseHtml(o) + (o.ohneAdresse ? '' : tun('physisch', t('g.p.etikette.p') + (o.sendung ? '<span class="klein">✓ ' + t('g.p.etikette.da', esc(o.sendung)) + '</span>' : ''),
-          F.postBereit ? etikettKnoepfe(o) : '')),
+          (F.postBereit ? etikettKnoepfe(o) : '') + sendungFeld(o))),
         aktion: [t('g.weiter'), function () { if (!o.sendung && F.postBereit && !o.ohneAdresse) frage(t('g.p.ohne.et'), function () { geheSchritt(2); }); else geheSchritt(2); }] },
       { titel: t('g.p.packen'), html: tun('physisch', t('g.p.packen.p', esc(regalName('unpaid'))), ''),
         aktion: [t('g.p.gepackt'), function () { hinter('setzeVerkauf', [o.nr, 'gepackt'], { keys: [f.key], text: t('g.p.gepackt') + ' ' + o.nr }); NEU_LADEN.schicht3 = 1; fallFertig(); }] }
@@ -2099,6 +2103,20 @@
    * «Neue Etikette» geht über den Server und fragt dort nach (Prüfung 18).
    */
   var ETIKETTEN = {};
+  /* Feedback Jonas 29.10.2026: Sendungsnummer beim Packen von Hand eintragen (Etikette nicht aus dem Tool). Beim Versenden steht sie dann zum Kopieren bereit. */
+  function sendungFeld(o) {
+    return '<div class="sendung-hand"><label class="klein" for="sendung-' + esc(o.nr) + '">' + t(o.sendung ? 'g.p.sendung.neu' : 'g.p.sendung') + '</label> '
+      + '<input class="mono" id="sendung-' + esc(o.nr) + '" type="text" inputmode="text" autocomplete="off" maxlength="40" placeholder="99.00.123456.12345678"> '
+      + '<button' + akt('sendungHand', o.nr) + '>' + t('g.p.sendung.k') + '</button></div>';
+  }
+  function sendungHand(nr, b, el, bestaetigt) {
+    var inp = $('sendung-' + nr), wert = inp ? inp.value.trim() : '';
+    if (!wert) { if (inp) inp.focus(); return; }
+    ruf('sendungSetzen', [nr, wert, bestaetigt === true], function (r) {
+      if (FALL && FALL.o && FALL.o.nr === nr) FALL.o.sendung = r.sendung;
+      melde(t('g.p.sendung.ok', r.sendung), 'ok'); zeichneAblauf();
+    }, function (m) { if (kuerzel(m) === 'sn') { frage(ohneKuerzel(m), function () { sendungHand(nr, b, el, true); }); return true; } return false; });
+  }
   function etikettKnoepfe(o) {
     var et = ETIKETTEN[o.nr];
     if (et) return '<button class="haupt-knopf"' + akt('etikettNochmals', o.nr) + '>' + t('g.p.etikette.nochmals') + '</button> <a href="' + etikettUrl(et) + '" download="' + esc(et.name) + '" target="_self">' + t('e1.datei') + '</a>'
@@ -2159,7 +2177,7 @@
         .catch(function () { fertigEinmal(gesendet ? 'unklar' : false); });
     } catch (e) { fertigEinmal(false); }
   }
-  Object.assign(AKTIONEN, { etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
+  Object.assign(AKTIONEN, { sendungHand: sendungHand, etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
   function kopiereText(text) {
     var fertig = function () { melde(t('kopiert'), 'ok'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, function () { melde(text, 'ok'); }); else melde(text, 'ok');

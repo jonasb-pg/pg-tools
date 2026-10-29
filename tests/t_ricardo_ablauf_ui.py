@@ -35,7 +35,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'adresseUebernehmen': {'stand': 'ok', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
          'aufgabeErledigt': AU, 'listingVerwerfen': True, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
          'zaehler': {'offen': 3, 'zuPacken': 2, 'versand': 1, 'retouren': 4}, 'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
-         'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
+         'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'sendungSetzen': {'nr': '50000002', 'sendung': '99.60.123456.00000001'}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
  return function(l,name,args){AUFRUFE.push([name,args]);var D=%s;var key=name==='ablauf'?'ablauf:'+args[0]:name;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[key]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
@@ -123,6 +123,11 @@ with sync_playwright() as p:
     ok('Stück holen' in s.text_content('.f-tun'), 'Holen')
     s.click('#f-aktion'); s.wait_for_timeout(300)
     ok(not [x for x in A() if x[0] == 'adressePruefen'] and 'Testa Beispiel' in s.text_content('#f-schritte'), 'Keine Adressprüfung bei der Post, Adresse angezeigt')
+    # Feedback Jonas 29.10.2026: Sendungsnummer von Hand beim Packen
+    ok(s.locator('#sendung-50000002').count() == 1 and 'Sendungsnummer von Hand' in s.text_content('#f-schritte'), 'Packen: Feld für die Sendungsnummer von Hand')
+    s.fill('#sendung-50000002', '99.60.123456.00000001'); s.click('button[data-akt=sendungHand]'); s.wait_for_timeout(250)
+    ok(['sendungSetzen', ['50000002', '99.60.123456.00000001', False]] in A() and s.evaluate('FALL.o.sendung') == '99.60.123456.00000001' and 'Sendungsnummer 99.60.123456.00000001' in s.text_content('#f-schritte'), 'Sendungsnummer gespeichert und angezeigt')
+    s.evaluate("FALL.o.sendung = ''; zeichneAblauf();"); s.wait_for_timeout(100)
     s.evaluate("window.DL = []; HTMLAnchorElement.prototype.click = function () { DL.push(this.download); }")   # Zusatz E1: herunterladen statt neuer Tab
     s.click('#f-schritte button:text-is("Etikette drucken")'); s.wait_for_timeout(200)
     ok(['etikette', ['50000002', False, False, ['zpl', 'pdf']]] in A() and 'Etikette 50000002.pdf' in s.evaluate('DL') and not any(u.startswith('blob:') for u in s.evaluate('OFFEN')) and 'Nochmals drucken' in s.text_content('#f-schritte'), 'Etikette gedruckt (PDF heruntergeladen, kein neuer Tab)')
