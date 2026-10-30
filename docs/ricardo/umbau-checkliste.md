@@ -67,3 +67,10 @@ Stand 30.10.2026. Quelle: Übersetzungstabelle T in Index.html (Live 2026-10-30.
 - Script-Eigenschaften werden nicht kopiert: kein Claude-Schlüssel (Texte aus Bausteinen), kein Post-Zugang (keine Etiketten), kein Mail-Abruf (MAIL_KONTO fehlt, keine Auslöser)
 - Web-App Version 1, 30.10.2026 21:44: https://script.google.com/a/macros/pretty-good.ch/s/AKfycbzXpMsUGUpZXGrHcbi2maSvDbY4KbSIs3OPJwgy04A3yatw11VixLa9eJ1_pDkx8lty/exec (Jeder in Pretty Good)
 - Vor Übernahme ins Live-Tool: nur Index.html übernehmen, TEST-Schalter nicht mitnehmen
+
+## Stand Umbau (30.10.2026, 22:12)
+
+- Web-App Version 2 im Testprojekt: neues Index.html nach dem Stufenmodell (apps/ricardo-test/Index.html, gebaut aus apps/ricardo/Index.html + apps/ricardo-test/cockpit.js mit build_index.py).
+- Code.gs im Test = Live + TEST-Schalter + neue Funktion `cockpit()` (nur Lesen, setzt ablauf/verkaeufe/uebersicht/retouren zusammen; versendete Verkäufe der letzten 60 Tage). Für die Übernahme ins Live-Tool ist `cockpit()` als Ergänzung nötig, der TEST-Schalter nicht.
+- Alle bisherigen Ansichten und Funktionen bleiben im Code (Abläufe Täglich/Packen/Versenden sind nur aus der Navigation genommen); der Listing-Ablauf ist unverändert der einzige Flow.
+- Tests: tests/t_ricardo_cockpit_ui.py (Cockpit, Panels, Handlungen, Zubringer, Suche, Navigation, Englisch) und die bisherigen UI-Tests t_ricardo_ui, t_ricardo_aufgaben_ui, t_ricardo_admin_ui (mit #nav-einst), t_ricardo_p2410_nachreview_ui laufen gegen das neue Index.html durch. t_ricardo_ablauf_ui prüft die alte Navigation und ist mit dem Umbau überholt.

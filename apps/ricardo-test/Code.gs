@@ -3146,7 +3146,7 @@ function api(lang, name, args) {
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus,
-    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen }[name];
+    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen, cockpit: cockpit }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
   const t0 = Date.now();
@@ -3975,6 +3975,26 @@ function ablauf(art) {
       regale: { unpaid: regal_('Verkauft') } };
   }
   throw new Error('Unbekannter Ablauf.');
+}
+
+/* ---------- Cockpit (Umbau 30.10.2026): alle Stufen in einem Aufruf ----------
+   Bereit → Online → Verkauft → Bezahlt → Versendet, Nebenausgänge Nicht verkauft, Retouren, Storniert.
+   Setzt die bestehenden Funktionen zusammen; schreibt nichts. */
+function cockpit() {
+  const s1 = ablauf('schicht1'), tg = ablauf('taeglich'), vk = verkaeufe(), ue = uebersicht(), rt = retouren();
+  const jetzt = Date.now(), grenze = jetzt - 60 * 86400000;
+  const versendet = alleVerkaeufe_().filter(function (v) { return v['Status'] === 'Bezahlt und versendet' && v['Bezahlt und versendet am'] instanceof Date && v['Bezahlt und versendet am'].getTime() >= grenze; })
+    .map(function (v) { const o = vZeile_(v); o.versendetAm = datum_(v['Bezahlt und versendet am']); o.versendetMs = v['Bezahlt und versendet am'].getTime(); return o; })
+    .sort(function (a, b) { return b.versendetMs - a.versendetMs; });
+  const pr = PropertiesService.getScriptProperties();
+  return { bereit: s1.bereit, analyse: analyseListe(), online: ue.liste, verkauft: vk.offen, versendet: versendet,
+    nichtverkauft: s1.unverkauft.filter(function (x) { return x.status !== 'Storniert'; }), ohneMail: s1.ohneMail,
+    storniert: s1.unverkauft.filter(function (x) { return x.status === 'Storniert'; }),
+    retouren: rt.offen, retourenAbgeschlossen: rt.abgeschlossen, retoureGruende: RETOURE_GRUENDE,
+    aufgaben: tg.aufgaben, melden: tg.melden, storno: tg.storno, offenZahlung: tg.offen, doppelt: tg.doppelt, stornoTage: tg.stornoTage, letzteBank: tg.letzteBank,
+    letzterImport: ue.letzterImport, unzugeordnet: ue.unzugeordnet, aktiv: ue.aktiv, schwelle: ue.schwelle, laufzeit: ue.laufzeit,
+    links: s1.links, regale: { offline: regal_('Bereit'), online: regal_('Gelistet'), unpaid: regal_('Verkauft') }, entscheide: ENTSCHEIDE_UNVERKAUFT,
+    postBereit: !!(pr.getProperty('POST_CLIENT_ID') && pr.getProperty('POST_CLIENT_SECRET')), test: typeof TEST !== 'undefined' && TEST };
 }
 
 /** Nummern (normalisiert) mit einer nicht freien Zeile, auch als Bündel-Teil. */
