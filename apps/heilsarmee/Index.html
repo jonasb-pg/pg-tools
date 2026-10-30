@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<base target="_top">
+<title>Heilsarmee Tool</title>
+<style>
+  :root { --b: #0a0a0a; --pink: #ffbaf5; --green: #a7f24a; --grey: #d2d2ce; --warn: #ffe3c9; --r: 4px; --rb: 24px; --h: 48px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-weight: 600; font-size: 16px; line-height: 1.45; color: var(--b); background: #fff; -webkit-tap-highlight-color: transparent; }
+  button, input { font: inherit; color: inherit; }
+  header { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 2px solid var(--b); }
+  header .col { max-width: 640px; margin: 0 auto; height: 64px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  header .t { font-size: 20px; font-weight: 900; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip { border: 2px solid var(--b); border-radius: var(--rb); background: #fff; padding: 4px 12px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  .screen { display: none; flex-direction: column; gap: 16px; }
+  .screen.active { display: flex; }
+  .lbl { display: block; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 4px; }
+  .field { display: flex; align-items: center; height: var(--h); border: 2px solid var(--b); border-radius: var(--r); padding: 0 12px; background: #fff; }
+  .field input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 18px; }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: var(--h); padding: 8px 16px; border: 2px solid var(--b); border-radius: var(--rb);
+    background: #fff; cursor: pointer; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; text-align: center; }
+  .btn:active { background: var(--b); color: #fff; }
+  .btn:disabled { opacity: .35; pointer-events: none; }
+  .btn.primary { background: var(--pink); }
+  .btn.big { min-height: 76px; font-size: 22px; }
+  .btn.sel { background: var(--b); color: #fff; }
+  .btn.list { justify-content: flex-start; text-align: left; text-transform: none; letter-spacing: 0; border-radius: var(--r); line-height: 1.3; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card { border: 2px solid var(--b); border-radius: var(--r); padding: 12px 16px; }
+  .muted { font-weight: 400; }
+  .preis { font-size: 56px; font-weight: 900; line-height: 1; letter-spacing: -.01em; }
+  .note { border-radius: var(--r); padding: 12px 16px; background: var(--warn); }
+  .note.ok { background: var(--green); }
+  .item { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--grey); padding: 8px 0; }
+  .item .x { background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 0 0 0 8px; }
+  .link { background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 8px 0; text-align: left; }
+  .tag { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: var(--grey); border-radius: var(--r); padding: 2px 6px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--b); color: #fff; border-radius: var(--rb); padding: 10px 20px; display: none; max-width: 90vw; z-index: 9; }
+  #busy { position: fixed; inset: 0; background: #ffffff99; display: none; align-items: center; justify-content: center; z-index: 8; font-size: 18px; }
+</style>
+</head>
+<body data-screen="start">
+<header><div class="col"><span class="t" id="titel">Heilsarmee Tool</span><span><button class="chip" id="btnZurueck" onclick="zurueck()" hidden>Zurück</button> <button class="chip" id="chipName" onclick="nameFragen()">Name</button></span></div></header>
+<main>
+  <!-- Start: Lots -->
+  <section class="screen active" id="screen-start">
+    <button class="btn primary big" id="btnNeuesLot" onclick="neuesLot()">Neues Lot</button>
+    <div><span class="lbl">Lots</span><div id="lotListe" class="stack"></div></div>
+  </section>
+
+  <!-- Lot: scannen -->
+  <section class="screen" id="screen-lot">
+    <div class="card" id="lotKopf"></div>
+    <div>
+      <label class="lbl" for="q">EAN scannen, PG-ID oder Name</label>
+      <div class="field"><input id="q" type="text" autocomplete="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();suchen();}"></div>
+    </div>
+    <button class="btn primary" onclick="suchen()">Suchen</button>
+    <div id="treffer" style="display:flex;flex-direction:column;gap:8px"></div>
+    <button class="link" onclick="vonHand()">Nicht gefunden? Von Hand erfassen</button>
+    <div><span class="lbl">Im Lot</span><div id="stuecke"></div></div>
+    <button class="btn" id="btnAbschliessen" onclick="abschliessen()">Lot abschliessen</button>
+  </section>
+
+  <!-- Stück: Neu/Gebraucht, Preis -->
+  <section class="screen" id="screen-stueck">
+    <div class="card" id="stueckKopf"></div>
+    <div id="handFelder" style="display:none;flex-direction:column;gap:12px">
+      <div><label class="lbl" for="hBez">Bezeichnung</label><div class="field"><input id="hBez" type="text" autocomplete="off"></div></div>
+      <div class="row2">
+        <div><label class="lbl" for="hOvp">OVP / Neupreis CHF</label><div class="field"><input id="hOvp" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
+        <div><label class="lbl" for="hMenge">Menge</label><div class="field"><input id="hMenge" type="text" inputmode="numeric" value="1" autocomplete="off"></div></div>
+      </div>
+    </div>
+    <div><span class="lbl">Zustand</span>
+      <div class="row2"><button class="btn big" id="btnNeu" onclick="zustand('Neu')">Neu</button><button class="btn big" id="btnGebraucht" onclick="zustand('Gebraucht')">Gebraucht</button></div>
+    </div>
+    <div id="preisBox" class="card" style="display:none">
+      <span class="lbl">Brockipreis (Preis-Gun)</span>
+      <div class="preis" id="preisGross">–</div>
+      <div class="muted" id="preisInfo"></div>
+      <div style="margin-top:12px"><label class="lbl" for="preisHand">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
+    </div>
+    <button class="btn primary big" id="btnUebernehmen" onclick="uebernehmen()" disabled>Übernehmen</button>
+  </section>
+
+  <!-- Abschluss -->
+  <section class="screen" id="screen-fertig">
+    <div class="note ok" id="fertigText"></div>
+    <button class="btn" onclick="zeige('start')">Zu den Lots</button>
+  </section>
+</main>
+<div id="busy">Bitte warten …</div>
+<div id="toast"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const chf = (n) => n == null || n === '' ? '–' : Number(n).toFixed(2);
+const LS = { get: (k, d) => { try { const v = localStorage.getItem('ha.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set: (k, v) => { try { localStorage.setItem('ha.' + k, JSON.stringify(v)); } catch (e) {} } };
+let boot = { prozentNeu: .5, prozentGebraucht: .75, stufen: [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59], lots: [] };
+let lot = null, st = null, screen = 'start';
+
+function call(fn) {
+  const args = Array.prototype.slice.call(arguments, 1);
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler((e) => reject(e instanceof Error ? e : new Error(e && e.message ? e.message : String(e))))[fn].apply(null, args);
+  });
+}
+function busy(on) { $('busy').style.display = on ? 'flex' : 'none'; }
+let toastT = null;
+function toast(t, ms) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => { el.style.display = 'none'; }, ms || 3000); }
+function name() { return LS.get('name', ''); }
+function nameFragen() { const n = prompt('Dein Name', name()); if (n != null) { LS.set('name', n.trim()); $('chipName').textContent = n.trim() || 'Name'; } }
+
+function zeige(s) {
+  screen = s;
+  document.querySelectorAll('.screen').forEach((x) => x.classList.toggle('active', x.id === 'screen-' + s));
+  document.body.dataset.screen = s;
+  $('btnZurueck').hidden = s === 'start';
+  $('titel').textContent = s === 'start' || !lot ? 'Heilsarmee Tool' : lot;
+  if (s === 'start') zeichneLots();
+  if (s === 'lot') setTimeout(() => $('q').focus(), 50);
+  window.scrollTo(0, 0);
+}
+function zurueck() { if (screen === 'stueck') zeige('lot'); else zeige('start'); }
+
+/* Preis wie der Server: Neupreis × Prozent, nächste Stufe (Gleichstand: die höhere) */
+function stufen(bis) { const s = boot.stufen.slice(); while (s[s.length - 1] < bis) s.push(s[s.length - 1] + 10); return s; }
+function vorschlag(ovp, prozent) {
+  const n = Number(String(ovp == null ? '' : ovp).replace(/['’\s]/g, '').replace(',', '.'));
+  if (!isFinite(n) || n <= 0) return null;
+  const roh = n * prozent; let best = null;
+  stufen(roh + 10).forEach((x) => { if (best == null || Math.abs(x - roh) < Math.abs(best - roh) - 1e-9 || (Math.abs(Math.abs(x - roh) - Math.abs(best - roh)) < 1e-9 && x > best)) best = x; });
+  return best;
+}
+const num = (v) => { const n = Number(String(v || '').replace(/['’\s]/g, '').replace(',', '.')); return String(v || '').trim() && isFinite(n) && n > 0 ? n : null; };
+
+/* ---------- Lots ---------- */
+function zeichneLots() {
+  const l = boot.lots || [];
+  $('lotListe').innerHTML = l.length ? l.map((x) => '<button class="btn list" style="margin-bottom:8px" onclick="oeffneLot(\'' + esc(x.lot) + '\')"><span><b>' + esc(x.lot) + '</b> <span class="tag">' + esc(x.status) + '</span><br><span class="muted">' +
+    esc(x.stuecke) + ' Stücke · CHF ' + chf(x.summe) + ' · ' + esc(x.eroeffnet) + '</span></span></button>').join('') : '<div class="muted">Noch keine Lots.</div>';
+}
+function neuesLot() {
+  busy(true);
+  call('neuesLot', name()).then((r) => { busy(false); boot.lots = r.lots; oeffneLot(r.lot); toast(r.lot + ' eröffnet'); }).catch((e) => { busy(false); toast(e.message, 6000); });
+}
+function oeffneLot(id) {
+  lot = id; const info = (boot.lots || []).filter((x) => x.lot === id)[0] || { status: 'Offen' };
+  if (info.status !== 'Offen') { toast(id + ' ist abgeschlossen. Reporting im Sheet, Tab «' + id + '».', 5000); return; }
+  $('treffer').innerHTML = ''; $('q').value = '';
+  zeige('lot'); ladeStuecke();
+}
+function ladeStuecke(liste) {
+  const zeichne = (s) => {
+    const menge = s.reduce((a, x) => a + (x.menge || 1), 0), summe = s.reduce((a, x) => a + (x.preis || 0) * (x.menge || 1), 0);
+    $('lotKopf').innerHTML = '<b>' + esc(lot) + '</b><br><span class="muted">' + menge + ' Stücke · Brockipreis total CHF ' + chf(summe) + '</span>';
+    $('stuecke').innerHTML = s.length ? s.slice(0, 30).map((x) => '<div class="item"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.pos) + ' · ' + esc(x.zustand) + (x.menge > 1 ? ' · ' + x.menge + '×' : '') +
+      '</span></span><span style="white-space:nowrap">CHF ' + chf(x.preis) + '<button class="x" onclick="loeschen(\'' + esc(x.pos) + '\')">Löschen</button></span></div>').join('') : '<div class="muted">Noch leer.</div>';
+    $('btnAbschliessen').disabled = !s.length;
+  };
+  if (liste) { zeichne(liste); return; }
+  call('lotStuecke', lot).then(zeichne).catch((e) => toast(e.message, 6000));
+}
+function loeschen(pos) {
+  if (!confirm(pos + ' aus dem Lot löschen?')) return;
+  call('stueckLoeschen', pos).then((r) => { ladeStuecke(r.stuecke); toast(pos + ' gelöscht'); }).catch((e) => toast(e.message, 6000));
+}
+
+/* ---------- Suche ---------- */
+function suchen() {
+  const q = $('q').value.trim();
+  if (!q) return;
+  $('treffer').innerHTML = '<div class="muted">Suche …</div>';
+  call('suche', q).then((r) => {
+    const t = r.treffer || [];
+    if (!t.length) { $('treffer').innerHTML = '<div class="note">Nichts gefunden für «' + esc(q) + '».</div>'; return; }
+    const frei = t.filter((x) => !x.vergeben);
+    if (frei.length === 1 && /^\d{6,14}$/.test(q.replace(/\s/g, ''))) { waehle(frei[0]); return; }   // Scan mit eindeutigem freiem Treffer: direkt weiter
+    window._t = t;
+    $('treffer').innerHTML = t.map((x, i) => '<button class="btn list" onclick="waehle(window._t[' + i + '])"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.id) + ' · OVP CHF ' + chf(x.ovp) +
+      (x.menge > 1 ? ' · ' + x.menge + '×' : '') + (x.vergeben ? ' · schon in ' + esc(x.vergeben) : '') + '</span></span></button>').join('');
+  }).catch((e) => { $('treffer').innerHTML = '<div class="note">' + esc(e.message) + '</div>'; });
+}
+
+/* ---------- Stück ---------- */
+function waehle(x) {
+  st = { quelle: 'Retoure', pgid: x.id, ean: x.ean, bez: x.bez, menge: x.menge || 1, ovp: x.ovp, ort: x.ort, vergeben: x.vergeben, zustand: '' };
+  $('handFelder').style.display = 'none';
+  $('stueckKopf').innerHTML = '<b>' + esc(x.bez) + '</b><br><span class="muted">' + esc(x.id) + (x.ean ? ' · ' + esc(x.ean) : '') + '<br>OVP CHF ' + chf(x.ovp) + (st.menge > 1 ? ' · Menge ' + st.menge : '') + '</span>' +
+    (x.vergeben ? '<div class="note" style="margin-top:8px">Schon erfasst in ' + esc(x.vergeben) + '.</div>' : '');
+  startStueck();
+}
+function vonHand() {
+  st = { quelle: 'Von Hand', pgid: '', ean: /^\d{6,14}$/.test($('q').value.trim()) ? $('q').value.trim() : '', bez: '', menge: 1, ovp: null, ort: '', zustand: '' };
+  $('stueckKopf').innerHTML = '<b>Von Hand erfassen</b>' + (st.ean ? '<br><span class="muted">EAN ' + esc(st.ean) + '</span>' : '');
+  $('hBez').value = /^\d{6,14}$/.test($('q').value.trim()) ? '' : $('q').value.trim(); $('hOvp').value = ''; $('hMenge').value = '1';
+  $('handFelder').style.display = 'flex';
+  startStueck();
+  setTimeout(() => $('hBez').focus(), 50);
+}
+function startStueck() {
+  $('btnNeu').classList.remove('sel'); $('btnGebraucht').classList.remove('sel');
+  $('preisBox').style.display = 'none'; $('preisHand').value = ''; $('btnUebernehmen').disabled = true;
+  zeige('stueck');
+}
+function zustand(z) {
+  st.zustand = z;
+  $('btnNeu').classList.toggle('sel', z === 'Neu'); $('btnGebraucht').classList.toggle('sel', z === 'Gebraucht');
+  $('preisBox').style.display = 'block';
+  rechne();
+}
+function rechne() {
+  if (!st || !st.zustand) return;
+  const ovp = st.quelle === 'Von Hand' ? num($('hOvp').value) : st.ovp;
+  const p = st.zustand === 'Neu' ? boot.prozentNeu : boot.prozentGebraucht;
+  const v = vorschlag(ovp, p), hand = num($('preisHand').value);
+  st.vorschlag = v; st.preis = hand || v;
+  $('preisGross').textContent = st.preis ? chf(st.preis) : '–';
+  $('preisInfo').textContent = hand ? 'Von Hand (Vorschlag ' + chf(v) + ')' : (v ? Math.round(p * 100) + '% von OVP CHF ' + chf(ovp) + ', gerundet' : 'OVP fehlt: Preis von Hand eingeben');
+  $('btnUebernehmen').disabled = !st.preis;
+}
+function uebernehmen(ok) {
+  if (st.quelle === 'Von Hand') {
+    st.bez = $('hBez').value.trim(); st.ovp = num($('hOvp').value); st.menge = Math.max(1, parseInt($('hMenge').value, 10) || 1);
+    if (!st.bez) { toast('Bezeichnung fehlt'); $('hBez').focus(); return; }
+  }
+  const hand = num($('preisHand').value);
+  const p = { lot: lot, pgid: st.pgid, ean: st.ean, bez: st.bez, menge: st.menge, zustand: st.zustand, ovp: st.ovp, preis: hand, quelle: st.quelle, ort: st.ort, von: name(), ok: ok === true };
+  $('btnUebernehmen').disabled = true;
+  call('stueckSpeichern', p).then((r) => {
+    toast(r.pos + ' · CHF ' + chf(r.preis));
+    $('q').value = ''; $('treffer').innerHTML = '';
+    zeige('lot'); ladeStuecke(r.stuecke);
+  }).catch((e) => {
+    $('btnUebernehmen').disabled = false;
+    const m = e.message || '';
+    if (/\[doppelt\]$/.test(m)) { if (confirm(m.replace(/\s*\[doppelt\]$/, '').replace(/^Bitte bestätigen: /, ''))) uebernehmen(true); return; }
+    toast(m, 6000);
+  });
+}
+
+/* ---------- Abschluss ---------- */
+function abschliessen() {
+  if (!confirm('Lot ' + lot + ' abschliessen? Danach kommen keine Stücke mehr dazu. Das Tool erstellt die Inventarliste mit Kategorien.')) return;
+  busy(true);
+  call('lotAbschliessen', lot).then((r) => {
+    busy(false); boot.lots = r.lots;
+    $('fertigText').innerHTML = 'Lot ' + esc(lot) + ' abgeschlossen: ' + r.stuecke + ' Stücke, OVP total CHF ' + chf(r.summeOvp) + ', Brockipreis total CHF ' + chf(r.summePreis) + '.<br>' +
+      'Inventarliste im Sheet, Tab «' + esc(r.tab) + '».' + (r.pruefen ? '<br>' + r.pruefen + ' Kategorien bitte im Tab prüfen (steht «Prüfen»).' : '') +
+      '<br><a href="' + esc(r.url) + '" target="_blank">Inventarliste öffnen</a>';
+    lot = null; zeige('fertig');
+  }).catch((e) => { busy(false); toast(e.message, 8000); });
+}
+
+/* Start */
+window.addEventListener('load', () => {
+  $('chipName').textContent = name() || 'Name';
+  busy(true);
+  call('getBootstrap').then((b) => { boot = Object.assign(boot, b || {}); busy(false); zeichneLots(); if (!name()) nameFragen(); })
+    .catch((e) => { busy(false); toast('Start fehlgeschlagen: ' + e.message, 8000); });
+});
+</script>
+</body>
+</html>
