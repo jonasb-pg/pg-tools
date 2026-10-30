@@ -83,6 +83,7 @@
       <span class="lbl">Brockipreis (Preis-Gun)</span>
       <div class="preis" id="preisGross">–</div>
       <div class="muted" id="preisInfo"></div>
+      <div class="row2" style="margin-top:12px"><button class="btn" id="btnTiefer" onclick="stufeWahl(-1)">–</button><button class="btn" id="btnHoeher" onclick="stufeWahl(1)">–</button></div>
       <div style="margin-top:12px"><label class="lbl" for="preisHand">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
     </div>
     <button class="btn primary big" id="btnUebernehmen" onclick="uebernehmen()" disabled>Übernehmen</button>
@@ -224,6 +225,20 @@ function rechne() {
   $('preisGross').textContent = st.preis ? chf(st.preis) : '–';
   $('preisInfo').textContent = hand ? 'Von Hand (Vorschlag ' + chf(v) + ')' : (v ? Math.round(p * 100) + '% von OVP CHF ' + chf(ovp) + ', gerundet' : 'OVP fehlt: Preis von Hand eingeben');
   $('btnUebernehmen').disabled = !st.preis;
+  const nb = nachbarn(st.preis);
+  $('btnTiefer').textContent = nb[0] ? '‹ ' + chf(nb[0]) : '–'; $('btnTiefer').disabled = !nb[0];
+  $('btnHoeher').textContent = nb[1] ? chf(nb[1]) + ' ›' : '–'; $('btnHoeher').disabled = !nb[1];
+}
+/* Nächst tiefere und nächst höhere Preisstufe zum aktuellen Preis (Jonas B. 30.10.2026) */
+function nachbarn(preis) {
+  if (!preis) return [null, null];
+  const s = stufen(preis + 20), lo = s.filter((x) => x < preis - 1e-9), hi = s.filter((x) => x > preis + 1e-9);
+  return [lo.length ? lo[lo.length - 1] : null, hi.length ? hi[0] : null];
+}
+function stufeWahl(r) {
+  const nb = nachbarn(st && st.preis), v = r < 0 ? nb[0] : nb[1];
+  if (!v) return;
+  $('preisHand').value = v.toFixed(2); rechne();
 }
 function uebernehmen(ok) {
   if (st.quelle === 'Von Hand') {
