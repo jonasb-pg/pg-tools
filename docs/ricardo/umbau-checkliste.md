@@ -58,3 +58,12 @@ Stand 30.10.2026. Quelle: Übersetzungstabelle T in Index.html (Live 2026-10-30.
 | Admin | Einstellungen speichern, Claude-Schlüssel-Hinweis, Versandtarife im Sheet (ad.einst*, ad.ki.*) | Seite Einstellungen | gleich |  |
 | Status | Listings: In Arbeit, Bereit, Gelistet, Verkauft, Versendet, Storniert, Unverkauft, Abgebrochen | Chips: Bereit (In Arbeit+Bereit), Online (Gelistet), Verkauft, Bezahlt, Versendet, Nicht verkauft (Unverkauft), Retouren, Storniert | Sheet-Werte bleiben, nur Anzeige |  |
 | Status | Verkäufe: Zu packen, Wartet auf Zahlung, Bereit zum Versand, Bezahlt und versendet, Retourniert, Retour abgeschlossen | Verkauft = Zu packen + Wartet auf Zahlung (Fahne gepackt); Bezahlt = Bereit zum Versand; Versendet = Bezahlt und versendet | Sheet-Werte bleiben, nur Anzeige |  |
+
+## Testumgebung (30.10.2026)
+
+- Sheet «RICARDO TOOL TEST»: Kopie des Live-Sheets vom 30.10.2026 21:41, ID 1L3VJnSpWt07hKIECrjgM-pnblWh4t1U6VKRay0YQ45s (gleicher Ordner wie das Live-Sheet)
+- Apps-Script-Projekt «Ricardo Tool TEST» (gebunden), ID 1V3AN4R-rvMCxFNwDzYyy5zu8MNz0GYRwfnS7jBYWxz1B41ydloSmf_M0; Dateien Code.gs, Index.html, Basis.gs (Basis.gs ist im Live-Projekt, aber nicht im Repo – nachholen)
+- Code.gs = Live 2026-10-30.1 + `const TEST = true` (apps/ricardo-test/Code.gs): kein Schreiben ins Analyse Tool (mmAufRicardo_), keine Rückzahlungs-Mail, Feedback als «Ricardo Tool TEST», Titel «Ricardo Tool TEST»
+- Script-Eigenschaften werden nicht kopiert: kein Claude-Schlüssel (Texte aus Bausteinen), kein Post-Zugang (keine Etiketten), kein Mail-Abruf (MAIL_KONTO fehlt, keine Auslöser)
+- Web-App Version 1, 30.10.2026 21:44: https://script.google.com/a/macros/pretty-good.ch/s/AKfycbzXpMsUGUpZXGrHcbi2maSvDbY4KbSIs3OPJwgy04A3yatw11VixLa9eJ1_pDkx8lty/exec (Jeder in Pretty Good)
+- Vor Übernahme ins Live-Tool: nur Index.html übernehmen, TEST-Schalter nicht mitnehmen
