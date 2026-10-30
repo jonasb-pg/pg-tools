@@ -35,7 +35,7 @@ DATEN = {'startDaten': {'version': 't', 'admin': False, 'zustaende': ['Neu und o
          'adresseUebernehmen': {'stand': 'ok', 'adresse': {'strasse': 'Testweg', 'nr': '1', 'postfach': '', 'plz': '3005', 'ort': 'Bern'}},
          'aufgabeErledigt': AU, 'listingVerwerfen': True, 'verkaufStornieren': TAEGLICH, 'setzeStatus': {}, 'uebersicht': {'letzterImport': '', 'liste': [], 'aktiv': 30, 'schwelle': 90, 'laufzeit': 6}, 'verkaeufe': {'offen': OFFEN}, 'retouren': {'offen': [], 'abgeschlossen': 0, 'auszahlungen': 0}, 'mailsJetzt': AU, 'aufgaben': AU,
          'zaehler': {'offen': 3, 'zuPacken': 2, 'versand': 1, 'retouren': 4}, 'ablauf:taeglich': TAEGLICH, 'ablauf:schicht1': SCHICHT1, 'ablauf:schicht2': SCHICHT2, 'ablauf:schicht3': SCHICHT3, 'bankAbgleich': BANK, 'bankBestaetigen': TAEGLICH,
-         'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'sendungSetzen': {'nr': '50000002', 'sendung': '99.60.123456.00000001'}, 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
+         'entscheidUnverkauft': dict(SCHICHT1, unverkauft=[]), 'setzeVerkauf': {'offen': OFFEN}, 'sendungSetzen': {'nr': '50000002', 'sendung': '99.60.123456.00000001'}, 'adresseVonHand': dict(OFFEN[1], name='Anna Muster', ort='3013 Bern', ohneAdresse=False), 'etikette': {'nr': '50000002', 'sendung': '99.60.1.2', 'pdf': 'JVBERi0xLjQK', 'name': 'Etikette 50000002.pdf', 'warnungen': '', 'produkt': 'ECO'}}
 stub = """<script>window.AUFRUFE=[];window.OFFEN=[];window.open=function(u){OFFEN.push(u)};window.google={script:{run:(function mk(ok,fail){return new Proxy({},{get:function(_,k){
  if(k==='withSuccessHandler')return function(f){return mk(f,fail)}; if(k==='withFailureHandler')return function(f){return mk(ok,f)};
  return function(l,name,args){AUFRUFE.push([name,args]);var D=%s;var key=name==='ablauf'?'ablauf:'+args[0]:name;setTimeout(function(){ok&&ok(JSON.parse(JSON.stringify(D[key]||{})))},5)}}})})()}};</script>""" % json.dumps(DATEN)
@@ -135,6 +135,17 @@ with sync_playwright() as p:
     ok('Matchmaker' in s.text_content('.f-tun'), 'Packen-Schritt')
     s.click('#f-aktion'); s.wait_for_timeout(200)
     ok(['setzeVerkauf', ['50000002', 'gepackt']] in A(), 'Gepackt')
+    # Feedback Jonas 30.10.2026: Adresse fehlt (Bericht hat den Verkauf noch nicht) -> Link auf Ricardo, Block einfügen
+    s.click('#nav-f-schicht2'); s.wait_for_timeout(300)
+    s.click('#f-schritte .f-eintrag:has-text("Neu: Tasche") button'); s.wait_for_timeout(200)
+    s.click('#f-aktion'); s.wait_for_timeout(300)
+    t = s.text_content('#f-schritte')
+    ok('Adresse fehlt' in t and 'Lieferadresse' in t and s.locator('#adr-50000003').count() == 1 and s.locator('#f-schritte button[data-akt=link]:has-text("Verkauf öffnen")').count() == 1, 'Adresse fehlt: Knopf «Verkauf öffnen» und Feld zum Einfügen')
+    s.click('button[data-akt=adresseHand]'); s.wait_for_timeout(150)
+    ok(not [x for x in A() if x[0] == 'adresseVonHand'], 'Leeres Feld: nichts gesendet')
+    s.fill('#adr-50000003', 'Lieferadresse\nAnna Muster\nMusterweg 12a\n3013 Bern'); s.click('button[data-akt=adresseHand]'); s.wait_for_timeout(300)
+    ok(['adresseVonHand', ['50000003', 'Lieferadresse\nAnna Muster\nMusterweg 12a\n3013 Bern', False]] in A() and s.evaluate('FALL.o.ohneAdresse') is False and 'Anna Muster' in s.text_content('#f-schritte') and s.locator('#adr-50000003').count() == 0, 'Adresse übernommen: Feld weg, Name angezeigt')
+    ok(s.evaluate("F.verkaeufe.offen.filter(function (x) { return x.nr === '50000003'; })[0].ohneAdresse") is False, 'Liste nachgeführt (kein «Adresse fehlt» mehr)')
     if len(sys.argv) > 1: s.screenshot(path=sys.argv[1] + '-packen.png', full_page=True)
     # ---------- Versenden ----------
     s.click('#nav-f-schicht3'); s.wait_for_timeout(300)

@@ -1628,7 +1628,9 @@
     'g.p.holen': ['Holen', 'Fetch'], 'g.p.holen.p': ['Stück holen: {0}', 'Take the item: {0}'],
     'g.p.etikette': ['Etikette', 'Label'], 'g.p.etikette.p': ['Etikette drucken und auf den Karton kleben.', 'Print the label and stick it on the box.'],
     'g.p.etikette.k': ['Etikette drucken', 'Print label'], 'g.p.etikette.nochmals': ['Nochmals drucken', 'Print again'], 'g.p.etikette.da': ['Etikette gedruckt, Sendungsnummer {0}', 'Label printed, tracking number {0}'],
-    'g.p.ohne.et': ['Ohne Etikette weiter?', 'Continue without a label?'], 'g.p.adr.fehlt': ['Adresse fehlt. Zuerst den Verkaufsbericht einlesen (Liste).', 'Address missing. Import the sales report first (list).'],
+    'g.p.ohne.et': ['Ohne Etikette weiter?', 'Continue without a label?'], 'g.p.adr.fehlt': ['Adresse fehlt (der Verkaufsbericht hat diesen Verkauf noch nicht).', 'Address missing (the sales report does not have this sale yet).'],
+    'g.p.adr.hand.r': ['Verkauf öffnen, den Block «Lieferadresse» markieren, kopieren und unten einfügen.', 'Open the sale, select the «Lieferadresse» block, copy it and paste it below.'],
+    'g.p.adr.hand': ['Adresse einfügen', 'Paste address'], 'g.p.adr.hand.k': ['Adresse übernehmen', 'Use address'], 'g.p.adr.hand.ok': ['Adresse übernommen: {0}', 'Address saved: {0}'],
     'g.p.adr.laeuft': ['Adresse wird bei der Post geprüft …', 'Checking the address with Swiss Post …'], 'g.p.adr.ok': ['Adresse von der Post bestätigt.', 'Address confirmed by Swiss Post.'],
     'g.p.adr.vorschlag': ['Die Post kennt die Adresse so: {0}', 'Swiss Post knows the address as: {0}'], 'g.p.adr.uebernehmen': ['Vorschlag übernehmen', 'Use suggestion'],
     'g.p.adr.unbekannt': ['Die Post findet diese Adresse nicht. Adresse auf Ricardo prüfen, bei Bedarf der Käufer*in schreiben.', 'Swiss Post cannot find this address. Check it on Ricardo, contact the buyer if needed.'],
@@ -1902,7 +1904,7 @@
   /* Entscheid Jonas 19.10.2026: keine Adressprüfung über die Post (kostenpflichtig). Angezeigt wird nur die Adresse aus dem Verkaufsbericht. */
   var ADR_PRUEFEN = false;
   function adresseHtml(o) {
-    if (o.ohneAdresse) return '<div class="meldung warn">' + t('g.p.adr.fehlt') + '</div>';
+    if (o.ohneAdresse) return '<div class="meldung warn">' + t('g.p.adr.fehlt') + '</div>' + adresseHandFeld(o);
     if (!ADR_PRUEFEN) return '<p><strong>' + esc(o.name) + '</strong><br>' + esc(o.ort || '') + '</p>';
     if (!F.postBereit) return '<div class="meldung warn">' + t('g.p.post.fehlt') + '</div>';
     var a = ADR && ADR.nr === o.nr ? ADR : null;
@@ -2105,6 +2107,22 @@
    */
   var ETIKETTEN = {};
   /* Feedback Jonas 29.10.2026: Sendungsnummer beim Packen von Hand eintragen (Etikette nicht aus dem Tool). Beim Versenden steht sie dann zum Kopieren bereit. */
+  /* Feedback Jonas 30.10.2026: Adresse von Hand beim Packen. Link auf die Ricardo-Verkaufsseite, Block «Lieferadresse» kopieren, einfügen. */
+  function adresseHandFeld(o) {
+    return tun('ricardo', t('g.p.adr.hand.r'), ricKnopf(o.link, t('g.verkauf.oeffnen')))
+      + '<div class="adresse-hand"><label class="klein" for="adr-' + esc(o.nr) + '">' + t('g.p.adr.hand') + '</label>'
+      + '<textarea id="adr-' + esc(o.nr) + '" rows="4" autocomplete="off" placeholder="Vorname Nachname&#10;Strasse 1&#10;3000 Bern" style="width:100%;font:inherit;margin-top:4px"></textarea>'
+      + '<button class="haupt-knopf" style="margin-top:8px"' + akt('adresseHand', o.nr) + '>' + t('g.p.adr.hand.k') + '</button></div>';
+  }
+  function adresseHand(nr, b, el, bestaetigt) {
+    var inp = $('adr-' + nr), wert = inp ? inp.value.trim() : '';
+    if (!wert) { if (inp) inp.focus(); return; }
+    ruf('adresseVonHand', [nr, wert, bestaetigt === true], function (z) {
+      if (FALL && FALL.o && FALL.o.nr === nr) { FALL.o.name = z.name; FALL.o.ort = z.ort; FALL.o.ohneAdresse = z.ohneAdresse; FALL.tag = z.ohneAdresse ? FALL.tag : (z.bezahlt ? t('g.p.bezahlt') : ''); FALL.tagKlasse = 'hell'; }
+      if (F && F.verkaeufe && F.verkaeufe.offen) F.verkaeufe.offen.forEach(function (x) { if (x.nr === nr) { x.name = z.name; x.ort = z.ort; x.ohneAdresse = z.ohneAdresse; } });
+      melde(t('g.p.adr.hand.ok', z.name + ', ' + z.ort), 'ok'); zeichneAblauf();
+    }, function (m) { if (kuerzel(m) === 'adr') { frage(ohneKuerzel(m), function () { adresseHand(nr, b, el, true); }); return true; } return false; });
+  }
   function sendungFeld(o) {
     return '<div class="sendung-hand"><label class="klein" for="sendung-' + esc(o.nr) + '">' + t(o.sendung ? 'g.p.sendung.neu' : 'g.p.sendung') + '</label> '
       + '<input class="mono" id="sendung-' + esc(o.nr) + '" type="text" inputmode="text" autocomplete="off" maxlength="40" placeholder="99.00.123456.12345678"> '
@@ -2178,7 +2196,7 @@
         .catch(function () { fertigEinmal(gesendet ? 'unklar' : false); });
     } catch (e) { fertigEinmal(false); }
   }
-  Object.assign(AKTIONEN, { sendungHand: sendungHand, etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
+  Object.assign(AKTIONEN, { sendungHand: sendungHand, adresseHand: adresseHand, etikettNeu: function (nr) { etikette(nr); }, etikettNochmals: function (nr) { if (ETIKETTEN[nr]) etikettAusgeben(ETIKETTEN[nr]); else etikette(nr); } });
   function kopiereText(text) {
     var fertig = function () { melde(t('kopiert'), 'ok'); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(fertig, function () { melde(text, 'ok'); }); else melde(text, 'ok');

@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-29.1';
+const VERSION = '2026-10-30.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -2177,6 +2177,62 @@ function vZeile_(v) {
  * Feedback Jonas 29.10.2026: Sendungsnummer von Hand beim Packen eintragen (Etikette nicht aus dem Tool, z.B. pick@home oder Etikette aus dem Ricardo-Mail).
  * Sie erscheint dann beim Versenden zum Kopieren. Eine vorhandene Nummer wird nur mit ueberschreiben = true ersetzt.
  */
+/**
+ * Feedback Jonas 30.10.2026: Der Verkaufsbericht von Ricardo enthält Verkäufe vom gleichen Tag oft noch nicht, die Mail hat keine Adresse.
+ * Darum beim Packen: den Block «Lieferadresse» von der Ricardo-Verkaufsseite kopieren und hier einfügen. Reine Funktion, gibt
+ * { firma, vorname, nachname, strasse, nr, postfach, plz, ort } zurück oder wirft einen Fehler mit dem, was fehlt.
+ * Erwartet: Namenszeile(n), Strasse mit Nummer (oder Postfach), «PLZ Ort». Kopfzeilen wie «Lieferadresse» und das Land werden übersprungen.
+ */
+function adresseLesen_(text) {
+  const weg = /^(lieferadresse|adresse|verkauft an|lieferart|schweiz|suisse|svizzera|switzerland|ch|liechtenstein)$/i;
+  const z = String(text || '').split(/\r?\n/).map(function (x) { return x.replace(/\s+/g, ' ').trim(); })
+    .filter(function (x) { return x && !weg.test(x.replace(/:$/, '')) && !/@/.test(x) && !/^\+?\d[\d\s]{7,}$/.test(x); });
+  let pi = -1;
+  for (let i = z.length - 1; i >= 0; i--) if (/^(?:CH-?|FL-?|LI-?)?\d{4}\s+\S/.test(z[i])) { pi = i; break; }
+  if (pi < 0) throw new Error('Adresse nicht erkannt: Die Zeile «PLZ Ort» fehlt (z. B. 3013 Bern).');
+  const pm = z[pi].match(/^(?:CH-?|FL-?|LI-?)?(\d{4})\s+(.+)$/);
+  let vor = z.slice(0, pi), postfach = '';
+  vor = vor.filter(function (x) { const m = x.match(/^postfach\s*(\d*)$/i); if (m) { postfach = m[1] || 'Postfach'; return false; } return true; });
+  const voll = ' Bitte den ganzen Block «Lieferadresse» kopieren (Name, Strasse, PLZ Ort).';
+  /* Eine einzige Zeile vor «PLZ Ort»: mit Hausnummer am Ende ist es die Strasse (Name fehlt), sonst der Name (Strasse fehlt) */
+  if (vor.length === 1 && !postfach) throw new Error('Adresse nicht erkannt: ' + (strasse_(vor[0])[1] ? 'Der Name fehlt.' : 'Die Strasse fehlt.') + voll);
+  const strZeile = postfach && vor.length === 1 ? '' : vor.pop() || '';
+  if (!strZeile && !postfach) throw new Error('Adresse nicht erkannt: Die Strasse fehlt.' + voll);
+  if (!vor.length) throw new Error('Adresse nicht erkannt: Der Name fehlt.' + voll);
+  const st = strZeile ? strasse_(strZeile) : ['', ''];
+  const name = vor[vor.length - 1], firma = vor.length > 1 ? vor.slice(0, -1).join(', ') : '';
+  const w = name.split(' ');
+  return { firma: firma, vorname: w.length > 1 ? w.slice(0, -1).join(' ') : '', nachname: w[w.length - 1], strasse: st[0], nr: st[1],
+    postfach: postfach === 'Postfach' ? '' : postfach, plz: pm[1], ort: pm[2] };
+}
+
+/** Adresse von Hand eintragen (aus adresseLesen_). Eine vorhandene Adresse wird nur mit ueberschreiben = true ersetzt. Gibt den Verkauf für die Oberfläche zurück. */
+function adresseVonHand(nr, text, ueberschreiben) {
+  nr = String(nr || '').trim();
+  if (!nr) throw new Error('Verkauf fehlt.');
+  const a = adresseLesen_(text);
+  const lock = sperre_(20000);
+  try {
+    const sv = SpreadsheetApp.getActive().getSheetByName(TAB_S);
+    const nrn = sv.getLastRow() > 1 ? sv.getRange(2, 1, sv.getLastRow() - 1, 1).getValues() : [];
+    let zeile = 0;
+    for (let i = 0; i < nrn.length; i++) if (String(nrn[i][0]).trim() === nr) { zeile = i + 2; break; }
+    if (!zeile) throw new Error('Verkauf ' + nr + ' nicht gefunden.');
+    const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
+    const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
+    if (V_OFFEN.indexOf(v['Status']) === -1) throw new Error('Verkauf ist bereits «' + v['Status'] + '».');
+    const hatte = String(v['Nachname'] || '').trim() && String(v['PLZ'] || '').trim();
+    if (hatte && ueberschreiben !== true) throw new Error('Bitte bestätigen: Für ' + nr + ' ist schon eine Adresse eingetragen (' + [v['Vorname'], v['Nachname']].join(' ').trim() + ', ' + v['PLZ'] + ' ' + v['Ort'] + '). Ersetzen? [adr]');
+    const c0 = V_COLS.indexOf('Firma') + 1, werte = [a.firma, a.vorname, a.nachname, a.strasse, a.nr, a.postfach, a.plz, a.ort];
+    const bereich = sv.getRange(zeile, c0, 1, werte.length);
+    if (typeof bereich.setNumberFormat === 'function') bereich.setNumberFormat('@');           // PLZ, Hausnummer, Postfach als Text
+    bereich.setValues([werte]);
+    ['Firma', 'Vorname', 'Nachname', 'Strasse', 'Hausnummer', 'Postfach', 'PLZ', 'Ort'].forEach(function (k, i) { v[k] = werte[i]; });
+    log_('Adresse von Hand', String(v['PG-ID'] || ''), nr + ': ' + [a.vorname, a.nachname].join(' ').trim() + ', ' + a.plz + ' ' + a.ort + (hatte ? ' (ersetzt)' : ''));
+    return vZeile_(v);
+  } finally { lock.releaseLock(); }
+}
+
 function sendungSetzen(nr, sendung, ueberschreiben) {
   nr = String(nr || '').trim(); sendung = String(sendung || '').replace(/\s+/g, '').slice(0, 40);
   if (!nr) throw new Error('Verkauf fehlt.');
@@ -3082,7 +3138,7 @@ function api(lang, name, args) {
     erstelleText: erstelleText, buendelHinzu: buendelHinzu, buendelLeeren: buendelLeeren, freiesListing: freiesListing, aehnlicheStuecke: aehnlicheStuecke,
     markiereGelistet: markiereGelistet, setzeStatus: setzeStatus,
     uebersicht: uebersicht, importVerkaeufe: importVerkaeufe, verkaeufe: verkaeufe,
-    setzeVerkauf: setzeVerkauf, sendungSetzen: sendungSetzen, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
+    setzeVerkauf: setzeVerkauf, sendungSetzen: sendungSetzen, adresseVonHand: adresseVonHand, postAdressen: postAdressen, adminSuche: adminSuche, adminLoescheListing: adminLoescheListing,
     adminLoescheVerkauf: adminLoescheVerkauf, adminEinstellungen: adminEinstellungen, adminSpeichereEinstellungen: adminSpeichereEinstellungen,
     retouren: retouren, retoureSuche: retoureSuche, retoureEroeffnen: retoureEroeffnen, retoureSchritt: retoureSchritt,
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
