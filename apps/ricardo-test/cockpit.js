@@ -165,6 +165,7 @@
     } else if (stufe === 'versendet') {
       (CP.versendet || []).forEach(function (o) {
         var au = cpAufgaben(o.pgId, o.artikel, o.nr, true), off = '';
+        if (o.bezahlt && !o.ricardoGemeldet) off += etk(t('c.o.melden'), 'orange');   // Abgleich 31.10.: versendet, aber Zahlung auf Ricardo nicht gemeldet
         au.fragen.forEach(function (q) { off += etk(esc(q.art), 'orange'); }); au.bewertungen.forEach(function () { off += etk(t('c.o.bewertung'), 'orange'); });
         l.push({ key: 's' + o.nr, art: 'versendet', o: o, z: [o.pgId || t('v.nichtzu'), o.titel, 'CHF ' + o.total, o.name || o.kaeufer, o.versendetAm, off] });
       });
@@ -202,6 +203,7 @@
     if (r.art === 'verkauft' || r.art === 'bezahlt' || r.art === 'versendet') {
       au = cpAufgaben(o.pgId, o.artikel, o.nr, r.art === 'versendet'); fragen(au);
       if (r.art === 'verkauft') { if (o.ohneAdresse) k.push('adresse'); else if (o.status === 'Zu packen') k.push('packen'); if (o.meldet && !o.bezahlt) k.push('pruefen'); if (cpStorno(o.nr)) k.push('storno'); else if (au.zahlung.length) k.push('erinnern'); }
+      if (r.art === 'versendet' && o.bezahlt && !o.ricardoGemeldet) k.push('melden');
       if (r.art === 'bezahlt') { if (!o.ricardoGemeldet) k.push('melden'); if (o.status === 'Zu packen') k.push(o.ohneAdresse ? 'adresse' : 'packen'); else if (o.ricardoGemeldet) k.push('versenden'); }
     }
     if (r.art === 'ohnemail') k.push('laufzeit');
@@ -373,6 +375,7 @@
       var au2 = cpAufgaben(o.pgId, o.artikel, o.nr, true);
       pOeffne(esc(o.pgId || o.nr), esc(o.titel) + ' · ' + t('c.s.versendet') + ' ' + esc(o.versendetAm) + ' · ' + t('v.nr', esc(o.nr)),
         '<p class="still">' + esc(o.name || o.kaeufer) + (o.ort ? ', ' + esc(o.ort) : '') + ' · CHF ' + esc(o.total) + ' · ' + t('c.p.sendung') + ' ' + (o.sendung ? '<span class="mono">' + esc(o.sendung) + '</span>' : t('c.p.sendung.keine')) + '</p>'
+        + (o.bezahlt && !o.ricardoGemeldet ? jetzt(t('c.p.melden'), '<p class="still">' + t('c.p.melden.r') + '</p><div class="knoepfe">' + lnkR(o.link, t('g.verkauf.oeffnen'), 'm' + o.nr) + knR(t('c.p.gemeldet'), 'cpVerkauf', 'm' + o.nr, o.nr, 'ricardoBezahlt') + '</div>') : '')
         + aufgabenHtml(au2)
         + block(t('c.p.retoure'), '<p class="still">' + t('c.p.retoure.text') + '</p>' + retoureFormular(o), au2.fragen.length > 0)
         + block(t('c.p.links'), '<div class="knoepfe">' + lnk(o.link, t('c.p.verkauf')) + '</div>', true) + adminBlock(o.pgId || o.nr));

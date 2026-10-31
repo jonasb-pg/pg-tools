@@ -16,7 +16,7 @@ def rep(a, b, count=1):
 
 # 1. CSS
 rep("</style>\n</head>", """  /* ---------- Cockpit (Umbau 30.10.2026) ---------- */
-  .cp-top { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+  .cp-top { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:28px; }   /* Feedback 31.10.: mehr Abstand zu den Chips */
   .cp-top input[type=text] { flex:1; min-width:260px; height:48px; }
   .cp-top button { white-space:nowrap; }
   /* Feedback 31.10.: Stand jeder Quelle im eigenen Knopf statt einer grauen Zeile */

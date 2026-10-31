@@ -31,3 +31,11 @@ Umstellung angefangen, aber nicht gespeichert: Im Live-Editor sind zwei von 14 E
 
 ## Stand 31.10.2026, 18:16 – Version 40 live
 Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Knoepfen, ohne Stufentexte (Rückfall: 39)». Servercode unverändert gegenüber Version 39 (Code 331451 / 3993215958), Oberfläche 281824 / 2997902977. Live geprüft: Kopf mit drei Quellen-Knöpfen und Stand, keine Stufentexte, To-dos unter Verwaltung, Zahlen unverändert.
+
+## Abgleich mit Ricardo 31.10.2026, 18:20 – Version 41
+- Version 41 (18:23): Abstand Kopf → Chips 28 px; «Zahlung bei Ricardo melden» jetzt auch bei versendeten Verkäufen (Etikett, To-do, «Jetzt» im Panel). Vorher verschwand die Aufgabe nach dem Versand (alter «Täglich»-Ablauf zeigte sie). Oberfläche 282399 / 815282252, Servercode unverändert.
+- Verkäufe: alle 30 Verkäufe auf Ricardo-Seite 1 (29./30.10.) sind im Tool. 20 Verkäufe sind im Tool bezahlt (Bank oder von Hand), auf Ricardo aber «Zahlung ausstehend» → jetzt als To-do sichtbar.
+- Angebote: 8 Stücke laufen auf Ricardo wieder (Ende 5./6.11., gleiche Artikel-Nr; vermutlich automatisch neu eingestellt), im Tool «Unverkauft»: RC-0012, AN-0035, PG-18882, AN-0015, RC-0027 (1 Gebot), PG-17549, PG-29347, AN-0026.
+- PG-22902 (Feiyu): Ricardo «nicht verkauft» 29.10., im Tool noch «Gelistet» (Mail fehlte) → im Panel «Nicht verkauft» bestätigen.
+- PG-18036 (Tamron): Ricardo-Angebot «nicht verkauft» 15.10., im Tool Verkauf 54000061 versendet – vermutlich Preisvorschlag nach Ablauf.
+- Übrige «Nicht verkauft» auf Ricardo stimmen mit dem Tool überein.
