@@ -3,7 +3,8 @@
 Alle bisherigen Ansichten und Funktionen bleiben im Code; neu sind Cockpit, Navigation, Start."""
 import pathlib, re
 root = pathlib.Path(__file__).resolve().parents[1]
-live = (root / 'ricardo' / 'Index.html').read_text(encoding='utf-8')
+# Grundlage = alte Oberfläche vor dem Cockpit (Tag ricardo-live-vor-cockpit-2026-10-31); apps/ricardo/Index.html ist seit 31.10. selbst das Ergebnis
+live = (root / 'ricardo-test' / 'Index_basis_alt.html').read_text(encoding='utf-8')
 cockpit = (root / 'ricardo-test' / 'cockpit.js').read_text(encoding='utf-8')
 s = live
 n = 0
@@ -18,12 +19,16 @@ rep("</style>\n</head>", """  /* ---------- Cockpit (Umbau 30.10.2026) ---------
   .cp-top { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
   .cp-top input[type=text] { flex:1; min-width:260px; height:48px; }
   .cp-top button { white-space:nowrap; }
+  /* Feedback 31.10.: Stand jeder Quelle im eigenen Knopf statt einer grauen Zeile */
+  .cp-top .cp-quelle { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:48px; padding-top:4px; padding-bottom:4px; line-height:1.15; }
+  .cp-top .cp-quelle small { display:block; font:500 12px/1.2 var(--sans); text-transform:none; letter-spacing:0; color:#5f5f5c; }
+  .cp-top .cp-quelle small:empty { display:none; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
   .chip { border-radius:24px; background:var(--weiss); display:inline-flex; align-items:center; gap:8px; }
   .chip.an { background:var(--pink); font-weight:900; }
   .chip .zahl { background:var(--weiss); }
   .chip.an .zahl { background:var(--ink); color:var(--weiss); border-color:var(--ink); }
-  #cp-sub { margin:0 0 12px; min-height:20px; }
+  #cp-sub { margin:0 0 12px; } #cp-sub:empty { display:none; }
   .klein-knopf { min-height:30px; padding:4px 10px; font-size:12px; margin-left:8px; }
   .cp-zeile { cursor:pointer; }
   .cp-zeile:hover td { background:var(--pink-hell); }
@@ -72,9 +77,9 @@ rep("""    <div class="nav">
       <button id="nav-f-taeglich" class="flow" onclick="ablaufStarten('taeglich')">""",
 """    <div class="nav">
       <button id="nav-cockpit" onclick="zeigeCockpit()"><span data-t="nav.cockpit"></span></button>
-      <button id="nav-todos" onclick="zeigeTodos()"><span data-t="nav.todos"></span><span class="zahl" id="z-todos" hidden></span></button>
       <button id="nav-listing" class="flow" onclick="ablaufStarten('schicht1')"><span>▸ <span data-t="nav.listing"></span></span><span class="zahl" id="z-listing" hidden></span></button>
       <div class="sektion gross" style="margin-top:8px" data-t="nav.sektion2"></div>
+      <button id="nav-todos" onclick="zeigeTodos()"><span data-t="nav.todos"></span><span class="zahl" id="z-todos" hidden></span></button>
       <button id="nav-zahlen" onclick="zeigeZahlen()"><span data-t="nav.zahlen"></span></button>
       <button id="nav-einst" onclick="zeigeEinst()"><span data-t="nav.einst"></span></button>
       <div hidden>
@@ -92,10 +97,10 @@ rep("""      <!-- ===================== LISTEN ===================== -->""", """
         <div class="cp-top">
           <input type="text" id="cp-q" data-tp="c.such.platz" autocomplete="off">
           <button onclick="cpSuchen()" data-t="suchen"></button>
-          <button onclick="cpBericht()" data-t="c.bericht"></button>
-          <button onclick="cpBank()" data-t="c.bank"></button>
+          <button class="cp-quelle" onclick="cpMails()"><span data-t="c.mails"></span><small id="cp-d-mails"></small></button>
+          <button class="cp-quelle" onclick="cpBericht()"><span data-t="c.bericht"></span><small id="cp-d-bericht"></small></button>
+          <button class="cp-quelle" onclick="cpBank()"><span data-t="c.bank"></span><small id="cp-d-bank"></small></button>
         </div>
-        <p class="still" id="cp-stand" style="margin:-6px 0 12px"></p>
         <div id="cp-warn"></div>
         <div class="chips cp-tun" id="cp-tun"></div>
         <div class="chips" id="cp-chips"></div>
@@ -166,6 +171,8 @@ rep("    if (ANSICHT === 'admin') ladeAdmin();\n    $('rt-treffer').innerHTML = 
 # Version sichtbar
 rep("$('version').textContent = 'Version ' + S.version;", "$('version').textContent = 'Version ' + S.version + ' · Cockpit';")
 
+# Feedback Jonas 31.10.2026: Hinweis «Angebote abgelaufen, Mail fehlt» im Reporting raus (verwirrt; das Stück steht im Cockpit unter Online mit «Laufzeit vorbei»)
+rep("""    if (p.ohneMail) h += '<div class="meldung warn" style="margin:0 0 16px">' + esc(t('kz.ohnemail', p.ohneMail)) + '</div>';\n""", "")
 out = root / 'ricardo-test' / 'Index.html'
 out.write_text(s, encoding='utf-8')
 print(n, 'Ersetzungen,', len(s), 'Zeichen')

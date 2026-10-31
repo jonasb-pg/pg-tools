@@ -72,7 +72,10 @@ with sync_playwright() as p:
     s.click('#nav-cockpit'); s.wait_for_timeout(100)
     ok(s.is_visible('#cp-chips') and s.is_hidden('#cp-tun') and 'an' in s.get_attribute('#nav-cockpit', 'class') and 'an' not in (s.get_attribute('#nav-todos', 'class') or ''), 'Cockpit zurück: Stufen')
     ok(s.query_selector('.cp-top button:has-text("Listing")') is None, 'Kein Listing-Knopf neben der Suche')
-    ok('Mails 30.10.2026 08:38' in s.inner_text('#cp-stand'), 'Stand-Zeile')
+    ok(s.query_selector('#cp-stand') is None, 'Keine graue Stand-Zeile mehr')
+    ok('zuletzt 30.10. 08:38' in s.inner_text('#cp-d-mails'), 'Stand Mails im Knopf')
+    ok(s.inner_text('#cp-d-bericht').startswith('zuletzt') or s.inner_text('#cp-d-bericht') == 'noch nie', 'Stand Verkaufsbericht im Knopf')
+    ok(s.inner_text('#cp-sub') == '', 'Keine Beschreibung unter den Chips')
     liste = L()
     ok('PG-401' in liste and 'ADRESSE FEHLT' in liste and 'PG-402' in liste and 'STORNO PRÜFEN' in liste and 'PG-403' not in liste, 'Stufe Verkauft: Adresse fehlt, Storno prüfen; bezahlte nicht dabei')
     # Panel Verkauft ohne Adresse

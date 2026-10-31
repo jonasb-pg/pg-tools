@@ -19,3 +19,12 @@ Umstellung angefangen, aber nicht gespeichert: Im Live-Editor sind zwei von 14 E
 - Rauchtest live: Cockpit lädt mit echten Daten (Bereit 72, Verkauft 30, Versendet 48, Nicht verkauft 44), To-dos 64, Panel Bereit zeigt «Do 05.11.2026 19:00». Keine Fehler in der Konsole.
 - Bestand nach der Umstellung: Listings, Verkäufe, Posteingang, Gebote identisch mit der Sicherung (letzte Einträge PG-20360, 54307926, 1a19228d98bb7db2, 1333232208); Retouren leer; Log nur ergänzt.
 - Rückfall: Bereitstellungen verwalten › Stift › Version 38 › Bereitstellen; danach apps/ricardo/Code.gs und Index.html aus Tag ricardo-live-vor-cockpit-2026-10-31 in den Editor, damit auch die Auslöser den alten Code nutzen.
+
+## Tiefenprüfung 31.10.2026, 18:15
+- Statisch: alle 46 Serveraufrufe der Oberfläche haben eine Funktion in `api()`; Syntax Code.gs und Oberflächen-JS ok; UI-Tests FEHLER 0.
+- Mail-Abruf und alle Hilfsfunktionen gegenüber dem alten Code unverändert. Auslöser: `mailsAbholen` (:09/:39) und `suchVorrat` (alle 5 Min.) – beide Funktionen vorhanden.
+- Ausführungsprotokoll seit der Umstellung: alle Läufe «Abgeschlossen» (u.a. mailsAbholen 18:09, 3.9 s). Kein Log-Eintrag ohne neue Mails ist normal.
+- Echter Gebrauch: Verkaufsbericht 17:54 eingelesen, «0 neu, 6 bekannt» (keine Doppelten). Cockpit lädt in 3–6 s (erster Aufruf nach Bereitstellung bis 17 s).
+- Daten: Listings, Verkäufe, Posteingang, Gebote unverändert gegenüber der Sicherung.
+- Oberflächen-Paket nach Feedback Jonas (Stufentexte weg, Stand pro Quelle im Knopf, To-dos unter Verwaltung, Hinweis «Mail fehlt» im Reporting weg, Suchtext beim Wechsel leeren): im Live-Editor gespeichert (Index 281824 / 2997902977), im Test als Version 9 bereitgestellt. **Live noch nicht bereitgestellt** (Bereitstellen von der Sicherheitsprüfung gestoppt) – die Web-App läuft weiter auf Version 39. Der Servercode ist identisch, die Auslöser betrifft das nicht.
+- apps/ricardo-test/build_index.py baut jetzt aus Index_basis_alt.html (alte Oberfläche, Tag ricardo-live-vor-cockpit-2026-10-31).

@@ -7,7 +7,7 @@
      ====================================================================== */
   Object.assign(T, {
     'nav.cockpit': ['Cockpit', 'Cockpit'], 'nav.todos': ['To-dos', 'To-dos'], 'nav.listing': ['Listing starten', 'Start listing'], 'nav.zahlen': ['Reporting', 'Reporting'], 'nav.einst': ['Einstellungen', 'Settings'],
-    'c.such.platz': ['PG-ID, Titel, Käufer oder Verkaufsnummer', 'PG-ID, title, buyer or sale number'],
+    'c.such.platz': ['PG-ID, Titel, Käufer, Verkaufs-Nr.', 'PG-ID, title, buyer, sale no.'],
     'c.bericht': ['Verkaufsbericht einlesen', 'Import sales report'], 'c.bank': ['Bank-Export einlesen', 'Import bank export'], 'c.listing': ['Listing starten', 'Start listing'],
     'c.stand': ['Mails {0} · Verkaufsbericht {1} · Bank-Export {2}', 'Mails {0} · sales report {1} · bank export {2}'], 'c.nie': ['noch nie', 'never'],
     'c.s.bereit': ['Bereit', 'Ready'], 'c.s.online': ['Online', 'Online'], 'c.s.verkauft': ['Verkauft', 'Sold'], 'c.s.bezahlt': ['Bezahlt', 'Paid'], 'c.s.versendet': ['Versendet', 'Shipped'],
@@ -58,7 +58,7 @@
     'c.p.bericht.letzter': ['Letzter Bericht: {0}', 'Last report: {0}'], 'c.p.post': ['Adressliste für die Post (ohne Etiketten aus dem Tool)', 'Address list for Swiss Post (without labels from the tool)'],
     'c.mail.aus': ['Die Ricardo-Mails werden nicht gelesen (Einstellungen › Betrieb).', 'The Ricardo mails are not read (Settings › Operations).'],
     'c.mail.still': ['Seit {0} keine Ricardo-Mail mehr: Benachrichtigungen, care@ und Gmail-Filter prüfen.', 'No Ricardo mail since {0}: check notifications, care@ and the Gmail filter.'],
-    'c.tun': ['Zu tun', 'To do'], 'c.mails': ['Mails jetzt prüfen', 'Check mails now'], 'c.s.aufgabe': ['Ohne Stück', 'No item'], 'c.tun.leer': ['Nichts zu tun.', 'Nothing to do.'], 'c.tun.alle': ['Alle', 'All'], 'c.th.tun': ['Zu tun', 'To do'],
+    'c.tun': ['Zu tun', 'To do'], 'c.mails': ['Mails prüfen', 'Check mails'], 'c.zuletzt': ['zuletzt {0}', 'last {0}'], 'c.s.aufgabe': ['Ohne Stück', 'No item'], 'c.tun.leer': ['Nichts zu tun.', 'Nothing to do.'], 'c.tun.alle': ['Alle', 'All'], 'c.th.tun': ['Zu tun', 'To do'],
     'c.sub.todos': ['Alles, was heute dran ist, über alle Stufen. Ein Klick auf eine Zeile öffnet die Handlung. Filter: eine Art von Aufgabe.', 'Everything due today across all stages. Click a row to open the action. Filter: one kind of task.'],
     'c.ende': ['Ende {0}', 'End {0}'], 'c.ende.so': ['Alle Auktionen enden am {0}: Laufzeit auf Ricardo so wählen, dass das Ende dort steht ({1} Tage).', 'All auctions end on {0}: choose the duration on Ricardo so that it ends then ({1} days).'],
     'c.p.reakt': ['Auf Ricardo neu einstellen', 'List again on Ricardo'],
@@ -246,13 +246,14 @@
   function cpMails() { ruf('mailsJetzt', [], function (a) { AU = a; if (CP) { CP.aufgaben = a; zeichneCockpit(); } }); }
   function cpTun(k) { CPT = CPT === k ? null : k; CPQ = null; CPP = null; zeichneCockpit(); }
   /* To-dos als eigener Reiter (Feedback 31.10.): dieselbe Seite, andere Sicht */
-  function zeigeTodos() { CPM = 'todos'; CPQ = null; CPP = null; zeige('cockpit'); }
-  function zeigeCockpit() { CPM = 'cockpit'; CPT = null; CPQ = null; CPP = null; zeige('cockpit'); }
+  function zeigeTodos() { CPM = 'todos'; CPQ = null; CPP = null; if ($('cp-q')) $('cp-q').value = ''; zeige('cockpit'); }
+  function zeigeCockpit() { CPM = 'cockpit'; CPT = null; CPQ = null; CPP = null; if ($('cp-q')) $('cp-q').value = ''; zeige('cockpit'); }
 
   function zeichneCockpit() {
     if (!CP) return;
     var k = CP.aufgaben && CP.aufgaben.kontrolle, h = '';
-    $('cp-stand').innerHTML = esc(t('c.stand', k && k.letzte ? k.letzte : '–', CP.letzterImport || t('c.nie'), CP.letzteBank || t('c.nie'))) + ' <button class="klein-knopf" onclick="cpMails()">' + esc(t('c.mails')) + '</button>';
+    var kurz = function (x) { return x ? t('c.zuletzt', String(x).replace(/\.(\d{4})\b/, '.')) : t('c.nie'); };
+    $('cp-d-mails').textContent = kurz(k && k.letzte); $('cp-d-bericht').textContent = kurz(CP.letzterImport); $('cp-d-bank').textContent = kurz(CP.letzteBank);
     if (k && !k.aktiv) h += '<div class="meldung warn">' + t('c.mail.aus') + '</div>';
     else if (k && k.warnung) h += '<div class="meldung warn">' + t('c.mail.still', esc(k.letzte)) + '</div>';
     if (k && k.unecht) h += '<div class="meldung warn">' + t('a.unecht', k.unecht) + '</div>';
@@ -272,7 +273,7 @@
     $('cp-tun').hidden = !todos; $('cp-chips').hidden = todos;
     $('cp-tun').innerHTML = alleTun.length ? tunChips : '<span class="still">' + esc(t('c.tun.leer')) + '</span>';
     $('cp-chips').innerHTML = CP_STUFEN.map(function (s) { return '<button class="chip' + (s === CPS && !CPQ ? ' an' : '') + '" onclick="cpStufe(\'' + s + '\')">' + esc(t('c.s.' + s)) + ' <span class="zahl">' + cpZahl(s) + '</span></button>'; }).join('');
-    $('cp-sub').textContent = CPQ ? '' : todos ? t('c.sub.todos') : t('c.sub.' + CPS);
+    $('cp-sub').textContent = '';   // Feedback Jonas 31.10.2026: keine Beschreibungstexte unter den Chips («verwirren nur»)
     var l = CPQ ? CPQ.zeilen : todos ? (CPT ? tunZeilen(alle, CPT) : alleTun) : cpZeilen(CPS), kopf = CPQ ? ['c.th.stueck', 'c.th.titel', '', '', '', ''] : todos ? ['c.th.stueck', 'c.th.titel', 'c.th.stufe', 'c.th.tun'] : CP_KOPF[CPS];
     if (CPQ) $('cp-sub').innerHTML = esc(t('c.treffer', l.length)) + ' <button class="klein-knopf" onclick="cpSucheZu()">' + esc(t('c.such.zu')) + '</button>';
     $('cp-liste').innerHTML = l.length ? '<div class="tabelle"><table><tr>' + kopf.map(function (x) { return '<th>' + (x ? esc(t(x)) : '') + '</th>'; }).join('') + '<th></th></tr>'
