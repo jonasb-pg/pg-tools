@@ -39,3 +39,4 @@ Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Kno
 - PG-22902 (Feiyu): Ricardo «nicht verkauft» 29.10., im Tool noch «Gelistet» (Mail fehlte) → im Panel «Nicht verkauft» bestätigen.
 - PG-18036 (Tamron): Ricardo-Angebot «nicht verkauft» 15.10., im Tool Verkauf 54000061 versendet – vermutlich Preisvorschlag nach Ablauf.
 - Übrige «Nicht verkauft» auf Ricardo stimmen mit dem Tool überein.
+- 18:30 (Go Jonas): die 8 wieder laufenden Angebote im Listings-Tab auf «Gelistet» gesetzt (Zeilen 51, 73, 92, 96, 112, 113, 120, 124): Gelistet am = Ricardo-Ende minus 7 Tage, Laufzeit Tage 7, Bearbeitet von «Abgleich Ricardo 31.10. (Claude)», Log-Eintrag. Cockpit danach: Online 8, Nicht verkauft 36, RC-0027 mit Gebot CHF 40.00.
