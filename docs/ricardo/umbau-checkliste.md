@@ -91,3 +91,6 @@ Feedback Jonas 31.10. (FEEDBACK TOOLS, Zeilen 32–59, Status mit Version vermer
 - Für die Übernahme ins Live-Tool zusätzlich nötig (Code.gs): `cockpit()`, `cockpitSuche()`/`sucheAlles_()`, api-Map, `idInTab_()` + Änderung in `findeQuelle_`/`imArchiv_`, `auktionsende_()`/`zoneOffset_()`/`laufzeitNeu_()`, DEFAULTS-Zeile «Auktionsende», `ANALYSE_MERKEN_SEK = 300`, startDaten.auktionsende; TEST-Schalter und `testVorratEinrichten` nicht.
 
 - V5 (17:09): `auktionsende_()` gibt `ms` statt eines Date-Objekts zurück. Regel: Rückgaben an die Oberfläche dürfen keine Date-Objekte enthalten, sonst bleibt google.script.run stumm hängen (kein Fehler, keine Antwort) – Einstellung «Auktionsende» im Testsheet (Zeile 32) eingetragen.
+
+## Live (31.10.2026, 17:48)
+Version 39 bereitgestellt (Rückfall Version 38). Details und Prüfungen: sicherung-2026-10-31.md.

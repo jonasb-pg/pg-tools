@@ -5,7 +5,7 @@
  * Einmalig: Funktion "einrichten" ausführen. Danach als Web-App bereitstellen.
  */
 
-const VERSION = '2026-10-30.1';
+const VERSION = '2026-10-31.1';
 const TAB_L = 'Listings', TAB_E = 'Einstellungen', TAB_V = 'Versand', TAB_LOG = 'Log', TAB_S = 'Verkäufe', TAB_P = 'Post-Adressen', TAB_W = 'Wochenübersicht', TAB_R = 'Retouren', TAB_A = 'Auszahlungen', TAB_D = 'Doku', TAB_I = 'Posteingang', TAB_F = 'Feedback';
 const TZ = 'Europe/Zurich';
 
@@ -87,7 +87,8 @@ const DEFAULTS = [
   ['Analyse Tool ID', ANALYSE_ID, 'ANALYSE TOOL: Tab «Ricardo» mit den analysierten Stücken (Titel, Beschrieb, Zustand, Preis, Versand, Fotos). Wird nur gelesen, nie beschrieben'],
   ['Such-Tabs', 'Online', 'Tabs im Return Tool, aus denen gelistet werden darf (Komma-getrennt)'],
   ['Hinweis-Tabs', HINWEIS_TABS, 'Übrige Kanal-Tabs im Return Tool. Werden immer mitdurchsucht und mit Tab und Lagerort angezeigt. Listen nur nach Bestätigung («Trotzdem listen»). Neue Kanal-Tabs (Spalten ID und Bezeichnung) und «Scanner» sucht das Tool auch ohne Eintrag hier mit. Tabs «Archiv …» sucht das Tool selbst, Treffer dort sind gesperrt. Fehlt ein Tab, der hier steht, meldet die Suche einen Fehler.'],
-  ['Laufzeit Tage', 6, 'Vorschlag für die Laufzeit der Auktion. Beim Listen kann man pro Angebot eine andere Laufzeit eintragen (Spalte «Laufzeit Tage» im Tab «Listings»).'],
+  ['Laufzeit Tage', 6, 'Nur noch Reserve: gilt, wenn «Auktionsende» leer oder unlesbar ist. Die Laufzeit rechnet das Tool beim Listen aus dem Auktionsende (Spalte «Laufzeit Tage» im Tab «Listings»).'],
+  ['Auktionsende', 'Donnerstag 19:00', 'Wochentag und Uhrzeit, an dem alle Auktionen enden (Entscheid Jonas 21.10.2026). Beim Listen zeigt das Tool das nächste Ende, das mindestens einen Tag entfernt ist, und rechnet die Laufzeit daraus.'],
   ['Versandsatz', 'Versand ausschliesslich per Post, keine Abholung.', 'Steht in jedem Beschrieb'],
   ['Post Frankierlizenz', '60162228', 'Frankierlizenz Pakete Inland für die Etiketten (Barcode API der Post). Zugang: Script-Eigenschaften POST_CLIENT_ID und POST_CLIENT_SECRET'],
   ['Etiketten-Format', 'PDF', 'PDF (Vorgabe) = Etikette als PDF-Datei (A6, 300 dpi) im Download-Ordner. ZPL = Etikette für den Zebra ZD220 (A6, 200 dpi), druckt direkt über «Zebra Browser Print». Erst auf ZPL stellen, wenn ein Testdruck aus der echten Web-App geklappt hat. Seiten, die vor der Umstellung geöffnet wurden, bekommen immer PDF.'],
@@ -428,7 +429,7 @@ function startDaten() {
   return {
     version: VERSION, admin: istAdmin_(),
     zustaende: ZUSTAENDE, maengelPflicht: MAENGEL_PFLICHT,
-    laufzeit: Number(cfg_('Laufzeit Tage')) || 6,
+    laufzeit: Number(cfg_('Laufzeit Tage')) || 6, auktionsende: String(cfg_('Auktionsende') || ''),
     retoureGruende: RETOURE_GRUENDE,
     kiAktiv: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY'),
     mailAktiv: !!PropertiesService.getScriptProperties().getProperty(MAIL_KONTO),
@@ -801,7 +802,9 @@ function kopfZeile_(vals, barcodeReicht) {
  * Das ANALYSE TOOL zu öffnen und zu lesen kostet 2 bis 3 s. Für Listen und Suche gilt eine Kopie von höchstens ANALYSE_MERKEN_SEK Sekunden;
  * wer ein Stück daraus listet, bekommt immer die frischen Angaben (findeAnalyse_). Pro Aufruf wird höchstens einmal frisch gelesen.
  */
-const ANALYSE_MERKEN_SEK = 60;
+/* Tempo (Feedback Jonas 31.10.2026, «immer noch sehr langsam»): 60 → 300 s. Der Auslöser «suchVorrat» liest ohnehin alle 5 Minuten frisch;
+   wer listet, liest immer frisch (findeAnalyse_). Dazwischen reicht die Kopie: analyseListe 7–10 s → unter 2 s. */
+const ANALYSE_MERKEN_SEK = 300;
 let ANALYSE_FRISCH = null;
 /* lang = true (nur Suche): sonst die Kopie des Auslösers «suchVorrat» (höchstens 15 Minuten). Prüfung 17: Ein Stück, das darin fehlt, findet die Suche
    im Return Tool (Tab «Analyse» o.ä.); auch der zweite Durchgang liest die Analyse nicht frisch. Der Start liest die Analyse immer frisch (findeAnalyse_). */
@@ -983,16 +986,60 @@ function findeQuelle_(id, auchAndere, nurFrisch, meldungen) {
     });
     return q;
   };
-  if (nurFrisch) return such(true);
+  if (nurFrisch) {
+    /* Tempo (31.10.2026): frisch heisst nicht mehr «jeden Tab ganz lesen» (rund 25 s), sondern zuerst nur die ID-Spalte jedes Tabs (idInTab_),
+       und ganz nur den Tab, in dem die Nummer steht. Gelesen wird direkt im Return Tool, nie aus dem Zwischenspeicher. */
+    let q = null;
+    tabs.forEach(function (tab) {
+      if (q) return;
+      const hart = t.such.indexOf(tab) !== -1;
+      if (!idInTab_(src, tab, ziel, meldungen || null, hart)) return;
+      const m = quelleSicher_(src, tab, true, meldungen || null, hart).filter(function (r) { return r.id && idNorm_(r.id) === ziel; });
+      if (m.length) q = m[0];
+    });
+    return q;
+  }
   const gemerkt = such(false);
   return gemerkt && !gemerkt.schlank ? gemerkt : such(true);             // nicht (ganz) in der gemerkten Kopie: frisch nachsehen
 }
-/** Tab «Archiv …» des Return Tools, in dem das Stück steht (frisch gelesen), sonst ''. */
+/**
+ * Steht die Nummer (normalisiert) in der ID-Spalte des Tabs? Liest nur Kopf (12 Zeilen) und ID-Spalte: unter 1 s statt 3 bis 9 s pro Tab.
+ * Gleiche Regeln wie leseQuelle_: Kopfzeile in den ersten 12 Zeilen; Archiv ohne Kopf = einmal täglich melden, zählt als «nicht drin»;
+ * hart (Such-Tabs) wirft Fehler, sonst Meldung in meldungen und false.
+ */
+function idInTab_(src, tab, ziel, meldungen, hart) {
+  try {
+    const sh = src.tab(tab).getSheetByName(tab);
+    if (!sh) throw new Error('Return Tool: Den Tab «' + tab + '» gibt es nicht. Einstellungen «Such-Tabs» und «Hinweis-Tabs» prüfen.');
+    const n = sh.getLastRow();
+    if (n < 1) return false;
+    const kopfZeilen = sh.getRange(1, 1, Math.min(12, n), Math.max(1, sh.getLastColumn())).getValues(), h = kopfZeile_(kopfZeilen, true);
+    if (h === -1) {
+      if (istArchiv_(tab)) {
+        einmalProTag_('archivkopf:' + tab, 'Return Tool', 'Tab «' + tab + '» heisst «Archiv…», hat aber keine Kopfzeile (Spalten ID und Bezeichnung in den ersten 12 Zeilen). Wird übersprungen.');
+        archivOhneKopf_(tab, true);
+        return false;
+      }
+      if (tabArt_(tab) === 'extra') return false;                        // kein Kanal-Tab
+      throw new Error('Return Tool: Im Tab «' + tab + '» fehlt die Kopfzeile (Spalten Bezeichnung und ID in den ersten 12 Zeilen).');
+    }
+    if (istArchiv_(tab)) archivOhneKopf_(tab, false);
+    const ci = kopfZeilen[h].map(function (x) { return String(x).trim(); }).indexOf('ID');
+    if (ci === -1 || n <= h + 1) return false;
+    return sh.getRange(h + 2, ci + 1, n - h - 1, 1).getValues().some(function (r) { return idNorm_(r[0]) === ziel; });
+  } catch (err) {
+    if (hart) throw err;
+    const m = 'Tab «' + tab + '» nicht lesbar: ' + String(err.message || err).replace(/^Return Tool: /, '');
+    if (meldungen && meldungen.indexOf(m) === -1) meldungen.push(m);
+    return false;
+  }
+}
+/** Tab «Archiv …» des Return Tools, in dem das Stück steht (frisch gelesen, nur ID-Spalten), sonst ''. */
 function imArchiv_(id, meldungen) {
   const src = rtQuelle_(), ziel = idNorm_(id);
   let tab = '';
   rtTabs_(src, true).archiv.forEach(function (t) {
-    if (!tab && quelleSicher_(src, t, true, meldungen || null, false).some(function (r) { return r.id && idNorm_(r.id) === ziel; })) tab = t;
+    if (!tab && idInTab_(src, t, ziel, meldungen || null, false)) tab = t;
   });
   return tab;
 }
@@ -1499,6 +1546,38 @@ function kiText_(rec) {
 
 /** Laufzeit eines Angebots in Tagen: eigener Wert im Listing, sonst die Einstellung (Entscheid Jonas 19.10.2026: Laufzeiten sind nicht immer 6 Tage). */
 function laufzeitVon_(wert, standard) { const n = Number(wert); return n >= 1 && n <= 30 ? n : (Number(standard) || 6); }
+/*
+ * Auktionsende (Feedback Jonas 31.10.2026): Alle Auktionen enden am gleichen Wochentag zur gleichen Zeit (Einstellung «Auktionsende», z.B. «Donnerstag 19:00»).
+ * Das nächste Ende, das mindestens MIN_LAUFZEIT_STUNDEN entfernt ist; die Laufzeit in Tagen (aufgerundet) kommt in «Laufzeit Tage».
+ * Ist die Einstellung leer oder unlesbar: null, dann gilt «Laufzeit Tage» wie bisher.
+ */
+const WOCHENTAGE = ['sonntag', 'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag'], MIN_LAUFZEIT_STUNDEN = 24;
+function auktionsende_(ab) {
+  const m = /^([a-zäö]+)\s+(\d{1,2})[:.](\d{2})$/i.exec(String(cfg_('Auktionsende') || '').trim());
+  if (!m) return null;
+  const wt = WOCHENTAGE.indexOf(m[1].toLowerCase()), hh = Number(m[2]), mi = Number(m[3]);
+  if (wt === -1 || !(hh >= 0 && hh < 24) || !(mi >= 0 && mi < 60)) return null;
+  const jetzt = ab instanceof Date ? ab : new Date();
+  const heute = Utilities.formatDate(jetzt, TZ, 'yyyy-MM-dd'), wtHeute = Number(Utilities.formatDate(jetzt, TZ, 'u')) % 7;   // u: 1 = Montag … 7 = Sonntag
+  let ende = null;
+  for (let d = (wt - wtHeute + 7) % 7; d <= 14 && !ende; d += 7) {
+    const tag = Utilities.formatDate(new Date(new Date(heute + 'T12:00:00Z').getTime() + d * 86400000), 'UTC', 'yyyy-MM-dd');   // Datum des Kandidaten
+    const kand = new Date(tag + 'T' + ('0' + hh).slice(-2) + ':' + ('0' + mi).slice(-2) + ':00' + zoneOffset_(tag));          // Offset an jenem Tag (Sommer-/Winterzeit)
+    if (kand.getTime() - jetzt.getTime() >= MIN_LAUFZEIT_STUNDEN * 3600000) ende = kand;
+  }
+  if (!ende) return null;
+  const kurz = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][wt];
+  /* Nur Zahlen und Text: Date-Objekte kann google.script.run nicht übertragen (der Aufruf bliebe stumm hängen) */
+  return { ms: ende.getTime(), tage: Math.max(1, Math.ceil((ende.getTime() - jetzt.getTime()) / 86400000)), text: kurz + ' ' + Utilities.formatDate(ende, TZ, 'dd.MM.yyyy HH:mm') };
+}
+/** Offset der Zeitzone TZ an einem Tag, als «+01:00» (für Date-Strings). */
+function zoneOffset_(tag) { const z = Utilities.formatDate(new Date(tag + 'T12:00:00Z'), TZ, 'XXX'); return z === 'Z' ? '+00:00' : z; }
+/** Laufzeit in Tagen für ein Listing: vom Auktionsende, sonst «Laufzeit Tage». */
+function laufzeitNeu_(tage) {
+  if (tage !== undefined && tage !== '' && tage !== null) return laufzeitVon_(tage, cfg_('Laufzeit Tage'));
+  const a = auktionsende_();
+  return a ? Math.min(30, a.tage) : laufzeitVon_('', cfg_('Laufzeit Tage'));
+}
 
 /*
  * 24.10.2026 (Prüfung 1, 6): «Gelistet» nur aus «In Arbeit» oder «Bereit». Ist das Listing schon «Gelistet» mit derselben Artikel-Nr, war es ein zweiter
@@ -1542,7 +1621,7 @@ function markiereGelistet(id, link, tage, bestaetigt) {
     const va = artikelAusLink_(vorher), schonDa = fr.indexOf(vorher) !== -1 || (!!va && fr.map(artikelAusLink_).indexOf(va) !== -1);
     if (vorher && va !== a.artikel && !schonDa) rec['Frühere Links'] = fr.concat([vorher]).join('\n');
     rec['Status'] = 'Gelistet'; rec['Ricardo-Link'] = a.link; rec['Gelistet am'] = new Date(); rec['Bearbeitet von'] = nutzer_();
-    rec['Laufzeit Tage'] = laufzeitVon_(tage, cfg_('Laufzeit Tage')); rec['Entscheid unverkauft'] = '';
+    rec['Laufzeit Tage'] = laufzeitNeu_(tage); rec['Entscheid unverkauft'] = '';
     schreibe_(sh, zeile, rec, true);
     log_('Gelistet', id, a.link);
   } finally { lock.releaseLock(); }
@@ -2163,6 +2242,8 @@ function iban_(s) {
 }
 
 /** Ein Verkauf für die Oberfläche. Prüfung Z10: lagerort = Regal nach Status (Lager-Ablauf), der Lagerort aus dem Return Tool nur als Hinweis (rtOrt). */
+/** Adresse aus dem Verkauf als eine Zeile (Strasse Nr, Postfach, PLZ Ort) – Vorschlag für die Retoure, von Hand überschreibbar (Jonas 31.10.2026). */
+function adresseZeile_(v) { return [[v['Strasse'], v['Hausnummer']].join(' ').trim(), v['Postfach'] ? 'Postfach ' + v['Postfach'] : '', [v['PLZ'], v['Ort']].join(' ').trim()].filter(String).join(', '); }
 function vZeile_(v) {
   return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID']), titel: v['Titel'], am: datum_(v['Verkauft am']),
     total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
@@ -3144,7 +3225,7 @@ function api(lang, name, args) {
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus,
-    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen }[name];
+    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen, cockpit: cockpit, cockpitSuche: cockpitSuche }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
   const t0 = Date.now();
@@ -3531,8 +3612,8 @@ function feedbackStatus(r, text, status) {
   return feedbackListe();
 }
 
-function adminSuche(q) {
-  pruefeAdmin_();
+function adminSuche(q) { pruefeAdmin_(); return sucheAlles_(q); }
+function sucheAlles_(q) {
   const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
   const passt = function (text) { text = text.toLowerCase(); return woerter.every(function (w) { return text.indexOf(w) !== -1; }); };
   const ss = SpreadsheetApp.getActive(), sl = ss.getSheetByName(TAB_L), sv = ss.getSheetByName(TAB_S);
@@ -3547,6 +3628,7 @@ function adminSuche(q) {
     const v = {}; V_COLS.forEach(function (k, j) { v[k] = row[j]; });
     if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Nachname']].join(' '))) return;
     const z = vZeile_(v); z.zeile = i + 2;
+    if (v['Status'] === 'Bezahlt und versendet') { z.adresse = adresseZeile_(v); z.versendetAm = datum_(v['Bezahlt und versendet am']); }
     z.storno = V_OFFEN.indexOf(v['Status']) !== -1;                                     // Prüfung 5 / Nach-Review 3: nicht versendet (bezahlt: mit Rückfrage)
     z.zuordnen = !String(v['PG-ID'] || '').trim() && ['Storniert', 'Retourniert'].indexOf(v['Status']) === -1;   // Prüfung 4
     verk.push(z);
@@ -3707,7 +3789,7 @@ function retouren() {
     const frist = vk instanceof Date ? new Date(vk.getTime() + RICARDO_FRIST_TAGE * 86400000) : null;
     return { nr: String(r['Retoure-Nr']), verkauf: String(r['Verkauf-Nr']), pgId: String(r['PG-ID']), titel: r['Titel'], kaeufer: String(r['Käufer']), name: String(r['Name']),
       eroeffnet: datum_(r['Eröffnet am']), grund: r['Grund'], notiz: r['Notiz'], iban: String(r['IBAN']),
-      betrag: runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)).toFixed(2),
+      betrag: (!r['Rückzahlung am'] && Number(r['Rückzahlung CHF']) > 0 ? runde_(Number(r['Rückzahlung CHF'])) : runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0))).toFixed(2),
       rueckzahlung: r['Rückzahlung am'] ? Number(r['Rückzahlung CHF']).toFixed(2) : '', rueckzahlungAm: datum_(r['Rückzahlung am']),
       stornoLink: r['Verkauf-Nr'] ? RICARDO_ORDER + 'cancelation/' + orderNr_(r['Verkauf-Nr']) + '/' : '',
       ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null,
@@ -3734,7 +3816,9 @@ function retoureSuche(q) {
   return out.reverse().slice(0, 20);
 }
 
-function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
+/* Feedback Jonas 31.10.2026: Betrag der Rückzahlung schon beim Eröffnen von Hand (Vorschlag Preis + Porto). Leer = Preis + Porto wie bisher.
+   Gemerkt in «Rückzahlung CHF» ohne «Rückzahlung am»: der Schritt Rückzahlung ist damit nicht erledigt, nur der Betrag vorgeschlagen. */
+function retoureEroeffnen(nr, grund, notiz, iban, adresse, betragHand, bestaetigt) {
   nr = String(nr).trim();
   if (RETOURE_GRUENDE.indexOf(grund) === -1) throw new Error('Bitte einen Grund wählen.');
   iban = iban_(iban);
@@ -3751,6 +3835,13 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
     const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (v['Status'] !== 'Bezahlt und versendet') throw new Error('Eine Retoure ist nur bei einem bezahlten und versendeten Verkauf möglich (Status: «' + v['Status'] + '»).');
+    const hoechstens = runde_((Number(v['Preis CHF']) || 0) + (Number(v['Versand CHF']) || 0));
+    let betrag = '';
+    if (betragHand !== undefined && betragHand !== null && String(betragHand).trim() !== '') {
+      betrag = runde_(zahl_(betragHand));
+      if (!(betrag > 0)) throw new Error('Bitte einen Rückzahlungsbetrag eingeben.');
+      if (hoechstens > 0 && betrag > hoechstens && bestaetigt !== true) throw new Error('Bitte bestätigen: Die Rückzahlung (CHF ' + betrag.toFixed(2) + ') ist mehr als Preis und Porto (CHF ' + hoechstens.toFixed(2) + '), z.B. Rückporto?');
+    }
     let max = 0;
     rZeilen_().forEach(function (x) { const m = /^RT-(\d+)$/.exec(String(x['Retoure-Nr'])); if (m) max = Math.max(max, Number(m[1])); });
     r = {}; R_COLS.forEach(function (k) { r[k] = ''; });
@@ -3759,6 +3850,7 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
     r['Grund'] = grund; r['Notiz'] = text_(notiz, 500);
     r['Preis CHF'] = v['Preis CHF']; r['Versand CHF'] = v['Versand CHF']; r['Provision CHF'] = v['Provision CHF']; r['Eröffnet von'] = nutzer_();
     r['IBAN'] = iban; r['Adresse'] = adresse; r['PLZ'] = v['PLZ']; r['Ort'] = v['Ort'];
+    if (betrag !== '') r['Rückzahlung CHF'] = betrag;
     rt.appendRow(R_COLS.map(function (k) { return r[k]; }));
     sv.getRange(zeile, V_COLS.indexOf('Status') + 1).setValue('Retourniert');
     const pg = String(v['PG-ID']).trim();
@@ -3783,10 +3875,11 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
 function rueckzahlungMail_(r) {
   const an = String(cfg_('Rückzahlungen an') || '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(an)) { log_('Rückzahlungs-Mail', String(r['PG-ID']), 'Keine gültige Adresse in «Rückzahlungen an»'); return { ok: false, an: an }; }
-  const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), betrag = runde_(preis + porto).toFixed(2);
+  const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), hand = Number(r['Rückzahlung CHF']) > 0;
+  const betrag = (hand ? runde_(Number(r['Rückzahlung CHF'])) : runde_(preis + porto)).toFixed(2);
   const zeilen = [
     'Bitte diese Rückzahlung (Retoure Ricardo) ausführen:', '',
-    'Betrag: CHF ' + betrag + ' (Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')',
+    'Betrag: CHF ' + betrag + (hand && Number(betrag) !== runde_(preis + porto) ? ' (von Hand; Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')' : ' (Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')'),
     'Name: ' + (r['Name'] || r['Käufer']),
     'Adresse: ' + r['Adresse'] + ', ' + String(r['PLZ'] || '') + ' ' + String(r['Ort'] || ''),
     'IBAN: ' + r['IBAN'],
@@ -3973,6 +4066,48 @@ function ablauf(art) {
       regale: { unpaid: regal_('Verkauft') } };
   }
   throw new Error('Unbekannter Ablauf.');
+}
+
+/* ---------- Cockpit (Umbau 30.10.2026): alle Stufen in einem Aufruf ----------
+   Bereit → Online → Verkauft → Bezahlt → Versendet, Nebenausgänge Nicht verkauft, Retouren, Storniert.
+   Setzt die bestehenden Funktionen zusammen; schreibt nichts.
+   Tempo (Feedback Jonas 31.10.2026): ohne die Analyse-Liste (externes Sheet, 7–11 s) – die holt die Oberfläche parallel über analyseListe(). */
+function cockpit() {
+  const jetzt = Date.now(), pr = PropertiesService.getScriptProperties();
+  const ls = alleListings_(), lz = Number(cfg_('Laufzeit Tage')) || 6, aktiv = aktiveNummern_(ls);
+  const bereit = ls.filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
+    const a = artikelAusLink_(r['Ricardo-Link']);
+    return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], regal: regal_(r['Status']), wieder: r['Entscheid unverkauft'] === 'Neu listen',
+      link: r['Ricardo-Link'] || '', kopieren: a ? RICARDO_LISTEN + '?prefill=' + a : '' };
+  });
+  const unverkauft = ls.filter(function (r) { return entscheidOffen_(r, aktiv); }).map(function (r) {
+    const a = artikelAusLink_(r['Ricardo-Link']);
+    return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], artikel: a, kopieren: a ? RICARDO_LISTEN + '?prefill=' + a : '' };
+  });
+  const ohneMail = ls.filter(function (r) {
+    return r['Status'] === 'Gelistet' && r['Gelistet am'] instanceof Date && r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz) * 86400000 < jetzt;
+  }).map(function (r) { return { id: String(r['PG-ID']), name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], ende: datum_(new Date(r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz) * 86400000)) }; });
+  const tg = ablauf('taeglich'), vk = verkaeufe(), ue = uebersicht(), rt = retouren();
+  const grenze = jetzt - 60 * 86400000;
+  const versendet = alleVerkaeufe_().filter(function (v) { return v['Status'] === 'Bezahlt und versendet' && v['Bezahlt und versendet am'] instanceof Date && v['Bezahlt und versendet am'].getTime() >= grenze; })
+    .map(function (v) { const o = vZeile_(v); o.versendetAm = datum_(v['Bezahlt und versendet am']); o.versendetMs = v['Bezahlt und versendet am'].getTime(); o.adresse = adresseZeile_(v); return o; })
+    .sort(function (a, b) { return b.versendetMs - a.versendetMs; });
+  return { bereit: bereit, analyse: null, online: ue.liste, verkauft: vk.offen, versendet: versendet,
+    nichtverkauft: unverkauft.filter(function (x) { return x.status !== 'Storniert'; }), ohneMail: ohneMail,
+    storniert: unverkauft.filter(function (x) { return x.status === 'Storniert'; }),
+    retouren: rt.offen, retourenAbgeschlossen: rt.abgeschlossen, retoureGruende: RETOURE_GRUENDE,
+    aufgaben: tg.aufgaben, melden: tg.melden, storno: tg.storno, offenZahlung: tg.offen, doppelt: tg.doppelt, stornoTage: tg.stornoTage, letzteBank: tg.letzteBank,
+    letzterImport: ue.letzterImport, unzugeordnet: ue.unzugeordnet, aktiv: ue.aktiv, schwelle: ue.schwelle, laufzeit: ue.laufzeit,
+    links: { listen: RICARDO_LISTEN, verkauft: RICARDO_VERKAUFT, amVerkaufen: RICARDO_AM_VERKAUFEN, artikel: RICARDO_A },
+    regale: { offline: regal_('Bereit'), online: regal_('Gelistet'), unpaid: regal_('Verkauft') }, entscheide: ENTSCHEIDE_UNVERKAUFT,
+    postBereit: !!(pr.getProperty('POST_CLIENT_ID') && pr.getProperty('POST_CLIENT_SECRET')), test: false, auktionsende: auktionsende_() };
+}
+/** Suche über alle Listings und Verkäufe für das Cockpit, ohne Admin-Pflicht (Löschen und Zuordnen bleiben im Admin). */
+function cockpitSuche(q) {
+  const a = sucheAlles_(q);
+  a.listings.forEach(function (l) { delete l.zeile; delete l.loeschbar; });
+  a.verkaeufe.forEach(function (v) { delete v.zeile; delete v.storno; delete v.zuordnen; });
+  return a;
 }
 
 /** Nummern (normalisiert) mit einer nicht freien Zeile, auch als Bündel-Teil. */
