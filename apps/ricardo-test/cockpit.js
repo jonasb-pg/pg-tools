@@ -268,7 +268,7 @@
     $('nav-todos').className = todos && ANSICHT === 'cockpit' ? 'an' : ''; $('nav-cockpit').className = !todos && ANSICHT === 'cockpit' ? 'an' : '';
     $('top-sub').textContent = t(todos ? 'nav.todos' : 'nav.cockpit');
     var tunChips = '<button class="chip' + (!CPT ? ' an' : '') + '" onclick="cpTun(null)">' + esc(t('c.tun.alle')) + ' <span class="zahl">' + alleTun.length + '</span></button>'
-      + CP_TUN.filter(function (k) { return tunZahl[k]; }).map(function (k) { return '<button class="chip' + (k === CPT ? ' an' : '') + '" onclick="cpTun(\'' + k + '\')">' + esc(t('c.t.' + k)) + ' <span class="zahl">' + tunZahl[k] + '</span></button>'; }).join('');
+      + CP_TUN.filter(function (k) { return tunZahl[k] || k === 'angebote'; }).map(function (k) { return '<button class="chip' + (k === CPT ? ' an' : '') + '" onclick="cpTun(\'' + k + '\')">' + esc(t('c.t.' + k)) + ' <span class="zahl">' + (tunZahl[k] || 0) + '</span></button>'; }).join('');   // Preisvorschläge immer sichtbar (Jonas 31.10.)
     $('cp-tun').hidden = !todos; $('cp-chips').hidden = todos;
     $('cp-tun').innerHTML = alleTun.length ? tunChips : '<span class="still">' + esc(t('c.tun.leer')) + '</span>';
     $('cp-chips').innerHTML = CP_STUFEN.map(function (s) { return '<button class="chip' + (s === CPS && !CPQ ? ' an' : '') + '" onclick="cpStufe(\'' + s + '\')">' + esc(t('c.s.' + s)) + ' <span class="zahl">' + cpZahl(s) + '</span></button>'; }).join('');
