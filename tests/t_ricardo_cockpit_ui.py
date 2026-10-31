@@ -6,13 +6,14 @@ from playwright.sync_api import sync_playwright
 html = (pathlib.Path(__file__).parent.parent / 'apps/ricardo-test/Index.html').read_text().replace('<?!= JSON.stringify(lang) ?>', '"de"')
 AUFGABEN = {'anzahl': 3, 'kontrolle': {'aktiv': True, 'letzte': '30.10.2026 08:38', 'warnung': False, 'unecht': 0},
             'angebote': [{'id': 'm1', 'pgId': 'PG-300', 'artikel': '1299001', 'titel': 'Pfanne 28 cm', 'betrag': '18.00', 'preis': '25.00', 'frist': '31.10. 20:00', 'restStunden': 20, 'empfehlung': 'Ablehnen', 'alter': 2, 'link': 'https://www.ricardo.ch/de/a/1299001/'}],
-            'fragen': [{'id': 'm2', 'pgId': 'PG-300', 'artikel': '1299001', 'titel': 'Garmin Rally', 'art': 'Frage', 'text': 'Induktion?', 'entwurf': 'Ja, geeignet.', 'von': 'mhuber', 'alter': 1, 'link': 'https://www.ricardo.ch/de/a/1299002/'}],
+            'fragen': [{'id': 'm2', 'pgId': 'PG-300', 'artikel': '1299001', 'titel': 'Garmin Rally', 'art': 'Frage', 'text': 'Induktion?', 'entwurf': 'Ja, geeignet.', 'von': 'mhuber', 'alter': 1, 'link': 'https://www.ricardo.ch/de/a/1299002/'}, {'id': 'm5', 'pgId': 'PG-401', 'artikel': '', 'nr': '54000001', 'titel': 'X', 'art': 'Nachricht', 'text': 'Hallo', 'entwurf': '', 'von': 'kaeufer1', 'alter': 2, 'link': 'https://www.ricardo.ch/de/a/1299005/'}],
             'zahlung': [{'nr': '54000002', 'pgId': 'PG-402', 'titel': 'Toner', 'kaeufer': 'L. Fischer', 'total': '23.80', 'tage': 8, 'meldet': '', 'entwurf': 'Bitte zahlen.', 'link': 'https://www.ricardo.ch/de/my-ricardo/selling/order/54000002/'}],
-            'bewertungen': []}
+            'bewertungen': [{'id': 'm3', 'pgId': 'PG-401', 'artikel': '', 'nr': '54000001', 'titel': 'X', 'art': 'Bewertung', 'entwurf': 'Danke!', 'von': 'kaeufer1', 'link': 'https://www.ricardo.ch/de/a/1299003/'}, {'id': 'm4', 'pgId': 'PG-405', 'artikel': '', 'nr': '54000005', 'titel': 'Y', 'art': 'Bewertung', 'entwurf': 'Danke!', 'von': 'kaeufer2', 'link': 'https://www.ricardo.ch/de/a/1299004/'}]}
 V = lambda nr, pg, titel, status, **k: dict({'nr': nr, 'pgId': pg, 'titel': titel, 'am': '29.10.2026', 'total': '100.00', 'preis': '90.00', 'status': status, 'name': 'M. Keller', 'kaeufer': 'mkeller', 'ort': '8002 Zürich',
     'lagerort': 'Ricardo Online', 'rtOrt': '', 'klasse': 'bis 2 kg', 'meldet': '', 'bezahlt': '', 'ricardoGemeldet': '', 'sendung': '', 'artikel': '1288' + nr[-3:], 'link': 'https://www.ricardo.ch/de/my-ricardo/selling/order/' + nr + '/', 'ohneAdresse': False}, **k)
 COCKPIT = {
-    'bereit': [{'id': 'PG-200', 'status': 'Bereit', 'name': 'Hue Bridge', 'ort': 'Ricardo Offline', 'regal': 'Ricardo Offline', 'wieder': True}],
+    'bereit': [{'id': 'PG-200', 'status': 'Bereit', 'name': 'Hue Bridge', 'ort': 'Ricardo Offline', 'regal': 'Ricardo Offline', 'wieder': True, 'link': 'https://www.ricardo.ch/de/a/hue-1299009/', 'kopieren': 'https://www.ricardo.ch/de/list/?prefill=1299009'}],
+    'auktionsende': {'text': 'Do 05.11.2026 19:00', 'tage': 6},
     'analyse': [{'id': 'PG-100', 'name': 'Toaster X', 'titel': 'Toaster X 2 Schlitze', 'zustand': 'Gebraucht', 'preis': 40, 'fotos': 5, 'ordner': 'https://drive.google.com/x', 'erfasst': '30.10.2026', 'mm': False}],
     'online': [{'id': 'PG-300', 'status': 'Gelistet', 'name': 'Pfanne 28 cm', 'ort': 'Ricardo Online', 'regal': 'Ricardo Online', 'link': 'https://www.ricardo.ch/de/a/1299001/', 'buendel': '', 'seit': '25.10.2026', 'gebot': {'keins': True}, 'laufzeit': 6, 'abgelaufen': False},
                {'id': 'PG-302', 'status': 'Gelistet', 'name': 'Hang it all', 'ort': 'Ricardo Online', 'regal': 'Ricardo Online', 'link': 'https://www.ricardo.ch/de/a/1299003/', 'buendel': '', 'seit': '20.10.2026', 'gebot': None, 'laufzeit': 6, 'abgelaufen': True}],
@@ -34,7 +35,7 @@ COCKPIT = {
 DATEN = {'startDaten': {'version': 't', 'admin': True, 'zustaende': ['Neu und originalverpackt', 'Gebraucht'], 'maengelPflicht': ['Gebraucht'], 'laufzeit': 6, 'retoureGruende': ['Defekt', 'Transportschaden', 'Falscher Artikel'], 'kiAktiv': False, 'mailAktiv': True, 'aktiv': 111, 'schwelle': 150, 'regale': COCKPIT['regale']},
          'cockpit': dict(COCKPIT, analyse=None), 'cockpitSuche': None, 'analyseListe': COCKPIT['analyse'], 'ablauf': {'art': 'schicht1', 'links': COCKPIT['links'], 'bereit': COCKPIT['bereit'], 'unverkauft': [], 'ohneMail': [], 'entscheide': COCKPIT['entscheide'], 'aktiv': 111, 'schwelle': 150, 'laufzeit': 6, 'regale': COCKPIT['regale']},
          'zaehler': {'zuPacken': 2, 'versand': 1, 'retouren': 1, 'offen': 4}, 'mailsJetzt': AUFGABEN, 'aufgaben': AUFGABEN,
-         'setzeVerkauf': {'offen': []}, 'aufgabeErledigt': dict(AUFGABEN, anzahl=2, angebote=[]), 'erinnerungErledigt': dict(AUFGABEN, anzahl=2, zahlung=[]), 'setzeStatus': {}, 'entscheidUnverkauft': {'art': 'schicht1'},
+         'setzeVerkauf': {'offen': []}, 'aufgabeErledigt': dict(AUFGABEN, anzahl=2, angebote=[]), 'erinnerungErledigt': dict(AUFGABEN, anzahl=2, zahlung=[]), 'setzeStatus': {}, 'entscheidUnverkauft': {'art': 'schicht1'}, 'markiereGelistet': {'id': 'PG-200', 'status': 'Gelistet'},
          'adresseVonHand': {'name': 'Praxis Am Bahnhof', 'ort': '3011 Bern', 'ohneAdresse': False, 'bezahlt': ''}, 'sendungSetzen': {'sendung': '99.00.9'}, 'verkaufStornieren': {},
          'retoureSchritt': {'offen': [], 'abgeschlossen': 4, 'entscheide': COCKPIT['entscheide'], 'auszahlungen': 0}, 'retoureEroeffnen': {'offen': [], 'abgeschlossen': 3, 'entscheide': [], 'auszahlungen': 1, 'mail': {'ok': True, 'an': 'buchhaltung@example.ch'}},
          'adminSuche': {'listings': [], 'verkaeufe': []}, 'cockpitSuche': {'listings': [{'id': 'PG-999', 'name': 'Altes Stück', 'status': 'Abgebrochen', 'am': '01.10.2026', 'zeile': 5, 'loeschbar': True}], 'verkaeufe': [V('54000002', 'PG-402', 'Toner', 'Wartet auf Zahlung', total='23.80', zeile=9)]},
@@ -59,8 +60,14 @@ with sync_playwright() as p:
     def L(): return s.inner_text('#cp-liste').upper()
     def zu(): s.keyboard.press('Escape'); s.wait_for_timeout(50)
     ok('TESTUMGEBUNG' in s.inner_text('#cp-warn'), 'Hinweis Testumgebung')
+    ok(s.is_hidden('#cp-tun') and s.is_visible('#nav-todos'), 'Zu-tun-Zeile nicht im Cockpit, eigener Reiter To-dos')
+    s.click('#nav-todos'); s.wait_for_timeout(100)
     tun = s.inner_text('#cp-tun').upper().replace('\n', ' ')
-    ok(all(x in tun for x in ['FRAGEN / NACHRICHTEN 1', 'PREISVORSCHLÄGE 1', 'ADRESSE FEHLT 1', 'STORNO PRÜFEN 1', 'ZAHLUNG BEI RICARDO MELDEN 1', 'VERSENDEN 1', 'LAUFZEIT PRÜFEN 1', 'NICHT VERKAUFT ENTSCHEIDEN 2', 'RETOURE-SCHRITT 1']), 'Zu tun: ' + tun)
+    ok(s.is_visible('#cp-tun') and s.is_hidden('#cp-chips') and 'an' in s.get_attribute('#nav-todos', 'class'), 'To-dos: Filterzeile statt Stufen')
+    ok(all(x in tun for x in ['ALLE ', 'FRAGEN 1', 'NACHRICHTEN 1', 'PREISVORSCHLÄGE 1', 'BEWERTUNGEN 1', 'ADRESSE FEHLT 1', 'STORNO PRÜFEN 1', 'ZAHLUNG BEI RICARDO MELDEN 1', 'VERSENDEN 1', 'LAUFZEIT PRÜFEN 1', 'NICHT VERKAUFT ENTSCHEIDEN 2', 'RETOURE-SCHRITT 1']) and 'ZAHLUNG PRÜFEN (' not in tun and 'FRAGEN / ' not in tun, 'To-dos: Fragen und Nachrichten getrennt, Bewertung nur versendet (1), «Zahlung prüfen» ohne Zusatz: ' + tun)
+    ok('PG-401' in L() and 'PG-405' in L() and 'NACHRICHT' in L() and s.inner_text('#cp-liste').count('→') >= 8, 'To-dos: alle Zeilen mit Stufe und Handlung')
+    s.click('#nav-cockpit'); s.wait_for_timeout(100)
+    ok(s.is_visible('#cp-chips') and s.is_hidden('#cp-tun') and 'an' in s.get_attribute('#nav-cockpit', 'class') and 'an' not in (s.get_attribute('#nav-todos', 'class') or ''), 'Cockpit zurück: Stufen')
     ok(s.query_selector('.cp-top button:has-text("Listing")') is None, 'Kein Listing-Knopf neben der Suche')
     ok('Mails 30.10.2026 08:38' in s.inner_text('#cp-stand'), 'Stand-Zeile')
     liste = L()
@@ -142,7 +149,7 @@ with sync_playwright() as p:
     ok('Ricardo Unpaid' in s.inner_text('#cp-panel') and s.is_visible('[data-akt="cpEntscheid"]'), 'Storniert: Paket holen, Entscheid')
     # Zubringer
     zu(); s.click('.cp-top button:has-text("Bank-Export")'); s.wait_for_timeout(100)
-    ok(s.is_visible('#f-bank') and '30.10.2026 08:37' in s.inner_text('#cp-panel') and 'So geht es' in s.inner_text('#cp-panel'), 'Bank-Panel mit Anleitung, Datei-Feld und letztem Abgleich')
+    ok(s.is_visible('#f-bank') and '30.10.2026 08:37' in s.inner_text('#cp-panel') and '1 · DATEI' in s.inner_text('#cp-panel').upper(), 'Bank-Panel mit Schritt 1, Datei-Feld und letztem Abgleich')
     s.evaluate("BANK={gutschriften:5,schonErfasst:1,offen:4,sicher:[{nr:'54000001',pgId:'PG-401',titel:'Autoradio',name:'P. Bahnhof',total:'217.00',grund:'Nummer und Betrag',bank:{datum:'2026-10-30',betrag:'217.00',text:'54000001'}}],unsicher:[{nr:'54000002',pgId:'PG-402',titel:'Toner',name:'L. Fischer',total:'23.80',grund:'Name und Betrag',bank:{datum:'2026-10-30',betrag:'23.80',text:'Fischer'}}],ohneTreffer:[{datum:'2026-10-30',betrag:'95.00',text:'Twint',auftrag:''}]}; $('f-bank-erg').innerHTML=cpBankHtml()")
     pan = s.inner_text('#cp-panel').upper()
     ok('ZUGEORDNET – BITTE BESTÄTIGEN · 1' in pan and 'UNSICHER – SELBER ENTSCHEIDEN · 1' in pan and 'GUTSCHRIFTEN OHNE RICARDO-VERKAUF · 1' in pan and s.inner_text('#cp-bank-n') == '1', 'Bank: drei Kästen, 1 vorangehakt')
@@ -171,8 +178,24 @@ with sync_playwright() as p:
     s.click('#nav-cockpit'); s.wait_for_timeout(100)
     ok(s.is_visible('#s-cockpit') and s.is_hidden('#nav-f-taeglich'), 'Cockpit zurück, alte Abläufe versteckt')
     ok(s.is_visible('.fb-auf'), 'Feedback-Knopf da')
+    s.click('#nav-todos'); s.wait_for_timeout(100)
     s.click('.chip.tun:has-text("Adresse fehlt")'); s.wait_for_timeout(100)
-    ok('PG-401' in L() and 'VERKAUFT' in L() and 'PG-402' not in L(), 'Zu tun › Adresse fehlt: nur dieses Stück, mit Stufe')
+    ok('PG-401' in L() and 'VERKAUFT' in L() and 'PG-402' not in L(), 'To-dos › Adresse fehlt: nur dieses Stück, mit Stufe')
+    s.click('tr[data-key="v54000001"]'); s.wait_for_timeout(100)
+    pan = s.inner_text('#cp-panel').upper()
+    ok('BEWERTUNG' not in pan and 'NACHRICHT' in pan, 'Panel Verkauft: Nachricht ja, Bewertung nein (kommt erst nach dem Versand)'); zu()
+    s.click('#nav-cockpit'); s.wait_for_timeout(100)
+    # Reaktivieren (Neu listen) im Panel Bereit
+    s.click('#cp-chips .chip:has-text("Bereit")'); s.wait_for_timeout(100)
+    s.click('tr[data-key="bPG-200"]'); s.wait_for_timeout(100)
+    pan = s.inner_text('#cp-panel')
+    ok('JETZT · AUF RICARDO NEU EINSTELLEN' in pan.upper() and 'Do 05.11.2026 19:00' in pan and s.is_visible('#wl-PG-200') and s.is_disabled('[data-akt="cpGelistet"]'), 'Neu listen: Reaktivieren-Block mit Auktionsende, «Gelistet» erst nach Ricardo')
+    s.click('[data-akt="linkR"][data-a*="prefill"]'); s.wait_for_timeout(100)
+    ok(s.is_enabled('[data-akt="cpGelistet"]'), 'Nach Ricardo-Klick: «Gelistet» frei')
+    s.fill('#wl-PG-200', 'https://www.ricardo.ch/de/a/hue-1299010/'); s.click('[data-akt="cpGelistet"]'); s.wait_for_timeout(200)
+    calls = s.evaluate('ARGS')
+    ok(any(c[0] == 'markiereGelistet' and c[1][:3] == ['PG-200', 'https://www.ricardo.ch/de/a/hue-1299010/', ''] for c in calls), 'markiereGelistet ohne Laufzeit (Server rechnet Auktionsende): ' + str([c for c in calls if c[0] == 'markiereGelistet']))
+    zu()
     s.click('#l-en'); s.wait_for_timeout(100)
     ok('READY' in s.inner_text('#cp-chips').upper() and 'SOLD' in s.inner_text('#cp-chips').upper(), 'Englisch')
     ok(not err, 'Keine JS-Fehler: ' + '; '.join(err[:3]))

@@ -6,7 +6,7 @@
      Der einzige Ablauf mit Schritten bleibt das Listing (ablaufStarten('schicht1')).
      ====================================================================== */
   Object.assign(T, {
-    'nav.cockpit': ['Cockpit', 'Cockpit'], 'nav.listing': ['Listing starten', 'Start listing'], 'nav.zahlen': ['Reporting', 'Reporting'], 'nav.einst': ['Einstellungen', 'Settings'],
+    'nav.cockpit': ['Cockpit', 'Cockpit'], 'nav.todos': ['To-dos', 'To-dos'], 'nav.listing': ['Listing starten', 'Start listing'], 'nav.zahlen': ['Reporting', 'Reporting'], 'nav.einst': ['Einstellungen', 'Settings'],
     'c.such.platz': ['PG-ID, Titel, Käufer oder Verkaufsnummer', 'PG-ID, title, buyer or sale number'],
     'c.bericht': ['Verkaufsbericht einlesen', 'Import sales report'], 'c.bank': ['Bank-Export einlesen', 'Import bank export'], 'c.listing': ['Listing starten', 'Start listing'],
     'c.stand': ['Mails {0} · Verkaufsbericht {1} · Bank-Export {2}', 'Mails {0} · sales report {1} · bank export {2}'], 'c.nie': ['noch nie', 'never'],
@@ -58,9 +58,17 @@
     'c.p.bericht.letzter': ['Letzter Bericht: {0}', 'Last report: {0}'], 'c.p.post': ['Adressliste für die Post (ohne Etiketten aus dem Tool)', 'Address list for Swiss Post (without labels from the tool)'],
     'c.mail.aus': ['Die Ricardo-Mails werden nicht gelesen (Einstellungen › Betrieb).', 'The Ricardo mails are not read (Settings › Operations).'],
     'c.mail.still': ['Seit {0} keine Ricardo-Mail mehr: Benachrichtigungen, care@ und Gmail-Filter prüfen.', 'No Ricardo mail since {0}: check notifications, care@ and the Gmail filter.'],
-    'c.tun': ['Zu tun', 'To do'], 'c.tun.leer': ['Nichts zu tun.', 'Nothing to do.'],
-    'c.t.fragen': ['Fragen / Nachrichten', 'Questions / messages'], 'c.t.angebote': ['Preisvorschläge', 'Price offers'], 'c.t.bewertungen': ['Bewertungen', 'Ratings'], 'c.t.melden': ['Zahlung bei Ricardo melden', 'Report payment'],
-    'c.t.pruefen': ['Zahlung prüfen (Käufer meldet)', 'Check payment (buyer says paid)'], 'c.t.erinnern': ['Erinnern', 'Remind'], 'c.t.storno': ['Storno prüfen', 'Check cancellation'], 'c.t.adresse': ['Adresse fehlt', 'Address missing'],
+    'c.tun': ['Zu tun', 'To do'], 'c.tun.leer': ['Nichts zu tun.', 'Nothing to do.'], 'c.tun.alle': ['Alle', 'All'], 'c.th.tun': ['Zu tun', 'To do'],
+    'c.sub.todos': ['Alles, was heute dran ist, über alle Stufen. Ein Klick auf eine Zeile öffnet die Handlung. Filter: eine Art von Aufgabe.', 'Everything due today across all stages. Click a row to open the action. Filter: one kind of task.'],
+    'c.ende': ['Ende {0}', 'End {0}'], 'c.ende.so': ['Alle Auktionen enden am {0}: Laufzeit auf Ricardo so wählen, dass das Ende dort steht ({1} Tage).', 'All auctions end on {0}: choose the duration on Ricardo so that it ends then ({1} days).'],
+    'c.p.reakt': ['Auf Ricardo neu einstellen', 'List again on Ricardo'],
+    'c.p.reakt.r': ['1. Altes Angebot auf Ricardo öffnen und «Erneut einstellen» (oder «Angebot kopieren») wählen. 2. Laufzeit so setzen, dass die Auktion am {0} endet. 3. Veröffentlichen. 4. Link des neuen Angebots hier einfügen und «Gelistet» klicken. Text und Preis bleiben wie beim alten Angebot; für Änderungen: «Listing ganz durchgehen».', '1. Open the old listing on Ricardo and choose «List again» (or «copy listing»). 2. Set the duration so that the auction ends on {0}. 3. Publish. 4. Paste the link of the new listing here and click «Listed». Text and price stay as before; for changes: «Go through the listing».'],
+    'c.p.reakt.link': ['Link des neuen Angebots', 'Link of the new listing'], 'c.p.reakt.ok': ['Gelistet', 'Listed'], 'c.p.reakt.alt': ['Altes Angebot öffnen', 'Open the old listing'], 'c.p.reakt.kopie': ['Angebot kopieren (vorausgefüllt)', 'Copy listing (prefilled)'],
+    'c.p.reakt.ganz': ['Listing ganz durchgehen (Text, Preis)', 'Go through the listing (text, price)'],
+    'c.p.datei': ['Datei', 'File'], 'c.p.bank.s1': ['1 · Datei aus dem E-Banking wählen und lesen', '1 · Pick and read the e-banking file'], 'c.p.bank.s2': ['2 · Zuordnungen prüfen', '2 · Check the matches'], 'c.p.bank.s3': ['3 · Zahlungen erfassen', '3 · Record the payments'],
+    'c.p.bericht.s1': ['1 · Verkaufsbericht auf Ricardo holen', '1 · Get the sales report on Ricardo'], 'c.p.bericht.s2': ['2 · Datei hier einlesen', '2 · Import the file here'],
+    'c.t.fragen': ['Fragen', 'Questions'], 'c.t.nachrichten': ['Nachrichten', 'Messages'], 'c.t.angebote': ['Preisvorschläge', 'Price offers'], 'c.t.bewertungen': ['Bewertungen', 'Ratings'], 'c.t.melden': ['Zahlung bei Ricardo melden', 'Report payment'],
+    'c.t.pruefen': ['Zahlung prüfen', 'Check payment'], 'c.t.erinnern': ['Erinnern', 'Remind'], 'c.t.storno': ['Storno prüfen', 'Check cancellation'], 'c.t.adresse': ['Adresse fehlt', 'Address missing'],
     'c.t.packen': ['Packen', 'Pack'], 'c.t.versenden': ['Versenden', 'Ship'], 'c.t.retoure': ['Retoure-Schritt', 'Return step'], 'c.t.laufzeit': ['Laufzeit prüfen', 'Check duration'], 'c.t.entscheid': ['Nicht verkauft entscheiden', 'Decide not sold'],
     'c.p.total': ['Preis {0} + Porto {1} = Total {2}', 'Price {0} + postage {1} = total {2}'], 'c.p.pruefen': ['Zahlung prüfen', 'Check payment'],
     'c.p.pruefen.text': ['Die Käufer*in meldet auf Ricardo «bezahlt» ({0}). Bezahlt wird es erst, wenn das Geld da ist: Bank-Export einlesen oder mit Beleg von Hand markieren.', 'The buyer reports «paid» on Ricardo ({0}). It counts as paid only once the money is in: import the bank export or mark it by hand with proof.'],
@@ -76,7 +84,7 @@
     'c.o.angebote': ['{0} Angebote', '{0} listings'], 'c.neu': ['+ Stück ohne Analyse', '+ Item without analysis'], 'c.test': ['TESTUMGEBUNG – Kopie des Live-Sheets, nichts geht nach aussen', 'TEST ENVIRONMENT – copy of the live sheet, nothing goes outside']
   });
 
-  var CP = null, CPS = 'verkauft', CPP = null, CPQ = null, CPT = null, CPLADEN = false, ANA_ZEIT = 0, RIC = {};
+  var CP = null, CPS = 'verkauft', CPP = null, CPQ = null, CPT = null, CPLADEN = false, ANA_ZEIT = 0, RIC = {}, CPM = 'cockpit';   // CPM: 'cockpit' oder 'todos' (eigener Reiter, Feedback 31.10.)
   var CP_STUFEN = ['bereit', 'online', 'verkauft', 'bezahlt', 'versendet', 'nichtverkauft', 'retouren', 'storniert'];
   function cpNach() { if (CP) ladeCockpit(true); }
   /* Tempo (Feedback 31.10.): Cockpit und Analyse-Liste laufen parallel; die Analyse (externes Sheet, langsam) kommt nach, höchstens alle 3 Minuten neu */
@@ -93,15 +101,29 @@
     ANA_ZEIT = Date.now();
     still('analyseListe', [], function (l) { ANA = l || []; zeichneAnalyse(); if (CP) { CP.analyse = ANA; if (ANSICHT === 'cockpit') zeichneCockpit(); } });
   }
+  /* Auktionsende im Browser (gleiche Regel wie auktionsende_ im Server): nächstes «Donnerstag 19:00», mindestens 24 h entfernt. null = Einstellung leer. */
+  function naechstesEnde() {
+    var m = /^([a-zäö]+)\s+(\d{1,2})[:.](\d{2})$/i.exec(String((S && S.auktionsende) || '').trim()), tage = ['sonntag', 'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag'];
+    if (!m) return null;
+    var wt = tage.indexOf(m[1].toLowerCase()), hh = Number(m[2]), mi = Number(m[3]), jetzt = new Date();
+    if (wt === -1) return null;
+    for (var d = (wt - jetzt.getDay() + 7) % 7; d <= 14; d += 7) {
+      var k = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + d, hh, mi, 0, 0);
+      if (k.getTime() - jetzt.getTime() >= 86400000) return { ende: k, tage: Math.max(1, Math.ceil((k.getTime() - jetzt.getTime()) / 86400000)), text: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][wt] + ' ' + ('0' + k.getDate()).slice(-2) + '.' + ('0' + (k.getMonth() + 1)).slice(-2) + '.' + k.getFullYear() + ' ' + ('0' + hh).slice(-2) + ':' + ('0' + mi).slice(-2) };
+    }
+    return null;
+  }
+  function endeText() { var e = naechstesEnde(); return e ? e.text : t('f.laufzeit.w'); }
   function cpRegal(k) { return (CP && CP.regale && CP.regale[k]) || ({ offline: 'Ricardo Offline', online: 'Ricardo Online', unpaid: 'Ricardo Unpaid' })[k]; }
   function tage(n) { return n === 0 ? t('c.heute') : n === 1 ? t('c.tag') : t('c.tage', n); }
   function tagKl(h) { return h >= 24 ? ' rot' : h >= 4 ? ' orange' : ''; }
   function etk(text, kl) { return text ? '<span class="etikett' + (kl ? ' ' + kl : '') + '">' + text + '</span>' : ''; }
   function artikelVon(link) { var m = /\/a\/(\d+)/.exec(String(link || '')); return m ? m[1] : ''; }
   /* Aufgaben aus den Ricardo-Mails zu einem Stück oder Verkauf */
-  function cpAufgaben(pgId, artikel, nr) {
+  /* mitBewertung: nur bei versendeten Verkäufen (Feedback 31.10.: eine Bewertung kommt erst nach dem Versand, vorher gehört sie nicht ins Zu-tun) */
+  function cpAufgaben(pgId, artikel, nr, mitBewertung) {
     var au = (CP && CP.aufgaben) || { fragen: [], angebote: [], zahlung: [], bewertungen: [] }, passt = function (o) { return (pgId && o.pgId === pgId) || (artikel && o.artikel === artikel) || (nr && o.nr === nr); };
-    return { fragen: (au.fragen || []).filter(passt), angebote: (au.angebote || []).filter(passt), zahlung: nr ? (au.zahlung || []).filter(function (o) { return o.nr === nr; }) : [], bewertungen: (au.bewertungen || []).filter(passt) };
+    return { fragen: (au.fragen || []).filter(passt), angebote: (au.angebote || []).filter(passt), zahlung: nr ? (au.zahlung || []).filter(function (o) { return o.nr === nr; }) : [], bewertungen: mitBewertung ? (au.bewertungen || []).filter(passt) : [] };
   }
   function cpMelden(nr) { return (CP.melden || []).filter(function (o) { return o.nr === nr; })[0]; }
   function cpOffenTage(nr) { var o = (CP.offenZahlung || []).filter(function (x) { return x.nr === nr; })[0]; return o ? o.tage : 0; }
@@ -142,8 +164,8 @@
       });
     } else if (stufe === 'versendet') {
       (CP.versendet || []).forEach(function (o) {
-        var au = cpAufgaben(o.pgId, o.artikel, o.nr), off = '';
-        au.fragen.forEach(function (q) { off += etk(esc(q.art), 'orange'); }); au.bewertungen.forEach(function () { off += etk(t('c.o.bewertung')); });
+        var au = cpAufgaben(o.pgId, o.artikel, o.nr, true), off = '';
+        au.fragen.forEach(function (q) { off += etk(esc(q.art), 'orange'); }); au.bewertungen.forEach(function () { off += etk(t('c.o.bewertung'), 'orange'); });
         l.push({ key: 's' + o.nr, art: 'versendet', o: o, z: [o.pgId || t('v.nichtzu'), o.titel, 'CHF ' + o.total, o.name || o.kaeufer, o.versendetAm, off] });
       });
     } else if (stufe === 'nichtverkauft') {
@@ -167,12 +189,17 @@
   };
   function cpZahl(stufe) { return cpZeilen(stufe).length; }
   /* Zu tun (Feedback 31.10., Nr. 17): was heute dran ist, über alle Stufen hinweg. Ein Schlüssel pro Handlung. */
-  var CP_TUN = ['fragen', 'angebote', 'bewertungen', 'adresse', 'packen', 'pruefen', 'erinnern', 'storno', 'melden', 'versenden', 'laufzeit', 'entscheid', 'retoure'];
+  var CP_TUN = ['fragen', 'nachrichten', 'angebote', 'bewertungen', 'adresse', 'packen', 'pruefen', 'erinnern', 'storno', 'melden', 'versenden', 'laufzeit', 'entscheid', 'retoure'];
   function tunVon(r) {
     var o = r.o, k = [], au;
-    if (r.art === 'online') { au = cpAufgaben(o.id, artikelVon(o.link), ''); if (au.fragen.length) k.push('fragen'); if (au.angebote.length) k.push('angebote'); if (au.bewertungen.length) k.push('bewertungen'); }
+    var fragen = function (au) {   // Feedback 31.10.: Fragen und Nachrichten getrennt
+      if (au.fragen.some(function (q) { return q.art === 'Frage'; })) k.push('fragen');
+      if (au.fragen.some(function (q) { return q.art !== 'Frage'; })) k.push('nachrichten');
+      if (au.angebote.length) k.push('angebote'); if (au.bewertungen.length) k.push('bewertungen');
+    };
+    if (r.art === 'online') fragen(cpAufgaben(o.id, artikelVon(o.link), ''));
     if (r.art === 'verkauft' || r.art === 'bezahlt' || r.art === 'versendet') {
-      au = cpAufgaben(o.pgId, o.artikel, o.nr); if (au.fragen.length) k.push('fragen'); if (au.angebote.length) k.push('angebote'); if (au.bewertungen.length) k.push('bewertungen');
+      au = cpAufgaben(o.pgId, o.artikel, o.nr, r.art === 'versendet'); fragen(au);
       if (r.art === 'verkauft') { if (o.ohneAdresse) k.push('adresse'); else if (o.status === 'Zu packen') k.push('packen'); if (o.meldet && !o.bezahlt) k.push('pruefen'); if (cpStorno(o.nr)) k.push('storno'); else if (au.zahlung.length) k.push('erinnern'); }
       if (r.art === 'bezahlt') { if (!o.ricardoGemeldet) k.push('melden'); if (o.status === 'Zu packen') k.push(o.ohneAdresse ? 'adresse' : 'packen'); else if (o.ricardoGemeldet) k.push('versenden'); }
     }
@@ -182,9 +209,15 @@
     return k;
   }
   function cpAlle() { var alle = []; CP_STUFEN.forEach(function (s) { alle = alle.concat(cpZeilen(s)); }); return alle; }
-  function tunZeilen(alle, tun) { return alle.filter(function (r) { return tunVon(r).indexOf(tun) !== -1; }).map(function (r) { return { key: r.key, art: r.art, o: r.o, ana: r.ana, z: [r.z[0], r.z[1], etk(t('c.s.' + stufeVon(r.art))), '', '', r.z[5]] }; }); }
+  function tunZeilen(alle, tun) {
+    return alle.filter(function (r) { var k = tunVon(r); return k.length && (!tun || k.indexOf(tun) !== -1); })
+      .map(function (r) { return { key: r.key, art: r.art, o: r.o, ana: r.ana, z: [r.z[0], r.z[1], etk(t('c.s.' + stufeVon(r.art))), tunVon(r).map(function (k) { return etk(t('c.t.' + k), 'orange'); }).join(''), '', r.z[5]] }; });
+  }
   function stufeVon(art) { return art === 'ohnemail' ? 'nichtverkauft' : art; }
   function cpTun(k) { CPT = CPT === k ? null : k; CPQ = null; CPP = null; zeichneCockpit(); }
+  /* To-dos als eigener Reiter (Feedback 31.10.): dieselbe Seite, andere Sicht */
+  function zeigeTodos() { CPM = 'todos'; CPQ = null; CPP = null; zeige('cockpit'); }
+  function zeigeCockpit() { CPM = 'cockpit'; CPT = null; CPQ = null; CPP = null; zeige('cockpit'); }
 
   function zeichneCockpit() {
     if (!CP) return;
@@ -198,19 +231,24 @@
     $('cp-warn').innerHTML = h;
     var alle = cpAlle(), tunZahl = {};
     alle.forEach(function (r) { tunVon(r).forEach(function (k) { tunZahl[k] = (tunZahl[k] || 0) + 1; }); });
-    var tunChips = CP_TUN.filter(function (k) { return tunZahl[k]; }).map(function (k) { return '<button class="chip tun' + (k === CPT ? ' an' : '') + '" onclick="cpTun(\'' + k + '\')">' + esc(t('c.t.' + k)) + ' <span class="zahl">' + tunZahl[k] + '</span></button>'; }).join('');
-    $('cp-tun').innerHTML = '<span class="f-label">' + esc(t('c.tun')) + '</span>' + (tunChips || '<span class="still">' + esc(t('c.tun.leer')) + '</span>');
-    $('cp-chips').innerHTML = CP_STUFEN.map(function (s) { return '<button class="chip' + (s === CPS && !CPQ && !CPT ? ' an' : '') + '" onclick="cpStufe(\'' + s + '\')">' + esc(t('c.s.' + s)) + ' <span class="zahl">' + cpZahl(s) + '</span></button>'; }).join('');
-    $('cp-sub').textContent = CPQ || CPT ? '' : t('c.sub.' + CPS);
-    var l = CPQ ? CPQ.zeilen : CPT ? tunZeilen(alle, CPT) : cpZeilen(CPS), kopf = CPQ ? ['c.th.stueck', 'c.th.titel', '', '', '', ''] : CPT ? ['c.th.stueck', 'c.th.titel', 'c.th.stufe', '', '', 'c.th.offen'] : CP_KOPF[CPS];
+    var todos = CPM === 'todos', alleTun = tunZeilen(alle, null);
+    marke($('z-todos'), alleTun.length);
+    $('nav-todos').className = todos && ANSICHT === 'cockpit' ? 'an' : ''; $('nav-cockpit').className = !todos && ANSICHT === 'cockpit' ? 'an' : '';
+    $('top-sub').textContent = t(todos ? 'nav.todos' : 'nav.cockpit');
+    var tunChips = '<button class="chip tun' + (!CPT ? ' an' : '') + '" onclick="cpTun(null)">' + esc(t('c.tun.alle')) + ' <span class="zahl">' + alleTun.length + '</span></button>'
+      + CP_TUN.filter(function (k) { return tunZahl[k]; }).map(function (k) { return '<button class="chip tun' + (k === CPT ? ' an' : '') + '" onclick="cpTun(\'' + k + '\')">' + esc(t('c.t.' + k)) + ' <span class="zahl">' + tunZahl[k] + '</span></button>'; }).join('');
+    $('cp-tun').hidden = !todos; $('cp-chips').hidden = todos;
+    $('cp-tun').innerHTML = alleTun.length ? tunChips : '<span class="still">' + esc(t('c.tun.leer')) + '</span>';
+    $('cp-chips').innerHTML = CP_STUFEN.map(function (s) { return '<button class="chip' + (s === CPS && !CPQ ? ' an' : '') + '" onclick="cpStufe(\'' + s + '\')">' + esc(t('c.s.' + s)) + ' <span class="zahl">' + cpZahl(s) + '</span></button>'; }).join('');
+    $('cp-sub').textContent = CPQ ? '' : todos ? t('c.sub.todos') : t('c.sub.' + CPS);
+    var l = CPQ ? CPQ.zeilen : todos ? (CPT ? tunZeilen(alle, CPT) : alleTun) : cpZeilen(CPS), kopf = CPQ ? ['c.th.stueck', 'c.th.titel', '', '', '', ''] : todos ? ['c.th.stueck', 'c.th.titel', 'c.th.stufe', 'c.th.tun', '', 'c.th.offen'] : CP_KOPF[CPS];
     if (CPQ) $('cp-sub').innerHTML = esc(t('c.treffer', l.length)) + ' <button class="klein-knopf" onclick="cpSucheZu()">' + esc(t('c.such.zu')) + '</button>';
-    if (CPT) $('cp-sub').textContent = t('c.t.' + CPT) + ' · ' + l.length;
     $('cp-liste').innerHTML = l.length ? '<div class="tabelle"><table><tr>' + kopf.map(function (x) { return '<th>' + (x ? esc(t(x)) : '') + '</th>'; }).join('') + '<th></th></tr>'
-      + l.map(function (r) { return '<tr class="cp-zeile' + (CPP && CPP.key === r.key ? ' an' : '') + '" data-key="' + esc(r.key) + '"' + akt('cpAuf', r.key) + '>' + r.z.map(function (c, i) { return '<td' + (i === 0 ? ' class="mono"' : '') + '>' + (i === 5 || ((CPQ || CPT) && i === 2) ? c : esc(c)) + '</td>'; }).join('') + '<td class="pfeil">→</td></tr>'; }).join('') + '</table></div>'
-      : '<p class="still">' + t(CPQ ? 'c.such.leer' : CPS === 'retouren' && !CPT ? 'c.rt.leer' : 'c.leer') + '</p>';
+      + l.map(function (r) { return '<tr class="cp-zeile' + (CPP && CPP.key === r.key ? ' an' : '') + '" data-key="' + esc(r.key) + '"' + akt('cpAuf', r.key) + '>' + r.z.map(function (c, i) { return '<td' + (i === 0 ? ' class="mono"' : '') + '>' + (i === 5 || ((CPQ || todos) && (i === 2 || i === 3)) ? c : esc(c)) + '</td>'; }).join('') + '<td class="pfeil">→</td></tr>'; }).join('') + '</table></div>'
+      : '<p class="still">' + t(CPQ ? 'c.such.leer' : todos ? 'c.tun.leer' : CPS === 'retouren' ? 'c.rt.leer' : 'c.leer') + '</p>';
     if (CPP) { var r = cpFinde(CPP.key); if (r) zeichnePanel(r); else if (CPP.art !== 'bank' && CPP.art !== 'bericht') cpZu(); }
   }
-  function cpStufe(s) { CPS = s; CPQ = null; CPT = null; CPP = null; if (s === 'bereit') ladeAnalyseCockpit(); zeichneCockpit(); }
+  function cpStufe(s) { CPS = s; CPQ = null; CPP = null; if (s === 'bereit') ladeAnalyseCockpit(); zeichneCockpit(); }
   function cpFinde(key) { return (CPQ ? CPQ.zeilen : []).concat(cpAlle()).filter(function (r) { return r.key === key; })[0]; }
   function cpAuf(key) { var r = cpFinde(key); if (!r) return; CPP = { key: key, art: r.art }; zeichnePanel(r); Array.prototype.forEach.call(document.querySelectorAll('.cp-zeile'), function (z) { z.classList.toggle('an', z.getAttribute('data-key') === key); }); }
   function cpZu() { CPP = null; $('cp-veil').hidden = true; Array.prototype.forEach.call(document.querySelectorAll('.cp-zeile'), function (z) { z.classList.remove('an'); }); }
@@ -274,9 +312,14 @@
     var o = r.o, art = r.art;
     if (art === 'bereit') {
       var ana = r.ana;
+      var ae = CP.auktionsende, endeText = ae ? esc(ae.text) : t('f.laufzeit.w');
+      var reakt = !ana && o.wieder ? jetzt(t('c.p.reakt'), '<p>' + t('c.p.reakt.r', '<strong>' + endeText + '</strong>') + '</p>'
+          + '<div class="knoepfe">' + lnkR(o.link, t('c.p.reakt.alt'), 'w' + o.id) + (o.kopieren ? lnkR(o.kopieren, t('c.p.reakt.kopie'), 'w' + o.id) : '') + '</div>'
+          + '<label class="klein" for="wl-' + esc(o.id) + '">' + t('c.p.reakt.link') + '</label><input type="text" id="wl-' + esc(o.id) + '" placeholder="https://www.ricardo.ch/de/a/..." autocomplete="off">'
+          + '<div class="knoepfe">' + knR(t('c.p.reakt.ok'), 'cpGelistet', 'w' + o.id, o.id) + kn(t('c.p.reakt.ganz'), 'cpWeiter', false, o.id) + '</div>') : '';
       pOeffne(esc(o.id), esc(ana ? (o.titel || o.name) : o.name) + ' · ' + t('c.s.bereit') + ' · ' + esc(o.ort || cpRegal('offline')),
         (ana ? '<p class="still">' + t('c.p.analyse', esc(o.erfasst || ''), esc(zu(o.zustand)), esc(o.fotos || 0)) + (o.preis ? ' · ' + t('c.p.neupreis', Number(o.preis).toFixed(2)) : '') + '</p>' : '')
-        + jetzt(t('such.listen'), '<p class="still">' + t('such.hilfe') + '</p><div class="knoepfe">' + kn(t(ana ? 'c.p.listen' : 'c.p.weiter'), ana ? 'cpStart' : 'cpWeiter', true, o.id) + '</div>')
+        + (reakt || jetzt(t('such.listen'), '<p class="still">' + t('such.hilfe') + '</p><p class="still">' + t('c.ende.so', '<strong>' + endeText + '</strong>', ae ? ae.tage : CP.laufzeit) + '</p><div class="knoepfe">' + kn(t(ana ? 'c.p.listen' : 'c.p.weiter'), ana ? 'cpStart' : 'cpWeiter', true, o.id) + '</div>'))
         + (ana ? '' : block(t('f.e.Anderer Kanal') + ' / ' + t('f.e.Entsorgung'), '<p class="still">' + t('f.s2.nicht.physisch') + '</p><div class="knoepfe">' + kn(t('c.p.abbrechen'), 'cpAbbrechen', false, o.id) + '</div>', true))
         + block(t('c.p.links'), '<div class="knoepfe">' + (/^https:\/\//.test(o.ordner || '') ? '<a href="' + esc(o.ordner) + '">' + t('c.p.fotos') + '</a>' : '') + '</div>', true) + adminBlock(o.id));
       return;
@@ -293,7 +336,7 @@
     }
     if (art === 'verkauft' || art === 'bezahlt') { zeichneVerkaufPanel(o, art); return; }
     if (art === 'versendet') {
-      var au2 = cpAufgaben(o.pgId, o.artikel, o.nr);
+      var au2 = cpAufgaben(o.pgId, o.artikel, o.nr, true);
       pOeffne(esc(o.pgId || o.nr), esc(o.titel) + ' · ' + t('c.s.versendet') + ' ' + esc(o.versendetAm) + ' · ' + t('v.nr', esc(o.nr)),
         '<p class="still">' + esc(o.name || o.kaeufer) + (o.ort ? ', ' + esc(o.ort) : '') + ' · CHF ' + esc(o.total) + ' · ' + t('c.p.sendung') + ' ' + (o.sendung ? '<span class="mono">' + esc(o.sendung) + '</span>' : t('c.p.sendung.keine')) + '</p>'
         + aufgabenHtml(au2)
@@ -393,12 +436,13 @@
   function cpBank() {
     CPP = { key: 'bank', art: 'bank' };
     pOeffne(esc(t('c.p.bank.titel')), t('c.p.bank.letzte', esc(CP.letzteBank || t('c.nie')), (CP.offenZahlung || []).length),
-      '<p class="still">' + t('c.bank.so') + '</p>' + hilfe(t('c.p.bank.text')) + '<div class="reihe" style="margin-top:10px"><input type="file" id="f-bank" accept=".xlsx,.xls,.csv,text/csv"> <button class="haupt-knopf" onclick="bankLesen()">' + t('v.einlesen') + '</button></div><div id="f-bank-erg">' + cpBankHtml() + '</div>');
+      block(t('c.p.bank.s1'), '<div class="reihe" style="margin-top:6px"><input type="file" id="f-bank" accept=".xlsx,.xls,.csv,text/csv"> <button class="haupt-knopf" onclick="bankLesen()">' + t('v.einlesen') + '</button></div>' + hilfe(t('c.p.bank.text')))
+      + '<div id="f-bank-erg">' + cpBankHtml() + '</div>');
   }
   /* Ergebnis in drei klar beschrifteten Kästen (Feedback 31.10., Nr. 8) */
   function cpBankHtml() {
     if (!BANK) return '';
-    var r = BANK, h = '<p class="still" style="margin-top:12px">' + t('c.bank.gelesen', r.gutschriften, r.schonErfasst, r.offen) + '</p>';
+    var r = BANK, h = '<p class="still">' + t('c.bank.gelesen', r.gutschriften, r.schonErfasst, r.offen) + '</p>';
     var zeile = function (o, i, an) {
       return '<label class="haken cp-bankzeile" style="margin:6px 0"><input type="checkbox" class="bank-wahl" data-i="' + i + '" ' + (an ? 'checked' : '') + '> <span><strong>' + esc(o.titel) + '</strong> <span class="still">' + (o.pgId ? esc(o.pgId) + ' · ' : '') + t('v.nr', esc(o.nr)) + ' · ' + esc(o.name || o.kaeufer) + ' · CHF ' + esc(o.total) + '</span><br><span class="klein">'
         + esc(tagCh(o.bank.datum, true)) + ' · CHF ' + esc(o.bank.betrag) + ' · ' + esc(o.grund) + '<br>' + esc(o.bank.text) + '</span></span></label>';
@@ -407,8 +451,8 @@
     h += block(t('c.bank.sicher') + ' · ' + r.sicher.length, '<p class="still">' + t('c.bank.sicher.text') + '</p>' + (r.sicher.length ? r.sicher.map(function (o, i) { return zeile(o, i, true); }).join('') : '<p class="still">–</p>'));
     h += block(t('c.bank.unsicher') + ' · ' + r.unsicher.length, '<p class="still">' + t('c.bank.unsicher.text') + '</p>' + (r.unsicher.length ? r.unsicher.map(function (o, i) { return zeile(o, r.sicher.length + i, false); }).join('') : '<p class="still">–</p>'), !r.unsicher.length);
     h += block(t('c.bank.ohne') + ' · ' + (r.ohneTreffer || []).length, '<p class="still">' + t('c.bank.ohne.text') + '</p>' + ((r.ohneTreffer || []).length ? '<ul>' + r.ohneTreffer.map(function (o) { return '<li>' + esc(tagCh(o.datum, true)) + ' · CHF ' + esc(o.betrag) + ' · ' + esc(o.text) + (o.auftrag ? ' · ' + esc(o.auftrag) : '') + '</li>'; }).join('') + '</ul>' : '<p class="still">–</p>'), true);
-    if (!BANK.alle.length) return h + '<p class="still">' + t('f.t1.keine') + '</p>';
-    return h + '<div class="cp-jetzt" style="margin-top:12px"><button class="haupt-knopf" onclick="cpBankErfassen()">' + t('c.bank.erfassen', '<span id="cp-bank-n">' + r.sicher.length + '</span>') + '</button></div>';
+    if (!BANK.alle.length) return block(t('c.p.bank.s2'), h + '<p class="still">' + t('f.t1.keine') + '</p>');
+    return block(t('c.p.bank.s2'), h) + jetzt(t('c.p.bank.s3'), '<button class="haupt-knopf" onclick="cpBankErfassen()">' + t('c.bank.erfassen', '<span id="cp-bank-n">' + r.sicher.length + '</span>') + '</button>');
   }
   function cpBankZaehlen() { var n = Array.prototype.filter.call(document.querySelectorAll('.bank-wahl'), function (x) { return x.checked; }).length; if ($('cp-bank-n')) $('cp-bank-n').textContent = n; }
   document.addEventListener('change', function (e) { if (e.target && e.target.classList && e.target.classList.contains('bank-wahl')) cpBankZaehlen(); });
@@ -420,8 +464,8 @@
   function cpBericht() {
     CPP = { key: 'bericht', art: 'bericht' };
     pOeffne(esc(t('c.p.bericht.titel')), t('c.p.bericht.letzter', esc(CP.letzterImport || t('u.keiner'))),
-      '<p class="still">' + t('c.p.bericht.text') + '</p><div class="knoepfe">' + lnk(CP.links.verkauft, t('v.import.link')) + '</div>'
-      + '<div class="reihe" style="margin-top:10px"><input type="file" id="f-bericht" accept=".csv,text/csv"> <button class="haupt-knopf" onclick="importieren(\'f-bericht\', function () { cpNach(); })">' + t('v.einlesen') + '</button></div><div id="f-bericht-meldung"></div>'
+      block(t('c.p.bericht.s1'), '<p class="still">' + t('c.p.bericht.text') + '</p><div class="knoepfe">' + lnk(CP.links.verkauft, t('v.import.link')) + '</div>')
+      + block(t('c.p.bericht.s2'), '<div class="reihe" style="margin-top:6px"><input type="file" id="f-bericht" accept=".csv,text/csv"> <button class="haupt-knopf" onclick="importieren(\'f-bericht\', function () { cpNach(); })">' + t('v.einlesen') + '</button></div><div id="f-bericht-meldung"></div>')
       + block(t('c.p.post'), '<div class="reihe"><button onclick="post(\'cp-post\')">' + t('v.post') + '</button> <span id="cp-post"></span></div>', true));
   }
 
@@ -433,7 +477,8 @@
     cpWeiter: function (id) { cpListing(id, false); },
     cpAbbrechen: function (id) { frage(t('s4.abbr.frage', id), function () { cpRuf('setzeStatus', [id, 'Abgebrochen']); cpZu(); }); },
     cpUnverkauft: function (id, abgelaufen) { var uz = CP.unzugeordnet || []; frage(unzugText(uz) + (abgelaufen === '1' ? '' : t('u.laeuft') + ' ') + t('u.frage', id), function () { ruf('setzeStatus', [id, 'Unverkauft', uz.length > 0], function () { melde(t('c.gespeichert'), 'ok'); cpZu(); cpNach(); }); }); },
-    cpEntscheid: function (id, e) { ruf('entscheidUnverkauft', [id, e], function () { if (e === 'Neu listen') { cpListing(id, false); return; } melde(t('c.gespeichert'), 'ok'); cpZu(); cpNach(); }); },
+    cpEntscheid: function (id, e) { ruf('entscheidUnverkauft', [id, e], function () { melde(t('c.gespeichert'), 'ok'); if (e === 'Neu listen') { CPM = 'cockpit'; CPS = 'bereit'; CPT = null; CPQ = null; CPP = { key: 'b' + id, art: 'bereit' }; $('cp-veil').hidden = true; CPLADEN = false; ladeCockpit(); return; } cpZu(); cpNach(); }); },
+    cpGelistet: function (id) { var f = $('wl-' + id), link = f ? f.value.trim() : ''; if (!link) { melde(t('s4.link'), 'stop'); if (f) f.focus(); return; } var los = function (ok) { ruf('markiereGelistet', ok ? [id, link, '', true] : [id, link, ''], function () { melde(t('s4.fertig', id), 'ok'); cpZu(); CPS = 'online'; cpNach(); }, function (m) { return bestaetigen(m, function () { los(true); }); }); }; los(false); },
     cpVerkauf: function (nr, aktion) {
       var o = (CP.verkauft || []).filter(function (x) { return x.nr === nr; })[0] || {}, los = function () { ruf('setzeVerkauf', [nr, aktion], function (v) { VK = v; melde(t('c.gespeichert'), 'ok'); if (aktion === 'versendet' || aktion === 'bezahlt') cpZu(); cpNach(); }); };
       if (aktion === 'gepackt' || aktion === 'ricardoBezahlt') los(); else frage(t(aktion === 'versendet' ? 'v.f.versendet' : 'v.f.bezahlt', o.pgId || o.titel || nr, o.total || ''), los);
