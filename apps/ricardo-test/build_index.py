@@ -46,10 +46,8 @@ rep("</style>\n</head>", """  /* ---------- Cockpit (Umbau 30.10.2026) ---------
   .cp-body { padding:16px 18px 40px; display:flex; flex-direction:column; gap:12px; }
   .cp-jetzt { background:#fff3e0; border:3px solid #e08a00; border-radius:4px; padding:14px 16px; }
   .cp-body .ok, .cp-schritte .ok { background:#dff3df; border:1px solid #6fbf6f; border-radius:4px; padding:6px 10px; margin:0 0 6px; }
-  .cp-tun { padding:10px 12px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); margin-bottom:12px; align-items:center; }
-  .cp-tun .f-label { margin:0 6px 0 0; }
-  .chip.tun { background:#fff3e0; }
-  .chip.tun.an { background:#e08a00; color:var(--weiss); }
+  .cp-zeile .etikett { white-space:normal; line-height:1.25; }
+  #cp-liste table { width:100%; }
   .cp-bankzeile { border:1px solid var(--linie); border-radius:4px; padding:8px 10px; }
   .cp-jetzt .f-label { margin-bottom:8px; }
   .cp-block { margin:0; border:2px solid var(--ink); border-radius:4px; background:var(--pink-hell); padding:0; }
@@ -160,6 +158,9 @@ rep("  /* ---------- Start ---------- */", cockpit + "\n  /* ---------- Start --
 # 7. Start: Cockpit statt «Täglich»
 rep("    lade(false); S = s; texte(); ablaufStarten('taeglich');\n    ladeAnalyse();\n    vorladen(['schicht1', 'schicht2', 'schicht3']);",
     "    lade(false); S = s; texte(); zeige('cockpit');")
+# Neue Mails beim Start auch ins Cockpit (früher nur «Zu erledigen»)
+rep("    still('mailsJetzt', [], function (a) { AU = a; marke($('z-aufgaben'), a.anzahl); if (ANSICHT === 'aufgaben') zeichneAufgaben(); });",
+    "    still('mailsJetzt', [], function (a) { AU = a; marke($('z-aufgaben'), a.anzahl); if (CP) { CP.aufgaben = a; if (ANSICHT === 'cockpit') zeichneCockpit(); } });")
 # Sprache: Cockpit neu zeichnen
 rep("    if (ANSICHT === 'admin') ladeAdmin();\n    $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();", "    if (ANSICHT === 'admin') ladeAdmin();\n    if (ANSICHT === 'cockpit' && CP) zeichneCockpit();\n    $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();")
 # Version sichtbar

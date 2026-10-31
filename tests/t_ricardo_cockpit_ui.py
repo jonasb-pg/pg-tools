@@ -19,7 +19,7 @@ COCKPIT = {
                {'id': 'PG-302', 'status': 'Gelistet', 'name': 'Hang it all', 'ort': 'Ricardo Online', 'regal': 'Ricardo Online', 'link': 'https://www.ricardo.ch/de/a/1299003/', 'buendel': '', 'seit': '20.10.2026', 'gebot': None, 'laufzeit': 6, 'abgelaufen': True}],
     'verkauft': [V('54000001', 'PG-401', 'Autoradio', 'Zu packen', ohneAdresse=True, name='', ort=''), V('54000002', 'PG-402', 'Toner', 'Wartet auf Zahlung', total='23.80'),
                  V('54000003', 'PG-403', 'Lego', 'Zu packen', bezahlt='30.10.2026'), V('54000004', 'PG-404', 'Garmin', 'Bereit zum Versand', bezahlt='30.10.2026', ricardoGemeldet='30.10.2026', sendung='99.00.1')],
-    'versendet': [V('54000005', 'PG-405', 'Dyson', 'Bezahlt und versendet', versendetAm='27.10.2026', sendung='99.00.2')],
+    'versendet': [V('54000005', 'PG-405', 'Dyson', 'Bezahlt und versendet', versendetAm='27.10.2026', sendung='99.00.2', adresse='Bahnhofstrasse 1, 3011 Bern')],
     'nichtverkauft': [{'id': 'PG-500', 'status': 'Unverkauft', 'name': 'Krups Mixer', 'ort': 'Ricardo Online', 'link': 'https://www.ricardo.ch/de/a/1299500/', 'artikel': '1299500', 'kopieren': 'https://www.ricardo.ch/de/list/?prefill=1299500'}],
     'ohneMail': [{'id': 'PG-302', 'name': 'Hang it all', 'ort': 'Ricardo Online', 'link': 'https://www.ricardo.ch/de/a/1299003/', 'ende': '26.10.2026'}],
     'storniert': [{'id': 'PG-600', 'status': 'Storniert', 'name': 'Gewindeschneider', 'ort': 'Ricardo Unpaid', 'link': '', 'artikel': '', 'kopieren': ''}],
@@ -64,8 +64,11 @@ with sync_playwright() as p:
     s.click('#nav-todos'); s.wait_for_timeout(100)
     tun = s.inner_text('#cp-tun').upper().replace('\n', ' ')
     ok(s.is_visible('#cp-tun') and s.is_hidden('#cp-chips') and 'an' in s.get_attribute('#nav-todos', 'class'), 'To-dos: Filterzeile statt Stufen')
-    ok(all(x in tun for x in ['ALLE ', 'FRAGEN 1', 'NACHRICHTEN 1', 'PREISVORSCHLÄGE 1', 'BEWERTUNGEN 1', 'ADRESSE FEHLT 1', 'STORNO PRÜFEN 1', 'ZAHLUNG BEI RICARDO MELDEN 1', 'VERSENDEN 1', 'LAUFZEIT PRÜFEN 1', 'NICHT VERKAUFT ENTSCHEIDEN 2', 'RETOURE-SCHRITT 1']) and 'ZAHLUNG PRÜFEN (' not in tun and 'FRAGEN / ' not in tun, 'To-dos: Fragen und Nachrichten getrennt, Bewertung nur versendet (1), «Zahlung prüfen» ohne Zusatz: ' + tun)
+    ok(all(x in tun for x in ['ALLE ', 'FRAGEN 1', 'NACHRICHTEN 1', 'PREISVORSCHLÄGE 1', 'BEWERTUNGEN 1', 'ADRESSE FEHLT 1', 'STORNO PRÜFEN 1', 'ZAHLUNG BEI RICARDO MELDEN 1', 'VERSENDEN 1', 'LAUFZEIT PRÜFEN 1', 'NICHT VERKAUFT 2', 'RETOURE-SCHRITT 1']) and 'ZAHLUNG PRÜFEN (' not in tun and s.query_selector('#cp-tun .chip.tun') is None and 'FRAGEN / ' not in tun, 'To-dos: Fragen und Nachrichten getrennt, Bewertung nur versendet (1), «Zahlung prüfen» ohne Zusatz: ' + tun)
     ok('PG-401' in L() and 'PG-405' in L() and 'NACHRICHT' in L() and s.inner_text('#cp-liste').count('→') >= 8, 'To-dos: alle Zeilen mit Stufe und Handlung')
+    kopf = s.inner_text('#cp-liste tr').upper()
+    ok('STUFE' in kopf and 'ZU TUN' in kopf and 'OFFEN' not in kopf, 'To-dos: Spalten Stück, Titel, Stufe, Zu tun (keine doppelte Spalte): ' + kopf)
+    ok(s.evaluate("document.querySelector('#cp-liste .tabelle').scrollWidth <= document.querySelector('#cp-liste .tabelle').clientWidth + 2"), 'To-dos passt in die Breite (kein Querscrollen)')
     s.click('#nav-cockpit'); s.wait_for_timeout(100)
     ok(s.is_visible('#cp-chips') and s.is_hidden('#cp-tun') and 'an' in s.get_attribute('#nav-cockpit', 'class') and 'an' not in (s.get_attribute('#nav-todos', 'class') or ''), 'Cockpit zurück: Stufen')
     ok(s.query_selector('.cp-top button:has-text("Listing")') is None, 'Kein Listing-Knopf neben der Suche')
@@ -179,7 +182,7 @@ with sync_playwright() as p:
     ok(s.is_visible('#s-cockpit') and s.is_hidden('#nav-f-taeglich'), 'Cockpit zurück, alte Abläufe versteckt')
     ok(s.is_visible('.fb-auf'), 'Feedback-Knopf da')
     s.click('#nav-todos'); s.wait_for_timeout(100)
-    s.click('.chip.tun:has-text("Adresse fehlt")'); s.wait_for_timeout(100)
+    s.click('#cp-tun .chip:has-text("Adresse fehlt")'); s.wait_for_timeout(100)
     ok('PG-401' in L() and 'VERKAUFT' in L() and 'PG-402' not in L(), 'To-dos › Adresse fehlt: nur dieses Stück, mit Stufe')
     s.click('tr[data-key="v54000001"]'); s.wait_for_timeout(100)
     pan = s.inner_text('#cp-panel').upper()
@@ -195,6 +198,16 @@ with sync_playwright() as p:
     s.fill('#wl-PG-200', 'https://www.ricardo.ch/de/a/hue-1299010/'); s.click('[data-akt="cpGelistet"]'); s.wait_for_timeout(200)
     calls = s.evaluate('ARGS')
     ok(any(c[0] == 'markiereGelistet' and c[1][:3] == ['PG-200', 'https://www.ricardo.ch/de/a/hue-1299010/', ''] for c in calls), 'markiereGelistet ohne Laufzeit (Server rechnet Auktionsende): ' + str([c for c in calls if c[0] == 'markiereGelistet']))
+    zu()
+    # Retoure: Adresse aus dem Verkauf vorausgefüllt, Betrag von Hand
+    s.click('#nav-cockpit'); s.wait_for_timeout(100); s.click('#cp-chips .chip:has-text("Versendet")'); s.wait_for_timeout(100)
+    s.click('tr[data-key="s54000005"]'); s.wait_for_timeout(100)
+    s.evaluate("document.querySelectorAll('#cp-panel details.cp-block').forEach(function (d) { d.open = true; })"); s.wait_for_timeout(50)
+    ok(s.input_value('#cpra') == 'Bahnhofstrasse 1, 3011 Bern' and s.input_value('#cprb0') != '', 'Retoure: Adresse vorausgefüllt (überschreibbar), Betrag vorgeschlagen')
+    s.fill('#cpri', 'CH9300762011623852957'); s.fill('#cprb0', '45.50'); s.click('[data-akt="cpRetoureNeu"]'); s.wait_for_timeout(100)
+    s.click('#dialog-ja'); s.wait_for_timeout(200)
+    a = [c for c in s.evaluate('ARGS') if c[0] == 'retoureEroeffnen']
+    ok(a and a[-1][1][4] == 'Bahnhofstrasse 1, 3011 Bern' and a[-1][1][5] == '45.50', 'retoureEroeffnen mit Adresse und Betrag: ' + str(a[-1][1] if a else None))
     zu()
     s.click('#l-en'); s.wait_for_timeout(100)
     ok('READY' in s.inner_text('#cp-chips').upper() and 'SOLD' in s.inner_text('#cp-chips').upper(), 'Englisch')

@@ -2246,6 +2246,8 @@ function iban_(s) {
 }
 
 /** Ein Verkauf für die Oberfläche. Prüfung Z10: lagerort = Regal nach Status (Lager-Ablauf), der Lagerort aus dem Return Tool nur als Hinweis (rtOrt). */
+/** Adresse aus dem Verkauf als eine Zeile (Strasse Nr, Postfach, PLZ Ort) – Vorschlag für die Retoure, von Hand überschreibbar (Jonas 31.10.2026). */
+function adresseZeile_(v) { return [[v['Strasse'], v['Hausnummer']].join(' ').trim(), v['Postfach'] ? 'Postfach ' + v['Postfach'] : '', [v['PLZ'], v['Ort']].join(' ').trim()].filter(String).join(', '); }
 function vZeile_(v) {
   return { nr: String(v['Verkauf-Nr']), pgId: String(v['PG-ID']), titel: v['Titel'], am: datum_(v['Verkauft am']),
     total: Number(v['Total CHF']).toFixed(2), preis: Number(v['Preis CHF']).toFixed(2), status: v['Status'],
@@ -3630,6 +3632,7 @@ function sucheAlles_(q) {
     const v = {}; V_COLS.forEach(function (k, j) { v[k] = row[j]; });
     if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Nachname']].join(' '))) return;
     const z = vZeile_(v); z.zeile = i + 2;
+    if (v['Status'] === 'Bezahlt und versendet') { z.adresse = adresseZeile_(v); z.versendetAm = datum_(v['Bezahlt und versendet am']); }
     z.storno = V_OFFEN.indexOf(v['Status']) !== -1;                                     // Prüfung 5 / Nach-Review 3: nicht versendet (bezahlt: mit Rückfrage)
     z.zuordnen = !String(v['PG-ID'] || '').trim() && ['Storniert', 'Retourniert'].indexOf(v['Status']) === -1;   // Prüfung 4
     verk.push(z);
@@ -3790,7 +3793,7 @@ function retouren() {
     const frist = vk instanceof Date ? new Date(vk.getTime() + RICARDO_FRIST_TAGE * 86400000) : null;
     return { nr: String(r['Retoure-Nr']), verkauf: String(r['Verkauf-Nr']), pgId: String(r['PG-ID']), titel: r['Titel'], kaeufer: String(r['Käufer']), name: String(r['Name']),
       eroeffnet: datum_(r['Eröffnet am']), grund: r['Grund'], notiz: r['Notiz'], iban: String(r['IBAN']),
-      betrag: runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0)).toFixed(2),
+      betrag: (!r['Rückzahlung am'] && Number(r['Rückzahlung CHF']) > 0 ? runde_(Number(r['Rückzahlung CHF'])) : runde_((Number(r['Preis CHF']) || 0) + (Number(r['Versand CHF']) || 0))).toFixed(2),
       rueckzahlung: r['Rückzahlung am'] ? Number(r['Rückzahlung CHF']).toFixed(2) : '', rueckzahlungAm: datum_(r['Rückzahlung am']),
       stornoLink: r['Verkauf-Nr'] ? RICARDO_ORDER + 'cancelation/' + orderNr_(r['Verkauf-Nr']) + '/' : '',
       ricardo: datum_(r['Ricardo storniert am']), ricardoFrist: frist ? datum_(frist) : '', ricardoTage: frist ? Math.floor((frist.getTime() - jetzt) / 86400000) : null,
@@ -3817,7 +3820,9 @@ function retoureSuche(q) {
   return out.reverse().slice(0, 20);
 }
 
-function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
+/* Feedback Jonas 31.10.2026: Betrag der Rückzahlung schon beim Eröffnen von Hand (Vorschlag Preis + Porto). Leer = Preis + Porto wie bisher.
+   Gemerkt in «Rückzahlung CHF» ohne «Rückzahlung am»: der Schritt Rückzahlung ist damit nicht erledigt, nur der Betrag vorgeschlagen. */
+function retoureEroeffnen(nr, grund, notiz, iban, adresse, betragHand, bestaetigt) {
   nr = String(nr).trim();
   if (RETOURE_GRUENDE.indexOf(grund) === -1) throw new Error('Bitte einen Grund wählen.');
   iban = iban_(iban);
@@ -3834,6 +3839,13 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
     const row = sv.getRange(zeile, 1, 1, V_COLS.length).getValues()[0];
     const v = {}; V_COLS.forEach(function (k, i) { v[k] = row[i]; });
     if (v['Status'] !== 'Bezahlt und versendet') throw new Error('Eine Retoure ist nur bei einem bezahlten und versendeten Verkauf möglich (Status: «' + v['Status'] + '»).');
+    const hoechstens = runde_((Number(v['Preis CHF']) || 0) + (Number(v['Versand CHF']) || 0));
+    let betrag = '';
+    if (betragHand !== undefined && betragHand !== null && String(betragHand).trim() !== '') {
+      betrag = runde_(zahl_(betragHand));
+      if (!(betrag > 0)) throw new Error('Bitte einen Rückzahlungsbetrag eingeben.');
+      if (hoechstens > 0 && betrag > hoechstens && bestaetigt !== true) throw new Error('Bitte bestätigen: Die Rückzahlung (CHF ' + betrag.toFixed(2) + ') ist mehr als Preis und Porto (CHF ' + hoechstens.toFixed(2) + '), z.B. Rückporto?');
+    }
     let max = 0;
     rZeilen_().forEach(function (x) { const m = /^RT-(\d+)$/.exec(String(x['Retoure-Nr'])); if (m) max = Math.max(max, Number(m[1])); });
     r = {}; R_COLS.forEach(function (k) { r[k] = ''; });
@@ -3842,6 +3854,7 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
     r['Grund'] = grund; r['Notiz'] = text_(notiz, 500);
     r['Preis CHF'] = v['Preis CHF']; r['Versand CHF'] = v['Versand CHF']; r['Provision CHF'] = v['Provision CHF']; r['Eröffnet von'] = nutzer_();
     r['IBAN'] = iban; r['Adresse'] = adresse; r['PLZ'] = v['PLZ']; r['Ort'] = v['Ort'];
+    if (betrag !== '') r['Rückzahlung CHF'] = betrag;
     rt.appendRow(R_COLS.map(function (k) { return r[k]; }));
     sv.getRange(zeile, V_COLS.indexOf('Status') + 1).setValue('Retourniert');
     const pg = String(v['PG-ID']).trim();
@@ -3866,10 +3879,11 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse) {
 function rueckzahlungMail_(r) {
   const an = String(cfg_('Rückzahlungen an') || '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(an)) { log_('Rückzahlungs-Mail', String(r['PG-ID']), 'Keine gültige Adresse in «Rückzahlungen an»'); return { ok: false, an: an }; }
-  const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), betrag = runde_(preis + porto).toFixed(2);
+  const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), hand = Number(r['Rückzahlung CHF']) > 0;
+  const betrag = (hand ? runde_(Number(r['Rückzahlung CHF'])) : runde_(preis + porto)).toFixed(2);
   const zeilen = [
     'Bitte diese Rückzahlung (Retoure Ricardo) ausführen:', '',
-    'Betrag: CHF ' + betrag + ' (Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')',
+    'Betrag: CHF ' + betrag + (hand && Number(betrag) !== runde_(preis + porto) ? ' (von Hand; Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')' : ' (Preis CHF ' + preis.toFixed(2) + ' + Porto CHF ' + porto.toFixed(2) + ')'),
     'Name: ' + (r['Name'] || r['Käufer']),
     'Adresse: ' + r['Adresse'] + ', ' + String(r['PLZ'] || '') + ' ' + String(r['Ort'] || ''),
     'IBAN: ' + r['IBAN'],
@@ -4080,7 +4094,7 @@ function cockpit() {
   const tg = ablauf('taeglich'), vk = verkaeufe(), ue = uebersicht(), rt = retouren();
   const grenze = jetzt - 60 * 86400000;
   const versendet = alleVerkaeufe_().filter(function (v) { return v['Status'] === 'Bezahlt und versendet' && v['Bezahlt und versendet am'] instanceof Date && v['Bezahlt und versendet am'].getTime() >= grenze; })
-    .map(function (v) { const o = vZeile_(v); o.versendetAm = datum_(v['Bezahlt und versendet am']); o.versendetMs = v['Bezahlt und versendet am'].getTime(); return o; })
+    .map(function (v) { const o = vZeile_(v); o.versendetAm = datum_(v['Bezahlt und versendet am']); o.versendetMs = v['Bezahlt und versendet am'].getTime(); o.adresse = adresseZeile_(v); return o; })
     .sort(function (a, b) { return b.versendetMs - a.versendetMs; });
   return { bereit: bereit, analyse: null, online: ue.liste, verkauft: vk.offen, versendet: versendet,
     nichtverkauft: unverkauft.filter(function (x) { return x.status !== 'Storniert'; }), ohneMail: ohneMail,
