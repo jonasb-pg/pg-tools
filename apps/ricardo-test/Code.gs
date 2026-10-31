@@ -1571,7 +1571,8 @@ function auktionsende_(ab) {
   }
   if (!ende) return null;
   const kurz = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][wt];
-  return { ende: ende, tage: Math.max(1, Math.ceil((ende.getTime() - jetzt.getTime()) / 86400000)), text: kurz + ' ' + Utilities.formatDate(ende, TZ, 'dd.MM.yyyy HH:mm') };
+  /* Nur Zahlen und Text: Date-Objekte kann google.script.run nicht übertragen (der Aufruf bliebe stumm hängen) */
+  return { ms: ende.getTime(), tage: Math.max(1, Math.ceil((ende.getTime() - jetzt.getTime()) / 86400000)), text: kurz + ' ' + Utilities.formatDate(ende, TZ, 'dd.MM.yyyy HH:mm') };
 }
 /** Offset der Zeitzone TZ an einem Tag, als «+01:00» (für Date-Strings). */
 function zoneOffset_(tag) { const z = Utilities.formatDate(new Date(tag + 'T12:00:00Z'), TZ, 'XXX'); return z === 'Z' ? '+00:00' : z; }
