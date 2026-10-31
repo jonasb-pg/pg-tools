@@ -28,3 +28,6 @@ Umstellung angefangen, aber nicht gespeichert: Im Live-Editor sind zwei von 14 E
 - Daten: Listings, Verkäufe, Posteingang, Gebote unverändert gegenüber der Sicherung.
 - Oberflächen-Paket nach Feedback Jonas (Stufentexte weg, Stand pro Quelle im Knopf, To-dos unter Verwaltung, Hinweis «Mail fehlt» im Reporting weg, Suchtext beim Wechsel leeren): im Live-Editor gespeichert (Index 281824 / 2997902977), im Test als Version 9 bereitgestellt. **Live noch nicht bereitgestellt** (Bereitstellen von der Sicherheitsprüfung gestoppt) – die Web-App läuft weiter auf Version 39. Der Servercode ist identisch, die Auslöser betrifft das nicht.
 - apps/ricardo-test/build_index.py baut jetzt aus Index_basis_alt.html (alte Oberfläche, Tag ricardo-live-vor-cockpit-2026-10-31).
+
+## Stand 31.10.2026, 18:16 – Version 40 live
+Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Knoepfen, ohne Stufentexte (Rückfall: 39)». Servercode unverändert gegenüber Version 39 (Code 331451 / 3993215958), Oberfläche 281824 / 2997902977. Live geprüft: Kopf mit drei Quellen-Knöpfen und Stand, keine Stufentexte, To-dos unter Verwaltung, Zahlen unverändert.
