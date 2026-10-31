@@ -3146,7 +3146,7 @@ function api(lang, name, args) {
     aufgaben: aufgaben, aufgabeErledigt: aufgabeErledigt, erinnerungErledigt: erinnerungErledigt, mailsJetzt: mailsJetzt,
     ablauf: ablauf, bankAbgleich: bankAbgleich, bankBestaetigen: bankBestaetigen, etikette: etikette, adressePruefen: adressePruefen, adresseUebernehmen: adresseUebernehmen, entscheidUnverkauft: entscheidUnverkauft, verkaufStornieren: verkaufStornieren,
     adminBetrieb: adminBetrieb, verbindungTest: verbindungTest, kennzahlen: kennzahlen, feedback: feedback, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus,
-    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen, cockpit: cockpit }[name];
+    zaehler: zaehler, uiTempo: uiTempo_, adminVerkaufZuordnen: adminVerkaufZuordnen, cockpit: cockpit, cockpitSuche: cockpitSuche }[name];
   if (!f) throw new Error('Unbekannte Funktion.');
   let r;
   const t0 = Date.now();
@@ -3533,8 +3533,8 @@ function feedbackStatus(r, text, status) {
   return feedbackListe();
 }
 
-function adminSuche(q) {
-  pruefeAdmin_();
+function adminSuche(q) { pruefeAdmin_(); return sucheAlles_(q); }
+function sucheAlles_(q) {
   const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
   const passt = function (text) { text = text.toLowerCase(); return woerter.every(function (w) { return text.indexOf(w) !== -1; }); };
   const ss = SpreadsheetApp.getActive(), sl = ss.getSheetByName(TAB_L), sv = ss.getSheetByName(TAB_S);
@@ -3979,22 +3979,42 @@ function ablauf(art) {
 
 /* ---------- Cockpit (Umbau 30.10.2026): alle Stufen in einem Aufruf ----------
    Bereit → Online → Verkauft → Bezahlt → Versendet, Nebenausgänge Nicht verkauft, Retouren, Storniert.
-   Setzt die bestehenden Funktionen zusammen; schreibt nichts. */
+   Setzt die bestehenden Funktionen zusammen; schreibt nichts.
+   Tempo (Feedback Jonas 31.10.2026): ohne die Analyse-Liste (externes Sheet, 7–11 s) – die holt die Oberfläche parallel über analyseListe(). */
 function cockpit() {
-  const s1 = ablauf('schicht1'), tg = ablauf('taeglich'), vk = verkaeufe(), ue = uebersicht(), rt = retouren();
-  const jetzt = Date.now(), grenze = jetzt - 60 * 86400000;
+  const jetzt = Date.now(), pr = PropertiesService.getScriptProperties();
+  const ls = alleListings_(), lz = Number(cfg_('Laufzeit Tage')) || 6, aktiv = aktiveNummern_(ls);
+  const bereit = ls.filter(function (r) { return OFFEN.indexOf(r['Status']) !== -1; }).map(function (r) {
+    return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], regal: regal_(r['Status']), wieder: r['Entscheid unverkauft'] === 'Neu listen' };
+  });
+  const unverkauft = ls.filter(function (r) { return entscheidOffen_(r, aktiv); }).map(function (r) {
+    const a = artikelAusLink_(r['Ricardo-Link']);
+    return { id: String(r['PG-ID']), status: r['Status'], name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], artikel: a, kopieren: a ? RICARDO_LISTEN + '?prefill=' + a : '' };
+  });
+  const ohneMail = ls.filter(function (r) {
+    return r['Status'] === 'Gelistet' && r['Gelistet am'] instanceof Date && r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz) * 86400000 < jetzt;
+  }).map(function (r) { return { id: String(r['PG-ID']), name: r['Bezeichnung'], ort: r['Lagerort'], link: r['Ricardo-Link'], ende: datum_(new Date(r['Gelistet am'].getTime() + laufzeitVon_(r['Laufzeit Tage'], lz) * 86400000)) }; });
+  const tg = ablauf('taeglich'), vk = verkaeufe(), ue = uebersicht(), rt = retouren();
+  const grenze = jetzt - 60 * 86400000;
   const versendet = alleVerkaeufe_().filter(function (v) { return v['Status'] === 'Bezahlt und versendet' && v['Bezahlt und versendet am'] instanceof Date && v['Bezahlt und versendet am'].getTime() >= grenze; })
     .map(function (v) { const o = vZeile_(v); o.versendetAm = datum_(v['Bezahlt und versendet am']); o.versendetMs = v['Bezahlt und versendet am'].getTime(); return o; })
     .sort(function (a, b) { return b.versendetMs - a.versendetMs; });
-  const pr = PropertiesService.getScriptProperties();
-  return { bereit: s1.bereit, analyse: analyseListe(), online: ue.liste, verkauft: vk.offen, versendet: versendet,
-    nichtverkauft: s1.unverkauft.filter(function (x) { return x.status !== 'Storniert'; }), ohneMail: s1.ohneMail,
-    storniert: s1.unverkauft.filter(function (x) { return x.status === 'Storniert'; }),
+  return { bereit: bereit, analyse: null, online: ue.liste, verkauft: vk.offen, versendet: versendet,
+    nichtverkauft: unverkauft.filter(function (x) { return x.status !== 'Storniert'; }), ohneMail: ohneMail,
+    storniert: unverkauft.filter(function (x) { return x.status === 'Storniert'; }),
     retouren: rt.offen, retourenAbgeschlossen: rt.abgeschlossen, retoureGruende: RETOURE_GRUENDE,
     aufgaben: tg.aufgaben, melden: tg.melden, storno: tg.storno, offenZahlung: tg.offen, doppelt: tg.doppelt, stornoTage: tg.stornoTage, letzteBank: tg.letzteBank,
     letzterImport: ue.letzterImport, unzugeordnet: ue.unzugeordnet, aktiv: ue.aktiv, schwelle: ue.schwelle, laufzeit: ue.laufzeit,
-    links: s1.links, regale: { offline: regal_('Bereit'), online: regal_('Gelistet'), unpaid: regal_('Verkauft') }, entscheide: ENTSCHEIDE_UNVERKAUFT,
+    links: { listen: RICARDO_LISTEN, verkauft: RICARDO_VERKAUFT, amVerkaufen: RICARDO_AM_VERKAUFEN, artikel: RICARDO_A },
+    regale: { offline: regal_('Bereit'), online: regal_('Gelistet'), unpaid: regal_('Verkauft') }, entscheide: ENTSCHEIDE_UNVERKAUFT,
     postBereit: !!(pr.getProperty('POST_CLIENT_ID') && pr.getProperty('POST_CLIENT_SECRET')), test: typeof TEST !== 'undefined' && TEST };
+}
+/** Suche über alle Listings und Verkäufe für das Cockpit, ohne Admin-Pflicht (Löschen und Zuordnen bleiben im Admin). */
+function cockpitSuche(q) {
+  const a = sucheAlles_(q);
+  a.listings.forEach(function (l) { delete l.zeile; delete l.loeschbar; });
+  a.verkaeufe.forEach(function (v) { delete v.zeile; delete v.storno; delete v.zuordnen; });
+  return a;
 }
 
 /** Nummern (normalisiert) mit einer nicht freien Zeile, auch als Bündel-Teil. */

@@ -39,7 +39,13 @@ rep("</style>\n</head>", """  /* ---------- Cockpit (Umbau 30.10.2026) ---------
   .cp-kopf .still { display:block; margin-top:4px; }
   .cp-kopf .x { min-height:0; width:40px; height:40px; padding:0; border-radius:50%; font-size:22px; line-height:1; flex:none; }
   .cp-body { padding:16px 18px 40px; display:flex; flex-direction:column; gap:12px; }
-  .cp-jetzt { background:var(--weiss); border:3px solid var(--ink); border-radius:4px; padding:14px 16px; }
+  .cp-jetzt { background:#fff3e0; border:3px solid #e08a00; border-radius:4px; padding:14px 16px; }
+  .cp-body .ok, .cp-schritte .ok { background:#dff3df; border:1px solid #6fbf6f; border-radius:4px; padding:6px 10px; margin:0 0 6px; }
+  .cp-tun { padding:10px 12px; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); margin-bottom:12px; align-items:center; }
+  .cp-tun .f-label { margin:0 6px 0 0; }
+  .chip.tun { background:#fff3e0; }
+  .chip.tun.an { background:#e08a00; color:var(--weiss); }
+  .cp-bankzeile { border:1px solid var(--linie); border-radius:4px; padding:8px 10px; }
   .cp-jetzt .f-label { margin-bottom:8px; }
   .cp-block { margin:0; border:2px solid var(--ink); border-radius:4px; background:var(--weiss); padding:0; }
   .cp-block > summary { padding:12px 16px; font:900 15px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.3px; }
@@ -51,7 +57,6 @@ rep("</style>\n</head>", """  /* ---------- Cockpit (Umbau 30.10.2026) ---------
   .cp-body textarea { width:100%; margin-top:4px; }
   .cp-body .frage { white-space:pre-wrap; background:var(--pink-hell); border:1px solid var(--linie); border-radius:4px; padding:8px 10px; margin:6px 0; }
   .cp-body .f-wahl { margin:10px 0 4px; }
-  .cp-body .ok { margin-bottom:6px; }
   .cp-body .tabelle { margin-top:8px; }
   .cp-body label { margin:12px 0 4px; }
   @media (max-width: 860px) { #cp-panel { width:100%; } .cp-top input[type=text] { min-width:0; } }
@@ -67,7 +72,7 @@ rep("""    <div class="nav">
       <button id="nav-listing" class="flow" onclick="ablaufStarten('schicht1')"><span>▸ <span data-t="nav.listing"></span></span><span class="zahl" id="z-listing" hidden></span></button>
       <div class="sektion gross" style="margin-top:8px" data-t="nav.sektion2"></div>
       <button id="nav-zahlen" onclick="zeigeZahlen()"><span data-t="nav.zahlen"></span></button>
-      <button id="nav-einst" onclick="zeige('admin')"><span data-t="nav.einst"></span></button>
+      <button id="nav-einst" onclick="zeigeEinst()"><span data-t="nav.einst"></span></button>
       <div hidden>
       <div class="sektion gross" data-t="nav.ablaeufe"></div>
       <button id="nav-f-taeglich" class="flow" onclick="ablaufStarten('taeglich')">""")
@@ -85,10 +90,10 @@ rep("""      <!-- ===================== LISTEN ===================== -->""", """
           <button onclick="cpSuchen()" data-t="suchen"></button>
           <button onclick="cpBericht()" data-t="c.bericht"></button>
           <button onclick="cpBank()" data-t="c.bank"></button>
-          <button class="dunkel" onclick="ablaufStarten('schicht1')">▸ <span data-t="c.listing"></span></button>
         </div>
         <p class="still" id="cp-stand" style="margin:-6px 0 12px"></p>
         <div id="cp-warn"></div>
+        <div class="chips cp-tun" id="cp-tun"></div>
         <div class="chips" id="cp-chips"></div>
         <p class="still" id="cp-sub"></p>
         <div id="cp-liste"></div>
@@ -102,9 +107,10 @@ rep("""    ['listen', 'aufgaben', 'verkauf', 'ueber', 'retour', 'admin'].forEach
     $('s-ablauf').hidden = was !== 'ablauf';""",
 """    ['cockpit', 'listen', 'aufgaben', 'verkauf', 'ueber', 'retour', 'admin'].forEach(function (x) { $('s-' + x).hidden = was !== x; $('nav-' + x).className = was === x ? 'an' : ''; });
     $('s-ablauf').hidden = was !== 'ablauf';
-    $('nav-listing').className = 'flow' + (was === 'ablauf' && FA === 'schicht1' ? ' an' : ''); $('nav-zahlen').className = was === 'admin' && ADM === 'kennzahlen' ? 'an' : ''; $('nav-einst').className = was === 'admin' && ADM !== 'kennzahlen' ? 'an' : '';
+    $('nav-listing').className = 'flow' + (was === 'ablauf' && FA === 'schicht1' ? ' an' : ''); $('nav-zahlen').className = was === 'admin' && ADM_GRUPPE === 'reporting' ? 'an' : ''; $('nav-einst').className = was === 'admin' && ADM_GRUPPE !== 'reporting' ? 'an' : '';
     if (was !== 'cockpit' && typeof cpZu === 'function') cpZu();""")
 rep("""    if (was === 'aufgaben') ladeAufgaben(false); else if (was === 'ueber')""", """    if (was === 'cockpit') { if (CP) { zeichneCockpit(); ladeCockpit(true); } else ladeCockpit(); return; }
+    if (was === 'listen' && !ANA.length) ladeAnalyse();
     if (was === 'aufgaben') ladeAufgaben(false); else if (was === 'ueber')""")
 rep("""    $('top-sub').textContent = was === 'ablauf' ? t('f.' + FA) : t('nav.' + was);
     if (was === 'ablauf') return;""", """    $('top-sub').textContent = was === 'ablauf' ? t('f.' + FA) : t('nav.' + was);
@@ -112,7 +118,13 @@ rep("""    $('top-sub').textContent = was === 'ablauf' ? t('f.' + FA) : t('nav.'
 # Marke Listing: Zahl aus dem Ablauf schicht1 (statt z-f-schicht1)
 rep("function marken(l) { marke($('z-f-' + FA), l.length); }", "function marken(l) { marke($('z-f-' + FA), l.length); if (FA === 'schicht1') marke($('z-listing'), l.length); }")
 # admTab: Nav-Markierung mitführen
-rep("    reiter.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });", "    reiter.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });\n    $('nav-zahlen').className = ADM === 'kennzahlen' ? 'an' : ''; $('nav-einst').className = ADM !== 'kennzahlen' ? 'an' : '';")
+rep("    var reiter = ['betrieb', 'kennzahlen', 'storno', 'feedback', 'einstellungen'];   // Einstellungen am Schluss (Jonas 17.10.2026)", "    var alle = ['betrieb', 'kennzahlen', 'storno', 'feedback', 'einstellungen'], reiter = ADM_GRUPPE === 'reporting' ? ['kennzahlen', 'betrieb'] : ['einstellungen', 'storno', 'feedback'];   // Umbau 31.10.2026: Reporting und Einstellungen getrennt")
+rep("    reiter.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });", "    alle.forEach(function (x) { $('adm-' + x).hidden = x !== ADM; });\n    $('nav-zahlen').className = ADM_GRUPPE === 'reporting' ? 'an' : ''; $('nav-einst').className = ADM_GRUPPE !== 'reporting' ? 'an' : ''; $('top-sub').textContent = t(ADM_GRUPPE === 'reporting' ? 'nav.zahlen' : 'nav.einst');")
+rep("  var ADM = 'betrieb', KZ = null, AF = [];", "  var ADM = 'betrieb', KZ = null, AF = [], ADM_GRUPPE = 'einst';")
+# Kennzahlen ohne Grade-Tabelle (Jonas 31.10.)
+rep("    if (k.grades.length) h += '<div class=\"karte\"><h2>' + esc(t('kz.grades'))", "    if (false && k.grades.length) h += '<div class=\"karte\"><h2>' + esc(t('kz.grades'))")
+# Bank-Lesen: im Cockpit das neue Ergebnis zeichnen
+rep("      ruf('bankAbgleich', [z], function (r) { BANK = r; $('f-bank-erg').innerHTML = bankHtml(); });", "      ruf('bankAbgleich', [z], function (r) { BANK = r; $('f-bank-erg').innerHTML = (CPP && CPP.art === 'bank') ? cpBankHtml() : bankHtml(); });")
 
 # 5. Haken: nach Handlungen aus dem Panel das Cockpit still neu laden
 rep("      melde(t('g.p.adr.hand.ok', z.name + ', ' + z.ort), 'ok'); zeichneAblauf();", "      melde(t('g.p.adr.hand.ok', z.name + ', ' + z.ort), 'ok'); zeichneAblauf(); cpNach();")
@@ -133,7 +145,7 @@ rep("  /* ---------- Start ---------- */", cockpit + "\n  /* ---------- Start --
 
 # 7. Start: Cockpit statt «Täglich»
 rep("    lade(false); S = s; texte(); ablaufStarten('taeglich');\n    ladeAnalyse();\n    vorladen(['schicht1', 'schicht2', 'schicht3']);",
-    "    lade(false); S = s; texte(); zeige('cockpit');\n    ladeAnalyse();\n    vorladen(['schicht1']);")
+    "    lade(false); S = s; texte(); zeige('cockpit');")
 # Sprache: Cockpit neu zeichnen
 rep("    if (ANSICHT === 'admin') ladeAdmin();\n    $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();", "    if (ANSICHT === 'admin') ladeAdmin();\n    if (ANSICHT === 'cockpit' && CP) zeichneCockpit();\n    $('rt-treffer').innerHTML = ''; if (RT) zeichneRetouren();")
 # Version sichtbar
