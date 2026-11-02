@@ -1,4 +1,4 @@
-"""Heilsarmee Tool 1.0.0: Oberfläche mit Schein-Server (google.script.run). Erfundene Daten. Lauf: python3 tests/t_heilsarmee_ui.py"""
+"""Heilsarmee Tool 1.1.0 (DE/EN): Oberfläche mit Schein-Server (google.script.run). Erfundene Daten. Lauf: python3 tests/t_heilsarmee_ui.py"""
 import os, sys
 from playwright.sync_api import sync_playwright
 
@@ -78,6 +78,41 @@ with sync_playwright() as p:
     check('Von Hand gespeichert', pg.evaluate('SAVES')[-1]['quelle'] == 'Von Hand' and pg.evaluate('SAVES')[-1]['ovp'] == 20)
     pg.click('#btnAbschliessen'); pg.wait_for_selector('#screen-fertig.active')
     check('Abschluss mit Hinweis Prüfen', 'abgeschlossen' in pg.inner_text('#fertigText') and 'prüfen' in pg.inner_text('#fertigText'))
+    check('DE aktiv markiert', 'on' in pg.get_attribute('#lgDE', 'class') and 'on' not in (pg.get_attribute('#lgEN', 'class') or ''))
+    # Englisch (Jonas B. 02.11.2026)
+    pg.click('#lgEN')
+    check('EN: Knopf Fertig-Seite übersetzt', pg.inner_text('#screen-fertig .btn').upper() == 'BACK TO LOTS')
+    pg.click('text=Back to lots')
+    check('EN: Startseite', pg.inner_text('#btnNeuesLot').upper() == 'NEW LOT' and 'items' in pg.inner_text('#lotListe') and 'OPEN' in pg.inner_text('#lotListe').upper())
+    check('EN: html lang', pg.evaluate('document.documentElement.lang') == 'en')
+    pg.click('#lotListe button >> nth=0')
+    check('EN: Lot-Screen', 'SCAN EAN' in pg.inner_text('#screen-lot').upper() and 'Not found? Enter by hand' in pg.inner_text('#screen-lot') and pg.inner_text('#btnZurueck') == 'Back')
+    pg.fill('#q', 'Nichts'); pg.click('#screen-lot .btn.primary'); pg.wait_for_selector('#treffer .note')
+    check('EN: nichts gefunden', 'Nothing found' in pg.inner_text('#treffer'))
+    pg.fill('#q', 'Beispiel Lampe'); pg.click('#screen-lot .btn.primary'); pg.wait_for_selector('#treffer .btn')
+    check('EN: Trefferliste', 'already in' in pg.inner_text('#treffer') and 'Orig.' in pg.inner_text('#treffer'))
+    pg.click('#lgDE')
+    check('DE zurück: Treffer neu gezeichnet', 'schon in' in pg.inner_text('#treffer') and 'SUCHEN' in pg.inner_text('#screen-lot').upper())
+    pg.click('#lgEN')
+    pg.click('#treffer .btn >> nth=0'); pg.wait_for_selector('#screen-stueck.active')
+    pg.click('#btnGebraucht')
+    check('EN: Zustand und Preis-Info', pg.inner_text('#btnNeu').upper() == 'NEW' and pg.inner_text('#btnGebraucht').upper() == 'USED' and 'of original price' in pg.inner_text('#preisInfo'))
+    pg.click('#lgDE')
+    check('Umschalten mitten im Stück: Zustand bleibt, Text deutsch', '75% von OVP' in pg.inner_text('#preisInfo') and 'sel' in pg.get_attribute('#btnGebraucht', 'class'))
+    pg.click('#lgEN')
+    # Servermeldung übersetzt
+    pg.evaluate("() => { API.stueckSpeichern = () => { throw new Error('Lot BRO-1 ist abgeschlossen.'); }; }")
+    pg.click('#btnUebernehmen'); pg.wait_for_timeout(100)
+    check('EN: Servermeldung übersetzt', pg.inner_text('#toast') == 'Lot BRO-1 is closed.')
+    b.close()
+    # Sprache bleibt gemerkt
+    b = p.chromium.launch(); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    seite = HTML.replace('<script>', MOCK + '<script>', 1)
+    pg.route('https://heilsarmee.test/', lambda r: r.fulfill(status=200, content_type='text/html; charset=utf-8', body=seite))
+    pg.goto('https://heilsarmee.test/'); pg.wait_for_function("document.getElementById('busy').style.display === 'none'")
+    pg.click('#lgEN'); pg.reload(); pg.wait_for_function("document.getElementById('busy').style.display === 'none'")
+    check('Gemerkte Sprache EN beim Start', pg.inner_text('#btnNeuesLot').upper() == 'NEW LOT')
+    check('Kopfzeile passt auf 390 px', pg.evaluate("document.documentElement.scrollWidth <= 390"))
     b.close()
 print(('%d Fehler' % len(fehler)) if fehler else 'Alle UI-Checks bestanden')
 sys.exit(1 if fehler else 0)

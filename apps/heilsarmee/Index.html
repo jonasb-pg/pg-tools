@@ -40,62 +40,65 @@
   .link { background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 8px 0; text-align: left; }
   .tag { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: var(--grey); border-radius: var(--r); padding: 2px 6px; }
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--b); color: #fff; border-radius: var(--rb); padding: 10px 20px; display: none; max-width: 90vw; z-index: 9; }
+  .lang { display: inline-flex; border: 2px solid var(--b); border-radius: var(--rb); overflow: hidden; vertical-align: middle; }
+  .lang button { border: 0; background: #fff; padding: 4px 10px; font-size: 14px; cursor: pointer; }
+  .lang button.on { background: var(--b); color: #fff; }
   #busy { position: fixed; inset: 0; background: #ffffff99; display: none; align-items: center; justify-content: center; z-index: 8; font-size: 18px; }
 </style>
 </head>
 <body data-screen="start">
-<header><div class="col"><span class="t" id="titel">Heilsarmee Tool</span><span><button class="chip" id="btnZurueck" onclick="zurueck()" hidden>Zurück</button> <button class="chip" id="chipName" onclick="nameFragen()">Name</button></span></div></header>
+<header><div class="col"><span class="t" id="titel">Heilsarmee Tool</span><span style="white-space:nowrap"><button class="chip" id="btnZurueck" onclick="zurueck()" hidden data-t="zurueck">Zurück</button> <button class="chip" id="chipName" onclick="nameFragen()">Name</button> <span class="lang" role="group" aria-label="Sprache / Language"><button id="lgDE" onclick="setLang('de')">DE</button><button id="lgEN" onclick="setLang('en')">EN</button></span></span></div></header>
 <main>
   <!-- Start: Lots -->
   <section class="screen active" id="screen-start">
-    <button class="btn primary big" id="btnNeuesLot" onclick="neuesLot()">Neues Lot</button>
-    <div><span class="lbl">Lots</span><div id="lotListe" class="stack"></div></div>
+    <button class="btn primary big" id="btnNeuesLot" onclick="neuesLot()" data-t="neuesLot">Neues Lot</button>
+    <div><span class="lbl" data-t="lots">Lots</span><div id="lotListe" class="stack"></div></div>
   </section>
 
   <!-- Lot: scannen -->
   <section class="screen" id="screen-lot">
     <div class="card" id="lotKopf"></div>
     <div>
-      <label class="lbl" for="q">EAN scannen, PG-ID oder Name</label>
+      <label class="lbl" for="q" data-t="q">EAN scannen, PG-ID oder Name</label>
       <div class="field"><input id="q" type="text" autocomplete="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();suchen();}"></div>
     </div>
-    <button class="btn primary" onclick="suchen()">Suchen</button>
+    <button class="btn primary" onclick="suchen()" data-t="suchen">Suchen</button>
     <div id="treffer" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button class="link" onclick="vonHand()">Nicht gefunden? Von Hand erfassen</button>
-    <div><span class="lbl">Im Lot</span><div id="stuecke"></div></div>
-    <button class="btn" id="btnAbschliessen" onclick="abschliessen()">Lot abschliessen</button>
+    <button class="link" onclick="vonHand()" data-t="vonHandLink">Nicht gefunden? Von Hand erfassen</button>
+    <div><span class="lbl" data-t="imLot">Im Lot</span><div id="stuecke"></div></div>
+    <button class="btn" id="btnAbschliessen" onclick="abschliessen()" data-t="abschliessen">Lot abschliessen</button>
   </section>
 
   <!-- Stück: Neu/Gebraucht, Preis -->
   <section class="screen" id="screen-stueck">
     <div class="card" id="stueckKopf"></div>
     <div id="handFelder" style="display:none;flex-direction:column;gap:12px">
-      <div><label class="lbl" for="hBez">Bezeichnung</label><div class="field"><input id="hBez" type="text" autocomplete="off"></div></div>
+      <div><label class="lbl" for="hBez" data-t="bez">Bezeichnung</label><div class="field"><input id="hBez" type="text" autocomplete="off"></div></div>
       <div class="row2">
-        <div><label class="lbl" for="hOvp">OVP / Neupreis CHF</label><div class="field"><input id="hOvp" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
-        <div><label class="lbl" for="hMenge">Menge</label><div class="field"><input id="hMenge" type="text" inputmode="numeric" value="1" autocomplete="off"></div></div>
+        <div><label class="lbl" for="hOvp" data-t="ovp">OVP / Neupreis CHF</label><div class="field"><input id="hOvp" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
+        <div><label class="lbl" for="hMenge" data-t="menge">Menge</label><div class="field"><input id="hMenge" type="text" inputmode="numeric" value="1" autocomplete="off"></div></div>
       </div>
     </div>
-    <div><span class="lbl">Zustand</span>
-      <div class="row2"><button class="btn big" id="btnNeu" onclick="zustand('Neu')">Neu</button><button class="btn big" id="btnGebraucht" onclick="zustand('Gebraucht')">Gebraucht</button></div>
+    <div><span class="lbl" data-t="zustand">Zustand</span>
+      <div class="row2"><button class="btn big" id="btnNeu" onclick="zustand('Neu')" data-t="z.Neu">Neu</button><button class="btn big" id="btnGebraucht" onclick="zustand('Gebraucht')" data-t="z.Gebraucht">Gebraucht</button></div>
     </div>
     <div id="preisBox" class="card" style="display:none">
-      <span class="lbl">Brockipreis (Preis-Gun)</span>
+      <span class="lbl" data-t="preisGun">Brockipreis (Preis-Gun)</span>
       <div class="preis" id="preisGross">–</div>
       <div class="muted" id="preisInfo"></div>
       <div class="row2" style="margin-top:12px"><button class="btn" id="btnTiefer" onclick="stufeWahl(-1)">–</button><button class="btn" id="btnHoeher" onclick="stufeWahl(1)">–</button></div>
-      <div style="margin-top:12px"><label class="lbl" for="preisHand">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
+      <div style="margin-top:12px"><label class="lbl" for="preisHand" data-t="andererPreis">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
     </div>
-    <button class="btn primary big" id="btnUebernehmen" onclick="uebernehmen()" disabled>Übernehmen</button>
+    <button class="btn primary big" id="btnUebernehmen" onclick="uebernehmen()" disabled data-t="uebernehmen">Übernehmen</button>
   </section>
 
   <!-- Abschluss -->
   <section class="screen" id="screen-fertig">
     <div class="note ok" id="fertigText"></div>
-    <button class="btn" onclick="zeige('start')">Zu den Lots</button>
+    <button class="btn" onclick="zeige('start')" data-t="zuLots">Zu den Lots</button>
   </section>
 </main>
-<div id="busy">Bitte warten …</div>
+<div id="busy" data-t="warten">Bitte warten …</div>
 <div id="toast"></div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -103,6 +106,60 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 const chf = (n) => n == null || n === '' ? '–' : Number(n).toFixed(2);
 const LS = { get: (k, d) => { try { const v = localStorage.getItem('ha.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set: (k, v) => { try { localStorage.setItem('ha.' + k, JSON.stringify(v)); } catch (e) {} } };
+/* Sprache (Jonas B. 02.11.2026): Deutsch und Englisch, Umschalter oben rechts, pro Gerät gemerkt. Daten im Sheet bleiben deutsch. */
+let L = LS.get('lang', 'de') === 'en' ? 'en' : 'de';
+const T = {
+  zurueck: ['Zurück', 'Back'], name: ['Name', 'Name'], deinName: ['Dein Name', 'Your name'],
+  neuesLot: ['Neues Lot', 'New lot'], lots: ['Lots', 'Lots'], keineLots: ['Noch keine Lots.', 'No lots yet.'],
+  stuecke: ['{0} Stücke', '{0} items'], eroeffnet: ['{0} eröffnet', '{0} opened'],
+  abgeschlossenInfo: ['{0} ist abgeschlossen. Reporting im Sheet, Tab «{0}».', '{0} is closed. Report in the sheet, tab «{0}».'],
+  'st.Offen': ['Offen', 'Open'], 'st.Abgeschlossen': ['Abgeschlossen', 'Closed'],
+  q: ['EAN scannen, PG-ID oder Name', 'Scan EAN, PG-ID or name'], suchen: ['Suchen', 'Search'], sucht: ['Suche …', 'Searching …'],
+  nichts: ['Nichts gefunden für «{0}».', 'Nothing found for «{0}».'], schonIn: ['schon in {0}', 'already in {0}'],
+  vonHandLink: ['Nicht gefunden? Von Hand erfassen', 'Not found? Enter by hand'], vonHand: ['Von Hand erfassen', 'Enter by hand'],
+  imLot: ['Im Lot', 'In this lot'], leer: ['Noch leer.', 'Still empty.'], loeschen: ['Löschen', 'Delete'],
+  lotKopf: ['{0} Stücke · Brockipreis total CHF {1}', '{0} items · shop price total CHF {1}'],
+  loeschenFrage: ['{0} aus dem Lot löschen?', 'Delete {0} from the lot?'], geloescht: ['{0} gelöscht', '{0} deleted'],
+  abschliessen: ['Lot abschliessen', 'Close lot'],
+  abschliessenFrage: ['Lot {0} abschliessen? Danach kommen keine Stücke mehr dazu. Das Tool erstellt die Inventarliste mit Kategorien.', 'Close lot {0}? No more items can be added afterwards. The tool creates the inventory list with categories.'],
+  bez: ['Bezeichnung', 'Description'], ovp: ['OVP / Neupreis CHF', 'Original price CHF'], menge: ['Menge', 'Quantity'], mengeN: ['Menge {0}', 'Quantity {0}'],
+  zustand: ['Zustand', 'Condition'], 'z.Neu': ['Neu', 'New'], 'z.Gebraucht': ['Gebraucht', 'Used'],
+  schonErfasst: ['Schon erfasst in {0}.', 'Already recorded in {0}.'],
+  preisGun: ['Brockipreis (Preis-Gun)', 'Shop price (price gun)'], andererPreis: ['Anderer Preis CHF', 'Other price CHF'],
+  vonHandVorschlag: ['Von Hand (Vorschlag {0})', 'By hand (suggested {0})'], prozentVon: ['{0}% von OVP CHF {1}, gerundet', '{0}% of original price CHF {1}, rounded'],
+  ovpFehlt: ['OVP fehlt: Preis von Hand eingeben', 'Original price missing: enter the price by hand'],
+  uebernehmen: ['Übernehmen', 'Save'], bezFehlt: ['Bezeichnung fehlt', 'Description missing'],
+  fertig: ['Lot {0} abgeschlossen: {1} Stücke, OVP total CHF {2}, Brockipreis total CHF {3}.', 'Lot {0} closed: {1} items, original price total CHF {2}, shop price total CHF {3}.'],
+  fertigTab: ['Inventarliste im Sheet, Tab «{0}».', 'Inventory list in the sheet, tab «{0}».'],
+  fertigPruefen: ['{0} Kategorien bitte im Tab prüfen (steht «Prüfen»).', 'Please check {0} categories in the tab (marked «Prüfen»).'],
+  listeOeffnen: ['Inventarliste öffnen', 'Open inventory list'], zuLots: ['Zu den Lots', 'Back to lots'],
+  warten: ['Bitte warten …', 'Please wait …'], startFehler: ['Start fehlgeschlagen: {0}', 'Start failed: {0}']
+};
+function t(k) { const v = T[k], a = arguments; return (v ? v[L === 'en' ? 1 : 0] : k).replace(/\{(\d)\}/g, (m, i) => (a[+i + 1] == null ? '' : a[+i + 1])); }
+/* Meldungen vom Server sind deutsch: die bekannten auf Englisch übersetzen */
+const SRV_EN = [
+  [/^Tab «(.+)» im Return Tool nicht gefunden\.$/, 'Tab «$1» not found in the Return Tool.'],
+  [/^Kopfzeile im Tab «(.+)» nicht gefunden \(Spalten ID und Barcode\)\.$/, 'Header row not found in tab «$1» (columns ID and Barcode).'],
+  [/^Kein Lot offen\.$/, 'No lot open.'], [/^Bitte Neu oder Gebraucht wählen\.$/, 'Please choose New or Used.'], [/^Bezeichnung fehlt\.$/, 'Description missing.'],
+  [/^Preis fehlt: OVP eingeben oder Brockipreis von Hand\.$/, 'Price missing: enter the original price or a shop price by hand.'],
+  [/^Lot (.+) gibt es nicht\.$/, 'Lot $1 does not exist.'], [/^Lot (.+) ist abgeschlossen\.$/, 'Lot $1 is closed.'],
+  [/^Bitte bestätigen: (.+) steht schon in (.+) \((.+)\)\. Trotzdem nochmals erfassen\? \[doppelt\]$/, 'Please confirm: $1 is already in $2 ($3). Record it again anyway? [doppelt]'],
+  [/^(.+) nicht gefunden\.$/, '$1 not found.'], [/^Lot (.+) hat noch keine Stücke\.$/, 'Lot $1 has no items yet.'], [/^Lot (.+) hat keine Stücke\.$/, 'Lot $1 has no items.']
+];
+function srv(m) { m = String(m || ''); if (L !== 'en') return m; for (const [re, en] of SRV_EN) if (re.test(m)) return m.replace(re, en); return m; }
+function texte() {
+  document.documentElement.lang = L;
+  document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  $('lgDE').classList.toggle('on', L === 'de'); $('lgEN').classList.toggle('on', L === 'en');
+  $('chipName').textContent = name() || t('name');
+}
+function setLang(l) {
+  L = l === 'en' ? 'en' : 'de'; LS.set('lang', L); texte();
+  /* Sichtbares neu zeichnen, ohne Eingaben zu verlieren */
+  if (screen === 'start') zeichneLots();
+  if (screen === 'lot' && lot) { ladeStuecke(window._st); if (window._t && $('treffer').innerHTML) zeichneTreffer(window._t); }
+  if (screen === 'stueck' && st) { kopfStueck(); rechne(); }
+}
 let boot = { prozentNeu: .5, prozentGebraucht: .75, stufen: [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59], lots: [] };
 let lot = null, st = null, screen = 'start';
 
@@ -116,7 +173,7 @@ function busy(on) { $('busy').style.display = on ? 'flex' : 'none'; }
 let toastT = null;
 function toast(t, ms) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => { el.style.display = 'none'; }, ms || 3000); }
 function name() { return LS.get('name', ''); }
-function nameFragen() { const n = prompt('Dein Name', name()); if (n != null) { LS.set('name', n.trim()); $('chipName').textContent = n.trim() || 'Name'; } }
+function nameFragen() { const n = prompt(t('deinName'), name()); if (n != null) { LS.set('name', n.trim()); $('chipName').textContent = n.trim() || t('name'); } }
 
 function zeige(s) {
   screen = s;
@@ -144,66 +201,74 @@ const num = (v) => { const n = Number(String(v || '').replace(/['’\s]/g, '').r
 /* ---------- Lots ---------- */
 function zeichneLots() {
   const l = boot.lots || [];
-  $('lotListe').innerHTML = l.length ? l.map((x) => '<button class="btn list" style="margin-bottom:8px" onclick="oeffneLot(\'' + esc(x.lot) + '\')"><span><b>' + esc(x.lot) + '</b> <span class="tag">' + esc(x.status) + '</span><br><span class="muted">' +
-    esc(x.stuecke) + ' Stücke · CHF ' + chf(x.summe) + ' · ' + esc(x.eroeffnet) + '</span></span></button>').join('') : '<div class="muted">Noch keine Lots.</div>';
+  $('lotListe').innerHTML = l.length ? l.map((x) => '<button class="btn list" style="margin-bottom:8px" onclick="oeffneLot(\'' + esc(x.lot) + '\')"><span><b>' + esc(x.lot) + '</b> <span class="tag">' + esc(T['st.' + x.status] ? t('st.' + x.status) : x.status) + '</span><br><span class="muted">' +
+    esc(t('stuecke', x.stuecke)) + ' · CHF ' + chf(x.summe) + ' · ' + esc(x.eroeffnet) + '</span></span></button>').join('') : '<div class="muted">' + t('keineLots') + '</div>';
 }
 function neuesLot() {
   busy(true);
-  call('neuesLot', name()).then((r) => { busy(false); boot.lots = r.lots; oeffneLot(r.lot); toast(r.lot + ' eröffnet'); }).catch((e) => { busy(false); toast(e.message, 6000); });
+  call('neuesLot', name()).then((r) => { busy(false); boot.lots = r.lots; oeffneLot(r.lot); toast(t('eroeffnet', r.lot)); }).catch((e) => { busy(false); toast(srv(e.message), 6000); });
 }
 function oeffneLot(id) {
   lot = id; const info = (boot.lots || []).filter((x) => x.lot === id)[0] || { status: 'Offen' };
-  if (info.status !== 'Offen') { toast(id + ' ist abgeschlossen. Reporting im Sheet, Tab «' + id + '».', 5000); return; }
-  $('treffer').innerHTML = ''; $('q').value = '';
+  if (info.status !== 'Offen') { toast(t('abgeschlossenInfo', id), 5000); return; }
+  $('treffer').innerHTML = ''; $('q').value = ''; window._t = null;
   zeige('lot'); ladeStuecke();
 }
 function ladeStuecke(liste) {
   const zeichne = (s) => {
+    window._st = s;
     const menge = s.reduce((a, x) => a + (x.menge || 1), 0), summe = s.reduce((a, x) => a + (x.preis || 0) * (x.menge || 1), 0);
-    $('lotKopf').innerHTML = '<b>' + esc(lot) + '</b><br><span class="muted">' + menge + ' Stücke · Brockipreis total CHF ' + chf(summe) + '</span>';
-    $('stuecke').innerHTML = s.length ? s.slice(0, 30).map((x) => '<div class="item"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.pos) + ' · ' + esc(x.zustand) + (x.menge > 1 ? ' · ' + x.menge + '×' : '') +
-      '</span></span><span style="white-space:nowrap">CHF ' + chf(x.preis) + '<button class="x" onclick="loeschen(\'' + esc(x.pos) + '\')">Löschen</button></span></div>').join('') : '<div class="muted">Noch leer.</div>';
+    $('lotKopf').innerHTML = '<b>' + esc(lot) + '</b><br><span class="muted">' + t('lotKopf', menge, chf(summe)) + '</span>';
+    $('stuecke').innerHTML = s.length ? s.slice(0, 30).map((x) => '<div class="item"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.pos) + ' · ' + esc(T['z.' + x.zustand] ? t('z.' + x.zustand) : x.zustand) + (x.menge > 1 ? ' · ' + x.menge + '×' : '') +
+      '</span></span><span style="white-space:nowrap">CHF ' + chf(x.preis) + '<button class="x" onclick="loeschen(\'' + esc(x.pos) + '\')">' + t('loeschen') + '</button></span></div>').join('') : '<div class="muted">' + t('leer') + '</div>';
     $('btnAbschliessen').disabled = !s.length;
   };
   if (liste) { zeichne(liste); return; }
-  call('lotStuecke', lot).then(zeichne).catch((e) => toast(e.message, 6000));
+  call('lotStuecke', lot).then(zeichne).catch((e) => toast(srv(e.message), 6000));
 }
 function loeschen(pos) {
-  if (!confirm(pos + ' aus dem Lot löschen?')) return;
-  call('stueckLoeschen', pos).then((r) => { ladeStuecke(r.stuecke); toast(pos + ' gelöscht'); }).catch((e) => toast(e.message, 6000));
+  if (!confirm(t('loeschenFrage', pos))) return;
+  call('stueckLoeschen', pos).then((r) => { ladeStuecke(r.stuecke); toast(t('geloescht', pos)); }).catch((e) => toast(srv(e.message), 6000));
 }
 
 /* ---------- Suche ---------- */
 function suchen() {
   const q = $('q').value.trim();
   if (!q) return;
-  $('treffer').innerHTML = '<div class="muted">Suche …</div>';
+  $('treffer').innerHTML = '<div class="muted">' + t('sucht') + '</div>'; window._t = null;
   call('suche', q).then((r) => {
-    const t = r.treffer || [];
-    if (!t.length) { $('treffer').innerHTML = '<div class="note">Nichts gefunden für «' + esc(q) + '».</div>'; return; }
-    const frei = t.filter((x) => !x.vergeben);
+    const tr = r.treffer || [];
+    if (!tr.length) { $('treffer').innerHTML = '<div class="note">' + esc(t('nichts', q)) + '</div>'; return; }
+    const frei = tr.filter((x) => !x.vergeben);
     if (frei.length === 1 && /^\d{6,14}$/.test(q.replace(/\s/g, ''))) { waehle(frei[0]); return; }   // Scan mit eindeutigem freiem Treffer: direkt weiter
-    window._t = t;
-    $('treffer').innerHTML = t.map((x, i) => '<button class="btn list" onclick="waehle(window._t[' + i + '])"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.id) + ' · OVP CHF ' + chf(x.ovp) +
-      (x.menge > 1 ? ' · ' + x.menge + '×' : '') + (x.vergeben ? ' · schon in ' + esc(x.vergeben) : '') + '</span></span></button>').join('');
-  }).catch((e) => { $('treffer').innerHTML = '<div class="note">' + esc(e.message) + '</div>'; });
+    zeichneTreffer(tr);
+  }).catch((e) => { $('treffer').innerHTML = '<div class="note">' + esc(srv(e.message)) + '</div>'; });
+}
+function zeichneTreffer(tr) {
+  window._t = tr;
+  $('treffer').innerHTML = tr.map((x, i) => '<button class="btn list" onclick="waehle(window._t[' + i + '])"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.id) + ' · ' + (L === 'en' ? 'Orig. ' : 'OVP ') + 'CHF ' + chf(x.ovp) +
+    (x.menge > 1 ? ' · ' + x.menge + '×' : '') + (x.vergeben ? ' · ' + esc(t('schonIn', x.vergeben)) : '') + '</span></span></button>').join('');
 }
 
 /* ---------- Stück ---------- */
 function waehle(x) {
   st = { quelle: 'Retoure', pgid: x.id, ean: x.ean, bez: x.bez, menge: x.menge || 1, ovp: x.ovp, ort: x.ort, vergeben: x.vergeben, zustand: '' };
   $('handFelder').style.display = 'none';
-  $('stueckKopf').innerHTML = '<b>' + esc(x.bez) + '</b><br><span class="muted">' + esc(x.id) + (x.ean ? ' · ' + esc(x.ean) : '') + '<br>OVP CHF ' + chf(x.ovp) + (st.menge > 1 ? ' · Menge ' + st.menge : '') + '</span>' +
-    (x.vergeben ? '<div class="note" style="margin-top:8px">Schon erfasst in ' + esc(x.vergeben) + '.</div>' : '');
+  kopfStueck();
   startStueck();
 }
 function vonHand() {
   st = { quelle: 'Von Hand', pgid: '', ean: /^\d{6,14}$/.test($('q').value.trim()) ? $('q').value.trim() : '', bez: '', menge: 1, ovp: null, ort: '', zustand: '' };
-  $('stueckKopf').innerHTML = '<b>Von Hand erfassen</b>' + (st.ean ? '<br><span class="muted">EAN ' + esc(st.ean) + '</span>' : '');
+  kopfStueck();
   $('hBez').value = /^\d{6,14}$/.test($('q').value.trim()) ? '' : $('q').value.trim(); $('hOvp').value = ''; $('hMenge').value = '1';
   $('handFelder').style.display = 'flex';
   startStueck();
   setTimeout(() => $('hBez').focus(), 50);
+}
+function kopfStueck() {
+  if (st.quelle === 'Von Hand') { $('stueckKopf').innerHTML = '<b>' + t('vonHand') + '</b>' + (st.ean ? '<br><span class="muted">EAN ' + esc(st.ean) + '</span>' : ''); return; }
+  $('stueckKopf').innerHTML = '<b>' + esc(st.bez) + '</b><br><span class="muted">' + esc(st.pgid) + (st.ean ? ' · ' + esc(st.ean) : '') + '<br>' + (L === 'en' ? 'Orig. price' : 'OVP') + ' CHF ' + chf(st.ovp) + (st.menge > 1 ? ' · ' + t('mengeN', st.menge) : '') + '</span>' +
+    (st.vergeben ? '<div class="note" style="margin-top:8px">' + esc(t('schonErfasst', st.vergeben)) + '</div>' : '');
 }
 function startStueck() {
   $('btnNeu').classList.remove('sel'); $('btnGebraucht').classList.remove('sel');
@@ -223,7 +288,7 @@ function rechne() {
   const v = vorschlag(ovp, p), hand = num($('preisHand').value);
   st.vorschlag = v; st.preis = hand || v;
   $('preisGross').textContent = st.preis ? chf(st.preis) : '–';
-  $('preisInfo').textContent = hand ? 'Von Hand (Vorschlag ' + chf(v) + ')' : (v ? Math.round(p * 100) + '% von OVP CHF ' + chf(ovp) + ', gerundet' : 'OVP fehlt: Preis von Hand eingeben');
+  $('preisInfo').textContent = hand ? t('vonHandVorschlag', chf(v)) : (v ? t('prozentVon', Math.round(p * 100), chf(ovp)) : t('ovpFehlt'));
   $('btnUebernehmen').disabled = !st.preis;
   const nb = nachbarn(st.preis);
   $('btnTiefer').textContent = nb[0] ? '‹ ' + chf(nb[0]) : '–'; $('btnTiefer').disabled = !nb[0];
@@ -243,7 +308,7 @@ function stufeWahl(r) {
 function uebernehmen(ok) {
   if (st.quelle === 'Von Hand') {
     st.bez = $('hBez').value.trim(); st.ovp = num($('hOvp').value); st.menge = Math.max(1, parseInt($('hMenge').value, 10) || 1);
-    if (!st.bez) { toast('Bezeichnung fehlt'); $('hBez').focus(); return; }
+    if (!st.bez) { toast(t('bezFehlt')); $('hBez').focus(); return; }
   }
   const hand = num($('preisHand').value);
   const p = { lot: lot, pgid: st.pgid, ean: st.ean, bez: st.bez, menge: st.menge, zustand: st.zustand, ovp: st.ovp, preis: hand, quelle: st.quelle, ort: st.ort, von: name(), ok: ok === true };
@@ -254,7 +319,7 @@ function uebernehmen(ok) {
     zeige('lot'); ladeStuecke(r.stuecke);
   }).catch((e) => {
     $('btnUebernehmen').disabled = false;
-    const m = e.message || '';
+    const m = srv(e.message || '');
     if (/\[doppelt\]$/.test(m)) { if (confirm(m.replace(/\s*\[doppelt\]$/, '').replace(/^Bitte bestätigen: /, ''))) uebernehmen(true); return; }
     toast(m, 6000);
   });
@@ -262,23 +327,23 @@ function uebernehmen(ok) {
 
 /* ---------- Abschluss ---------- */
 function abschliessen() {
-  if (!confirm('Lot ' + lot + ' abschliessen? Danach kommen keine Stücke mehr dazu. Das Tool erstellt die Inventarliste mit Kategorien.')) return;
+  if (!confirm(t('abschliessenFrage', lot))) return;
   busy(true);
   call('lotAbschliessen', lot).then((r) => {
     busy(false); boot.lots = r.lots;
-    $('fertigText').innerHTML = 'Lot ' + esc(lot) + ' abgeschlossen: ' + r.stuecke + ' Stücke, OVP total CHF ' + chf(r.summeOvp) + ', Brockipreis total CHF ' + chf(r.summePreis) + '.<br>' +
-      'Inventarliste im Sheet, Tab «' + esc(r.tab) + '».' + (r.pruefen ? '<br>' + r.pruefen + ' Kategorien bitte im Tab prüfen (steht «Prüfen»).' : '') +
-      '<br><a href="' + esc(r.url) + '" target="_blank">Inventarliste öffnen</a>';
+    $('fertigText').innerHTML = esc(t('fertig', lot, r.stuecke, chf(r.summeOvp), chf(r.summePreis))) + '<br>' +
+      esc(t('fertigTab', r.tab)) + (r.pruefen ? '<br>' + esc(t('fertigPruefen', r.pruefen)) : '') +
+      '<br><a href="' + esc(r.url) + '" target="_blank">' + t('listeOeffnen') + '</a>';
     lot = null; zeige('fertig');
-  }).catch((e) => { busy(false); toast(e.message, 8000); });
+  }).catch((e) => { busy(false); toast(srv(e.message), 8000); });
 }
 
 /* Start */
 window.addEventListener('load', () => {
-  $('chipName').textContent = name() || 'Name';
+  texte();
   busy(true);
   call('getBootstrap').then((b) => { boot = Object.assign(boot, b || {}); busy(false); zeichneLots(); if (!name()) nameFragen(); })
-    .catch((e) => { busy(false); toast('Start fehlgeschlagen: ' + e.message, 8000); });
+    .catch((e) => { busy(false); toast(t('startFehler', srv(e.message)), 8000); });
 });
 </script>
 </body>

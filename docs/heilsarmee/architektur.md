@@ -16,6 +16,10 @@ Erst beim Reporting (nicht beim Inventarisieren). Reihenfolge: Tab «Kategorien�
 Regeln in Kategorien.gs, KI (nur mit Script-Eigenschaft ANTHROPIC_API_KEY), sonst «Prüfen».
 Die Regeln erkennen Bubble-Beschreibungen gut, Galaxus-Produktnamen nur zu rund einem Viertel (Test 30.10.2026: 97 von 378).
 
+## Sprache (1.1.0, 02.11.2026)
+Oberfläche Deutsch und Englisch, Umschalter DE/EN oben rechts, pro Gerät gemerkt (localStorage «ha.lang»).
+Nur Index.html geändert; die bekannten Servermeldungen übersetzt die Oberfläche. Daten und Reporting-Tab im Sheet bleiben deutsch.
+
 ## Offen
 - Reuse-Ablauf (Bubble, Standardpreisliste der Filiale, Foto-Erkennung).
 - Etikettendruck entfällt: Preis-Gun.
