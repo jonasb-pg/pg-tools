@@ -35,4 +35,4 @@ Live seit 02.11.2026 14:40 als Bereitstellungs-Version 4 (Rückfall: Version 3).
 Knopf «Kamera» neben dem Suchfeld, übernommen aus dem Umpacken-Tool: Live-Bild der Rückkamera, alle 200 ms Strichcode suchen
 (BarcodeDetector des Browsers, sonst ZXing 0.21.3 von jsdelivr). Ein Treffer schliesst die Kamera und sucht wie ein Handscanner.
 Erlaubt der Google-Rahmen die Live-Kamera nicht: Foto-Kamera des Handys öffnet, das Foto wird gelesen. Nur Index.html geändert.
-Im Editor gespeichert, noch nicht live (wartet auf Go für Bereitstellungs-Version 5, Rückfall Version 4).
+Live seit 02.11.2026 17:19 als Bereitstellungs-Version 5 «1.2.1 Kamera-Scan» (Rückfall: Version 4).
