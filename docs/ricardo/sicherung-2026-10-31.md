@@ -40,3 +40,7 @@ Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Kno
 - PG-18036 (Tamron): Ricardo-Angebot «nicht verkauft» 15.10., im Tool Verkauf 54000061 versendet – vermutlich Preisvorschlag nach Ablauf.
 - Übrige «Nicht verkauft» auf Ricardo stimmen mit dem Tool überein.
 - 18:30 (Go Jonas): die 8 wieder laufenden Angebote im Listings-Tab auf «Gelistet» gesetzt (Zeilen 51, 73, 92, 96, 112, 113, 120, 124): Gelistet am = Ricardo-Ende minus 7 Tage, Laufzeit Tage 7, Bearbeitet von «Abgleich Ricardo 31.10. (Claude)», Log-Eintrag. Cockpit danach: Online 8, Nicht verkauft 36, RC-0027 mit Gebot CHF 40.00.
+
+## 02.11.2026
+- Retoure PG-18036 (Tamron, Verkauf 54000061) nachgetragen: RT-0001 abgeschlossen (CHF 204.00 zurückbezahlt, auf Ricardo storniert laut Jonas, Entscheid Neu listen), ohne Rückzahlungs-Mail. Verkauf → Retourniert, Listing → In Arbeit (Texte behalten, «Getestet» geleert).
+- Suche: Käufer auch über Vorname und Firma; Akzente und Gross/klein egal (Test tests/t_ricardo_suche_name.js). Im Live-Editor gespeichert (Code 331711 / 3729864063), Bereitstellung als Version 42 noch offen (Sicherheitsprüfung).

@@ -3618,8 +3618,10 @@ function feedbackStatus(r, text, status) {
 
 function adminSuche(q) { pruefeAdmin_(); return sucheAlles_(q); }
 function sucheAlles_(q) {
-  const woerter = String(q || '').toLowerCase().split(/\s+/).filter(String);
-  const passt = function (text) { text = text.toLowerCase(); return woerter.every(function (w) { return text.indexOf(w) !== -1; }); };
+  /* Feedback Jonas 02.11.2026: Käufer auch über Vor- und Nachnamen finden; Akzente und Gross/klein egal («andre» findet «André») */
+  const norm = function (t) { return String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); };
+  const woerter = norm(q).split(/\s+/).filter(String);
+  const passt = function (text) { text = norm(text); return woerter.every(function (w) { return text.indexOf(w) !== -1; }); };
   const ss = SpreadsheetApp.getActive(), sl = ss.getSheetByName(TAB_L), sv = ss.getSheetByName(TAB_S);
   const listings = [], verk = [];
   if (sl.getLastRow() > 1) sl.getRange(2, 1, sl.getLastRow() - 1, L_COLS.length).getValues().forEach(function (row, i) {
@@ -3630,7 +3632,7 @@ function sucheAlles_(q) {
   });
   if (sv.getLastRow() > 1) sv.getRange(2, 1, sv.getLastRow() - 1, V_COLS.length).getValues().forEach(function (row, i) {
     const v = {}; V_COLS.forEach(function (k, j) { v[k] = row[j]; });
-    if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Nachname']].join(' '))) return;
+    if (!v['Verkauf-Nr'] || !passt([v['Verkauf-Nr'], v['Artikel-Nr'], v['PG-ID'], v['Titel'], v['Käufer'], v['Vorname'], v['Nachname'], v['Firma']].join(' '))) return;
     const z = vZeile_(v); z.zeile = i + 2;
     if (v['Status'] === 'Bezahlt und versendet') { z.adresse = adresseZeile_(v); z.versendetAm = datum_(v['Bezahlt und versendet am']); }
     z.storno = V_OFFEN.indexOf(v['Status']) !== -1;                                     // Prüfung 5 / Nach-Review 3: nicht versendet (bezahlt: mit Rückfrage)
