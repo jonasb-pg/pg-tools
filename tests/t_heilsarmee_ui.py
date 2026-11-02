@@ -1,4 +1,4 @@
-"""Heilsarmee Tool 1.1.0 (DE/EN): Oberfläche mit Schein-Server (google.script.run). Erfundene Daten. Lauf: python3 tests/t_heilsarmee_ui.py"""
+"""Heilsarmee Tool (DE/EN, Kamera-Scan): Oberfläche mit Schein-Server (google.script.run). Erfundene Daten. Lauf: python3 tests/t_heilsarmee_ui.py"""
 import os, sys
 from playwright.sync_api import sync_playwright
 
@@ -69,6 +69,7 @@ with sync_playwright() as p:
     check('Preis von Hand gesendet', pg.evaluate('SAVES')[-1]['preis'] == 49)
     pg.fill('#q', 'Unbekanntes Ding'); pg.click('text=Suchen'); pg.wait_for_selector('#treffer .note')
     pg.click('text=Nicht gefunden? Von Hand erfassen')
+    pg.wait_for_function("document.activeElement.id === 'hBez'")   # Fokus springt nach 50 ms ins Namensfeld: erst danach tippen
     check('Von Hand: Name vorausgefüllt', pg.input_value('#hBez') == 'Unbekanntes Ding')
     pg.click('#btnGebraucht')
     check('Ohne OVP kein Preis', pg.is_disabled('#btnUebernehmen'))
@@ -113,6 +114,46 @@ with sync_playwright() as p:
     pg.click('#lgEN'); pg.reload(); pg.wait_for_function("document.getElementById('busy').style.display === 'none'")
     check('Gemerkte Sprache EN beim Start', pg.inner_text('#btnNeuesLot').upper() == 'NEW LOT')
     check('Kopfzeile passt auf 390 px', pg.evaluate("document.documentElement.scrollWidth <= 390"))
+    b.close()
+    # Kamera-Scan (02.11.2026): Live-Bild mit Schein-Kamera und Schein-BarcodeDetector
+    b = p.chromium.launch(); pg = b.new_page(viewport={'width': 390, 'height': 844})
+    KAMMOCK = """<script>
+window.DETECTS = 0;
+window.BarcodeDetector = class { constructor(o) { this.o = o; } detect(src) { DETECTS++; return Promise.resolve(src instanceof HTMLImageElement || DETECTS > 3 ? [{rawValue: window.SCANCODE}] : []); } };
+window.SCANCODE = '7612345678901';
+navigator.mediaDevices.getUserMedia = (c) => { window.KAMWUNSCH = c; if (window.KAMVERBOT) return Promise.reject(new Error('NotAllowed'));
+  const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; const x = cv.getContext('2d'); setInterval(() => { x.fillStyle = '#' + Math.floor(Math.random()*999); x.fillRect(0,0,320,240); }, 50);
+  return Promise.resolve(cv.captureStream(10)); };
+</script>"""
+    seite2 = HTML.replace('<script>', MOCK + KAMMOCK + '<script>', 1)
+    pg.route('https://heilsarmee.test/', lambda r: r.fulfill(status=200, content_type='text/html; charset=utf-8', body=seite2))
+    pg.goto('https://heilsarmee.test/')
+    pg.wait_for_function("document.getElementById('busy').style.display === 'none'")
+    pg.click('text=BRO-1')
+    check('Kamera-Knopf neben dem Suchfeld', pg.is_visible('#btnKamera') and pg.inner_text('#btnKamera').upper() == 'KAMERA')
+    check('Suchfeld und Kamera passen auf 390 px', pg.evaluate("document.documentElement.scrollWidth <= 390"))
+    pg.click('#btnKamera')
+    pg.wait_for_selector('#screen-stueck.active', timeout=5000)
+    check('Live-Scan: Treffer öffnet das Stück', 'Testmarke Speiseteller' in pg.inner_text('#stueckKopf'))
+    check('Rückkamera verlangt', pg.evaluate("KAMWUNSCH.video.facingMode.ideal") == 'environment')
+    check('Kamera nach Treffer zu, Stream gestoppt', pg.evaluate("document.getElementById('kamera').hidden && !KAM.an && !KAM.stream && !document.body.classList.contains('kam')"))
+    pg.click('#lgEN'); pg.evaluate("zeige('lot')")
+    check('EN: Camera', pg.inner_text('#btnKamera').upper() == 'CAMERA')
+    pg.click('#btnKamera'); pg.wait_for_selector('#kamera video')
+    check('EN: Hinweis und Schliessen', 'Hold the barcode' in pg.inner_text('#kamera') and 'CLOSE' in pg.inner_text('#kamera').upper())
+    pg.click('#kamera .btn')
+    check('Schliessen beendet die Kamera', pg.evaluate("document.getElementById('kamera').hidden && !KAM.an"))
+    pg.click('#lgDE')
+    # Keine Live-Kamera erlaubt: Foto-Kamera, Foto wird gelesen (ein freier Treffer: direkt zum Stück)
+    pg.evaluate("() => { window.KAMVERBOT = true; window.SCANCODE = '7612345678918'; }")
+    with pg.expect_file_chooser() as fc:
+        pg.click('#btnKamera')
+    png = bytes.fromhex('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360f8cf000000030101005bdd1b4f0000000049454e44ae426082')
+    fc.value.set_files(files=[{'name': 'scan.png', 'mimeType': 'image/png', 'buffer': png}])
+    pg.wait_for_function("document.getElementById('q').value === '7612345678918'")
+    pg.wait_for_timeout(200)
+    check('Foto-Scan: Code gesucht, einziger freier Treffer offen', pg.is_visible('#screen-stueck.active') and 'Beispiel Lampe' in pg.inner_text('#stueckKopf'))
+    check('Foto-Scan: Hinweis auf Foto-Kamera', 'Foto-Kamera' in pg.inner_text('#toast'))
     b.close()
 print(('%d Fehler' % len(fehler)) if fehler else 'Alle UI-Checks bestanden')
 sys.exit(1 if fehler else 0)

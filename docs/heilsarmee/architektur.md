@@ -30,3 +30,9 @@ Live seit 02.11.2026 13:36 als Bereitstellungs-Version 3 (Rückfall: Version 2).
 Prozentsatz = Rabatt. Vorher rechnete das Tool Gebraucht als 75% vom Neupreis (falsch). Config-Zeilen PROZENT_* im Sheet durch RABATT_* ersetzt,
 Spalte «Prozent» im Tab «Stücke» heisst «Rabatt». Im Sheet war nur ein Stück erfasst (Neu, unverändert richtig).
 Live seit 02.11.2026 14:40 als Bereitstellungs-Version 4 (Rückfall: Version 3).
+
+## Kamera-Scan (02.11.2026)
+Knopf «Kamera» neben dem Suchfeld, übernommen aus dem Umpacken-Tool: Live-Bild der Rückkamera, alle 200 ms Strichcode suchen
+(BarcodeDetector des Browsers, sonst ZXing 0.21.3 von jsdelivr). Ein Treffer schliesst die Kamera und sucht wie ein Handscanner.
+Erlaubt der Google-Rahmen die Live-Kamera nicht: Foto-Kamera des Handys öffnet, das Foto wird gelesen. Nur Index.html geändert.
+Im Editor gespeichert, noch nicht live (wartet auf Go für Bereitstellungs-Version 5, Rückfall Version 4).
