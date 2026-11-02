@@ -1,4 +1,4 @@
-/* Heilsarmee Tool 1.0.0: Preise, Kategorien, Suche, Speichern, Reporting mit Schein-Sheets. Erfundene Daten. Lauf: node tests/t_heilsarmee.js */
+/* Heilsarmee Tool 1.2.0 (Prozentsatz = Rabatt): Preise, Kategorien, Suche, Speichern, Reporting mit Schein-Sheets. Erfundene Daten. Lauf: node tests/t_heilsarmee.js */
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const c = { console: console };
 vm.createContext(c);
@@ -8,8 +8,9 @@ let n = 0; const ok = (b, m) => { assert.ok(b, m); n++; }; const eq = (a, b, m) 
 // Preise: nächste Stufe, über 59 in 10er-Schritten, Gleichstand die höhere
 const P = (x, p) => c.preisVorschlag_(x, p);
 eq(P(39, 0.5), 18.9, '39 Neu'); eq(P(118, 0.5), 59, '118 Neu'); eq(P(7.1, 0.5), 2.9, '7.10 Neu');
-eq(P(49, 0.75), 39, '49 Gebraucht'); eq(P(100, 0.75), 79, '100 Gebraucht'); eq(P(120, 0.75), 89, '120 Gebraucht');
-eq(P(30, 0.75), 24.9, '22.50 → 24.90'); eq(P(2, 0.5), 1.9, 'Minimum 1.90'); eq(P('39,00', 0.5), 18.9, 'Komma'); eq(P("1'000", 0.5), 499, 'Tausender');
+eq(P(49, 0.75), 9.9, '49 Gebraucht (75% Rabatt → 12.25)'); eq(P(100, 0.75), 24.9, '100 Gebraucht → 25'); eq(P(120, 0.75), 29.9, '120 Gebraucht → 30'); eq(P(40, 0.75), 9.9, '40 Gebraucht → 10 (Beispiel Mail)');
+eq(P(400, 0.75), 99, '400 Gebraucht → 100'); eq(P(40, 0), 39, 'Rabatt 0 → voller Preis'); eq(P(40, 1), null, 'Rabatt 100% ungültig');
+eq(P(30, 0.75), 6.9, '30 Gebraucht → 7.50 → 6.90'); eq(P(2, 0.5), 1.9, 'Minimum 1.90'); eq(P('39,00', 0.5), 18.9, 'Komma'); eq(P("1'000", 0.5), 499, 'Tausender');
 eq(P(null, 0.5), null, 'ohne OVP'); eq(P(0, 0.5), null, 'OVP 0');
 eq(P(118, 0.5), 59, 'Grenze 59'); eq(P(128, 0.5), 69, '64 → 69'); eq(P(68, 0.5), 29.9, '34 → 29.90 (näher als 39)'); eq(P(70, 0.5), 39, '35 → 39');
 eq(c.stufen_(70).slice(11, 14), [59, 69, 79], 'Stufen über 59');
@@ -75,7 +76,7 @@ const cache = {}; c.CacheService = { getScriptCache: () => ({ get: (k) => cache[
 c.setup();
 ok(blaetter['Stücke'] && blaetter['Lots'] && blaetter['Config'], 'Setup legt Tabs an');
 const b = c.getBootstrap();
-eq([b.prozentNeu, b.prozentGebraucht], [0.5, 0.75], 'Prozent aus Config');
+eq([b.rabattNeu, b.rabattGebraucht], [0.5, 0.75], 'Rabatt aus Config');
 const l1 = c.neuesLot('Tina'); eq(l1.lot, 'BRO-1', 'erstes Lot'); eq(c.neuesLot('Tina').lot, 'BRO-2', 'zweites Lot');
 const t = c.suche('7612345678901').treffer; eq(t.length, 1, 'Suche im Return Tool'); eq(t[0].ovp, 39, 'OVP gelesen');
 const s1 = c.stueckSpeichern({ lot: 'BRO-1', pgid: 'PG-100', ean: '7612345678901', bez: t[0].bez, menge: 1, zustand: 'Neu', ovp: 39, von: 'Tina' });
@@ -84,7 +85,7 @@ assert.throws(() => c.stueckSpeichern({ lot: 'BRO-1', pgid: 'PG-100', bez: 'x', 
 eq(c.suche('7612345678901').treffer[0].vergeben, 'BRO-1/1 (BRO-1)', 'vergeben angezeigt');
 assert.throws(() => c.stueckSpeichern({ lot: 'BRO-1', pgid: 'PG-102', bez: 'x', ovp: 13.3 }), /Neu oder Gebraucht/, 'Zustand Pflicht'); n++;
 const s2 = c.stueckSpeichern({ lot: 'BRO-1', pgid: 'PG-102', bez: 'Ubiquiti Poe-24-12w-G', menge: 2, zustand: 'Gebraucht', ovp: 13.3, preis: 4.9 });
-eq([s2.pos, s2.preis, s2.vorschlag], ['BRO-1/2', 4.9, 9.9], 'Gebraucht 75%, Preis von Hand');
+eq([s2.pos, s2.preis, s2.vorschlag], ['BRO-1/2', 4.9, 2.9], 'Gebraucht 75% Rabatt (13.30 → 3.33 → 2.90), Preis von Hand');
 const s3 = c.stueckSpeichern({ lot: 'BRO-1', bez: 'Fleecedecke', zustand: 'Gebraucht', ovp: '', preis: '6.90' });
 eq([s3.pos, s3.preis], ['BRO-1/3', 6.9], 'von Hand ohne OVP');
 assert.throws(() => c.stueckSpeichern({ lot: 'BRO-1', bez: 'Ohne Preis', zustand: 'Neu' }), /Preis fehlt/, 'ohne Preis'); n++;

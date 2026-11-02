@@ -10,7 +10,7 @@ const DB = [{id:'PG-100',bez:'Testmarke Speiseteller',menge:1,ean:'7612345678901
             {id:'PG-101',bez:'Beispiel Lampe',menge:1,ean:'7612345678918',ovp:118,ort:'HEI-1',vergeben:''},
             {id:'PG-102',bez:'Beispiel Lampe',menge:1,ean:'7612345678918',ovp:118,ort:'HEI-1',vergeben:'BRO-1/9 (BRO-1)'}];
 const API = {
-  getBootstrap: () => ({version:'1.0.0',prozentNeu:.5,prozentGebraucht:.75,stufen:[1.9,2.9,4.9,6.9,9.9,14.9,18.9,24.9,29.9,39,49,59],lots:LOTS,user:''}),
+  getBootstrap: () => ({version:'1.0.0',rabattNeu:.5,rabattGebraucht:.75,stufen:[1.9,2.9,4.9,6.9,9.9,14.9,18.9,24.9,29.9,39,49,59],lots:LOTS,user:''}),
   neuesLot: () => { LOTS.unshift({lot:'BRO-2',status:'Offen',eroeffnet:'',stuecke:0,summe:0}); return {lot:'BRO-2',lots:LOTS}; },
   lotStuecke: () => STUECKE,
   suche: (q) => ({treffer: DB.filter(x => x.ean === q || x.id.toLowerCase() === q.toLowerCase() || x.bez.toLowerCase().includes(q.toLowerCase()))}),
@@ -46,12 +46,12 @@ with sync_playwright() as p:
     pg.click('#btnNeu')
     check('Neu: 50% von 39 = 18.90', pg.inner_text('#preisGross') == '18.90')
     pg.click('#btnGebraucht')
-    check('Gebraucht: 75% von 39 = 29.90', pg.inner_text('#preisGross') == '29.90')
-    check('Stufen-Knöpfe 24.90 / 39.00', pg.inner_text('#btnTiefer') == '‹ 24.90' and pg.inner_text('#btnHoeher') == '39.00 ›')
+    check('Gebraucht: 75% Rabatt auf 39 = 9.90', pg.inner_text('#preisGross') == '9.90')
+    check('Stufen-Knöpfe 6.90 / 14.90', pg.inner_text('#btnTiefer') == '‹ 6.90' and pg.inner_text('#btnHoeher') == '14.90 ›')
     pg.click('#btnHoeher')
-    check('Höher: 39.00 von Hand', pg.inner_text('#preisGross') == '39.00' and pg.input_value('#preisHand') == '39.00' and pg.inner_text('#btnHoeher') == '49.00 ›')
+    check('Höher: 14.90 von Hand', pg.inner_text('#preisGross') == '14.90' and pg.input_value('#preisHand') == '14.90' and pg.inner_text('#btnHoeher') == '18.90 ›')
     pg.click('#btnTiefer'); pg.click('#btnTiefer')
-    check('Zweimal tiefer: 24.90', pg.inner_text('#preisGross') == '24.90')
+    check('Zweimal tiefer: 6.90', pg.inner_text('#preisGross') == '6.90')
     pg.fill('#preisHand', '')
     pg.click('#btnNeu')
     pg.click('#btnUebernehmen'); pg.wait_for_selector('#screen-lot.active')
@@ -73,7 +73,7 @@ with sync_playwright() as p:
     pg.click('#btnGebraucht')
     check('Ohne OVP kein Preis', pg.is_disabled('#btnUebernehmen'))
     pg.fill('#hOvp', '20')
-    check('Gebraucht 75% von 20 = 14.90', pg.inner_text('#preisGross') == '14.90')
+    check('Gebraucht 75% Rabatt auf 20 = 4.90', pg.inner_text('#preisGross') == '4.90')
     pg.click('#btnUebernehmen'); pg.wait_for_selector('#screen-lot.active')
     check('Von Hand gespeichert', pg.evaluate('SAVES')[-1]['quelle'] == 'Von Hand' and pg.evaluate('SAVES')[-1]['ovp'] == 20)
     pg.click('#btnAbschliessen'); pg.wait_for_selector('#screen-fertig.active')
@@ -96,9 +96,9 @@ with sync_playwright() as p:
     pg.click('#lgEN')
     pg.click('#treffer .btn >> nth=0'); pg.wait_for_selector('#screen-stueck.active')
     pg.click('#btnGebraucht')
-    check('EN: Zustand und Preis-Info', pg.inner_text('#btnNeu').upper() == 'NEW' and pg.inner_text('#btnGebraucht').upper() == 'USED' and 'of original price' in pg.inner_text('#preisInfo'))
+    check('EN: Zustand und Preis-Info', pg.inner_text('#btnNeu').upper() == 'NEW' and pg.inner_text('#btnGebraucht').upper() == 'USED' and 'discount on original price' in pg.inner_text('#preisInfo'))
     pg.click('#lgDE')
-    check('Umschalten mitten im Stück: Zustand bleibt, Text deutsch', '75% von OVP' in pg.inner_text('#preisInfo') and 'sel' in pg.get_attribute('#btnGebraucht', 'class'))
+    check('Umschalten mitten im Stück: Zustand bleibt, Text deutsch', '75% Rabatt auf OVP' in pg.inner_text('#preisInfo') and 'sel' in pg.get_attribute('#btnGebraucht', 'class'))
     pg.click('#lgEN')
     # Servermeldung übersetzt
     pg.evaluate("() => { API.stueckSpeichern = () => { throw new Error('Lot BRO-1 ist abgeschlossen.'); }; }")

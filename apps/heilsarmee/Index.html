@@ -126,7 +126,7 @@ const T = {
   zustand: ['Zustand', 'Condition'], 'z.Neu': ['Neu', 'New'], 'z.Gebraucht': ['Gebraucht', 'Used'],
   schonErfasst: ['Schon erfasst in {0}.', 'Already recorded in {0}.'],
   preisGun: ['Brockipreis (Preis-Gun)', 'Shop price (price gun)'], andererPreis: ['Anderer Preis CHF', 'Other price CHF'],
-  vonHandVorschlag: ['Von Hand (Vorschlag {0})', 'By hand (suggested {0})'], prozentVon: ['{0}% von OVP CHF {1}, gerundet', '{0}% of original price CHF {1}, rounded'],
+  vonHandVorschlag: ['Von Hand (Vorschlag {0})', 'By hand (suggested {0})'], prozentVon: ['{0}% Rabatt auf OVP CHF {1}, gerundet', '{0}% discount on original price CHF {1}, rounded'],
   ovpFehlt: ['OVP fehlt: Preis von Hand eingeben', 'Original price missing: enter the price by hand'],
   uebernehmen: ['Übernehmen', 'Save'], bezFehlt: ['Bezeichnung fehlt', 'Description missing'],
   fertig: ['Lot {0} abgeschlossen: {1} Stücke, OVP total CHF {2}, Brockipreis total CHF {3}.', 'Lot {0} closed: {1} items, original price total CHF {2}, shop price total CHF {3}.'],
@@ -160,7 +160,7 @@ function setLang(l) {
   if (screen === 'lot' && lot) { ladeStuecke(window._st); if (window._t && $('treffer').innerHTML) zeichneTreffer(window._t); }
   if (screen === 'stueck' && st) { kopfStueck(); rechne(); }
 }
-let boot = { prozentNeu: .5, prozentGebraucht: .75, stufen: [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59], lots: [] };
+let boot = { rabattNeu: .5, rabattGebraucht: .75, stufen: [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59], lots: [] };
 let lot = null, st = null, screen = 'start';
 
 function call(fn) {
@@ -187,12 +187,13 @@ function zeige(s) {
 }
 function zurueck() { if (screen === 'stueck') zeige('lot'); else zeige('start'); }
 
-/* Preis wie der Server: Neupreis × Prozent, nächste Stufe (Gleichstand: die höhere) */
+/* Preis wie der Server: Neupreis × (1 − Rabatt), nächste Stufe (Gleichstand: die höhere) */
 function stufen(bis) { const s = boot.stufen.slice(); while (s[s.length - 1] < bis) s.push(s[s.length - 1] + 10); return s; }
-function vorschlag(ovp, prozent) {
+function vorschlag(ovp, rabatt) {
   const n = Number(String(ovp == null ? '' : ovp).replace(/['’\s]/g, '').replace(',', '.'));
   if (!isFinite(n) || n <= 0) return null;
-  const roh = n * prozent; let best = null;
+  if (!(rabatt >= 0 && rabatt < 1)) return null;
+  const roh = n * (1 - rabatt); let best = null;
   stufen(roh + 10).forEach((x) => { if (best == null || Math.abs(x - roh) < Math.abs(best - roh) - 1e-9 || (Math.abs(Math.abs(x - roh) - Math.abs(best - roh)) < 1e-9 && x > best)) best = x; });
   return best;
 }
@@ -284,7 +285,7 @@ function zustand(z) {
 function rechne() {
   if (!st || !st.zustand) return;
   const ovp = st.quelle === 'Von Hand' ? num($('hOvp').value) : st.ovp;
-  const p = st.zustand === 'Neu' ? boot.prozentNeu : boot.prozentGebraucht;
+  const p = st.zustand === 'Neu' ? boot.rabattNeu : boot.rabattGebraucht;
   const v = vorschlag(ovp, p), hand = num($('preisHand').value);
   st.vorschlag = v; st.preis = hand || v;
   $('preisGross').textContent = st.preis ? chf(st.preis) : '–';

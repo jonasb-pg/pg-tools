@@ -2,7 +2,7 @@
  * HEILSARMEE TOOL (Server) – Pilot Filiale Bern (brocki.ch). Entscheide Jonas B. 29./30.10.2026.
  *
  * Ablauf: Lot eröffnen (BRO-1, BRO-2 …) → EAN, PG-ID oder Name eingeben → Stück aus dem Tab «Heilsarmee» im Return Tool
- * → Neu oder Gebraucht wählen → Brockipreis wird vorgeschlagen (Neu 50%, Gebraucht 75% vom OVP/Neupreis, auf die nächste
+ * → Neu oder Gebraucht wählen → Brockipreis wird vorgeschlagen (Rabatt auf den Neupreis: Neu 50%, Gebraucht 75%, d.h. Preis 50% bzw. 25% vom OVP/Neupreis, auf die nächste
  * Preisstufe gerundet), von Hand überschreibbar → Preis mit der Preis-Gun kleben → Übernehmen → nächstes Stück.
  * Lot abschliessen → Reporting-Tab «BRO-n» mit Kategorie PG und Kategorie Brocki (Kassenkategorie), OVP und Brockipreis, Summen.
  *
@@ -11,21 +11,22 @@
  * Das Return Tool wird nur gelesen (Entscheid Jonas B. 30.10.2026). Das Verschieben ins «Archiv Heilsarmee» macht das Team selbst.
  * Preisstufen: 1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59, dann 69, 79 … (Pilot-Excel, Tab PREISE GEBRAUCHT).
  */
-const VERSION = '1.0.0';
+const VERSION = '1.2.0';
 const TZ = 'Europe/Zurich';
 
 const CONFIG_DEFAULTS = [
   ['RETURN_TOOL_ID', '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E', 'Sheet-ID des Return Tools (wird nur gelesen)'],
   ['RETURN_TAB', 'Heilsarmee', 'Tab im Return Tool mit den Retouren für die Heilsarmee'],
-  ['PROZENT_NEU', 0.5, 'Neu: Anteil vom OVP (0.5 = 50%)'],
-  ['PROZENT_GEBRAUCHT', 0.75, 'Gebraucht: Anteil vom Neupreis (0.75 = 75%)'],
+  /* Jonas B. 02.11.2026: Der Prozentsatz ist der Rabatt auf den Neupreis. Preis = Neupreis × (1 − Rabatt). */
+  ['RABATT_NEU', 0.5, 'Neu: Rabatt auf den OVP (0.5 = 50% Rabatt, Preis = 50% vom OVP)'],
+  ['RABATT_GEBRAUCHT', 0.75, 'Gebraucht: Rabatt auf den ungefähren Neupreis (0.75 = 75% Rabatt, Preis = 25% vom Neupreis)'],
   ['LOT_PREFIX', 'BRO-', 'Vorsilbe der Lot-ID'],
   ['KI_MODELL', 'claude-haiku-5-5', 'KI-Modell für Kategorien, die die Regeln nicht erkennen (nur mit Schlüssel ANTHROPIC_API_KEY)'],
 ];
 const STUFEN_BASIS = [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59];
 const LOT_COLS = ['Lot', 'Eröffnet am', 'Eröffnet von', 'Status', 'Abgeschlossen am', 'Stücke', 'Summe OVP CHF', 'Summe Brockipreis CHF'];
 const ST_COLS = ['Pos-ID', 'Lot', 'Erfasst am', 'Erfasst von', 'Quelle', 'PG-ID', 'EAN', 'Bezeichnung', 'Menge', 'Zustand',
-  'OVP CHF', 'Prozent', 'Vorschlag CHF', 'Brockipreis CHF', 'Preis von Hand', 'Lagerort RT', 'Bemerkung'];
+  'OVP CHF', 'Rabatt', 'Vorschlag CHF', 'Brockipreis CHF', 'Preis von Hand', 'Lagerort RT', 'Bemerkung'];
 const KAT_COLS = ['Bezeichnung', 'Kategorie PG', 'Preisgruppe PG', 'Kategorie Brocki', 'Kassenkategorie Brocki', 'Quelle', 'Bestimmt am'];
 
 function doGet() {
@@ -71,11 +72,11 @@ function stufen_(bis) {
   while (s[s.length - 1] < bis) s.push(s[s.length - 1] + 10);
   return s;
 }
-/** Neupreis × Prozent, auf die nächstgelegene Preisstufe (bei Gleichstand die höhere). null ohne Neupreis. */
-function preisVorschlag_(neupreis, prozent) {
-  const n = zahl_(neupreis), p = zahl_(prozent);
-  if (n == null || n <= 0 || p == null || p <= 0) return null;
-  const roh = n * p, s = stufen_(roh + 10);
+/** Neupreis × (1 − Rabatt), auf die nächstgelegene Preisstufe (bei Gleichstand die höhere). null ohne Neupreis. */
+function preisVorschlag_(neupreis, rabatt) {
+  const n = zahl_(neupreis), r = zahl_(rabatt);
+  if (n == null || n <= 0 || r == null || r < 0 || r >= 1) return null;
+  const roh = n * (1 - r), s = stufen_(roh + 10);
   let best = s[0];
   s.forEach((x) => { if (Math.abs(x - roh) < Math.abs(best - roh) - 1e-9 || (Math.abs(Math.abs(x - roh) - Math.abs(best - roh)) < 1e-9 && x > best)) best = x; });
   return Math.round(best * 100) / 100;
@@ -86,9 +87,9 @@ function getConfig_() {
   CONFIG_DEFAULTS.forEach((d) => { c[d[0]] = d[1]; });
   const sh = SpreadsheetApp.getActive().getSheetByName('Config');
   if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach((r) => { if (str_(r[0]) && str_(r[1]) !== '') c[str_(r[0])] = r[1]; });
-  ['PROZENT_NEU', 'PROZENT_GEBRAUCHT'].forEach((k) => {
-    let v = zahl_(c[k]); if (v != null && v > 1) v = v / 100;                    // 50 → 0.5
-    c[k] = v != null && v > 0 && v <= 1 ? v : CONFIG_DEFAULTS.filter((d) => d[0] === k)[0][1];
+  ['RABATT_NEU', 'RABATT_GEBRAUCHT'].forEach((k) => {
+    let v = zahl_(c[k]); if (v != null && v >= 1) v = v / 100;                   // 75 → 0.75
+    c[k] = v != null && v >= 0 && v < 1 ? v : CONFIG_DEFAULTS.filter((d) => d[0] === k)[0][1];
   });
   return c;
 }
@@ -174,7 +175,7 @@ function suche_(q, liste, verg) {
 function getBootstrap() {
   const cfg = getConfig_();
   if (!SpreadsheetApp.getActive().getSheetByName('Stücke')) setup();
-  return { version: VERSION, prozentNeu: cfg.PROZENT_NEU, prozentGebraucht: cfg.PROZENT_GEBRAUCHT, stufen: stufen_(1000), lots: lots_(), user: nutzer_() };
+  return { version: VERSION, rabattNeu: cfg.RABATT_NEU, rabattGebraucht: cfg.RABATT_GEBRAUCHT, stufen: stufen_(1000), lots: lots_(), user: nutzer_() };
 }
 
 function lots_() {
@@ -219,8 +220,8 @@ function stueckSpeichern(p) {
   if (zustand !== 'Neu' && zustand !== 'Gebraucht') throw new Error('Bitte Neu oder Gebraucht wählen.');
   const bez = str_(p.bez);
   if (!bez) throw new Error('Bezeichnung fehlt.');
-  const ovp = zahl_(p.ovp), prozent = zustand === 'Neu' ? cfg.PROZENT_NEU : cfg.PROZENT_GEBRAUCHT;
-  const vorschlag = preisVorschlag_(ovp, prozent);
+  const ovp = zahl_(p.ovp), rabatt = zustand === 'Neu' ? cfg.RABATT_NEU : cfg.RABATT_GEBRAUCHT;
+  const vorschlag = preisVorschlag_(ovp, rabatt);
   let preis = zahl_(p.preis);
   if (preis == null) preis = vorschlag;
   if (preis == null || preis <= 0) throw new Error('Preis fehlt: OVP eingeben oder Brockipreis von Hand.');
@@ -239,7 +240,7 @@ function stueckSpeichern(p) {
     const pos = lot + '/' + n;
     const row = { 'Pos-ID': pos, 'Lot': lot, 'Erfasst am': new Date(), 'Erfasst von': str_(p.von) || nutzer_(), 'Quelle': str_(p.quelle) || (pg ? 'Retoure' : 'Von Hand'),
       'PG-ID': str_(p.pgid), 'EAN': str_(p.ean), 'Bezeichnung': bez, 'Menge': menge, 'Zustand': zustand, 'OVP CHF': ovp == null ? '' : ovp,
-      'Prozent': prozent, 'Vorschlag CHF': vorschlag == null ? '' : vorschlag, 'Brockipreis CHF': preis, 'Preis von Hand': vorschlag == null || Math.abs(preis - vorschlag) > 0.001 ? 'Ja' : '',
+      'Rabatt': rabatt, 'Vorschlag CHF': vorschlag == null ? '' : vorschlag, 'Brockipreis CHF': preis, 'Preis von Hand': vorschlag == null || Math.abs(preis - vorschlag) > 0.001 ? 'Ja' : '',
       'Lagerort RT': str_(p.ort), 'Bemerkung': str_(p.bemerkung) };
     sh.appendRow(ST_COLS.map((k) => row[k]));
     const z = sh.getLastRow();
