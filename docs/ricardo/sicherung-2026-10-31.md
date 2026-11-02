@@ -43,4 +43,4 @@ Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Kno
 
 ## 02.11.2026
 - Retoure PG-18036 (Tamron, Verkauf 54000061) nachgetragen: RT-0001 abgeschlossen (CHF 204.00 zurückbezahlt, auf Ricardo storniert laut Jonas, Entscheid Neu listen), ohne Rückzahlungs-Mail. Verkauf → Retourniert, Listing → In Arbeit (Texte behalten, «Getestet» geleert).
-- Suche: Käufer auch über Vorname und Firma; Akzente und Gross/klein egal (Test tests/t_ricardo_suche_name.js). Im Live-Editor gespeichert (Code 331711 / 3729864063), Bereitstellung als Version 42 noch offen (Sicherheitsprüfung).
+- Suche: Käufer auch über Vorname und Firma; Akzente und Gross/klein egal (Test tests/t_ricardo_suche_name.js). Im Live-Editor gespeichert (Code 331711 / 3729864063), Live seit 02.11.2026 16:03 als Version 42 (Rückfall: 41); live geprüft: «linda» findet Linda Bertschi.
