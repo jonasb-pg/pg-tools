@@ -19,6 +19,7 @@ Die Regeln erkennen Bubble-Beschreibungen gut, Galaxus-Produktnamen nur zu rund 
 ## Sprache (1.1.0, 02.11.2026)
 Oberfläche Deutsch und Englisch, Umschalter DE/EN oben rechts, pro Gerät gemerkt (localStorage «ha.lang»).
 Nur Index.html geändert; die bekannten Servermeldungen übersetzt die Oberfläche. Daten und Reporting-Tab im Sheet bleiben deutsch.
+Live seit 02.11.2026 13:36 als Bereitstellungs-Version 3 (Rückfall: Version 2).
 
 ## Offen
 - Reuse-Ablauf (Bubble, Standardpreisliste der Filiale, Foto-Erkennung).
