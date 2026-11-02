@@ -29,3 +29,4 @@ Live seit 02.11.2026 13:36 als Bereitstellungs-Version 3 (Rückfall: Version 2).
 ## 1.2.0 (02.11.2026)
 Prozentsatz = Rabatt. Vorher rechnete das Tool Gebraucht als 75% vom Neupreis (falsch). Config-Zeilen PROZENT_* im Sheet durch RABATT_* ersetzt,
 Spalte «Prozent» im Tab «Stücke» heisst «Rabatt». Im Sheet war nur ein Stück erfasst (Neu, unverändert richtig).
+Live seit 02.11.2026 14:40 als Bereitstellungs-Version 4 (Rückfall: Version 3).
