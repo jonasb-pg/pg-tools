@@ -68,8 +68,9 @@ with sync_playwright() as p:
 
     # N5: erledigtes Stück → «Retoure? Neu analysieren» → Rückfrage → mit «retoure» übernommen
     pg.fill('#q', 'Föhn'); pg.press('#q', 'Enter'); pg.wait_for_timeout(150)
-    assert 'Schon analysiert' in pg.text_content('#treffer') and pg.locator('#treffer button[data-v="PG-120"]').count() == 0
-    pg.click('#treffer a[data-a="nochmal"][data-v="PG-120"]'); pg.wait_for_timeout(150)
+    # seit 03.11.2026 (Feedback FG): deutlich «bereits analysiert» oben, ohne Übernehmen-Knopf; «Neu analysieren» im Hinweis
+    assert 'PG-120 ist bereits analysiert' in pg.text_content('#such-meldung') and pg.locator('button[data-v="PG-120"]').count() == 0
+    pg.click('#such-meldung a[data-a="nochmal"][data-v="PG-120"]'); pg.wait_for_timeout(150)
     assert 'A-000007' in pg.text_content('#such-meldung') and pg.evaluate('!AN'), 'N5: Rückfrage mit alter Analyse'
     pg.click('#such-meldung button[data-a="retoure"]'); pg.wait_for_timeout(200)
     assert letzter(pg, 'uebernehmen') == ['PG-120', 'retoure'] and pg.evaluate('AN && AN.d.produkt.id') == 'PG-120', 'N5: neu analysieren'

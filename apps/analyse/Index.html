@@ -534,6 +534,9 @@
     'start.platz': ['z.B. SW', 'e.g. SW'], 'start.knopf': ['Los', 'Go'], 'start.fehler': ['Bitte 2 bis 4 Buchstaben eingeben.', 'Please enter 2 to 4 letters.'],
     'such.platz': ['Barcode scannen, PG-ID oder Produktname eingeben', 'Scan barcode, enter PG-ID or product name'],
     'such.keine': ['Weder im Analyse Tool noch im Return Tool gefunden. Bitte zuerst im Return Tool erfassen.', 'Found neither in the Analyse Tool nor in the Return Tool. Please record it in the Return Tool first.'],
+    'such.fertig': ['{0} ist bereits analysiert.', '{0} has already been analysed.'], 'such.fertigWann': ['Analysiert am {0}', 'Analysed on {0}'],
+    'such.fertigZiel': ['Ergebnis: {0}', 'Result: {0}'], 'such.fertigNein': ['nicht reusable', 'not reusable'],
+    'such.fertigNicht': ['Nicht nochmals analysieren. Steht es noch im Return Tool im Tab «Analyse», dort das Ergebnis eintragen.', 'Do not analyse again. If it is still in the Return Tool tab «Analyse», record the result there.'],
     'such.rt': ['Nicht in der Warteschlange, aber im Return Tool. Stimmt die PG-ID auf dem Stück? Dann übernehmen.', 'Not in the queue, but in the Return Tool. Does the PG-ID on the item match? Then take it over.'],
     'rt.los': ['Übernehmen und analysieren', 'Take over and analyse'], 'rt.archiv': ['Archiv, nicht übernehmbar', 'Archive, cannot be taken over'],
     'rt.erledigt': ['Schon analysiert', 'Already analysed'], 'rt.ohneId': ['Ohne PG-ID: zuerst im Return Tool verbuchen', 'No PG-ID: book it in the Return Tool first'],
@@ -891,8 +894,18 @@
         $('such-meldung').innerHTML = mm.map(function (x) { return '<div class="meldung warn"><p><strong>' + esc(x.id) + '</strong> · ' + esc(x.bezeichnung) + '<br>' + tx('mm.liegt', x.mm) + '</p><div class="knoepfe">' + taste('mmZurueck', 'mm.zurueck', 'pink', ' data-v="' + esc(x.id) + '"') + '</div></div>'; }).join('');
         return;
       }
+      /* Feedback FG 02.11.2026: schon analysiert → deutlich sagen, wann, von wem, mit welchem Ergebnis. Liegt kein anderes, übernehmbares Stück im Return Tool, nur das. */
+      var fertig = [], gesehen = {};
+      if (!r.inSchlange) r.treffer.concat(r.rt || []).forEach(function (x) { if (x.status === 'Erledigt' && !gesehen[x.id]) { gesehen[x.id] = 1; fertig.push(x); } });
+      var fertigHtml = fertig.map(function (x) {
+        var f = x.fertig || {}, was = [f.am, f.wer, f.nr].filter(String).join(' · '), ziel = f.regal || (f.reusable === 'Nein' ? t('such.fertigNein') : '');
+        return '<div class="meldung warn"><p><strong>' + tx('such.fertig', x.id) + '</strong>' + (was ? '<br>' + tx('such.fertigWann', was) : '') + (ziel ? '<br>' + tx('such.fertigZiel', ziel) : '')
+          + '<br>' + tx('such.fertigNicht') + '</p><p><a href="#" class="link" data-a="nochmal" data-v="' + esc(x.id) + '">' + tx('rt.nochmal') + '</a></p></div>';
+      }).join('');
+      var anderes = (r.rt || []).some(function (x) { return x.status !== 'Erledigt' && !x.archiv && !x.ohneId; });
+      if (fertig.length && !anderes && !r.rtFehler) { $('such-meldung').innerHTML = fertigHtml; return; }
       if (!r.inSchlange && (r.rt && r.rt.length || r.rtFehler)) {                 // nicht in der Warteschlange: was im Return Tool steht, mit PG-ID übernehmen
-        $('such-meldung').innerHTML = (r.rtFehler ? box(r.rtFehler, 'stop') : '') + (r.rt && r.rt.length ? box(t('such.rt'), 'warn') : '');
+        $('such-meldung').innerHTML = fertigHtml + (r.rtFehler ? box(r.rtFehler, 'stop') : '') + (anderes ? box(t('such.rt'), 'warn') : '');
         $('treffer').innerHTML = (r.treffer.length ? '<h3 class="gruppe">' + tx('such.imTool') + '</h3>' + tabelle(r.treffer, false) : '') + (r.rt && r.rt.length ? '<h3 class="gruppe">' + tx('such.imRt') + '</h3>' + rtTabelle(r.rt) : '');
         return;
       }

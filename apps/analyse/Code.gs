@@ -839,8 +839,22 @@ function suche(q) {
       rt = roh.slice(0, 15).map(function (x) { x.status = status[idKey_(x.id)] || ''; return x; });
     } catch (err) { rtFehler = 'Das Return Tool konnte nicht durchsucht werden: ' + err.message; log_('Return-Tool-Suche', q, err.message); }
   }
+  fertigInfo_(liste.concat(rt));
   return { treffer: liste, inSchlange: offen.length > 0, sofort: sofort, mehrdeutig: !!bc && offen.length > 1, anWarnung: offen.length === 1 && !!liste[0].an,
     etikett: offen.length > 0 && !sofort, rt: rt, rtFehler: rtFehler };
+}
+
+/* Feedback FG 02.11.2026: Ein schon analysiertes Stück zeigt beim Scannen, wann, von wem und mit welchem Ergebnis (letzte Analyse), statt nur «nicht in der Warteschlange». */
+function fertigInfo_(stuecke) {
+  const erl = {};
+  stuecke.forEach(function (x) { if (x && x.status === 'Erledigt' && x.id) erl[idKey_(x.id)] = 1; });
+  if (!Object.keys(erl).length) return;
+  const info = {};
+  try { lies_('Analysen').z.forEach(function (a) { const k = idKey_(a['PG-ID']); if (erl[k]) info[k] = a; }); } catch (err) { return; }
+  stuecke.forEach(function (x) {
+    const a = x && x.status === 'Erledigt' ? info[idKey_(x.id)] : null;
+    if (a) x.fertig = { nr: String(a['Analyse-Nr'] || ''), wer: String(a['Kürzel'] || ''), am: zeitText_(a['Ende']).slice(0, 10), regal: String(a['Regal'] || ''), reusable: String(a['Reusable'] || '') };
+  });
 }
 
 function warteschlange() {
