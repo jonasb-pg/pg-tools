@@ -46,4 +46,4 @@ Live seit 03.11.2026 09:26 als Bereitstellungs-Version 6 (Rückfall: Version 5).
 ## Design Lot-Screen (03.11.2026)
 Ein Hauptknopf «Strichcode scannen» oben, darunter «Oder eintippen» mit Suchen im selben Feld. Lot-Zahlen als eine Zeile statt Kasten
 («1 Stück» in Einzahl). Schon vergebene Treffer grau, ohne Lot in Klammern. Trennlinie vor «Im Lot». Ein Handscanner tippt weiter ins Suchfeld.
-Im Editor gespeichert, noch nicht live (wartet auf Go für Bereitstellungs-Version 7, Rückfall Version 6).
+Live seit 03.11.2026 09:34 als Bereitstellungs-Version 7 (Rückfall: Version 6).
