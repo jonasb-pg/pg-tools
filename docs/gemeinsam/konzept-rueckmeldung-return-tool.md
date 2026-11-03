@@ -53,3 +53,14 @@ Modus-Schalter mit Vorschau und Aus; Obergrenze pro Lauf; vor Start Kopie des Re
 4. Ricardo verkauft: Archiv bei Versand oder nach Retourenfrist?
 5. Heilsarmee: gilt ein abgeschlossenes Lot als Lieferung (GESPENDET)?
 6. Brücke bis zur Datenbank von HuggyStudio?
+
+## Fall: Produkt mit ID, die im Return Tool nicht auffindbar ist (Frage Jonas 03.11.2026)
+Grundsatz: Der Dienst legt im Return Tool nie eine neue Zeile an und vergibt nie eine PG-ID (ID-Vergabe nur durch das Return Tool, End of Day).
+| Lage | Status | Was passiert |
+|---|---|---|
+| PG-ID noch nicht verteilt (steht im Tab Scanner, ID kommt erst mit End of Day) | Wartet | jeder Lauf prüft neu, wird automatisch gebucht, sobald die Zeile da ist |
+| nach 48 h immer noch nirgends | Konflikt «nicht im Return Tool» | Mail an Jonas; Liste in RÜCKFÜHRUNG; Lösung: im Return Tool erfassen (Scanner) → Ereignis läuft von selbst weiter, oder «ignorieren» mit Grund |
+| PG-ID nur im Archiv | je nach Art: Retoure = erwartet, sonst Konflikt «im Archiv» | nichts geschrieben |
+| PG-ID doppelt (pink) | Konflikt «doppelt» | nichts geschrieben |
+| keine PG-ID (Heilsarmee von Hand, alte AN-/RC-Nummern) | Übersprungen «ohne PG-ID» | gezählt im Bericht, nichts geschrieben |
+Heute in den Tools: Analyse lässt seit 24.10. nur Stücke mit PG-ID zu («Bitte zuerst im Return Tool erfassen»); Umpacken lehnt unbekannte IDs ab; Heilsarmee erfasst «von Hand» ohne PG-ID; Ricardo kennt RC-Nummern für Stücke ohne Inventar.
