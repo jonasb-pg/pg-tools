@@ -41,4 +41,4 @@ Live seit 02.11.2026 17:19 als Bereitstellungs-Version 5 «1.2.1 Kamera-Scan» (
 Von Hand erfassen: zuerst Neupreis eingeben. Ist er nicht auffindbar, Knopf «Neupreis nicht verfügbar»: OVP wird «NA» (auch so im Tab «Stücke»),
 der Verkaufspreis wird direkt gewählt: grosse Knöpfe 1.90 / 2.90 / 4.90 / 6.90, darunter ein Dropdown mit allen weiteren Heilsarmee-Stufen.
 Nochmals tippen führt zurück zur Neupreis-Eingabe. Nebenbei: Feld «Menge» ragte auf schmalen Handys über den Rand (behoben).
-Im Editor gespeichert, noch nicht live (wartet auf Go für Bereitstellungs-Version 6, Rückfall Version 5).
+Live seit 03.11.2026 09:26 als Bereitstellungs-Version 6 (Rückfall: Version 5).
