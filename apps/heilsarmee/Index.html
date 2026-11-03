@@ -40,6 +40,10 @@
   .note.ok { background: var(--green); }
   .item { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--grey); padding: 8px 0; }
   .item .x { background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 0 0 0 8px; }
+  #treffer:empty { display: none; }
+  .trenn { border-top: 2px solid var(--b); padding-top: 16px; margin-top: 8px; }
+  #lotKopf { font-size: 15px; margin: -4px 0 0; }
+  .btn.list.vergeben { border-color: var(--grey); color: #777; }
   .link { background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 8px 0; text-align: left; }
   .tag { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: var(--grey); border-radius: var(--r); padding: 2px 6px; }
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--b); color: #fff; border-radius: var(--rb); padding: 10px 20px; display: none; max-width: 90vw; z-index: 9; }
@@ -70,15 +74,16 @@
 
   <!-- Lot: scannen -->
   <section class="screen" id="screen-lot">
-    <div class="card" id="lotKopf"></div>
+    <!-- Design 03.11.2026: ein Hauptknopf (Scannen), darunter Eintippen; Lot-Zahlen als eine Zeile statt Kasten -->
+    <div class="muted" id="lotKopf"></div>
+    <button class="btn primary big" id="btnKamera" onclick="kamera()" data-t="kamera">Strichcode scannen</button>
     <div>
-      <label class="lbl" for="q" data-t="q">EAN scannen, PG-ID oder Name</label>
-      <div class="scanreihe"><div class="field"><input id="q" type="text" autocomplete="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();suchen();}"></div><button class="btn" id="btnKamera" onclick="kamera()" data-t="kamera">Kamera</button></div>
+      <label class="lbl" for="q" data-t="q">Oder eintippen: EAN, PG-ID oder Name</label>
+      <div class="scanreihe"><div class="field"><input id="q" type="text" autocomplete="off" enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();suchen();}"></div><button class="btn" id="btnSuchen" onclick="suchen()" data-t="suchen">Suchen</button></div>
     </div>
-    <button class="btn primary" onclick="suchen()" data-t="suchen">Suchen</button>
     <div id="treffer" style="display:flex;flex-direction:column;gap:8px"></div>
     <button class="link" onclick="vonHand()" data-t="vonHandLink">Nicht gefunden? Von Hand erfassen</button>
-    <div><span class="lbl" data-t="imLot">Im Lot</span><div id="stuecke"></div></div>
+    <div class="trenn"><span class="lbl" data-t="imLot">Im Lot</span><div id="stuecke"></div></div>
     <button class="btn" id="btnAbschliessen" onclick="abschliessen()" data-t="abschliessen">Lot abschliessen</button>
   </section>
 
@@ -132,11 +137,11 @@ const T = {
   stuecke: ['{0} Stücke', '{0} items'], eroeffnet: ['{0} eröffnet', '{0} opened'],
   abgeschlossenInfo: ['{0} ist abgeschlossen. Reporting im Sheet, Tab «{0}».', '{0} is closed. Report in the sheet, tab «{0}».'],
   'st.Offen': ['Offen', 'Open'], 'st.Abgeschlossen': ['Abgeschlossen', 'Closed'],
-  q: ['EAN scannen, PG-ID oder Name', 'Scan EAN, PG-ID or name'], suchen: ['Suchen', 'Search'], sucht: ['Suche …', 'Searching …'],
+  q: ['Oder eintippen: EAN, PG-ID oder Name', 'Or type: EAN, PG-ID or name'], suchen: ['Suchen', 'Search'], sucht: ['Suche …', 'Searching …'],
   nichts: ['Nichts gefunden für «{0}».', 'Nothing found for «{0}».'], schonIn: ['schon in {0}', 'already in {0}'],
   vonHandLink: ['Nicht gefunden? Von Hand erfassen', 'Not found? Enter by hand'], vonHand: ['Von Hand erfassen', 'Enter by hand'],
   imLot: ['Im Lot', 'In this lot'], leer: ['Noch leer.', 'Still empty.'], loeschen: ['Löschen', 'Delete'],
-  lotKopf: ['{0} Stücke · Brockipreis total CHF {1}', '{0} items · shop price total CHF {1}'],
+  lotKopf: ['{0} Stücke · Brockipreis total CHF {1}', '{0} items · shop price total CHF {1}'], lotKopf1: ['1 Stück · Brockipreis total CHF {1}', '1 item · shop price total CHF {1}'],
   loeschenFrage: ['{0} aus dem Lot löschen?', 'Delete {0} from the lot?'], geloescht: ['{0} gelöscht', '{0} deleted'],
   abschliessen: ['Lot abschliessen', 'Close lot'],
   abschliessenFrage: ['Lot {0} abschliessen? Danach kommen keine Stücke mehr dazu. Das Tool erstellt die Inventarliste mit Kategorien.', 'Close lot {0}? No more items can be added afterwards. The tool creates the inventory list with categories.'],
@@ -154,7 +159,7 @@ const T = {
   fertigPruefen: ['{0} Kategorien bitte im Tab prüfen (steht «Prüfen»).', 'Please check {0} categories in the tab (marked «Prüfen»).'],
   listeOeffnen: ['Inventarliste öffnen', 'Open inventory list'], zuLots: ['Zu den Lots', 'Back to lots'],
   warten: ['Bitte warten …', 'Please wait …'],
-  kamera: ['Kamera', 'Camera'], kamAus: ['Schliessen', 'Close'], kamHinweis: ['Strichcode in den Rahmen halten', 'Hold the barcode inside the frame'],
+  kamera: ['Strichcode scannen', 'Scan barcode'], kamAus: ['Schliessen', 'Close'], kamHinweis: ['Strichcode in den Rahmen halten', 'Hold the barcode inside the frame'],
   kamFoto: ['Live-Kamera nicht erlaubt: Foto-Kamera öffnet', 'Live camera not allowed: photo camera opens'], kamNichts: ['Kein Strichcode erkannt. Näher und scharf nochmals.', 'No barcode found. Try again closer and in focus.'],
   kamLader: ['Der Strichcode-Leser liess sich nicht laden. Bitte Internet prüfen.', 'The barcode reader could not be loaded. Please check the internet connection.'], startFehler: ['Start fehlgeschlagen: {0}', 'Start failed: {0}']
 };
@@ -243,7 +248,7 @@ function ladeStuecke(liste) {
   const zeichne = (s) => {
     window._st = s;
     const menge = s.reduce((a, x) => a + (x.menge || 1), 0), summe = s.reduce((a, x) => a + (x.preis || 0) * (x.menge || 1), 0);
-    $('lotKopf').innerHTML = '<b>' + esc(lot) + '</b><br><span class="muted">' + t('lotKopf', menge, chf(summe)) + '</span>';
+    $('lotKopf').textContent = t(menge === 1 ? 'lotKopf1' : 'lotKopf', menge, chf(summe));
     $('stuecke').innerHTML = s.length ? s.slice(0, 30).map((x) => '<div class="item"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.pos) + ' · ' + esc(T['z.' + x.zustand] ? t('z.' + x.zustand) : x.zustand) + (x.menge > 1 ? ' · ' + x.menge + '×' : '') +
       '</span></span><span style="white-space:nowrap">CHF ' + chf(x.preis) + '<button class="x" onclick="loeschen(\'' + esc(x.pos) + '\')">' + t('loeschen') + '</button></span></div>').join('') : '<div class="muted">' + t('leer') + '</div>';
     $('btnAbschliessen').disabled = !s.length;
@@ -271,8 +276,8 @@ function suchen() {
 }
 function zeichneTreffer(tr) {
   window._t = tr;
-  $('treffer').innerHTML = tr.map((x, i) => '<button class="btn list" onclick="waehle(window._t[' + i + '])"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.id) + ' · ' + (L === 'en' ? 'Orig. ' : 'OVP ') + 'CHF ' + chf(x.ovp) +
-    (x.menge > 1 ? ' · ' + x.menge + '×' : '') + (x.vergeben ? ' · ' + esc(t('schonIn', x.vergeben)) : '') + '</span></span></button>').join('');
+  $('treffer').innerHTML = tr.map((x, i) => '<button class="btn list' + (x.vergeben ? ' vergeben' : '') + '" onclick="waehle(window._t[' + i + '])"><span>' + esc(x.bez) + '<br><span class="muted">' + esc(x.id) + ' · ' + (L === 'en' ? 'Orig. ' : 'OVP ') + 'CHF ' + chf(x.ovp) +
+    (x.menge > 1 ? ' · ' + x.menge + '×' : '') + (x.vergeben ? ' · ' + esc(t('schonIn', String(x.vergeben).replace(/\s*\(.*\)$/, ''))) : '') + '</span></span></button>').join('');
 }
 
 /* ---------- Stück ---------- */
