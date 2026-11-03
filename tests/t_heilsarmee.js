@@ -88,6 +88,7 @@ const s2 = c.stueckSpeichern({ lot: 'BRO-1', pgid: 'PG-102', bez: 'Ubiquiti Poe-
 eq([s2.pos, s2.preis, s2.vorschlag], ['BRO-1/2', 4.9, 2.9], 'Gebraucht 75% Rabatt (13.30 → 3.33 → 2.90), Preis von Hand');
 const s3 = c.stueckSpeichern({ lot: 'BRO-1', bez: 'Fleecedecke', zustand: 'Gebraucht', ovp: '', preis: '6.90' });
 eq([s3.pos, s3.preis], ['BRO-1/3', 6.9], 'von Hand ohne OVP');
+eq(blaetter['Stücke'].rows[3][10], 'NA', 'ohne OVP: NA in der Spalte OVP CHF');
 assert.throws(() => c.stueckSpeichern({ lot: 'BRO-1', bez: 'Ohne Preis', zustand: 'Neu' }), /Preis fehlt/, 'ohne Preis'); n++;
 const zeile = blaetter['Stücke'].rows[2];
 eq(zeile[c.ST_COLS ? 0 : 0], 'BRO-1/2', 'Zeile geschrieben');

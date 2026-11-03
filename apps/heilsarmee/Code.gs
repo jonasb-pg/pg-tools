@@ -11,7 +11,7 @@
  * Das Return Tool wird nur gelesen (Entscheid Jonas B. 30.10.2026). Das Verschieben ins «Archiv Heilsarmee» macht das Team selbst.
  * Preisstufen: 1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59, dann 69, 79 … (Pilot-Excel, Tab PREISE GEBRAUCHT).
  */
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const TZ = 'Europe/Zurich';
 
 const CONFIG_DEFAULTS = [
@@ -239,7 +239,7 @@ function stueckSpeichern(p) {
     const n = alle.filter((s) => str_(s['Lot']) === lot).reduce((a, s) => { const m = str_(s['Pos-ID']).match(/\/(\d+)$/); return Math.max(a, m ? Number(m[1]) : 0); }, 0) + 1;
     const pos = lot + '/' + n;
     const row = { 'Pos-ID': pos, 'Lot': lot, 'Erfasst am': new Date(), 'Erfasst von': str_(p.von) || nutzer_(), 'Quelle': str_(p.quelle) || (pg ? 'Retoure' : 'Von Hand'),
-      'PG-ID': str_(p.pgid), 'EAN': str_(p.ean), 'Bezeichnung': bez, 'Menge': menge, 'Zustand': zustand, 'OVP CHF': ovp == null ? '' : ovp,
+      'PG-ID': str_(p.pgid), 'EAN': str_(p.ean), 'Bezeichnung': bez, 'Menge': menge, 'Zustand': zustand, 'OVP CHF': ovp == null ? 'NA' : ovp,   // ohne OVP (nicht gefunden): NA (Jonas B. 03.11.2026)
       'Rabatt': rabatt, 'Vorschlag CHF': vorschlag == null ? '' : vorschlag, 'Brockipreis CHF': preis, 'Preis von Hand': vorschlag == null || Math.abs(preis - vorschlag) > 0.001 ? 'Ja' : '',
       'Lagerort RT': str_(p.ort), 'Bemerkung': str_(p.bemerkung) };
     sh.appendRow(ST_COLS.map((k) => row[k]));

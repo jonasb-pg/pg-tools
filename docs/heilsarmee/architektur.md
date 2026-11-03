@@ -36,3 +36,9 @@ Knopf «Kamera» neben dem Suchfeld, übernommen aus dem Umpacken-Tool: Live-Bil
 (BarcodeDetector des Browsers, sonst ZXing 0.21.3 von jsdelivr). Ein Treffer schliesst die Kamera und sucht wie ein Handscanner.
 Erlaubt der Google-Rahmen die Live-Kamera nicht: Foto-Kamera des Handys öffnet, das Foto wird gelesen. Nur Index.html geändert.
 Live seit 02.11.2026 17:19 als Bereitstellungs-Version 5 «1.2.1 Kamera-Scan» (Rückfall: Version 4).
+
+## 1.3.0 Neupreis nicht verfügbar (03.11.2026)
+Von Hand erfassen: zuerst Neupreis eingeben. Ist er nicht auffindbar, Knopf «Neupreis nicht verfügbar»: OVP wird «NA» (auch so im Tab «Stücke»),
+der Verkaufspreis wird direkt gewählt: grosse Knöpfe 1.90 / 2.90 / 4.90 / 6.90, darunter ein Dropdown mit allen weiteren Heilsarmee-Stufen.
+Nochmals tippen führt zurück zur Neupreis-Eingabe. Nebenbei: Feld «Menge» ragte auf schmalen Handys über den Rand (behoben).
+Im Editor gespeichert, noch nicht live (wartet auf Go für Bereitstellungs-Version 6, Rückfall Version 5).

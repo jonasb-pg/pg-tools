@@ -29,7 +29,10 @@
   .btn.big { min-height: 76px; font-size: 22px; }
   .btn.sel { background: var(--b); color: #fff; }
   .btn.list { justify-content: flex-start; text-align: left; text-transform: none; letter-spacing: 0; border-radius: var(--r); line-height: 1.3; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .row2 > * { min-width: 0; }
+  /* Von Hand ohne OVP (Jonas B. 03.11.2026): grosse Knöpfe für die unteren 4 Stufen, darunter alle weiteren Stufen */
+  .stufen4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  #stufeMehr { width: 100%; height: var(--h); border: 2px solid var(--b); border-radius: var(--r); background: #fff; font: inherit; font-size: 18px; padding: 0 12px; margin-top: 8px; }
   .card { border: 2px solid var(--b); border-radius: var(--r); padding: 12px 16px; }
   .muted { font-weight: 400; }
   .preis { font-size: 56px; font-weight: 900; line-height: 1; letter-spacing: -.01em; }
@@ -88,6 +91,7 @@
         <div><label class="lbl" for="hOvp" data-t="ovp">OVP / Neupreis CHF</label><div class="field"><input id="hOvp" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
         <div><label class="lbl" for="hMenge" data-t="menge">Menge</label><div class="field"><input id="hMenge" type="text" inputmode="numeric" value="1" autocomplete="off"></div></div>
       </div>
+      <button class="btn" id="btnOvpNA" onclick="ovpNA()" data-t="ovpNichtDa">Neupreis nicht verfügbar</button>
     </div>
     <div><span class="lbl" data-t="zustand">Zustand</span>
       <div class="row2"><button class="btn big" id="btnNeu" onclick="zustand('Neu')" data-t="z.Neu">Neu</button><button class="btn big" id="btnGebraucht" onclick="zustand('Gebraucht')" data-t="z.Gebraucht">Gebraucht</button></div>
@@ -96,8 +100,10 @@
       <span class="lbl" data-t="preisGun">Brockipreis (Preis-Gun)</span>
       <div class="preis" id="preisGross">–</div>
       <div class="muted" id="preisInfo"></div>
-      <div class="row2" style="margin-top:12px"><button class="btn" id="btnTiefer" onclick="stufeWahl(-1)">–</button><button class="btn" id="btnHoeher" onclick="stufeWahl(1)">–</button></div>
-      <div style="margin-top:12px"><label class="lbl" for="preisHand" data-t="andererPreis">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
+      <div id="stufenWahl" style="display:none"><div class="stufen4" id="stufen4"></div>
+        <select id="stufeMehr" onchange="stufeSetzen(Number(this.value))"></select></div>
+      <div class="row2" id="tiefHoch" style="margin-top:12px"><button class="btn" id="btnTiefer" onclick="stufeWahl(-1)">–</button><button class="btn" id="btnHoeher" onclick="stufeWahl(1)">–</button></div>
+      <div id="preisHandBox" style="margin-top:12px"><label class="lbl" for="preisHand" data-t="andererPreis">Anderer Preis CHF</label><div class="field"><input id="preisHand" type="text" inputmode="decimal" autocomplete="off" oninput="rechne()"></div></div>
     </div>
     <button class="btn primary big" id="btnUebernehmen" onclick="uebernehmen()" disabled data-t="uebernehmen">Übernehmen</button>
   </section>
@@ -139,6 +145,8 @@ const T = {
   schonErfasst: ['Schon erfasst in {0}.', 'Already recorded in {0}.'],
   preisGun: ['Brockipreis (Preis-Gun)', 'Shop price (price gun)'], andererPreis: ['Anderer Preis CHF', 'Other price CHF'],
   vonHandVorschlag: ['Von Hand (Vorschlag {0})', 'By hand (suggested {0})'], prozentVon: ['{0}% Rabatt auf OVP CHF {1}, gerundet', '{0}% discount on original price CHF {1}, rounded'],
+  ovpNichtDa: ['Neupreis nicht verfügbar', 'Original price not available'],
+  ovpNA: ['OVP NA: Verkaufspreis wählen', 'Original price NA: choose the sale price'], weitereStufen: ['Weitere Preise …', 'More prices …'],
   ovpFehlt: ['OVP fehlt: Preis von Hand eingeben', 'Original price missing: enter the price by hand'],
   uebernehmen: ['Übernehmen', 'Save'], bezFehlt: ['Bezeichnung fehlt', 'Description missing'],
   fertig: ['Lot {0} abgeschlossen: {1} Stücke, OVP total CHF {2}, Brockipreis total CHF {3}.', 'Lot {0} closed: {1} items, original price total CHF {2}, shop price total CHF {3}.'],
@@ -173,7 +181,7 @@ function setLang(l) {
   /* Sichtbares neu zeichnen, ohne Eingaben zu verlieren */
   if (screen === 'start') zeichneLots();
   if (screen === 'lot' && lot) { ladeStuecke(window._st); if (window._t && $('treffer').innerHTML) zeichneTreffer(window._t); }
-  if (screen === 'stueck' && st) { kopfStueck(); rechne(); }
+  if (screen === 'stueck' && st) { kopfStueck(); if (st.ovpNA) stufenZeichnen(); rechne(); }
 }
 let boot = { rabattNeu: .5, rabattGebraucht: .75, stufen: [1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59], lots: [] };
 let lot = null, st = null, screen = 'start';
@@ -277,7 +285,7 @@ function waehle(x) {
 function vonHand() {
   st = { quelle: 'Von Hand', pgid: '', ean: /^\d{6,14}$/.test($('q').value.trim()) ? $('q').value.trim() : '', bez: '', menge: 1, ovp: null, ort: '', zustand: '' };
   kopfStueck();
-  $('hBez').value = /^\d{6,14}$/.test($('q').value.trim()) ? '' : $('q').value.trim(); $('hOvp').value = ''; $('hMenge').value = '1';
+  $('hBez').value = /^\d{6,14}$/.test($('q').value.trim()) ? '' : $('q').value.trim(); $('hOvp').value = ''; $('hOvp').readOnly = false; $('hMenge').value = '1';
   $('handFelder').style.display = 'flex';
   startStueck();
   setTimeout(() => $('hBez').focus(), 50);
@@ -290,6 +298,7 @@ function kopfStueck() {
 function startStueck() {
   $('btnNeu').classList.remove('sel'); $('btnGebraucht').classList.remove('sel');
   $('preisBox').style.display = 'none'; $('preisHand').value = ''; $('btnUebernehmen').disabled = true;
+  st.wahl = null; st.ovpNA = false; preisModus();
   zeige('stueck');
 }
 function zustand(z) {
@@ -298,7 +307,37 @@ function zustand(z) {
   $('preisBox').style.display = 'block';
   rechne();
 }
+/* Von Hand: zuerst Neupreis erfragen. Nicht auffindbar → «Neupreis nicht verfügbar»: OVP = NA,
+   Verkaufspreis direkt aus den Heilsarmee-Stufen (Jonas B. 03.11.2026). Nochmals tippen = zurück zur Eingabe. */
+function preisModus() {
+  const na = !!(st && st.ovpNA);
+  $('stufenWahl').style.display = na ? 'block' : 'none'; $('tiefHoch').style.display = na ? 'none' : ''; $('preisHandBox').style.display = na ? 'none' : '';
+  $('btnOvpNA').classList.toggle('sel', na);
+  if (na) { stufenZeichnen(); $('preisBox').style.display = 'block'; }
+}
+function ovpNA() {
+  st.ovpNA = !st.ovpNA; st.wahl = null;
+  $('hOvp').value = st.ovpNA ? 'NA' : ''; $('hOvp').readOnly = st.ovpNA; $('preisHand').value = '';
+  if (!st.ovpNA) { $('preisBox').style.display = st.zustand ? 'block' : 'none'; setTimeout(() => $('hOvp').focus(), 50); }
+  preisModus(); rechne();
+}
+function stufenZeichnen() {
+  const s = stufen(149);
+  $('stufen4').innerHTML = s.slice(0, 4).map((x) => '<button class="btn big" data-p="' + x + '" onclick="stufeSetzen(' + x + ')">' + chf(x) + '</button>').join('');
+  $('stufeMehr').innerHTML = '<option value="">' + esc(t('weitereStufen')) + '</option>' + s.slice(4).map((x) => '<option value="' + x + '">CHF ' + chf(x) + '</option>').join('');
+}
+function stufeSetzen(x) { if (!st) return; st.wahl = x > 0 ? x : null; rechne(); }
+function rechneHand() {
+  st.preis = st.wahl; st.vorschlag = null;
+  $('preisGross').textContent = st.wahl ? chf(st.wahl) : '–';
+  $('preisInfo').textContent = t('ovpNA');
+  $('stufen4').querySelectorAll('button').forEach((b) => b.classList.toggle('sel', Number(b.dataset.p) === st.wahl));
+  const ist4 = $('stufen4').querySelector('.sel');
+  $('stufeMehr').value = st.wahl && !ist4 ? String(st.wahl) : '';
+  $('btnUebernehmen').disabled = !(st.wahl && st.zustand);
+}
 function rechne() {
+  if (st && st.ovpNA) { rechneHand(); return; }
   if (!st || !st.zustand) return;
   const ovp = st.quelle === 'Von Hand' ? num($('hOvp').value) : st.ovp;
   const p = st.zustand === 'Neu' ? boot.rabattNeu : boot.rabattGebraucht;
@@ -324,10 +363,10 @@ function stufeWahl(r) {
 }
 function uebernehmen(ok) {
   if (st.quelle === 'Von Hand') {
-    st.bez = $('hBez').value.trim(); st.ovp = num($('hOvp').value); st.menge = Math.max(1, parseInt($('hMenge').value, 10) || 1);
+    st.bez = $('hBez').value.trim(); st.ovp = st.ovpNA ? null : num($('hOvp').value); st.menge = Math.max(1, parseInt($('hMenge').value, 10) || 1);
     if (!st.bez) { toast(t('bezFehlt')); $('hBez').focus(); return; }
   }
-  const hand = num($('preisHand').value);
+  const hand = st.ovpNA ? st.wahl : num($('preisHand').value);
   const p = { lot: lot, pgid: st.pgid, ean: st.ean, bez: st.bez, menge: st.menge, zustand: st.zustand, ovp: st.ovp, preis: hand, quelle: st.quelle, ort: st.ort, von: name(), ok: ok === true };
   $('btnUebernehmen').disabled = true;
   call('stueckSpeichern', p).then((r) => {
