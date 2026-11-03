@@ -48,5 +48,6 @@ Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Kno
 ## Rückzahlungs-Mail (03.11.2026)
 Einstellung «Rückzahlungen an» stand auf invoice@ (ohne s, Adresse gibt es nicht); im Sheet auf invoices@pretty-good.ch korrigiert (Go Jonas).
 Code: «Rückzahlungen an» nimmt mehrere Adressen mit Komma (Jonas will die Mail auch selbst: eine Gruppenmail vom eigenen Konto zeigt Gmail nur unter «Gesendet»).
-Erst nach dem Live-Stellen die Einstellung auf «invoices@pretty-good.ch, jonas.b@pretty-good.ch» setzen; die alte Version akzeptiert nur eine Adresse.
+Live seit 03.11.2026 15:12 als Version 43 (Rückfall: 42). Danach Einstellung auf «invoices@pretty-good.ch, jonas.b@pretty-good.ch» gesetzt.
+Test 15:14: echte Funktion rueckzahlungMail_ mit erfundenen Daten (RT-TEST, PG-99999) über eine kurz eingefügte Editor-Funktion, danach wieder entfernt (Prüfsumme wie vorher). Mail kam bei Jonas im Posteingang an. Ein Log-Eintrag «Rückzahlungs-Mail PG-99999 RT-TEST» bleibt im Tab Log.
 Test: tests/t_ricardo_rueckzahlung.js.
