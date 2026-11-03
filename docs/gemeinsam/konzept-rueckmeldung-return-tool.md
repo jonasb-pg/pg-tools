@@ -1,43 +1,46 @@
-# Konzept: Ergebnisse aus Analyse Tool und Ricardo Tool zurück ins Return Tool
+# Architektur: Rückführung aller Tools ins Return Tool
 
-Stand 03.11.2026, Entwurf (Claude), noch nicht entschieden. Jonas: «zu 99% wasserdicht, kein Wirrwarr, keine Fehler im Return Tool». Konzipierung später fortsetzen.
+Stand 03.11.2026, Entwurf (Claude), noch nicht entschieden. Vorgaben Jonas: im Return Tool muss niemand etwas tun; klarer Lauf von den Tools ins Return Tool; alle Tools beachten; zu 99% wasserdicht, kein Wirrwarr.
 
-Anlass: Feedback FG 02.11. (analysierte Stücke tauchen beim Scannen wieder auf). Ursache: Das Analyse Tool meldet alle 10 Minuten «Erledigt, steht im Return Tool aber (wieder) in der Analyse ohne «Reusable»»; 02.–03.11. 201 verschiedene PG-IDs. Das Ergebnis wird im Return Tool nicht nachgetragen.
+## Bild
+Tools (Analyse, Ricardo, Umpacken, Heilsarmee, Matchmaker über Analyse) → schreiben Ereignisse (nur anhängen) ins Sheet «RÜCKFÜHRUNG» (Tab «Ereignisse») → Dienst im Script des Return Tools (Zeittrigger alle 10 Min., gleiche Sperre wie End of Day und VERSCH) verarbeitet sie mit den eigenen Funktionen des Return Tools → Status zurück ins Ereignis, Protokoll, Mail an Jonas nur bei Konflikt.
+Scanner (Python) schreibt wie heute neue Zeilen in Tab «Scanner» (Eingang, bleibt). vidaXL (eigene DB) und Ersatzteil-Tool: nicht im Return Tool, ausserhalb.
 
-## Grundidee
-Das Return Tool bleibt der einzige Schreiber seiner Zeilen. Analyse Tool und Ricardo Tool schreiben nie direkt hinein, sondern legen Rückmeldungen in ein Postfach (je ein Tab im eigenen Sheet). Das Return Tool holt sie mit einem Menüpunkt «Rückmeldungen übernehmen» ab: Vorschau → Ausführen (mit eigener Sperre und eigenen Verschiebe-Funktionen) → Quittung im Postfach.
+## Warum der Dienst im Script des Return Tools
+Script-Sperre gilt pro Projekt: nur so kann er nie gleichzeitig mit End of Day, VERSCH oder Lieferung laufen. Er ruft dieselben Funktionen wie ein Klick (Analyse Log, Erledigt am, Archiv-Status, Lieferliste stimmen). Schreiben von aussen löst kein onEdit aus und kennt die Sperre nicht.
 
-## Warum nicht direkt schreiben
-- Zeilen wandern (End of Day, «→ VERSCH.»), Zeilennummern instabil.
-- Schreibzugriffe von aussen lösen kein onEdit aus: «Erledigt am (auto)», «Analyse Log», Verschieben fehlen.
-- Keine gemeinsame Sperre zwischen den Scripts.
-- Zwei Schreiber pro Feld.
+## Sheet «RÜCKFÜHRUNG»
+- Ereignisse: Ereignis-ID (Quelle + Quell-Nr + Art, eindeutig), Zeit, Quelle, Art, PG-ID, Werte (JSON), Status (Neu, Wartet, Erledigt, Konflikt, Übersprungen), Ergebnis, Bearbeitet am. Tools hängen nur an; Status schreibt nur der Dienst.
+- Zuordnung: Art + Wert → Ziel im Return Tool (Tab, Feld, Aktion).
+- Protokoll: je Schreibvorgang PG-ID, Tab, Feld, alt, neu, Ereignis-ID.
+- Einstellungen: Modus (Aus / Vorschau / Schreiben), max. Ereignisse pro Lauf, Mail bei Konflikt.
 
-## Rückmeldungen
-| Ereignis | Return Tool | Danach |
+## Ereignisse
+| Quelle | Art | Return Tool |
 |---|---|---|
-| Analyse fertig, reusable | Tab «Analyse»: Reusable Ja, Kürzel, Befund | verschieben in Zielkanal (Spalte S); Regal Ricardo → «Online» |
-| Analyse fertig, nicht reusable | Reusable Nein, Kürzel, Befund | offen (Archiv Entsorgt?) |
-| Ricardo verkauft (bezahlt und versendet) | Tab «Online»: Ricardo-Link, Erzielter VP | → Archiv (Verkauft) |
-| Ricardo nicht verkauft, Entscheid anderer Kanal / Entsorgung | Tab «Online» | verschieben |
-| Ricardo-Retoure | Archiv | bestehende Funktion «Archiv: zurück» → Online |
+| Analyse | ANALYSE_FERTIG (reusable, Kürzel, Befund, Regal) | Tab Analyse: Reusable, Kürzel, Befund; verschieben: Regal Ricardo → Online, Analysiert → Zielkanal (Spalte S), nicht reusable → (offen), Matchmaker → (offen) |
+| Analyse | MATCHMAKER_ABGEHOLT (Preis) | → Archiv (Verkauft) |
+| Ricardo | GELISTET (Ricardo-Link) | Tab Online: Ricardo-Link |
+| Ricardo | VERSENDET (Erzielter VP, Verkauf-Nr) | Online: Erzielter VP → Archiv (Verkauft) |
+| Ricardo | ENTSCHEID_NICHT_VERKAUFT (anderer Kanal / Entsorgung) | verschieben |
+| Ricardo | RETOURE | Archiv zurück → Online (bzw. Analyse) |
+| Umpacken | LAGERORT_NEU, VERKAUFT_AN (Abnehmer) | heute direkter Übertrag (nur Lagerort) → auf Ereignisse umstellen |
+| Heilsarmee | LOT_ABGEGEBEN (PG-IDs, Lot) | Tab Heilsarmee → Lieferung (GESPENDET); von Hand erfasste Stücke ohne PG-ID: nichts |
 
-## Regeln
-1. Nur über PG-ID, nie Zeilennummer; Zeile in der Sperre unmittelbar vor dem Schreiben frisch suchen.
-2. PG-ID genau einmal in aktiven Tabs und im erwarteten Tab, sonst Konflikt.
-3. Nur leere Felder füllen; anderer Wert = Konflikt (Mensch); gleicher Wert = erledigt.
-4. Verschieben nur über die bestehenden Return-Tool-Funktionen.
-5. Ziel nur aus fester Zuordnungstabelle; unbekannt = Konflikt.
-6. Jede Rückmeldung quittiert, idempotent; Abbruch mittendrin lässt Rest offen.
-7. Vorschau vor dem Ausführen; Ausführen auf Knopf einer festen Person (z.B. abends vor End of Day).
-8. Protokoll: vorher, nachher, Quelle.
+## Verarbeitung je Ereignis (in der Sperre)
+1. Schon erledigt (Ereignis-ID)? → nichts. 2. Zuordnung kennt Art/Wert? sonst Konflikt. 3. PG-ID genau einmal in aktiven Tabs, im erwarteten Tab? Noch nicht da (z.B. Verkauf vor Analyse) → Wartet, nach 48 h Konflikt; doppelt/falscher Tab → Konflikt. 4. Felder leer oder gleich? anderer Wert → Konflikt. 5. Schreiben + Aktion über Return-Tool-Funktion, Zeile direkt davor frisch per PG-ID suchen. 6. Protokoll, Status Erledigt.
+Reihenfolge: nach Zeit, pro PG-ID nacheinander. Jedes Ereignis einzeln: Abbruch lässt Rest offen.
+
+## Sicherungen
+Modus-Schalter mit Vorschau und Aus; Obergrenze pro Lauf; vor Start Kopie des Return Tools; Rückgängig pro Ereignis über Protokoll (Archiv zurück für Verschiebungen); keine Texte mit = + - @ am Anfang; Tests mit Kopie des Return Tools vor jedem Einspielen; tägliche Kontrollzahl (Ereignisse neu/erledigt/Konflikt) im Morgen-Lauf, Mail nur bei Konflikt.
 
 ## Einführung
-1. Fragen klären. 2. Eine Woche nur Vorschau, Vergleich mit Handarbeit. 3. Ausführen auf Knopf. 4. Altlast (201 Stücke) in Portionen über dieselbe Vorschau. 5. Später allenfalls automatisch.
+0. Zugang zum Code des Return Tools klären und lesen. 1. Sheet RÜCKFÜHRUNG, Tools schreiben Ereignisse (ohne Wirkung). 2. Dienst im Modus Vorschau, eine Woche, Abgleich mit Handarbeit. 3. Schreiben, zuerst nur ANALYSE_FERTIG, dann Ricardo, dann Umpacken/Heilsarmee. 4. Altlast: Ereignisse aus der Analyse-Historie nachtragen (201 Stücke), in Portionen.
 
 ## Offene Fragen
-1. Code des Return Tools (v6.0): wer hat ihn, darf Claude ihn lesen und einen Menüpunkt ergänzen? (Bisher Regel «Return Tool nur lesen».)
-2. Nicht reusable: immer Archiv Entsorgt oder je nach Grund Spenden/Ersatzteile?
-3. Regal Matchmaker: wohin im Return Tool?
-4. Ricardo verkauft: sofort ins Archiv oder erst nach Retourenfrist?
-5. Brücke bis zur neuen Datenbank von HuggyStudio?
+1. Code des Return Tools (v6.0): Zugang? Funktionen für VERSCH, Lieferung, Archiv zurück wiederverwendbar? Regel «Return Tool nur lesen» müsste für den Dienst fallen.
+2. Nicht reusable: Archiv Entsorgt oder je nach Grund Spenden?
+3. Regal Matchmaker: wo im Return Tool, bis abgeholt?
+4. Ricardo verkauft: Archiv bei Versand oder nach Retourenfrist?
+5. Heilsarmee: gilt ein abgeschlossenes Lot als Lieferung (GESPENDET)?
+6. Brücke bis zur Datenbank von HuggyStudio?
