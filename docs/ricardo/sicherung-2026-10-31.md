@@ -44,3 +44,9 @@ Nach Go Jonas bereitgestellt: **Version 40** «2026-10-31.2 Kopf mit Quellen-Kno
 ## 02.11.2026
 - Retoure PG-18036 (Tamron, Verkauf 54000061) nachgetragen: RT-0001 abgeschlossen (CHF 204.00 zurückbezahlt, auf Ricardo storniert laut Jonas, Entscheid Neu listen), ohne Rückzahlungs-Mail. Verkauf → Retourniert, Listing → In Arbeit (Texte behalten, «Getestet» geleert).
 - Suche: Käufer auch über Vorname und Firma; Akzente und Gross/klein egal (Test tests/t_ricardo_suche_name.js). Im Live-Editor gespeichert (Code 331711 / 3729864063), Live seit 02.11.2026 16:03 als Version 42 (Rückfall: 41); live geprüft: «linda» findet Linda Bertschi.
+
+## Rückzahlungs-Mail (03.11.2026)
+Einstellung «Rückzahlungen an» stand auf invoice@ (ohne s, Adresse gibt es nicht); im Sheet auf invoices@pretty-good.ch korrigiert (Go Jonas).
+Code: «Rückzahlungen an» nimmt mehrere Adressen mit Komma (Jonas will die Mail auch selbst: eine Gruppenmail vom eigenen Konto zeigt Gmail nur unter «Gesendet»).
+Erst nach dem Live-Stellen die Einstellung auf «invoices@pretty-good.ch, jonas.b@pretty-good.ch» setzen; die alte Version akzeptiert nur eine Adresse.
+Test: tests/t_ricardo_rueckzahlung.js.

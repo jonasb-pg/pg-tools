@@ -105,7 +105,7 @@ const DEFAULTS = [
   ['Regal Online', REGAL_VORGABE['Regal Online'], 'Regal für gelistete Stücke'],
   ['Regal Unpaid', REGAL_VORGABE['Regal Unpaid'], 'Regal für verkaufte Stücke, bis sie bezahlt und versendet sind'],
   ['Mails prüfen zwischen', '07:00-19:00', 'In diesem Zeitfenster liest das Tool alle 30 Minuten die Ricardo-Mails (Verkäufe, Fragen, Preisvorschläge). Dazu immer, wenn jemand das Tool öffnet. Leer = nie automatisch.'],
-  ['Rückzahlungen an', 'invoice@pretty-good.ch', 'An diese Adresse schickt das Tool bei jeder neuen Retoure eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto. Wer zahlt, klickt danach im Tool «Rückzahlung gemacht»'],
+  ['Rückzahlungen an', 'invoices@pretty-good.ch', 'An diese Adresse schickt das Tool bei jeder neuen Retoure eine Mail mit PG-ID, Produkt, Name, Adresse, IBAN und Betrag inkl. Porto. Wer zahlt, klickt danach im Tool «Rückzahlung gemacht»'],
   ['Mail-Absender', 'care@pretty-good.ch', 'Von dieser Adresse kommen die Ricardo-Mails ins Postfach (Google-Gruppe). Das Tool verarbeitet nur Mails, die nachweislich von Ricardo stammen.'],
   ['Preisvorschlag bis Stunden nach Auktionsende', 24, 'Preisvorschläge, die bis so viele Stunden nach dem Ende der Auktion eintreffen, empfiehlt das Tool anzunehmen. Spätere ablehnen. Entscheid Jonas 16.10.2026.'],
   ['Storno vorschlagen nach Tagen', 14, 'Ricardo gibt Käufer*innen 14 Tage zum Zahlen. Ist ein Verkauf danach nicht bezahlt, schlägt der Ablauf «Täglich» den Storno vor. Storniert wird nur von Hand.'],
@@ -3879,8 +3879,9 @@ function retoureEroeffnen(nr, grund, notiz, iban, adresse, betragHand, bestaetig
  * Scheitert der Versand, bleibt die Retoure gültig; das Tool meldet es und schreibt den Fehler ins Log.
  */
 function rueckzahlungMail_(r) {
-  const an = String(cfg_('Rückzahlungen an') || '').trim();
-  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(an)) { log_('Rückzahlungs-Mail', String(r['PG-ID']), 'Keine gültige Adresse in «Rückzahlungen an»'); return { ok: false, an: an }; }
+  /* Mehrere Adressen mit Komma (Jonas B. 03.11.2026: invoices@ und er selbst; eine Gruppenmail vom eigenen Konto landet bei ihm nur unter «Gesendet») */
+  const liste = String(cfg_('Rückzahlungen an') || '').split(/[,;\s]+/).map(function (x) { return x.trim(); }).filter(String), an = liste.join(', ');
+  if (!liste.length || !liste.every(function (x) { return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x); })) { log_('Rückzahlungs-Mail', String(r['PG-ID']), 'Keine gültige Adresse in «Rückzahlungen an»'); return { ok: false, an: an }; }
   const preis = runde_(Number(r['Preis CHF']) || 0), porto = runde_(Number(r['Versand CHF']) || 0), hand = Number(r['Rückzahlung CHF']) > 0;
   const betrag = (hand ? runde_(Number(r['Rückzahlung CHF'])) : runde_(preis + porto)).toFixed(2);
   const zeilen = [
