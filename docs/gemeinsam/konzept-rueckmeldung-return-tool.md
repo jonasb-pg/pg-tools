@@ -2,7 +2,16 @@
 
 Stand 03.11.2026, Entwurf (Claude), noch nicht entschieden. Vorgaben Jonas: im Return Tool muss niemand etwas tun; klarer Lauf von den Tools ins Return Tool; alle Tools beachten; zu 99% wasserdicht, kein Wirrwarr.
 
-## Bild
+## Korrektur Jonas 03.11.2026 17:37
+«Es muss von der Sammlung rübergespielt werden und nicht vom Tool»: Der Dienst läuft im Script des Sheets RÜCKFÜHRUNG, nicht im Return Tool. Folgen und Gegenmassnahmen siehe Abschnitt «Dienst in der Sammlung». Die Abschnitte darunter mit «Dienst im Script des Return Tools» sind damit überholt.
+
+## Dienst in der Sammlung (gilt)
+- Keine gemeinsame Sperre mit End of Day / VERSCH: Schreiben pro Zeile = frisch per PG-ID suchen, schreiben, sofort zurücklesen (ID und Werte); stimmt etwas nicht → alte Werte zurück, Konflikt. Kein Lauf im Zeitfenster von End of Day (Einstellung).
+- Nebenwirkungen, die sonst das Return Tool macht (Erledigt am, Analyse Log, Verschieben, Archiv-Status), macht der Dienst selbst, nach dem gelesenen Code des Return Tools nachgebaut.
+- Stufe 1: nur Felder schreiben (Reusable, Kürzel, Befund, Erledigt am, Analyse-Log-Zeile, Ricardo-Link, Erzielter VP, Lagerort), kein Verschieben.
+- Stufe 2: Verschieben = in Ziel-Tab anhängen → prüfen → Quellzeile löschen (nur wenn ID dort noch steht); vorher prüfen, ob die PG-ID im Ziel schon steht (kein Doppel).
+
+## Bild (alt)
 Tools (Analyse, Ricardo, Umpacken, Heilsarmee, Matchmaker über Analyse) → schreiben Ereignisse (nur anhängen) ins Sheet «RÜCKFÜHRUNG» (Tab «Ereignisse») → Dienst im Script des Return Tools (Zeittrigger alle 10 Min., gleiche Sperre wie End of Day und VERSCH) verarbeitet sie mit den eigenen Funktionen des Return Tools → Status zurück ins Ereignis, Protokoll, Mail an Jonas nur bei Konflikt.
 Scanner (Python) schreibt wie heute neue Zeilen in Tab «Scanner» (Eingang, bleibt). vidaXL (eigene DB) und Ersatzteil-Tool: nicht im Return Tool, ausserhalb.
 
