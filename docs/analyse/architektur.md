@@ -121,3 +121,6 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 | Übernahme abgelehnt | `uebernehmen`: Meldung mit allen Tabs, in denen die ID steht, Log «Übernahme abgelehnt» |
 | Wiedereinstieg | `ohne` steht im Matchmaker-Stand (`abschliessen`) und im Reparatur-Stand (`repPause`); `matchmakerZurueck`/`reparaturWeiter` holen damit den kurzen Ablauf. `preisAus()` liefert den Preis auch nach dem Wiedereinstieg; bei `schon` behält der Browser den gezeigten Preis |
 
+
+## 2026-11-03.1 (Version 19, live 03.11.2026 16:40, Rückfall 18)
+Feedback FG 02.11.: Schon analysierte Stücke zeigen beim Scannen «PG-… ist bereits analysiert» mit Datum, Kürzel, Analyse-Nr. und Ergebnis (Regal oder «nicht reusable»), Link «Retoure? Neu analysieren». Liegt kein anderes übernehmbares Stück im Return Tool, kein «übernehmen» mehr. Server: `fertigInfo_` in `suche`. Tests: t_analyse_fertig_0311.js, t_analyse_fertig_0311_ui.py.
