@@ -1,7 +1,8 @@
 /**
  * HEILSARMEE TOOL (Server) – Pilot Filiale Bern (brocki.ch). Entscheide Jonas B. 29./30.10.2026.
  *
- * Ablauf: Lot eröffnen (BRO-1, BRO-2 …) → EAN, PG-ID oder Name eingeben → Stück aus dem Tab «Heilsarmee» im Return Tool
+ * Ablauf: Lot eröffnen (BRO-1, BRO-2 …) → EAN, PG-ID oder Name eingeben → Stück aus dem Return Tool (zuerst Tab «Heilsarmee», dann alle
+ *   aktiven Kanal-Tabs aus RETURN_TABS, ohne Archive; Jonas B. 06.11.2026)
  * → Neu oder Gebraucht wählen → Brockipreis wird vorgeschlagen (Rabatt auf den Neupreis: Neu 50%, Gebraucht 75%, d.h. Preis 50% bzw. 25% vom OVP/Neupreis, auf die nächste
  * Preisstufe gerundet), von Hand überschreibbar → Preis mit der Preis-Gun kleben → Übernehmen → nächstes Stück.
  * Lot abschliessen → Reporting-Tab «BRO-n» mit Kategorie PG und Kategorie Brocki (Kassenkategorie), OVP und Brockipreis, Summen.
@@ -11,12 +12,14 @@
  * Das Return Tool wird nur gelesen (Entscheid Jonas B. 30.10.2026). Das Verschieben ins «Archiv Heilsarmee» macht das Team selbst.
  * Preisstufen: 1.9, 2.9, 4.9, 6.9, 9.9, 14.9, 18.9, 24.9, 29.9, 39, 49, 59, dann 69, 79 … (Pilot-Excel, Tab PREISE GEBRAUCHT).
  */
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const TZ = 'Europe/Zurich';
 
 const CONFIG_DEFAULTS = [
   ['RETURN_TOOL_ID', '1FpHJNeWZENdhgP6MqAYyOOEe1FN0tIZWOkRiYItOz2E', 'Sheet-ID des Return Tools (wird nur gelesen)'],
   ['RETURN_TAB', 'Heilsarmee', 'Tab im Return Tool mit den Retouren für die Heilsarmee'],
+  /* Jonas B. 06.11.2026: alle Tabs durchsuchen, nicht nur Heilsarmee. Archive nicht (verkauft/geliefert), Scanner nicht (ohne PG-ID). */
+  ['RETURN_TABS', 'Heilsarmee, Stationär, Analyse, Online, Berner Brocki, Caritas, Spenden', 'Diese Tabs im Return Tool werden durchsucht (Komma getrennt; Heilsarmee-Treffer zuerst, keine Archive)'],
   /* Jonas B. 02.11.2026: Der Prozentsatz ist der Rabatt auf den Neupreis. Preis = Neupreis × (1 − Rabatt). */
   ['RABATT_NEU', 0.5, 'Neu: Rabatt auf den OVP (0.5 = 50% Rabatt, Preis = 50% vom OVP)'],
   ['RABATT_GEBRAUCHT', 0.75, 'Gebraucht: Rabatt auf den ungefähren Neupreis (0.75 = 75% Rabatt, Preis = 25% vom Neupreis)'],
@@ -125,17 +128,14 @@ function setup() {
 }
 
 /* ============================== Return Tool lesen ============================== */
-/** Liest den Tab Heilsarmee (Kopfzeile wird gesucht: Zeile mit «ID» und «Barcode»). Cache 60 s. */
-function returnTool_() {
-  const cache = CacheService.getScriptCache(), hit = cache.get('ha-rt');
-  if (hit) return JSON.parse(hit);
-  const cfg = getConfig_();
-  const sh = SpreadsheetApp.openById(str_(cfg.RETURN_TOOL_ID)).getSheetByName(str_(cfg.RETURN_TAB));
-  if (!sh) throw new Error('Tab «' + cfg.RETURN_TAB + '» im Return Tool nicht gefunden.');
+/** Liest einen Tab des Return Tools (Kopfzeile wird gesucht: Zeile mit «ID» und «Barcode»). null = Tab fehlt oder ohne Kopfzeile. */
+function rtTab_(ss, name) {
+  const sh = ss.getSheetByName(name);
+  if (!sh) return null;
   const werte = sh.getDataRange().getDisplayValues();
   let kopf = -1;
   for (let i = 0; i < Math.min(20, werte.length); i++) if (werte[i].indexOf('ID') >= 0 && werte[i].indexOf('Barcode') >= 0) { kopf = i; break; }
-  if (kopf < 0) throw new Error('Kopfzeile im Tab «' + cfg.RETURN_TAB + '» nicht gefunden (Spalten ID und Barcode).');
+  if (kopf < 0) return null;
   const k = werte[kopf], ix = (n) => k.indexOf(n);
   const out = [];
   for (let i = kopf + 1; i < werte.length; i++) {
@@ -144,7 +144,56 @@ function returnTool_() {
     out.push({ id: id, bez: str_(r[ix('Bezeichnung')]), menge: zahl_(r[ix('#')]) || 1, ean: str_(r[ix('Barcode')]), ovp: zahl_(r[ix('OVP')]),
       kat: str_(r[ix('Kategorie')]), ort: str_(r[ix('Lagerort')]), link: str_(r[ix('Link')]) });
   }
+  return out;
+}
+
+/** Tab Heilsarmee (Haupttab). Cache 60 s. */
+function returnTool_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get('ha-rt');
+  if (hit) return JSON.parse(hit);
+  const cfg = getConfig_();
+  const ss = SpreadsheetApp.openById(str_(cfg.RETURN_TOOL_ID));
+  if (!ss.getSheetByName(str_(cfg.RETURN_TAB))) throw new Error('Tab «' + cfg.RETURN_TAB + '» im Return Tool nicht gefunden.');
+  const out = rtTab_(ss, str_(cfg.RETURN_TAB));
+  if (!out) throw new Error('Kopfzeile im Tab «' + cfg.RETURN_TAB + '» nicht gefunden (Spalten ID und Barcode).');
   try { cache.put('ha-rt', JSON.stringify(out), 60); } catch (e) { /* zu gross für den Cache: ohne */ }
+  return out;
+}
+
+/** Die übrigen Tabs aus RETURN_TABS (ohne Haupttab, ohne Archive). Kurzform im Cache, 30 min, in Stücken (je max. 90 KB).
+ *  frisch = true liest neu (Suche ohne Treffer), aber höchstens alle 2 Minuten – sonst kostet jedes «nicht gefunden» rund 10 s. Ein fehlender Tab wird übersprungen. */
+const RT2_KEY = 'ha-rt2', RT2_SEK = 1800, RT2_STUECK = 90000;
+function rtWeitere_(frisch) {
+  const cache = CacheService.getScriptCache();
+  if (frisch) { const alt = Date.now() - Number(cache.get(RT2_KEY + '-t') || 0); if (alt < 120000) frisch = false; }
+  if (!frisch) {
+    try {
+      const n = Number(cache.get(RT2_KEY + '-n') || 0);
+      if (n > 0) {
+        const keys = []; for (let i = 0; i < n; i++) keys.push(RT2_KEY + '-' + i);
+        const teile = cache.getAll ? cache.getAll(keys) : keys.reduce((o, k) => { o[k] = cache.get(k); return o; }, {});
+        if (keys.every((k) => teile[k])) return JSON.parse(keys.map((k) => teile[k]).join('')).map((a) => ({ id: a[0], bez: a[1], menge: a[2], ean: a[3], ovp: a[4], ort: a[5] }));
+      }
+    } catch (e) { /* Cache kaputt: neu lesen */ }
+  }
+  const cfg = getConfig_(), haupt = str_(cfg.RETURN_TAB);
+  const tabs = String(cfg.RETURN_TABS || '').split(',').map((t) => t.trim()).filter((t) => t && t !== haupt && !/^archiv/i.test(t));
+  const ss = SpreadsheetApp.openById(str_(cfg.RETURN_TOOL_ID));
+  const out = [];
+  tabs.forEach((t) => { const l = rtTab_(ss, t); if (l) l.forEach((x) => out.push(x)); });
+  try {
+    const txt = JSON.stringify(out.map((x) => [x.id, x.bez, x.menge, x.ean, x.ovp, x.ort])), teile = {};
+    let n = 0; for (let i = 0; i < txt.length; i += RT2_STUECK) teile[RT2_KEY + '-' + (n++)] = txt.slice(i, i + RT2_STUECK);
+    teile[RT2_KEY + '-n'] = String(n); teile[RT2_KEY + '-t'] = String(Date.now());
+    if (cache.putAll) cache.putAll(teile, RT2_SEK); else Object.keys(teile).forEach((k) => cache.put(k, teile[k], RT2_SEK));
+  } catch (e) { /* zu gross für den Cache: ohne */ }
+  return out;
+}
+
+/** Ganze Liste: Heilsarmee zuerst, dann die übrigen Tabs; dieselbe PG-ID nur einmal. */
+function rtAlle_(frisch) {
+  const gesehen = {}, out = [];
+  returnTool_().concat(rtWeitere_(frisch)).forEach((x) => { const k = pgNorm_(x.id) || x.id; if (gesehen[k]) return; gesehen[k] = 1; out.push(x); });
   return out;
 }
 
@@ -188,7 +237,10 @@ function lots_() {
 }
 
 function suche(q) {
-  return { treffer: suche_(q, returnTool_(), vergeben_()) };
+  const verg = vergeben_();
+  let t = suche_(q, rtAlle_(false), verg);
+  if (!t.length && str_(q)) t = suche_(q, rtAlle_(true), verg);          // ohne Treffer frisch nachlesen (neu erfasste Stücke)
+  return { treffer: t };
 }
 
 function neuesLot(von) {

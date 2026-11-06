@@ -47,3 +47,11 @@ Live seit 03.11.2026 09:26 als Bereitstellungs-Version 6 (Rückfall: Version 5).
 Ein Hauptknopf «Strichcode scannen» oben, darunter «Oder eintippen» mit Suchen im selben Feld. Lot-Zahlen als eine Zeile statt Kasten
 («1 Stück» in Einzahl). Schon vergebene Treffer grau, ohne Lot in Klammern. Trennlinie vor «Im Lot». Ein Handscanner tippt weiter ins Suchfeld.
 Live seit 03.11.2026 09:34 als Bereitstellungs-Version 7 (Rückfall: Version 6).
+
+## 1.4.0 Suche in allen Tabs des Return Tools (06.11.2026, live Version 8, 14:36; Rückfall Version 7)
+- Jonas B.: «soll alle Tabs durchsuchen, nicht nur Heilsarmee», Herkunfts-Tab muss nicht angezeigt werden.
+- Durchsucht werden die Tabs aus Config `RETURN_TABS` (Standard: Heilsarmee, Stationär, Analyse, Online, Berner Brocki, Caritas, Spenden). Keine Archive (verkauft/geliefert), nicht «Scanner» (ohne PG-ID). Fehlt ein Tab oder hat er keine Kopfzeile, wird er übersprungen.
+- Reihenfolge: Heilsarmee-Treffer zuerst, dieselbe PG-ID nur einmal. Anzeige, Preisregel und Speichern unverändert; das Return Tool wird weiterhin nur gelesen.
+- Tempo: Tab Heilsarmee 60 s im Zwischenspeicher wie bisher; die übrigen Tabs als Kurzform 30 min im Zwischenspeicher (in Stücken je 90 KB). Ohne Treffer wird frisch gelesen, aber höchstens alle 2 Minuten.
+- Keine neuen Berechtigungen, kein Auslöser.
+- Tests: tests/t_heilsarmee.js (57) und tests/t_heilsarmee_tabs.js (15). Prüfsumme Code.gs vorher 21420 / 1352494533, nachher 24564 / 1606869215 (Editor = Repo).
