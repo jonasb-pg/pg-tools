@@ -13,7 +13,7 @@ Das Apps-Script-Projekt «vidaXL Erfassung» (gebunden an «vidaXL Retouren DB»
 - `VERSION` bleibt '1.2.1' (keine Schema-Änderung; ein Versionswechsel liesse setup() bei Live und /dev im Wechsel immer wieder laufen).
 - Prüfsummen (Länge, djb2): vorher Code 50903 / 788728050, Index 45791 / 1006675081.
 - Tests: 26 Prüfungen mit Attrappen (normal, doppelt, verlorene Antwort → Wiederholung, zweimal keine Antwort → Meldung, späte Antworten, andere SKU, Rückkehr aus Hintergrund, Serverfehler, Text). /dev: Enter dreifach → eine Suche; zwei SKUs gefunden.
-- Rückfall: Bereitstellung Version 7.
+- **Live: Bereitstellung Version 8 (06.11.2026, 12:18, Go Jonas B. «Geh live»).** Rückfall: Version 7. Kontrolle live: Enter doppelt → eine Suche (12:18:35, 3.9 s), Produkt angezeigt.
 
 ## Neuer Client-Code (Index.html, ersetzt `function submitSku`)
 ```js
