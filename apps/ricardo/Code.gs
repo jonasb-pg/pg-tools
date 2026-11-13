@@ -1588,6 +1588,9 @@ function markiereGelistet(id, link, tage, bestaetigt) {
   id = String(id).trim();
   const a = angebotsLink_(link);
   if (!a) throw new Error('Das ist kein gültiger Ricardo-Angebotslink. Bitte die Adresse des veröffentlichten Angebots einfügen (ricardo.ch/…/a/…).');
+  /* 13.11.2026 (Jonas: Stücke als «No bid», aber verkauft): 8 Links vom 05.11. endeten auf einer 9-stelligen Nummer (…-198580646), die Ricardo nicht kennt.
+     Gebote, Verkäufe und «nicht verkauft» liessen sich darum nicht zuordnen. Ricardo-Artikelnummern haben 10 Stellen (1334608262). */
+  if (a.artikel.length < 10) throw new Error('Die Nummer am Ende des Links (' + a.artikel + ') ist keine Ricardo-Artikelnummer (die hat 10 Stellen, z.B. 1334608262). Bitte das veröffentlichte Angebot auf Ricardo öffnen und die Adresse aus der Adresszeile kopieren.');
   const n = Number(tage);
   if (tage !== undefined && tage !== '' && !(n >= 1 && n <= 30 && Math.round(n) === n)) throw new Error('Laufzeit: bitte eine ganze Zahl von 1 bis 30 Tagen eintragen.');
   const lock = sperre_(20000);
@@ -3278,6 +3281,7 @@ const EN_REGELN = [
   [/^Bitte zuerst den Zustand wählen und speichern\.$/, 'Please choose the condition and save first.'],
   [/^Bitte zuerst die Mängel beschreiben\.$/, 'Please describe the defects first.'],
   [/^Das ist kein gültiger Ricardo-Angebotslink\..*$/, 'This is not a valid Ricardo listing link. Please paste the address of the published listing.'],
+  [/^Die Nummer am Ende des Links \((\d+)\) ist keine Ricardo-Artikelnummer.*$/, 'The number at the end of the link ($1) is not a Ricardo article number (it has 10 digits, e.g. 1334608262). Please open the published listing on Ricardo and copy the address from the address bar.'],
   [/^Listing ist noch nicht vollständig: (.*)$/, function (m, l) { return 'Listing is not complete yet: ' + l.split('; ').map(en_).join('; '); }],
   [/^Dieser Ricardo-Link ist bereits bei (\S+) hinterlegt\.$/, 'This Ricardo link is already stored for $1.'],
   [/^Unbekannter Status\.$/, 'Unknown status.'],
