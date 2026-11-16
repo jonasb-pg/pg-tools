@@ -55,3 +55,8 @@ Live seit 03.11.2026 09:34 als Bereitstellungs-Version 7 (Rückfall: Version 6).
 - Tempo: Tab Heilsarmee 60 s im Zwischenspeicher wie bisher; die übrigen Tabs als Kurzform 30 min im Zwischenspeicher (in Stücken je 90 KB). Ohne Treffer wird frisch gelesen, aber höchstens alle 2 Minuten.
 - Keine neuen Berechtigungen, kein Auslöser.
 - Tests: tests/t_heilsarmee.js (57) und tests/t_heilsarmee_tabs.js (15). Prüfsumme Code.gs vorher 21420 / 1352494533, nachher 24564 / 1606869215 (Editor = Repo).
+
+## 1.4.1 Menge bei jedem Stück (16.11.2026, im Repo, noch nicht bereitgestellt)
+- Jonas B.: «man sollte die Anzahl der Produkte eingeben können». Bisher gab es das Feld Menge nur bei «Von Hand»; bei Stücken aus dem Return Tool wurde dessen Anzahl fest übernommen.
+- Neu: Feld «Menge» mit Minus/Plus auf dem Stück-Screen für jedes Stück, vorbelegt mit der Anzahl aus dem Return Tool bzw. 1, Bereich 1–999. Nur Index.html; Server (stueckSpeichern, Spalte Menge, Summen, Reporting) unverändert.
+- Tests: tests/t_heilsarmee_ui.py (Menge vorbelegt, Minus/Plus, gesendet, 390 px), t_heilsarmee.js 57, t_heilsarmee_tabs.js 15.
