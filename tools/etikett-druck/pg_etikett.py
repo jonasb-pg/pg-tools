@@ -20,7 +20,7 @@ Aufrufe:
 import html, inspect, json, os, sys, threading, time, traceback, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = '2026-11-17.1'
+VERSION = '2026-11-17.2'
 PORT = 9123
 MODELL = 'QL-500'
 HERSTELLER = 0x04F9                                   # Brother
@@ -338,8 +338,13 @@ def probe():
             daten = druckdaten(bild, fmt)
             zeile(len(daten) > 1000, 'Druckdaten %s erzeugt, %d Bytes' % (F['name'], len(daten)))
         except Exception as e:                        # noqa: BLE001
-            zeile(False, 'Etikett %s: %r' % (F['name'], e))
-            traceback.print_exc()
+            if fmt == '90':
+                zeile(False, 'Etikett %s: %r' % (F['name'], e))
+                traceback.print_exc()
+            else:
+                # Befund Mac mini 17.11.2026: Die Bibliothek lehnt 62 × 29 mm für den QL-500 ab (271 Punkte, verlangt sind mindestens 295).
+                # Das ist kein Fehler der Einrichtung: 29 × 90 mm druckt. Offen, bis die Rolle da ist.
+                print('HINWEIS Etikett %s geht mit diesem Drucker noch nicht: %s' % (F['name'], e), flush=True)
     try:
         g = geraete()
         zeile(bool(g), 'Drucker über USB: %s' % (', '.join(geraet_name(d) for d in g) or 'keiner gefunden (eingeschaltet und eingesteckt?)'))

@@ -47,8 +47,10 @@ cat > "$PLIST" <<PL
 PL
 launchctl bootout "gui/$(id -u)/$NAME" >/dev/null 2>&1
 launchctl bootstrap "gui/$(id -u)" "$PLIST" || launchctl load "$PLIST" || ende "Der Dienst lässt sich nicht starten."
-sleep 2
-if curl -s -m 5 "http://127.0.0.1:9123/status.json" >/dev/null; then echo "Der Dienst läuft: http://127.0.0.1:9123"; else echo "FEHLER: Der Dienst antwortet nicht. Protokoll: $HOME/Library/Logs/pg-etikett-dienst.log"; PROBE=1; fi
+# Der erste Start kann dauern (Befund 17.11.2026: nach 2 Sekunden antwortete der Dienst noch nicht): bis zu 30 Sekunden warten.
+LAEUFT=0
+for i in $(seq 1 15); do sleep 2; if curl -s -m 3 "http://127.0.0.1:9123/status.json" >/dev/null; then LAEUFT=1; break; fi; done
+if [ "$LAEUFT" = 1 ]; then echo "Der Dienst läuft: http://127.0.0.1:9123"; else echo "FEHLER: Der Dienst antwortet nicht. Protokoll: $HOME/Library/Logs/pg-etikett-dienst.log"; tail -20 "$HOME/Library/Logs/pg-etikett-dienst.log" 2>/dev/null; PROBE=1; fi
 
 if [ "$PROBE" = 0 ]; then
   printf '\nFERTIG. Jetzt öffnet sich die Seite des Druckprogramms: dort auf «Testetikett 29 × 90 mm» klicken.\n'
