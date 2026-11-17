@@ -160,3 +160,14 @@ Fehler in Version 20 und 21 (live 12:56 bis 13:23): Die neue Druckfunktion hiess
 | Test | `t_analyse_etikett_ui.py`: `etikett('vo.unsicher', 'gelb')` liefert die Marke und druckt nicht; kein Funktionsname ist in `Index.html` auf derselben Ebene doppelt vergeben. |
 | Rückfall | 19 (20 und 21 haben den Fehler). |
 | Befund vom Platz | Für den QL-500 gibt es auf dem Mac keinen Treiber: Er erscheint nicht im Druckdialog, P-touch Editor druckt direkt. Der Browserdruck (Stufe 1) funktioniert darum an diesem Drucker nicht. Offen: Druckprogramm auf dem Mac, das den QL-500 direkt über USB anspricht. |
+
+
+## 2026-11-17.4 (noch nicht bereitgestellt): Etikett über das Druckprogramm «PG Etikett»
+Befund am Platz: kein Mac-Treiber für den QL-500, darum kein Browserdruck. Neu öffnet `etDrucken` ein Fenster auf `http://127.0.0.1:9123/druck` (Programm `tools/etikett-druck`, siehe LIESMICH dort); das Programm zeichnet und druckt.
+
+| Teil | Umsetzung |
+|---|---|
+| Tool | `etAdresse(id, titel)` baut die Adresse (ID, Bezeichnung, Format, Auftragsnummer), `window.open(…, 'pg-etikett')`. Entfernt: Zeichnen im Browser (`etBild`, `etVor`, `etRahmen`, `etPasst`) und der Logo-Code. |
+| Warum ein Fenster | Chrome lässt eingebettete Seiten (die Apps-Script-Seite ist eingebettet) nicht auf Adressen des eigenen Rechners zugreifen (Local Network Access). Ein eigenes Fenster ist davon nicht betroffen. |
+| Fenster blockiert | Meldung mit Hinweis auf Pop-ups, kein Log-Eintrag, der Abschluss bleibt. |
+| Offen | Einrichten auf dem Mac mini und Test am QL-500. |

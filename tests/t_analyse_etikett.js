@@ -13,5 +13,5 @@ c.etikettLog('=HYPERLINK("x")', 'irgendwas', '=1+1XYZ'); const z = log.pop();
 assert.ok(z[1].charAt(0) === "'" && z[2] === "von Hand · '=1+1", 'Formeln werden entschärft, das Kürzel gekürzt, unbekannte Art zählt als von Hand');
 c.etikettLog(); assert.deepStrictEqual(log.pop(), ['Etikett', '', 'von Hand · '], 'ohne Angaben kein Fehler');
 assert.deepStrictEqual(Array.from(vm.runInContext('VORLADEN.etikettLog', c)), [], 'liest keinen Tab vor');
-assert.strictEqual(vm.runInContext('VERSION', c), '2026-11-17.3');
+assert.strictEqual(vm.runInContext('VERSION', c), '2026-11-17.4');
 console.log('t_analyse_etikett ok');
