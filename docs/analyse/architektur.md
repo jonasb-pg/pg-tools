@@ -139,3 +139,13 @@ Auftrag Jonas 17.11.: Die ID jedes analysierten Stücks direkt aus dem Tool druc
 | Offen | Testdruck am Mac mit dem QL-500 (Druckdialog in der Apps-Script-Seite, Papierformat im Treiber) steht noch aus. Stufe 2: Druck ohne Dialog über ein kleines Druckprogramm auf dem Mac, erst nach dem Testdruck. |
 
 Tests: `tests/t_analyse_etikett.js`, `tests/t_analyse_etikett_ui.py` (liest den QR-Code des Etiketts mit OpenCV zurück).
+
+
+## 2026-11-17.2 (Version 21, live 17.11.2026 13:14, Rückfall 20): Etikett 90 × 29 mm, Format wählbar
+Jonas 17.11.: Im Drucker liegen Etiketten 29 × 90,3 mm, die DK-11209 (29 × 62 mm) wird erst bestellt. Logo zuerst gewünscht, dann wieder weg.
+
+| Teil | Umsetzung |
+|---|---|
+| Format | `ET_F`: 90 × 29 mm (1063 × 342 Punkte) und 62 × 29 mm (732 × 342 Punkte). Gewählt pro Gerät mit dem Knopf «Etikett 90 × 29 mm (wechseln)» auf dem Fertig-Bildschirm (`localStorage` `at-etikett-format`, ohne Wahl 90 mm). Die Druckseite hat die Grösse des gewählten Formats. |
+| Logo | Code vorhanden (`etVor` lädt das Logo oben links mit `crossOrigin`, `etBild` zeichnet es rechts bzw. oben rechts), aber ausgeschaltet: `ET_MIT_LOGO = false`. Die Logo-Datei für Tests liegt in `tests/daten/logo-pretty-good.svg`. |
+| Offen | Testdruck am Mac mit dem QL-500: Druckdialog in der Apps-Script-Seite, Papierformat und Ausrichtung im Treiber. |

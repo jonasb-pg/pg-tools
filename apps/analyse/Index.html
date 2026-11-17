@@ -2214,7 +2214,7 @@
    * Automatisch gedruckt wird nur an Geräten, an denen das eingeschaltet ist (at-etikett): An den anderen Plätzen käme sonst nach jedem Stück ein Druckdialog.
    * Der Abschluss hängt nie am Drucker: Gedruckt wird erst, wenn der Fertig-Bildschirm steht.
    */
-  var ET_F = { '90': { b: 1063, mm: 90 }, '62': { b: 732, mm: 62 } }, ET_H = 342, ET_LOGO = null;     // Punkte bei 300 dpi, Höhe 29 mm
+  var ET_F = { '90': { b: 1063, mm: 90 }, '62': { b: 732, mm: 62 } }, ET_H = 342, ET_LOGO = null, ET_MIT_LOGO = false;     // Punkte bei 300 dpi, Höhe 29 mm. Logo: Jonas 17.11.2026 «Logo weg» (der Code bleibt, Schalter aus)
   function etAuto() { return lies('at-etikett') === '1'; }
   function etAutoSetz(v, k, el) { merke('at-etikett', el.checked ? '1' : null); }
   function etFormat() { return lies('at-etikett-format') === '62' ? '62' : '90'; }
@@ -2224,7 +2224,7 @@
   function etVor(weiter) {
     var offen = 0, zu = false, fertig = function () { if (zu) return; zu = true; weiter(); }, eins = function () { if (--offen <= 0) fertig(); };
     if (!window.qrcode) { offen++; var sc = document.createElement('script'); sc.src = QRLIB; sc.onload = eins; sc.onerror = eins; document.head.appendChild(sc); }
-    if (!ET_LOGO) { offen++; var im = new Image(); im.crossOrigin = 'anonymous'; im.onload = function () { ET_LOGO = im; eins(); }; im.onerror = eins; im.src = $('logo').getAttribute('src'); }
+    if (ET_MIT_LOGO && !ET_LOGO) { offen++; var im = new Image(); im.crossOrigin = 'anonymous'; im.onload = function () { ET_LOGO = im; eins(); }; im.onerror = eins; im.src = $('logo').getAttribute('src'); }
     if (!offen) { fertig(); return; }
     setTimeout(fertig, 2500);
   }

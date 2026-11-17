@@ -63,7 +63,7 @@ with sync_playwright() as p:
     try:
         import cv2, numpy
         ohne=cv2.imdecode(numpy.frombuffer(d,numpy.uint8),cv2.IMREAD_GRAYSCALE); mit=cv2.imdecode(numpy.frombuffer(d2,numpy.uint8),cv2.IMREAD_GRAYSCALE)
-        ok(int((mit[:, 790:]<128).sum())>8000 and int((mit[:, 1040:]<128).sum())==0, 'Logo steht rechts auf dem Etikett, der Rand bleibt frei')
+        ok(int((mit[:, 790:]<128).sum())==0, 'kein Logo auf dem Etikett (Jonas 17.11.: Logo weg), rechts bleibt frei')
     except ImportError: pass
     # Format wechseln: 62 × 29 mm, gemerkt pro Gerät
     ok('90 × 29 mm' in pg.inner_text('#fertig button[data-a=etFormatSetz]').lower(), 'Knopf zeigt das Format 90 × 29 mm')
