@@ -126,7 +126,7 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 Feedback FG 02.11.: Schon analysierte Stücke zeigen beim Scannen «PG-… ist bereits analysiert» mit Datum, Kürzel, Analyse-Nr. und Ergebnis (Regal oder «nicht reusable»), Link «Retoure? Neu analysieren». Liegt kein anderes übernehmbares Stück im Return Tool, kein «übernehmen» mehr. Server: `fertigInfo_` in `suche`. Tests: t_analyse_fertig_0311.js, t_analyse_fertig_0311_ui.py.
 
 
-## 2026-11-17.1 (noch nicht bereitgestellt): Etikett drucken
+## 2026-11-17.1 (Version 20, live 17.11.2026 12:56, Rückfall 19): Etikett drucken
 Auftrag Jonas 17.11.: Die ID jedes analysierten Stücks direkt aus dem Tool drucken (Brother QL-500 am Mac über USB, Rolle DK-11209, 62 × 29 mm).
 
 | Teil | Umsetzung |
@@ -136,6 +136,6 @@ Auftrag Jonas 17.11.: Die ID jedes analysierten Stücks direkt aus dem Tool druc
 | Wann | Automatisch nach jedem Abschluss (`fertigZeigen`), aber nur an Geräten mit eingeschaltetem Schalter «An diesem Gerät nach jedem Abschluss automatisch drucken» (`localStorage` `at-etikett`, ohne Einstellung aus). Von Hand: Knopf «Etikett drucken» im Kopf der Analyse, auf dem Fertig-Bildschirm (auch bei Reparatur-Pause) und in der Meldung «ist bereits analysiert». |
 | Log | `etikettLog(id, art, kuerzel)`: Zeile «Etikett» im Log («automatisch nach Abschluss» oder «von Hand»). Sonst schreibt der Druck nichts. |
 | Abschluss | hängt nie am Drucker: Gedruckt wird erst, wenn der Fertig-Bildschirm steht; ein Fehler beim Drucken zeigt nur eine Meldung. |
-| Offen | Stufe 2: Druck ohne Dialog über ein kleines Druckprogramm auf dem Mac. Erst nach dem Testdruck am Gerät. |
+| Offen | Testdruck am Mac mit dem QL-500 (Druckdialog in der Apps-Script-Seite, Papierformat im Treiber) steht noch aus. Stufe 2: Druck ohne Dialog über ein kleines Druckprogramm auf dem Mac, erst nach dem Testdruck. |
 
 Tests: `tests/t_analyse_etikett.js`, `tests/t_analyse_etikett_ui.py` (liest den QR-Code des Etiketts mit OpenCV zurück).
