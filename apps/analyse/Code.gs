@@ -20,7 +20,7 @@
  * Prüfung 24.10.2026 (Version .2): Lauf-ID gegen doppelte Abschlüsse, Namen statt Positionen beim Abschluss (bezugPruefen_), Kanal-Tabs nach Kopfzeile erkannt (Vertrag V4).
  */
 
-const VERSION = '2026-10-29.1';
+const VERSION = '2026-11-17.1';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
@@ -299,7 +299,7 @@ function api(lang, name, args) {
   /* 24.10.2026: «uebernehmen» fehlte hier, der Knopf «Übernehmen und analysieren» scheiterte darum immer mit «Unbekannte Funktion». */
   const f = { startDaten: startDaten, suche: suche, uebernehmen: uebernehmen, ohneInventar: ohneInventar, starteAnalyse: starteAnalyse, rechercheJetzt: rechercheJetzt,
     pruefen: pruefen, abschliessen: abschliessen, warteschlange: warteschlange, aktualisieren: aktualisieren,
-    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen, vorab: vorab, uiTempo: uiTempo }[name];
+    ersatzteile: ersatzteile, ersatzteilSuche: ersatzteilSuche, handbuchHochladen: handbuchHochladen, handbuchKeins: handbuchKeins, handbuchStand: handbuchStand, handbuchPdf: handbuchPdf, feedback: feedback, fotoStand: fotoStand, fotoHochladen: fotoHochladen, fotoLoeschen: fotoLoeschen, fotoOhne: fotoOhne, ricardoText: ricardoText, matchmaker: matchmaker, matchmakerZurueck: matchmakerZurueck, reparaturPause: reparaturPause, reparaturWeiter: reparaturWeiter, werkstatt: werkstatt, kontoSpeichern: kontoSpeichern, mittelSpeichern: mittelSpeichern, adminDaten: adminDaten, verbindungTest: verbindungTest, anmelden: anmelden, kennzahlen: kennzahlen, bestellliste: bestellliste, bestellStatus: bestellStatus, feedbackListe: feedbackListe, feedbackStatus: feedbackStatus, startpreisSpeichern: startpreisSpeichern, preisSetzen: preisSetzen, vorab: vorab, uiTempo: uiTempo, etikettLog: etikettLog }[name];
   if (!f) throw new Error(en_('Unbekannte Funktion.'));
   const t0 = Date.now();
   TAKT = t0;
@@ -521,7 +521,8 @@ const VORLADEN = {
   warteschlange: ['Einstellungen', 'Produkte', 'Stufen'],
   vorab: ['Einstellungen', 'Produkte', 'Stufen', 'Testmittel', 'Sicherheitspunkte', 'Listen'],
   uebernehmen: ['Einstellungen', 'Produkte'],
-  uiTempo: []
+  uiTempo: [],
+  etikettLog: []
 };
 function vorladen_(namen) {
   if (IN_SPERRE || !namen || !namen.length || typeof Sheets === 'undefined') return;
@@ -2573,6 +2574,11 @@ function vorab(ids) {
   const e = einst_(), aus = {};
   (Array.isArray(ids) ? ids : []).slice(0, 5).forEach(function (id) { try { aus[String(id)] = ueberblickSpeicher_(produkt_(id), e); } catch (err) { /* nächstes */ } });
   return aus;
+}
+/** Etikett gedruckt (17.11.2026, Jonas): eine Zeile «Etikett» im Log. Geschrieben wird sonst nichts; der Druck selbst läuft im Browser am Analyseplatz. */
+function etikettLog(id, art, kuerzel) {
+  log_('Etikett', txt_(String(id || '').slice(0, 40)), (art === 'auto' ? 'automatisch nach Abschluss' : 'von Hand') + ' · ' + txt_(String(kuerzel || '').slice(0, 4)));
+  return true;
 }
 /** Wartezeiten, wie sie die Oberfläche misst (vom Aufruf bis zur Antwort): eine Zeile «Tempo UI» im Log pro Meldung. liste = [[Name, Anzahl, Median ms, Max ms, wartet]]. */
 function uiTempo(liste, kuerzel) {

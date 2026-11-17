@@ -124,3 +124,18 @@ Infrastruktur (alle mit Kürzel): werkstatt --> Testkonten + Testmittel; kontoSp
 
 ## 2026-11-03.1 (Version 19, live 03.11.2026 16:40, Rückfall 18)
 Feedback FG 02.11.: Schon analysierte Stücke zeigen beim Scannen «PG-… ist bereits analysiert» mit Datum, Kürzel, Analyse-Nr. und Ergebnis (Regal oder «nicht reusable»), Link «Retoure? Neu analysieren». Liegt kein anderes übernehmbares Stück im Return Tool, kein «übernehmen» mehr. Server: `fertigInfo_` in `suche`. Tests: t_analyse_fertig_0311.js, t_analyse_fertig_0311_ui.py.
+
+
+## 2026-11-17.1 (noch nicht bereitgestellt): Etikett drucken
+Auftrag Jonas 17.11.: Die ID jedes analysierten Stücks direkt aus dem Tool drucken (Brother QL-500 am Mac über USB, Rolle DK-11209, 62 × 29 mm).
+
+| Teil | Umsetzung |
+|---|---|
+| Etikett | `etBild(id, titel)` zeichnet im Browser ein Bild mit 732 × 342 Punkten (62 × 29 mm bei 300 dpi): QR-Code mit der ID, die ID gross, die Bezeichnung auf höchstens zwei Zeilen. QR-Bibliothek wie bei der Foto-Seite (`QRLIB`); kommt sie nicht, druckt das Etikett ohne Code. |
+| Druck (Stufe 1) | `etRahmen` legt einen unsichtbaren Rahmen `#et-rahmen` mit Seitengrösse 62 × 29 mm an und ruft den Druckdialog des Browsers auf. Braucht den Brother-Treiber des Macs, sonst nichts. |
+| Wann | Automatisch nach jedem Abschluss (`fertigZeigen`), aber nur an Geräten mit eingeschaltetem Schalter «An diesem Gerät nach jedem Abschluss automatisch drucken» (`localStorage` `at-etikett`, ohne Einstellung aus). Von Hand: Knopf «Etikett drucken» im Kopf der Analyse, auf dem Fertig-Bildschirm (auch bei Reparatur-Pause) und in der Meldung «ist bereits analysiert». |
+| Log | `etikettLog(id, art, kuerzel)`: Zeile «Etikett» im Log («automatisch nach Abschluss» oder «von Hand»). Sonst schreibt der Druck nichts. |
+| Abschluss | hängt nie am Drucker: Gedruckt wird erst, wenn der Fertig-Bildschirm steht; ein Fehler beim Drucken zeigt nur eine Meldung. |
+| Offen | Stufe 2: Druck ohne Dialog über ein kleines Druckprogramm auf dem Mac. Erst nach dem Testdruck am Gerät. |
+
+Tests: `tests/t_analyse_etikett.js`, `tests/t_analyse_etikett_ui.py` (liest den QR-Code des Etiketts mit OpenCV zurück).

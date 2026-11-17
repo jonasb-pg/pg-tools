@@ -503,7 +503,7 @@
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
   /* Version der Oberfläche. Geht beim Abschluss mit (N6, 24.10.2026). Ein gespeicherter Lauf aus einer anderen Version wird NICHT mehr verworfen:
      Der Server vergleicht beim Abschluss die Namen der Schritte (d.bezug) und lässt geänderte Schritte neu bestätigen. */
-  var VERSION = '2026-10-29.1';
+  var VERSION = '2026-11-17.1';
   var TAB_ID = Math.random().toString(36).slice(2, 10);   // M5: dieses Browser-Tab (zweites Tab erkennen, Speicher zusammenführen)
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
@@ -690,6 +690,8 @@
     'fs.wiederholt': ['Hochladen hat nicht geklappt, neuer Versuch …', 'Upload failed, trying again …'],
     'fertig.titel': ['{0} ist abgeschlossen', '{0} is finished'], 'fertig.preis': ['Preis {0}', 'Price {0}'], 'fertig.dauer': ['Dauer {0} Min, Budget {1} Min', 'Duration {0} min, budget {1} min'], 'fertig.befund': ['Befund', 'Finding'],
     'fertig.verkauf': ['Verkaufsinfo', 'Sales information'],
+    'et.knopf': ['Etikett drucken', 'Print label'], 'et.auto': ['An diesem Gerät nach jedem Abschluss automatisch drucken', 'Print automatically after every finished item on this device'],
+    'et.fehler': ['Das Etikett liess sich nicht drucken. Bitte {0} von Hand anschreiben.', 'The label could not be printed. Please write {0} on the product by hand.'],
     'kopieren': ['Kopieren', 'Copy'], 'kopiert': ['Kopiert', 'Copied'], 'pause': ['Pausieren', 'Pause'], 'weiter': ['Weiter', 'Resume'],
     'liste.titel': ['Warteschlange', 'Queue'], 'liste.zahlen': ['{0} offen · {1} mit Recherche · {2} in Recherche · {3} mit Fehler', '{0} open · {1} researched · {2} in research · {3} with error'],
     'liste.zuletzt': ['Letzter Abgleich: {0}', 'Last sync: {0}'], 'liste.nie': ['noch nie', 'never'], 'liste.neu': ['Aktualisieren', 'Refresh'], 'liste.fehler': ['Fehler erneut versuchen', 'Retry errors'],
@@ -900,7 +902,7 @@
       var fertigHtml = fertig.map(function (x) {
         var f = x.fertig || {}, was = [f.am, f.wer, f.nr].filter(String).join(' · '), ziel = f.regal || (f.reusable === 'Nein' ? t('such.fertigNein') : '');
         return '<div class="meldung warn"><p><strong>' + tx('such.fertig', x.id) + '</strong>' + (was ? '<br>' + tx('such.fertigWann', was) : '') + (ziel ? '<br>' + tx('such.fertigZiel', ziel) : '')
-          + '<br>' + tx('such.fertigNicht') + '</p><p><a href="#" class="link" data-a="nochmal" data-v="' + esc(x.id) + '">' + tx('rt.nochmal') + '</a></p></div>';
+          + '<br>' + tx('such.fertigNicht') + '</p><p><a href="#" class="link" data-a="nochmal" data-v="' + esc(x.id) + '">' + tx('rt.nochmal') + '</a> &nbsp; <a href="#" class="link" data-a="etikett" data-v="' + esc(x.id) + '" data-k="' + esc(x.bezeichnung || '') + '">' + tx('et.knopf') + '</a></p></div>';
       }).join('');
       var anderes = (r.rt || []).some(function (x) { return x.status !== 'Erledigt' && !x.archiv && !x.ohneId; });
       if (fertig.length && !anderes && !r.rtFehler) { $('such-meldung').innerHTML = fertigHtml; return; }
@@ -1174,7 +1176,8 @@
     unterTitel();
     /* Nur was man am Tisch braucht: Stufe, Preis (für die Reparaturfrage), Anzahl, die ID zum Abgleichen und der Link zur Produktseite. */
     $('a-unter').innerHTML = '<span class="pgid">' + esc(p.id) + '</span><span class="etikett hell">' + esc(p.stufe) + '</span>' + (p.ovp === '' || p.ovp == null ? '' : '<span class="etikett">' + tx('a.ovp', p.ovp) + '</span>')
-      + (p.anzahl > 1 ? '<span class="etikett">' + tx('a.anzahl', p.anzahl) + '</span>' : '') + (istUrl(p.link) ? link(p.link, t('a.seite')) : '') + handbuchTeil(AN.d.handbuch);
+      + (p.anzahl > 1 ? '<span class="etikett">' + tx('a.anzahl', p.anzahl) + '</span>' : '') + (istUrl(p.link) ? link(p.link, t('a.seite')) : '') + handbuchTeil(AN.d.handbuch)
+      + '<button class="mini" data-a="etikett" data-v="' + esc(p.id) + '" data-k="' + esc(p.bezeichnung) + '">' + tx('et.knopf') + '</button>';
     $('a-abbruch').textContent = t('a.abbruch');
     zeichneSchritt(); zeichneInfos(); uhr();
   }
@@ -1772,7 +1775,7 @@
     ruf('reparaturPause', [{ id: p.id, kuerzel: K, was: v.was, teil: v.teil ? { teil: v.teil, nummer: v.nummer, shop: v.shop, preis: v.preis, link: v.link } : null, stand: stand }], function (r) {
       if (!AN || AN.d.produkt.id !== p.id) return;
       FERTIG = { titel: p.bezeichnung, r: { pause: true, id: p.id, teil: !!v.teil } }; RIC = null;
-      ende(); zahlen(r.zahlen); REP = r.liste; zeichneRep(); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+      ende(); zahlen(r.zahlen); REP = r.liste; zeichneRep(); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();     // Etikett hier nur über den Knopf: automatisch druckt es beim Abschluss
     });
   }
   /* Fortsetzen aus dem Regal «Reparatur»: gleicher Stand wie beim Pausieren, die Reparatur läuft. */
@@ -2111,6 +2114,7 @@
     r.id = p.id; FERTIG = { titel: p.bezeichnung, r: r }; RIC = null;
     REP = REP.filter(function (x) { return x.id !== p.id; }); zeichneRep();
     ende(); if (r.zahlen) zahlen(r.zahlen); zeichneFertig(); window.scrollTo(0, 0); $('q').focus();
+    if (etAuto()) etDrucken(p.id, p.bezeichnung, 'auto');
   }
   /*
    * Speicher-Warteschlange (at-speichern). M5 (24.10.2026): Vor jedem Schreiben frisch lesen und mit dem Speicher zusammenführen (Schlüssel = Lauf-ID):
@@ -2201,14 +2205,95 @@
     a.d = nd; a.gate = null;
     a.i = i > -1 ? i : Math.max(0, nd.ablauf.indexOf('entscheid'));
   }
+  /*
+   * ---------- Etikett (17.11.2026, Jonas) ----------
+   * Jedes Stück bekommt nach dem Abschluss ein Etikett mit seiner ID (Brother QL-500 am Mac, Rolle DK-11209, 62 × 29 mm).
+   * Stufe 1: Das Tool zeichnet das Etikett als Bild und druckt es über den Druckdialog des Browsers (unsichtbarer Rahmen mit Seitengrösse 62 × 29 mm).
+   * Automatisch gedruckt wird nur an Geräten, an denen das eingeschaltet ist (at-etikett): An den anderen Plätzen käme sonst nach jedem Stück ein Druckdialog.
+   * Der Abschluss hängt nie am Drucker: Gedruckt wird erst, wenn der Fertig-Bildschirm steht.
+   */
+  var ET_B = 732, ET_H = 342;                         // 62 × 29 mm bei 300 dpi
+  function etAuto() { return lies('at-etikett') === '1'; }
+  function etAutoSetz(v, k, el) { merke('at-etikett', el.checked ? '1' : null); }
+  /* Die QR-Bibliothek ist dieselbe wie für die Foto-Seite. Kommt sie nicht (kein Netz), druckt das Etikett ohne Code: Die ID steht immer als Text darauf. */
+  function etQr(weiter) {
+    if (window.qrcode) { weiter(); return; }
+    var zu = false, ende = function () { if (zu) return; zu = true; weiter(); };
+    var sc = document.createElement('script'); sc.src = QRLIB; sc.onload = ende; sc.onerror = ende;
+    document.head.appendChild(sc);
+    setTimeout(ende, 2500);
+  }
+  /* Text auf die Breite bringen: Schrift verkleinern bis «min», dann mit … kürzen. */
+  function etPasst(c, text, breit, gross, min, stil) {
+    var g = gross;
+    for (; g > min; g -= 2) { c.font = stil.replace('#', g); if (c.measureText(text).width <= breit) return { g: g, text: text }; }
+    c.font = stil.replace('#', min);
+    if (c.measureText(text).width <= breit) return { g: min, text: text };
+    var s = text;
+    while (s.length > 1 && c.measureText(s + '…').width > breit) s = s.slice(0, -1);
+    return { g: min, text: s === text ? text : s.trim() + '…' };
+  }
+  function etBild(id, titel) {
+    var cv = document.createElement('canvas'); cv.width = ET_B; cv.height = ET_H;
+    var c = cv.getContext('2d'), rand = 24, x0 = rand;
+    c.fillStyle = '#fff'; c.fillRect(0, 0, ET_B, ET_H); c.fillStyle = '#000';
+    try {
+      if (window.qrcode) {
+        var q = window.qrcode(0, 'M'); q.addData(String(id)); q.make();
+        var n = q.getModuleCount(), seite = ET_H - 2 * rand, m = Math.floor(seite / n), ab = rand + Math.floor((seite - m * n) / 2);
+        for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) if (q.isDark(y, x)) c.fillRect(ab + x * m, ab + y * m, m, m);
+        x0 = rand + seite + 28;
+      }
+    } catch (e) { x0 = rand; }
+    var breit = ET_B - x0 - rand, mono = 'bold #px Menlo, Consolas, "Courier New", monospace', sans = '#px Helvetica, Arial, sans-serif';
+    c.textBaseline = 'alphabetic';
+    var a = etPasst(c, String(id), breit, 96, 40, mono);
+    c.font = mono.replace('#', a.g); c.fillText(a.text, x0, 150);
+    /* Bezeichnung: höchstens zwei Zeilen, an Wortgrenzen umbrochen */
+    var worte = String(titel || '').replace(/\s+/g, ' ').trim().split(' '), z1 = '', rest = '';
+    c.font = sans.replace('#', 40);
+    for (var i = 0; i < worte.length; i++) { var t1 = z1 ? z1 + ' ' + worte[i] : worte[i]; if (c.measureText(t1).width <= breit || !z1) z1 = t1; else { rest = worte.slice(i).join(' '); break; } }
+    if (z1) { var b1 = etPasst(c, z1, breit, 40, 40, sans); c.font = sans.replace('#', 40); c.fillText(b1.text, x0, 222); }
+    if (rest) { var b2 = etPasst(c, rest, breit, 40, 40, sans); c.font = sans.replace('#', 40); c.fillText(b2.text, x0, 274); }
+    return cv.toDataURL('image/png');
+  }
+  /* Unsichtbarer Rahmen mit genau einem Etikett; der Browser öffnet seinen Druckdialog. Geht das nicht, bleibt die ID auf dem Bildschirm zum Abschreiben. */
+  function etRahmen(bild, id) {
+    try {
+      var alt = $('et-rahmen'); if (alt) alt.parentNode.removeChild(alt);
+      var f = document.createElement('iframe'); f.id = 'et-rahmen'; f.setAttribute('aria-hidden', 'true');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      f.onload = function () { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { melde(t('et.fehler', id), true); } };
+      /* Die Marken der Druckseite stehen hier nie ausgeschrieben: Ein ausgeschriebenes Seitenende mitten im Skript bringt alles durcheinander, was die Seite danach sucht. */
+      var m = function (n, zu) { return '<' + (zu ? '/' : '') + n + '>'; };
+      f.srcdoc = '<!doctype html>' + m('html') + m('head') + '<meta charset="utf-8">' + m('title') + esc(id) + m('title', 1)
+        + m('style') + '@page{size:62mm 29mm;margin:0}html,body{margin:0;padding:0}img{display:block;width:62mm;height:29mm}' + m('style', 1) + m('head', 1)
+        + m('body') + '<img src="' + bild + '" alt="">' + m('body', 1) + m('html', 1);
+      document.body.appendChild(f);
+    } catch (e) { melde(t('et.fehler', id), true); }
+  }
+  function etDrucken(id, titel, art) {
+    if (!id) return;
+    etQr(function () {
+      var bild;
+      try { bild = etBild(id, titel); } catch (e) { melde(t('et.fehler', id), true); return; }
+      etRahmen(bild, id);
+      try { leise('etikettLog', [String(id), art === 'auto' ? 'auto' : 'hand', K]); } catch (e) { /* das Log darf nie stören */ }
+    });
+  }
+  function etikett(id, titel) { etDrucken(id, titel || '', 'hand'); }
+  function etZeile(id, titel) {
+    return '<div class="knoepfe" style="margin-top:12px;align-items:center"><button class="mini" data-a="etikett" data-v="' + esc(id) + '" data-k="' + esc(titel) + '">' + tx('et.knopf') + '</button>'
+      + '<label class="ric-check"><input type="checkbox" data-a="etAutoSetz"' + (etAuto() ? ' checked' : '') + '>' + tx('et.auto') + '</label></div>';
+  }
   function zeichneFertig() {
     var r = FERTIG && FERTIG.r, zeileF = function (name, id, text) {
       return '<div class="feld"><div class="name">' + tx(name) + '</div><div class="wert" id="' + id + '">' + esc(text) + '</div><div class="seite"><button class="mini" data-a="kopiere" data-v="' + id + '">' + tx('kopieren') + '</button></div></div>'; };
-    if (r && r.pause) { $('fertig').innerHTML = '<div class="karte"><div class="urteil ja">' + tx('fertig.reparatur', r.id) + '</div><h2>' + tx('fertig.pausiert', FERTIG.titel) + '</h2>' + (r.teil ? '<p class="still">' + tx('fertig.bestellt') + '</p>' : '') + '</div>'; return; }
+    if (r && r.pause) { $('fertig').innerHTML = '<div class="karte"><div class="urteil ja">' + tx('fertig.reparatur', r.id) + '</div><h2>' + tx('fertig.pausiert', FERTIG.titel) + '</h2>' + (r.teil ? '<p class="still">' + tx('fertig.bestellt') + '</p>' : '') + etZeile(r.id, FERTIG.titel) + '</div>'; return; }
     $('fertig').innerHTML = !r ? '' : '<div class="karte"><div class="urteil ' + (r.reusable ? 'ja' : 'nein') + '">' + (r.regal === 'Matchmaker' ? tx('fertig.mm', r.id || '') : r.regal === 'Ricardo Offline' ? tx('fertig.ricardo', r.id || '') : tx(r.regal === 'Analysiert' ? 'fertig.analysiert' : (r.reusable ? 'fertig.regal' : 'fertig.weg'))) + '</div><h2>' + tx('fertig.titel', FERTIG.titel) + '</h2>'
       + '<p class="still">' + (r.speichert ? esc(t('sp.speichert')) : esc(r.pgid || '')) + ' · ' + tx(r.reusable ? 'en.ja' : 'en.nein') + (r.grade ? ' · ' + tx('zu.grade') + ' ' + esc(r.grade) : '') + ' · ' + tx('fertig.dauer', r.dauerMin, r.budget || '–') + '</p>'
       + (r.preis ? '<div class="urteil ja" style="margin-top:8px">' + tx('fertig.preis', chf(r.preis)) + '</div>' : '')
-      + (r.befund ? zeileF('fertig.befund', 'f-befund', r.befund) : '') + (r.verkaufsinfo ? zeileF('fertig.verkauf', 'f-verkauf', r.verkaufsinfo) : '') + '</div>';
+      + (r.befund ? zeileF('fertig.befund', 'f-befund', r.befund) : '') + (r.verkaufsinfo ? zeileF('fertig.verkauf', 'f-verkauf', r.verkaufsinfo) : '') + etZeile(r.id, FERTIG.titel) + '</div>';
   }
   function kopiere(id, k, el) { kopiereText($(id).textContent, el); }
   /* In die Zwischenablage; der Knopf sagt kurz «Kopiert». Wo der Browser das im eingebetteten Fenster nicht erlaubt, geht es über ein unsichtbares Feld. */
@@ -2493,7 +2578,7 @@
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, befundTool: befundTool, befundZu: befundZu, ohneStart: ohneStart, fotoGross: fotoGross, fotoGrossZu: fotoGrossZu, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
-    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz };
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz, etikett: etikett, etAutoSetz: etAutoSetz };
 
   /* ---------- Start ---------- */
   (function () {
