@@ -17,15 +17,32 @@ class _QR:
 qrcode.QRCode = _QR; sys.modules['qrcode'] = qrcode
 AUFRUFE = []
 bq = types.ModuleType('brother_ql'); br = types.ModuleType('brother_ql.raster'); bc = types.ModuleType('brother_ql.conversion')
+# Die echte Bibliothek kennt für den QL-500 eine Mindestlänge von 295 Punkten und lehnt 62 × 29 mm (271 Punkte) ab (Befund Mac mini 17.11.2026).
+# Die Attrappe bildet beide Bauarten nach: Modell als gesperrtes Objekt (BAUART 'objekt') oder Modellname mit Tabelle im Modul (BAUART 'tabelle').
+import dataclasses
+@dataclasses.dataclass(frozen=True)
+class _Modell:
+    name: str = 'QL-500'
+    min_max_length_dots: tuple = (295, 11811)
+    min_max_feed: tuple = (35, 1500)
+BAUART = {'art': 'objekt'}
+bd = types.ModuleType('brother_ql.devicedependent'); bd.min_max_length_dots = {'QL-500': (295, 11811), 'QL-700': (150, 11811)}; bd.sonst = {'QL-500': (720, 90)}
+class RasterFehler(Exception): pass
 class _Raster:
-    def __init__(self, modell): self.modell = modell; self.data = b''
+    def __init__(self, modell):
+        self.modell = modell; self.data = b''
+        self.model = _Modell() if BAUART['art'] == 'objekt' else modell
+    def bereich(self): return self.model.min_max_length_dots if BAUART['art'] == 'objekt' else bd.min_max_length_dots[self.model]
 br.BrotherQLRaster = _Raster
 def convert(qlr, images, label, rotate='auto', threshold=70.0, dither=False, compress=False, red=False, dpi_600=False, hq=True, cut=True):
+    lo, hi = qlr.bereich()
+    if not (lo <= images[0].size[1] <= hi):
+        raise RasterFehler('Invalid raster height: %d, expected between %d and %d dots for the QL-500 printer' % (images[0].size[1], lo, hi))
     AUFRUFE.append({'modell': qlr.modell, 'label': label, 'groesse': images[0].size, 'rotate': rotate, 'compress': compress})
     qlr.data = b'\x00' * 200 + b'\x1b@' + bytes(2000)
     return qlr.data
 bc.convert = convert
-sys.modules.update({'brother_ql': bq, 'brother_ql.raster': br, 'brother_ql.conversion': bc})
+sys.modules.update({'brother_ql': bq, 'brother_ql.raster': br, 'brother_ql.conversion': bc, 'brother_ql.devicedependent': bd})
 GESENDET = []; DRUCKER = {'da': True, 'belegt': False}
 usb = types.ModuleType('usb'); core = types.ModuleType('usb.core'); util = types.ModuleType('usb.util')
 class USBError(Exception): pass
@@ -75,8 +92,19 @@ ok(nur.size == (991, 306), 'ohne QR-Bibliothek/-Muster druckt das Etikett nur mi
 n = P.drucke('PG-500', 'Testgerät', '90')
 ok(AUFRUFE[-1] == {'modell': 'QL-500', 'label': '29x90', 'groesse': (306, 991), 'rotate': '0', 'compress': False}, '29 × 90: Bild der Länge nach (306 × 991), Modell QL-500, ohne Kompression')
 P.drucke('PG-500', 'Testgerät', '62')
-ok(AUFRUFE[-1]['label'] == '62x29' and AUFRUFE[-1]['groesse'] == (696, 271), '62 × 29: Bild 696 × 271, nicht gedreht')
-ok(GESENDET == [2202, 2202] and 'QL-500' in n, 'Druckdaten gehen an den USB-Ausgang des Druckers')
+ok(AUFRUFE[-1]['label'] == '62x29' and AUFRUFE[-1]['groesse'] == (696, 271), '62 × 29 (Modell als Objekt): Mindestlänge wird gesenkt, Bild 696 × 271, nicht gedreht')
+BAUART['art'] = 'tabelle'
+P.drucke('PG-500', 'Testgerät', '62')
+ok(AUFRUFE[-1]['label'] == '62x29' and bd.min_max_length_dots == {'QL-500': (271, 11811), 'QL-700': (150, 11811)} and bd.sonst == {'QL-500': (720, 90)}, '62 × 29 (Modellname mit Tabelle): nur die Mindestlänge des QL-500 wird gesenkt, sonst nichts')
+P.drucke('PG-500', 'Testgerät', '90'); BAUART['art'] = 'objekt'
+ok(AUFRUFE[-1]['label'] == '29x90', '29 × 90 druckt danach unverändert')
+alt_c = bc.convert
+def kaputt(**k): raise RasterFehler('etwas ganz anderes')
+bc.convert = kaputt
+try: P.drucke('PG-1', '', '62'); ok(False, 'anderer Fehler muss durchgehen')
+except RasterFehler as e: ok('ganz anderes' in str(e), 'andere Fehler der Bibliothek werden nicht verschluckt')
+bc.convert = alt_c
+ok(GESENDET == [2202] * 4 and 'QL-500' in n, 'Druckdaten gehen an den USB-Ausgang des Druckers')
 DRUCKER['da'] = False
 try: P.drucke('PG-1', '', '90'); ok(False, 'ohne Drucker muss es scheitern')
 except RuntimeError as e: ok('Kein Brother-Drucker' in str(e), 'ohne Drucker: klare Meldung')

@@ -20,7 +20,7 @@ Aufrufe:
 import html, inspect, json, os, sys, threading, time, traceback, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = '2026-11-17.2'
+VERSION = '2026-11-17.3'
 PORT = 9123
 MODELL = 'QL-500'
 HERSTELLER = 0x04F9                                   # Brother
@@ -150,18 +150,78 @@ def druckdaten(bild, fmt):
     F = FORMATE[fmt]
     if F['drehen']:
         bild = bild.rotate(90, expand=True)           # 991 × 306 quer → 306 × 991 der Länge nach
-    q = BrotherQLRaster(MODELL)
-    q.exception_on_warning = True
-    w = dict(qlr=q, images=[bild], label=F['label'], rotate='0', threshold=70.0, dither=False, compress=False,
-             red=False, dpi_600=False, hq=True, cut=True)
-    p = inspect.signature(convert).parameters
-    if not any(x.kind == x.VAR_KEYWORD for x in p.values()):
-        w = {a: b for a, b in w.items() if a in p}
-    aus = convert(**w)
-    daten = aus if isinstance(aus, (bytes, bytearray)) else q.data
+    def wandle(q):
+        q.exception_on_warning = True
+        w = dict(qlr=q, images=[bild], label=F['label'], rotate='0', threshold=70.0, dither=False, compress=False,
+                 red=False, dpi_600=False, hq=True, cut=True)
+        p = inspect.signature(convert).parameters
+        if not any(x.kind == x.VAR_KEYWORD for x in p.values()):
+            w = {a: b for a, b in w.items() if a in p}
+        aus = convert(**w)
+        return aus if isinstance(aus, (bytes, bytearray)) else q.data
+    try:
+        daten = wandle(BrotherQLRaster(MODELL))
+    except Exception as e:                            # noqa: BLE001
+        # Befund Mac mini 17.11.2026: Für 62 × 29 mm meldet die Bibliothek «Invalid raster height: 271, expected between 295 and 11811 dots for the QL-500».
+        # Die Mindestlänge des Modells (25 mm, gedacht für Endlosband) greift dort auch bei vorgestanzten Etiketten, obwohl das Etikett selbst 29 mm lang ist.
+        # Nur in diesem Fall: Mindestlänge für diesen Lauf auf die Höhe des Etiketts senken und nochmals wandeln.
+        if 'raster height' not in str(e).lower():
+            raise
+        q = BrotherQLRaster(MODELL)
+        if not laenge_lockern(q, bild.size[1]):
+            raise
+        log('Mindestlänge des Modells für %s auf %d Punkte gesenkt' % (F['name'], bild.size[1]))
+        daten = wandle(q)
     if not daten:
         raise RuntimeError('Die Bibliothek hat keine Druckdaten geliefert.')
     return bytes(daten)
+
+
+def _ist_laengenbereich(v, hoehe):
+    return (isinstance(v, (tuple, list)) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in v)
+            and hoehe < v[0] < 2000 and v[1] > 5000)
+
+
+def laenge_lockern(q, hoehe):
+    """Sucht die Mindest-/Höchstlänge des Modells (ein Zahlenpaar wie 295, 11811) und senkt das Minimum auf «hoehe».
+    Die Bibliothek gibt es in zwei Bauarten: Modell als Objekt mit Eigenschaften, oder Modellname mit Tabellen im Modul. Beide werden abgedeckt."""
+    geaendert = False
+    m = getattr(q, 'model', None)
+    if m is not None and not isinstance(m, str):
+        for name in dir(m):
+            if name.startswith('__'):
+                continue
+            try:
+                v = getattr(m, name)
+            except Exception:                         # noqa: BLE001
+                continue
+            if _ist_laengenbereich(v, hoehe):
+                neu = type(v)((hoehe, v[1]))
+                try:
+                    object.__setattr__(m, name, neu)
+                    geaendert = True
+                except Exception:                     # noqa: BLE001
+                    try:
+                        setattr(m, name, neu)
+                        geaendert = True
+                    except Exception:                 # noqa: BLE001
+                        pass
+    schluessel = [m, getattr(m, 'name', None), getattr(m, 'identifier', None), MODELL]
+    for modname, mod in list(sys.modules.items()):
+        if not modname.startswith('brother_ql') or mod is None:
+            continue
+        for tabelle in list(vars(mod).values()):
+            if not isinstance(tabelle, dict):
+                continue
+            for k in schluessel:
+                try:
+                    v = tabelle.get(k)
+                except TypeError:
+                    continue
+                if _ist_laengenbereich(v, hoehe):
+                    tabelle[k] = type(v)((hoehe, v[1]))
+                    geaendert = True
+    return geaendert
 
 
 def usb_backend():
@@ -338,13 +398,15 @@ def probe():
             daten = druckdaten(bild, fmt)
             zeile(len(daten) > 1000, 'Druckdaten %s erzeugt, %d Bytes' % (F['name'], len(daten)))
         except Exception as e:                        # noqa: BLE001
-            if fmt == '90':
-                zeile(False, 'Etikett %s: %r' % (F['name'], e))
-                traceback.print_exc()
-            else:
-                # Befund Mac mini 17.11.2026: Die Bibliothek lehnt 62 × 29 mm für den QL-500 ab (271 Punkte, verlangt sind mindestens 295).
-                # Das ist kein Fehler der Einrichtung: 29 × 90 mm druckt. Offen, bis die Rolle da ist.
-                print('HINWEIS Etikett %s geht mit diesem Drucker noch nicht: %s' % (F['name'], e), flush=True)
+            zeile(False, 'Etikett %s: %r' % (F['name'], e))
+            traceback.print_exc()
+            try:                                      # für die Fehlersuche: wie die installierte Bibliothek das Modell beschreibt
+                from brother_ql.raster import BrotherQLRaster
+                m = getattr(BrotherQLRaster(MODELL), 'model', None)
+                print('        Modell laut Bibliothek: %r' % (m,))
+                print('        Eigenschaften: %r' % ({n: getattr(m, n) for n in dir(m) if not n.startswith('_') and not callable(getattr(m, n, None))},))
+            except Exception as e2:                   # noqa: BLE001
+                print('        (Modell nicht lesbar: %r)' % (e2,))
     try:
         g = geraete()
         zeile(bool(g), 'Drucker über USB: %s' % (', '.join(geraet_name(d) for d in g) or 'keiner gefunden (eingeschaltet und eingesteckt?)'))
