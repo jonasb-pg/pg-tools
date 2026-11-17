@@ -99,10 +99,18 @@ with sync_playwright() as p:
     pg.click('#such-meldung a[data-a=etikett]'); pg.wait_for_timeout(600)
     ok(pg.evaluate("window.DRUCKE||0")==4 and '<title>PG-500</title>' in bild()[1], 'Nachdruck druckt die richtige ID')
     # 7) böse Zeichen in der Bezeichnung brechen nichts
-    pg.evaluate("etikett('PG-9', 'A \"B\" <c> & d\\'e sehr langer Name der sicher nicht auf zwei Zeilen passt weil er viel zu lang ist und noch länger wird')"); pg.wait_for_timeout(600)
+    pg.evaluate("etHand('PG-9', 'A \"B\" <c> & d\\'e sehr langer Name der sicher nicht auf zwei Zeilen passt weil er viel zu lang ist und noch länger wird')"); pg.wait_for_timeout(600)
     d3,src3=bild()
     ok(pg.evaluate("window.DRUCKE||0")==5 and d3 is not None, 'Sonderzeichen und überlange Bezeichnung: Etikett druckt')
     if aus and d3: open(aus+'/et_lang.png','wb').write(d3)
+    # 8) Fehler vom 17.11.: Die Funktion für die farbigen Marken heisst «etikett» und darf nicht überschrieben sein
+    vor=pg.evaluate("window.DRUCKE||0")
+    marke=pg.evaluate("etikett('vo.unsicher','gelb')"); pg.wait_for_timeout(400)
+    ok(isinstance(marke,str) and marke.startswith('<span class="etikett gelb">') and pg.evaluate("window.DRUCKE||0")==vor, 'etikett(Text, Farbe) liefert weiter die farbige Marke und druckt nichts')
+    import re as _re
+    from collections import Counter as _C
+    dop=[k for k,v in _C(_re.findall(r'^(\s*)function (\w+)\(',open('../apps/analyse/Index.html',encoding='utf8').read(),_re.M)).items() if v>1]
+    ok(not dop, 'kein Funktionsname ist auf derselben Ebene doppelt vergeben '+str(dop))
     ok(not err, 'keine Skriptfehler '+' | '.join(err))
     # Druckseite als PDF: Seitengrösse prüfen
     if aus:

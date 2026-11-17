@@ -503,7 +503,7 @@
   /* Oberfläche zum Analyse Tool. Spricht mit dem Server nur über api(sprache, name, argumente) und urteilt selbst nicht: Welche Schritte ein Produkt hat, was noch fehlt und ob es reusable ist, sagt der Server. */
   /* Version der Oberfläche. Geht beim Abschluss mit (N6, 24.10.2026). Ein gespeicherter Lauf aus einer anderen Version wird NICHT mehr verworfen:
      Der Server vergleicht beim Abschluss die Namen der Schritte (d.bezug) und lässt geänderte Schritte neu bestätigen. */
-  var VERSION = '2026-11-17.2';
+  var VERSION = '2026-11-17.3';
   var TAB_ID = Math.random().toString(36).slice(2, 10);   // M5: dieses Browser-Tab (zweites Tab erkennen, Speicher zusammenführen)
   var L = 'de', S = null, K = '', ANSICHT = 'scan';
   var AN = null;                                    // laufende Analyse, steht auch im Speicher des Browsers (at-lauf)
@@ -2294,7 +2294,8 @@
       try { leise('etikettLog', [String(id), art === 'auto' ? 'auto' : 'hand', K]); } catch (e) { /* das Log darf nie stören */ }
     });
   }
-  function etikett(id, titel) { etDrucken(id, titel || '', 'hand'); }
+  /* Heisst bewusst nicht «etikett»: So heisst schon die Funktion für die farbigen Marken (17.11.2026: gleicher Name hatte sie überschrieben). */
+  function etHand(id, titel) { etDrucken(id, titel || '', 'hand'); }
   function etZeile(id, titel) {
     return '<div class="knoepfe" style="margin-top:12px;align-items:center"><button class="mini" data-a="etikett" data-v="' + esc(id) + '" data-k="' + esc(titel) + '">' + tx('et.knopf') + '</button>'
       + '<button class="mini" data-a="etFormatSetz">' + tx('et.format', ET_F[etFormat()].mm) + '</button>'
@@ -2592,7 +2593,7 @@
     abbruch: abbruch, abbruchJetzt: abbruchJetzt, recherche: recherche, modellFrage: modellFrage, modellNeu: modellNeu, weiter: weiter, zurueck: zurueck, infosAuf: infosAuf, produktKopieren: produktKopieren, raus: raus, rausOk: rausOk, rueckrufFrei: rueckrufFrei,
     versiegelt: versiegelt, identJa: identJa, neuOvp: neuOvp, befundAuf: befundAuf, befundOk: befundOk, befundTool: befundTool, befundZu: befundZu, ohneStart: ohneStart, fotoGross: fotoGross, fotoGrossZu: fotoGrossZu, doch: doch, fotosAuf: fotosAuf, fsGalerie: fsGalerie, koFest: koFest, springe: springe, hbKeins: hbKeins, hbZeig: hbZeig, hbZu: hbZu, fbAuf: fbAuf, fbZu: fbZu, fbSenden: fbSenden, kanal: kanal, kanalZurueck: kanalZurueck, fwAbbruch: fwAbbruch, fotoWeg: fotoWeg, fotoOhne: fotoOhne, ricVersand: ricVersand, ricText: ricText, fsFoto: fsFoto, fsWeg: fsWeg, fsOhne: fsOhne, hbBlatt: hbBlatt, hbTreffer: hbTreffer, setze: setze, sicherNein: sicherNein, sicherDoch: sicherDoch, sicherPunkt: sicherPunkt, sicherGate: sicherGate, fehlt: fehlt, mittelFehlt: mittelFehlt, mittelHaben: mittelHaben, fn: fn, fnWeiter: fnWeiter,
     repMin: repMin, repStart: repStart, repSpaeter: repSpaeter, spNimm: spNimm, repPause: repPause, repWeiter: repWeiter, mmNochmal: mmNochmal, mmZurueck: mmZurueck, wsNeu: wsNeu, wsEdit: wsEdit, wsDienst: wsDienst, wsAbbr: wsAbbr, wsSpeichern: wsSpeichern, wsKopier: wsKopier, mtSetz: mtSetz, mtNeu: mtNeu, repKo: repKo, repNein: repNein, repFertig: repFertig, resetOk: resetOk, grade: grade, abschluss: abschluss, rueck: rueck,
-    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz, etikett: etikett, etAutoSetz: etAutoSetz, etFormatSetz: etFormatSetz };
+    kopiere: kopiere, aktualisieren: aktualisieren, teilSuchen: teilSuchen, test: test, bestellSetz: bestellSetz, mtAuf: mtAuf, mtAbbr: mtAbbr, admTab: admTab, startpreisSpeichern: startpreisSpeichern, zrArt: zrArt, zrSchritt: zrSchritt, zrEigen: zrEigen, afSetz: afSetz, etikett: etHand, etAutoSetz: etAutoSetz, etFormatSetz: etFormatSetz };
 
   /* ---------- Start ---------- */
   (function () {
