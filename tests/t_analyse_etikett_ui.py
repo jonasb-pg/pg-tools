@@ -1,5 +1,5 @@
 import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
-"""Etikett aus dem Analyse Tool (17.11.2026, Jonas): Bild 62 × 29 mm, Druck über einen unsichtbaren Rahmen, automatisch nur wo eingeschaltet. Erfundene Daten."""
+"""Etikett aus dem Analyse Tool (17.11.2026, Jonas): Bild 90 × 29 mm oder 62 × 29 mm mit Logo, Druck über einen unsichtbaren Rahmen, automatisch nur wo eingeschaltet. Erfundene Daten."""
 import base64, json, struct, sys
 from playwright.sync_api import sync_playwright
 html=open('../apps/analyse/Index.html',encoding='utf8').read()
@@ -23,6 +23,8 @@ with sync_playwright() as p:
     pg.route('http://app.test/', lambda r: r.fulfill(body=html, content_type='text/html; charset=utf-8'))
     # QR-Bibliothek: einmal echt (lokal nachgebaut ist nicht nötig), sonst gesperrt → Etikett ohne Code
     pg.route('**/qrcode.min.js', lambda r: r.abort())
+    LOGO=open('daten/logo-pretty-good.svg',encoding='utf8').read()
+    pg.route('**/logo-pretty-good.svg', lambda r: r.abort())
     pg.goto('http://app.test/'); pg.wait_for_timeout(300)
     pg.evaluate("document.getElementById('start').hidden=true; K='JB';")
     def bild():
@@ -39,13 +41,14 @@ with sync_playwright() as p:
     # 2) Knopf: druckt, ohne QR-Bibliothek trotzdem (ID als Text)
     pg.click('#fertig button[data-a=etikett]'); pg.wait_for_timeout(3200)
     d,src=bild()
-    ok(d is not None and d[:8]==b'\x89PNG\r\n\x1a\n' and struct.unpack('>II',d[16:24])==(732,342), 'Etikett ist ein PNG mit 732 × 342 Punkten (62 × 29 mm bei 300 dpi)')
-    ok('@page{size:62mm 29mm;margin:0}' in src and 'width:62mm;height:29mm' in src, 'Druckseite hat genau die Etikettengrösse')
-    ok(pg.evaluate("window.DRUCKE||0")==1, 'Knopf löst genau einen Druck aus (auch ohne QR-Bibliothek)')
+    ok(d is not None and d[:8]==b'\x89PNG\r\n\x1a\n' and struct.unpack('>II',d[16:24])==(1063,342), 'ohne Wahl: Etikett ist ein PNG mit 1063 × 342 Punkten (90 × 29 mm bei 300 dpi)')
+    ok('@page{size:90mm 29mm;margin:0}' in src and 'width:90mm;height:29mm' in src, 'Druckseite hat genau die Etikettengrösse')
+    ok(pg.evaluate("window.DRUCKE||0")==1, 'Knopf löst genau einen Druck aus (auch ohne QR-Bibliothek und ohne Logo)')
     ok(pg.evaluate("RUFE.filter(function(x){return x[0]==='etikettLog'}).map(function(x){return x[1].join('|')}).join(';')")=='PG-25337|hand|JB', 'Druck von Hand steht im Log-Aufruf')
     if aus: open(aus+'/et_ohne_qr.png','wb').write(d)
     # 3) Schalter ein: bleibt gemerkt, Abschluss druckt automatisch
-    pg.unroute('**/qrcode.min.js')
+    pg.unroute('**/qrcode.min.js'); pg.unroute('**/logo-pretty-good.svg')
+    pg.route('**/logo-pretty-good.svg', lambda r: r.fulfill(body=LOGO, content_type='image/svg+xml', headers={'access-control-allow-origin':'*'}))
     pg.route('**/qrcode.min.js', lambda r: r.fulfill(body='window.QRM='+json.dumps(QR)+';'+QRSTUB, content_type='application/javascript'))
     pg.click('#fertig input[data-a=etAutoSetz]')
     ok(pg.evaluate("localStorage.getItem('at-etikett')")=='1', 'Schalter ein wird für dieses Gerät gemerkt')
@@ -56,7 +59,26 @@ with sync_playwright() as p:
     ok(pg.locator('#et-rahmen').count()==1, 'es bleibt immer nur ein Druckrahmen auf der Seite')
     ok(pg.evaluate("RUFE.filter(function(x){return x[0]==='etikettLog'}).pop()[1].join('|')")=='AN-0068|auto|JB', 'automatischer Druck steht im Log-Aufruf')
     ok(pg.locator('#fertig input[data-a=etAutoSetz]').is_checked(), 'Schalter zeigt den gemerkten Stand')
-    if aus and d2: open(aus+'/et_mit_qr.png','wb').write(d2)
+    if aus and d2: open(aus+'/et_90.png','wb').write(d2)
+    try:
+        import cv2, numpy
+        ohne=cv2.imdecode(numpy.frombuffer(d,numpy.uint8),cv2.IMREAD_GRAYSCALE); mit=cv2.imdecode(numpy.frombuffer(d2,numpy.uint8),cv2.IMREAD_GRAYSCALE)
+        ok(int((mit[:, 790:]<128).sum())>8000 and int((mit[:, 1040:]<128).sum())==0, 'Logo steht rechts auf dem Etikett, der Rand bleibt frei')
+    except ImportError: pass
+    # Format wechseln: 62 × 29 mm, gemerkt pro Gerät
+    ok('90 × 29 mm' in pg.inner_text('#fertig button[data-a=etFormatSetz]').lower(), 'Knopf zeigt das Format 90 × 29 mm')
+    pg.click('#fertig button[data-a=etFormatSetz]'); pg.wait_for_timeout(100)
+    ok(pg.evaluate("localStorage.getItem('at-etikett-format')")=='62' and '62 × 29 mm' in pg.inner_text('#fertig button[data-a=etFormatSetz]').lower(), 'Wechsel auf 62 × 29 mm wird gemerkt')
+    pg.click('#fertig button[data-a=etikett]'); pg.wait_for_timeout(500)
+    d6,src6=bild()
+    ok(struct.unpack('>II',d6[16:24])==(732,342) and '@page{size:62mm 29mm;margin:0}' in src6, '62 mm: Bild 732 × 342 Punkte, Druckseite 62 × 29 mm')
+    try:
+        import cv2, numpy
+        ok(cv2.QRCodeDetector().detectAndDecode(cv2.imdecode(numpy.frombuffer(d6,numpy.uint8),cv2.IMREAD_GRAYSCALE))[0]=='AN-0068', '62 mm: QR-Code lesbar')
+    except ImportError: pass
+    if aus: open(aus+'/et_62.png','wb').write(d6)
+    pg.click('#fertig button[data-a=etFormatSetz]'); pg.wait_for_timeout(100)
+    ok(pg.evaluate("localStorage.getItem('at-etikett-format')") is None, 'zurück auf 90 mm')
     try:
         import cv2, numpy
         img=cv2.imdecode(numpy.frombuffer(d2,numpy.uint8),cv2.IMREAD_GRAYSCALE)
@@ -67,19 +89,19 @@ with sync_playwright() as p:
     pg.click('#fertig input[data-a=etAutoSetz]')
     ok(pg.evaluate("localStorage.getItem('at-etikett')") is None, 'Schalter aus löscht die Einstellung')
     pg.evaluate("fertigZeigen({id:'PG-1',bezeichnung:'X'},{reusable:true,grade:'A',regal:'Analysiert',preis:1,dauerMin:1,budget:1,nr:'',speichert:true})"); pg.wait_for_timeout(300)
-    ok(pg.evaluate("window.DRUCKE||0")==2, 'Schalter aus: kein Druck beim Abschluss')
+    ok(pg.evaluate("window.DRUCKE||0")==3, 'Schalter aus: kein Druck beim Abschluss')
     # 5) Reparatur-Pause: Knopf ja, automatisch nein
     pg.evaluate("localStorage.setItem('at-etikett','1'); FERTIG={titel:'Toaster',r:{pause:true,id:'PG-77',teil:false}}; zeichneFertig();"); pg.wait_for_timeout(200)
-    ok(pg.locator('#fertig button[data-a=etikett][data-v=PG-77]').count()==1 and pg.evaluate("window.DRUCKE||0")==2, 'Reparatur-Pause: Knopf da, kein automatischer Druck')
+    ok(pg.locator('#fertig button[data-a=etikett][data-v=PG-77]').count()==1 and pg.evaluate("window.DRUCKE||0")==3, 'Reparatur-Pause: Knopf da, kein automatischer Druck')
     # 6) schon analysiert: Nachdruck aus der Meldung
     pg.fill('#q','PG-500'); pg.evaluate('suchen()'); pg.wait_for_timeout(200)
     ok(pg.locator('#such-meldung a[data-a=etikett][data-v=PG-500]').count()==1 and pg.locator('#such-meldung a[data-a=nochmal]').count()==1, 'schon analysiert: Link «Etikett drucken» neben «Neu analysieren»')
     pg.click('#such-meldung a[data-a=etikett]'); pg.wait_for_timeout(600)
-    ok(pg.evaluate("window.DRUCKE||0")==3 and '<title>PG-500</title>' in bild()[1], 'Nachdruck druckt die richtige ID')
+    ok(pg.evaluate("window.DRUCKE||0")==4 and '<title>PG-500</title>' in bild()[1], 'Nachdruck druckt die richtige ID')
     # 7) böse Zeichen in der Bezeichnung brechen nichts
     pg.evaluate("etikett('PG-9', 'A \"B\" <c> & d\\'e sehr langer Name der sicher nicht auf zwei Zeilen passt weil er viel zu lang ist und noch länger wird')"); pg.wait_for_timeout(600)
     d3,src3=bild()
-    ok(pg.evaluate("window.DRUCKE||0")==4 and d3 is not None, 'Sonderzeichen und überlange Bezeichnung: Etikett druckt')
+    ok(pg.evaluate("window.DRUCKE||0")==5 and d3 is not None, 'Sonderzeichen und überlange Bezeichnung: Etikett druckt')
     if aus and d3: open(aus+'/et_lang.png','wb').write(d3)
     ok(not err, 'keine Skriptfehler '+' | '.join(err))
     # Druckseite als PDF: Seitengrösse prüfen

@@ -20,7 +20,7 @@
  * Prüfung 24.10.2026 (Version .2): Lauf-ID gegen doppelte Abschlüsse, Namen statt Positionen beim Abschluss (bezugPruefen_), Kanal-Tabs nach Kopfzeile erkannt (Vertrag V4).
  */
 
-const VERSION = '2026-11-17.1';
+const VERSION = '2026-11-17.2';
 const TZ = 'Europe/Zurich';
 const API = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
