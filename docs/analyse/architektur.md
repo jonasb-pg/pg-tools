@@ -149,3 +149,14 @@ Jonas 17.11.: Im Drucker liegen Etiketten 29 × 90,3 mm, die DK-11209 (29 × 62 
 | Format | `ET_F`: 90 × 29 mm (1063 × 342 Punkte) und 62 × 29 mm (732 × 342 Punkte). Gewählt pro Gerät mit dem Knopf «Etikett 90 × 29 mm (wechseln)» auf dem Fertig-Bildschirm (`localStorage` `at-etikett-format`, ohne Wahl 90 mm). Die Druckseite hat die Grösse des gewählten Formats. |
 | Logo | Code vorhanden (`etVor` lädt das Logo oben links mit `crossOrigin`, `etBild` zeichnet es rechts bzw. oben rechts), aber ausgeschaltet: `ET_MIT_LOGO = false`. Die Logo-Datei für Tests liegt in `tests/daten/logo-pretty-good.svg`. |
 | Offen | Testdruck am Mac mit dem QL-500: Druckdialog in der Apps-Script-Seite, Papierformat und Ausrichtung im Treiber. |
+
+
+## 2026-11-17.3 (Version 22, live 17.11.2026 13:23, Rückfall 19): Korrektur Namenskonflikt
+Fehler in Version 20 und 21 (live 12:56 bis 13:23): Die neue Druckfunktion hiess `etikett(id, titel)` und überschrieb damit `etikett(text, farbe)` für die farbigen Marken. Folge: In den Schritten Vollständigkeit, Sicherheit und Reset ging der Druckdialog von selbst auf, statt der Marke stand «undefined». Gemeldet von Jonas mit Foto vom Analyseplatz.
+
+| Teil | Umsetzung |
+|---|---|
+| Korrektur | Druck von Hand heisst `etHand`; die Aktion `data-a="etikett"` zeigt in der Tabelle `A` darauf. |
+| Test | `t_analyse_etikett_ui.py`: `etikett('vo.unsicher', 'gelb')` liefert die Marke und druckt nicht; kein Funktionsname ist in `Index.html` auf derselben Ebene doppelt vergeben. |
+| Rückfall | 19 (20 und 21 haben den Fehler). |
+| Befund vom Platz | Für den QL-500 gibt es auf dem Mac keinen Treiber: Er erscheint nicht im Druckdialog, P-touch Editor druckt direkt. Der Browserdruck (Stufe 1) funktioniert darum an diesem Drucker nicht. Offen: Druckprogramm auf dem Mac, das den QL-500 direkt über USB anspricht. |
